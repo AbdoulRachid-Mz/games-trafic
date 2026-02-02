@@ -1,0 +1,575 @@
+:root {
+  /* Backgrounds gradients */
+  .bg-gradient-1 {
+    background: radial-gradient(
+      circle at top right,
+      rgb(36, 9, 119) 0%,
+      rgb(36, 9, 119) 48%,
+      rgb(72, 7, 149) 48%,
+      rgb(72, 7, 149) 53%,
+      rgb(109, 5, 178) 53%,
+      rgb(109, 5, 178) 56%,
+      rgb(145, 2, 208) 56%,
+      rgb(145, 2, 208) 69%,
+      rgb(181, 0, 237) 69%,
+      rgb(181, 0, 237) 100%
+    );
+  }
+  .bg-gradient-2 {
+    background: linear-gradient(
+      45deg,
+      rgb(20, 222, 124) 0%,
+      rgb(20, 222, 124) 21%,
+      rgb(25, 190, 119) 21%,
+      rgb(25, 190, 119) 37%,
+      rgb(30, 158, 113) 37%,
+      rgb(30, 158, 113) 46%,
+      rgb(35, 126, 108) 46%,
+      rgb(35, 126, 108) 53%,
+      rgb(39, 94, 103) 53%,
+      rgb(39, 94, 103) 59%,
+      rgb(44, 62, 97) 59%,
+      rgb(44, 62, 97) 77%,
+      rgb(49, 30, 92) 77%,
+      rgb(49, 30, 92) 100%
+    );
+  }
+  .bg-gradient-3 {
+    background: repeating-linear-gradient(
+        135deg,
+        rgb(0, 0, 0) 0px,
+        rgb(0, 0, 0) 10px,
+        transparent 10px,
+        transparent 11px
+      ),
+      repeating-linear-gradient(
+        22.5deg,
+        rgb(0, 0, 0) 0px,
+        rgb(0, 0, 0) 10px,
+        transparent 10px,
+        transparent 11px
+      ),
+      linear-gradient(
+        90deg,
+        hsl(194, 74%, 56%),
+        hsl(266, 74%, 56%),
+        hsl(338, 74%, 56%),
+        hsl(50, 74%, 56%),
+        hsl(122, 74%, 56%)
+      );
+  }
+  .bg-gradient-4 {
+    background: radial-gradient(
+        circle at 16% 83%,
+        rgba(148, 148, 148, 0.06) 0%,
+        rgba(148, 148, 148, 0.06) 50%,
+        rgba(63, 63, 63, 0.06) 50%,
+        rgba(63, 63, 63, 0.06) 100%
+      ),
+      radial-gradient(
+        circle at 68% 87%,
+        rgba(66, 66, 66, 0.06) 0%,
+        rgba(66, 66, 66, 0.06) 50%,
+        rgba(105, 105, 105, 0.06) 50%,
+        rgba(105, 105, 105, 0.06) 100%
+      ),
+      radial-gradient(
+        circle at 38% 50%,
+        rgba(123, 123, 123, 0.06) 0%,
+        rgba(123, 123, 123, 0.06) 50%,
+        rgba(172, 172, 172, 0.06) 50%,
+        rgba(172, 172, 172, 0.06) 100%
+      ),
+      linear-gradient(90deg, hsl(18, 0%, 1%), hsl(18, 0%, 1%));
+  }
+  .bg-gradient-5 {
+    background: linear-gradient(
+        200deg,
+        rgba(213, 213, 213, 0.01) 0%,
+        rgba(213, 213, 213, 0.01) 14.286%,
+        rgba(140, 140, 140, 0.01) 14.286%,
+        rgba(140, 140, 140, 0.01) 28.572%,
+        rgba(52, 52, 52, 0.01) 28.572%,
+        rgba(52, 52, 52, 0.01) 42.858%,
+        rgba(38, 38, 38, 0.01) 42.858%,
+        rgba(38, 38, 38, 0.01) 57.144%,
+        rgba(159, 159, 159, 0.01) 57.144%,
+        rgba(159, 159, 159, 0.01) 71.42999999999999%,
+        rgba(71, 71, 71, 0.01) 71.43%,
+        rgba(71, 71, 71, 0.01) 85.71600000000001%,
+        rgba(88, 88, 88, 0.01) 85.716%,
+        rgba(88, 88, 88, 0.01) 100.002%
+      ),
+      linear-gradient(
+        337deg,
+        rgba(25, 25, 25, 0.01) 0%,
+        rgba(25, 25, 25, 0.01) 12.5%,
+        rgba(150, 150, 150, 0.01) 12.5%,
+        rgba(150, 150, 150, 0.01) 25%,
+        rgba(84, 84, 84, 0.01) 25%,
+        rgba(84, 84, 84, 0.01) 37.5%,
+        rgba(85, 85, 85, 0.01) 37.5%,
+        rgba(85, 85, 85, 0.01) 50%,
+        rgba(188, 188, 188, 0.01) 50%,
+        rgba(188, 188, 188, 0.01) 62.5%,
+        rgba(80, 80, 80, 0.01) 62.5%,
+        rgba(80, 80, 80, 0.01) 75%,
+        rgba(73, 73, 73, 0.01) 75%,
+        rgba(73, 73, 73, 0.01) 87.5%,
+        rgba(219, 219, 219, 0.01) 87.5%,
+        rgba(219, 219, 219, 0.01) 100%
+      ),
+      linear-gradient(
+        203deg,
+        rgba(233, 233, 233, 0.01) 0%,
+        rgba(233, 233, 233, 0.01) 25%,
+        rgba(114, 114, 114, 0.01) 25%,
+        rgba(114, 114, 114, 0.01) 50%,
+        rgba(164, 164, 164, 0.01) 50%,
+        rgba(164, 164, 164, 0.01) 75%,
+        rgba(228, 228, 228, 0.01) 75%,
+        rgba(228, 228, 228, 0.01) 100%
+      ),
+      linear-gradient(
+        317deg,
+        rgba(139, 139, 139, 0.02) 0%,
+        rgba(139, 139, 139, 0.02) 16.667%,
+        rgba(44, 44, 44, 0.02) 16.667%,
+        rgba(44, 44, 44, 0.02) 33.334%,
+        rgba(166, 166, 166, 0.02) 33.334%,
+        rgba(166, 166, 166, 0.02) 50.001000000000005%,
+        rgba(2, 2, 2, 0.02) 50.001%,
+        rgba(2, 2, 2, 0.02) 66.668%,
+        rgba(23, 23, 23, 0.02) 66.668%,
+        rgba(23, 23, 23, 0.02) 83.33500000000001%,
+        rgba(21, 21, 21, 0.02) 83.335%,
+        rgba(21, 21, 21, 0.02) 100.002%
+      ),
+      linear-gradient(
+        328deg,
+        rgba(3, 3, 3, 0.03) 0%,
+        rgba(3, 3, 3, 0.03) 12.5%,
+        rgba(116, 116, 116, 0.03) 12.5%,
+        rgba(116, 116, 116, 0.03) 25%,
+        rgba(214, 214, 214, 0.03) 25%,
+        rgba(214, 214, 214, 0.03) 37.5%,
+        rgba(217, 217, 217, 0.03) 37.5%,
+        rgba(217, 217, 217, 0.03) 50%,
+        rgba(68, 68, 68, 0.03) 50%,
+        rgba(68, 68, 68, 0.03) 62.5%,
+        rgba(118, 118, 118, 0.03) 62.5%,
+        rgba(118, 118, 118, 0.03) 75%,
+        rgba(200, 200, 200, 0.03) 75%,
+        rgba(200, 200, 200, 0.03) 87.5%,
+        rgba(198, 198, 198, 0.03) 87.5%,
+        rgba(198, 198, 198, 0.03) 100%
+      ),
+      linear-gradient(
+        97deg,
+        rgba(195, 195, 195, 0.03) 0%,
+        rgba(195, 195, 195, 0.03) 16.667%,
+        rgba(177, 177, 177, 0.03) 16.667%,
+        rgba(177, 177, 177, 0.03) 33.334%,
+        rgba(170, 170, 170, 0.03) 33.334%,
+        rgba(170, 170, 170, 0.03) 50.001000000000005%,
+        rgba(158, 158, 158, 0.03) 50.001%,
+        rgba(158, 158, 158, 0.03) 66.668%,
+        rgba(121, 121, 121, 0.03) 66.668%,
+        rgba(121, 121, 121, 0.03) 83.33500000000001%,
+        rgba(146, 146, 146, 0.03) 83.335%,
+        rgba(146, 146, 146, 0.03) 100.002%
+      ),
+      linear-gradient(
+        268deg,
+        rgba(103, 103, 103, 0.03) 0%,
+        rgba(103, 103, 103, 0.03) 25%,
+        rgba(112, 112, 112, 0.03) 25%,
+        rgba(112, 112, 112, 0.03) 50%,
+        rgba(4, 4, 4, 0.03) 50%,
+        rgba(4, 4, 4, 0.03) 75%,
+        rgba(227, 227, 227, 0.03) 75%,
+        rgba(227, 227, 227, 0.03) 100%
+      ),
+      linear-gradient(90deg, hsl(98, 0%, 0%), hsl(98, 0%, 0%));
+  }
+  .bg-gradient-6 {
+    background: radial-gradient(
+        circle at 29% 55%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 4%,
+        transparent 4%,
+        transparent 44%,
+        transparent 44%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 85% 89%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 51%,
+        transparent 51%,
+        transparent 52%,
+        transparent 52%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 6% 90%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 53%,
+        transparent 53%,
+        transparent 64%,
+        transparent 64%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 35% 75%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 6%,
+        transparent 6%,
+        transparent 98%,
+        transparent 98%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 56% 75%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 16%,
+        transparent 16%,
+        transparent 23%,
+        transparent 23%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 42% 0%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 3%,
+        transparent 3%,
+        transparent 26%,
+        transparent 26%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 29% 28%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 51%,
+        transparent 51%,
+        transparent 75%,
+        transparent 75%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 77% 21%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 35%,
+        transparent 35%,
+        transparent 55%,
+        transparent 55%,
+        transparent 100%
+      ),
+      radial-gradient(
+        circle at 65% 91%,
+        hsla(329, 0%, 99%, 0.05) 0%,
+        hsla(329, 0%, 99%, 0.05) 46%,
+        transparent 46%,
+        transparent 76%,
+        transparent 76%,
+        transparent 100%
+      ),
+      linear-gradient(45deg, rgb(83, 91, 235), rgb(76, 11, 174));
+  }
+
+
+  /* grid bg */
+  .bg-grid-1 {
+    background: #020617;
+    background-image: linear-gradient(
+        to right,
+        rgba(71, 85, 105, 0.3) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(71, 85, 105, 0.3) 1px, transparent 1px),
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(139, 92, 246, 0.15) 0%,
+        transparent 70%
+      );
+    background-size: 32px 32px, 32px 32px, 100% 100%;
+  }
+
+  .bg-grid-2 {
+    background: #020617;
+    background-image: linear-gradient(
+        to right,
+        rgba(71, 85, 105, 0.15) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(71, 85, 105, 0.15) 1px, transparent 1px),
+      radial-gradient(
+        circle at 50% 60%,
+        rgba(236, 72, 153, 0.15) 0%,
+        rgba(168, 85, 247, 0.05) 40%,
+        transparent 70%
+      );
+    background-size: 40px 40px, 40px 40px, 100% 100%;
+  }
+
+  .bg-grid-3 {
+    background: #000000;
+    background-image: linear-gradient(
+        to right,
+        rgba(75, 85, 99, 0.4) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(75, 85, 99, 0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-grid-4 {
+    background: #020617;
+    background-image: linear-gradient(
+        to right,
+        rgba(100, 116, 139, 0.4) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(100, 116, 139, 0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-grid-5 {
+    background: white;
+    background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+      linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-grid-6 {
+    background: white;
+    background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 19px,
+        rgba(75, 85, 99, 0.08) 19px,
+        rgba(75, 85, 99, 0.08) 20px,
+        transparent 20px,
+        transparent 39px,
+        rgba(75, 85, 99, 0.08) 39px,
+        rgba(75, 85, 99, 0.08) 40px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 19px,
+        rgba(75, 85, 99, 0.08) 19px,
+        rgba(75, 85, 99, 0.08) 20px,
+        transparent 20px,
+        transparent 39px,
+        rgba(75, 85, 99, 0.08) 39px,
+        rgba(75, 85, 99, 0.08) 40px
+      ),
+      radial-gradient(
+        circle at 20px 20px,
+        rgba(55, 65, 81, 0.12) 2px,
+        transparent 2px
+      ),
+      radial-gradient(
+        circle at 40px 40px,
+        rgba(55, 65, 81, 0.12) 2px,
+        transparent 2px
+      );
+    background-size: 40px 40px, 40px 40px, 40px 40px, 40px 40px;
+  }
+
+  .bg-grid-7 {
+    background: #fafafa;
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(0, 0, 0, 0.1) 0,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 20px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        rgba(0, 0, 0, 0.1) 0,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 20px
+      );
+    background-size: 40px 40px;
+  }
+
+  .bg-grid-8 {
+    background: white;
+    background-image: linear-gradient(
+        to right,
+        rgba(71, 85, 105, 0.3) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(71, 85, 105, 0.3) 1px, transparent 1px),
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(139, 92, 246, 0.25) 0%,
+        rgba(139, 92, 246, 0.1) 40%,
+        transparent 80%
+      );
+    background-size: 32px 32px, 32px 32px, 100% 100%;
+  }
+
+  .bg-grid-9 {
+    background: #0f0f0f;
+    background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 19px,
+        rgba(34, 197, 94, 0.15) 19px,
+        rgba(34, 197, 94, 0.15) 20px,
+        transparent 20px,
+        transparent 39px,
+        rgba(34, 197, 94, 0.15) 39px,
+        rgba(34, 197, 94, 0.15) 40px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 19px,
+        rgba(34, 197, 94, 0.15) 19px,
+        rgba(34, 197, 94, 0.15) 20px,
+        transparent 20px,
+        transparent 39px,
+        rgba(34, 197, 94, 0.15) 39px,
+        rgba(34, 197, 94, 0.15) 40px
+      ),
+      radial-gradient(
+        circle at 20px 20px,
+        rgba(16, 185, 129, 0.18) 2px,
+        transparent 2px
+      ),
+      radial-gradient(
+        circle at 40px 40px,
+        rgba(16, 185, 129, 0.18) 2px,
+        transparent 2px
+      );
+    background-size: 40px 40px, 40px 40px, 40px 40px, 40px 40px;
+  }
+
+  /* conic backgrounds */
+  .bg-conic-1 {
+    background: conic-gradient(from 0deg at 50% 50%, #c299fa 0%, #e7d7e8 50%, #361599 100%);
+  }
+  .bg-conic-2 {
+    background: conic-gradient(from 0deg at 50% 50%, #de7ed0 0%, #5da8ee 50%, #c0576f 100%);
+  }
+  .bg-conic-3 {
+    background: conic-gradient(from 0deg at 50% 50%, #cee0bf 0%, #65aa73 50%, #334b04 100%);
+  }
+  .bg-conic-4 {
+    background: conic-gradient(from 0deg at 50% 50%, #0a08e0 0%, #6d8a66 100%);
+  }
+  .bg-conic-5 {
+    background: conic-gradient(from 0deg at 50% 50%, #fbfa42 0%, #6a90c5 100%);
+  }
+  .bg-conic-6 {
+    background: conic-gradient(from 0deg at 50% 50%, #4ec553 0%, #8c6d09 50%, #f396a7 100%);
+  }
+  .bg-conic-7 {
+    background: conic-gradient(from 0deg at 50% 50%, #3c1a51 0%, #fc895f 50%, #70fd4e 100%);
+  }
+  .bg-conic-8 {
+    background: conic-gradient(from 0deg at 50% 50%, #b958f5 0%, #6d5571 100%);
+  }
+  .bg-conic-9 {
+    background: conic-gradient(from 0deg at 50% 50%, #cf6931 0%, #62d2ec 50%, #05e6f1 100%);
+  }
+  .bg-conic-10 {
+    background: conic-gradient(from 0deg at 50% 50%, #212898 0%, #4481f7 50%, #c415a4 100%);
+  }
+  .bg-conic-11 {
+    background: conic-gradient(from 0deg at 50% 50%, #7baaea 0%, #782d58 100%);
+  }
+
+
+  /* mesh */
+  .bg-mesh-1 {
+    background-color: #6420aa;
+    background-image: radial-gradient(at 36% 57%, #6420aa 0%, transparent 60%),
+                      radial-gradient(at 48% 17%, #ff3ea5 0%, transparent 50%),
+                      radial-gradient(at 52% 7%, #ff7ed4 0%, transparent 40%),
+                      radial-gradient(at 48% 78%, #ffb5da 0%, transparent 30%);
+  }
+  .bg-mesh-2 {
+    background-color: #640d6b;
+    background-image: radial-gradient(at 23% 71%, #640d6b 0%, transparent 60%),
+                      radial-gradient(at 29% 24%, #b51b75 0%, transparent 50%),
+                      radial-gradient(at 61% 31%, #e65c19 0%, transparent 40%),
+                      radial-gradient(at 94% 1%, #f8d082 0%, transparent 30%);
+  }
+  .bg-mesh-3 {
+    background-color: #e178c5;
+    background-image: radial-gradient(at 51% 81%, #e178c5 0%, transparent 60%),
+                      radial-gradient(at 70% 91%, #ff8e8f 0%, transparent 50%),
+                      radial-gradient(at 90% 34%, #ffb38e 0%, transparent 40%),
+                      radial-gradient(at 54% 94%, #fffdcb 0%, transparent 30%);
+  }
+  .bg-mesh-4 {
+    /* Custom gradient - Download PNG */
+    /* Fallback: */
+    background: #ff00ff;
+  }
+  .bg-mesh-5 {
+    /* Custom gradient - Download PNG */
+    /* Fallback: */
+    background: #ffb680;
+  }
+  .bg-mesh-6 {
+    /* Custom gradient - Download PNG */
+    /* Fallback: */
+    background: #0077b6;
+  }
+  .bg-mesh-7 {
+    /* Custom gradient - Download PNG */
+    /* Fallback: */
+    background: #1b4332;
+  }
+  .bg-mesh-8 {
+    /* Custom gradient - Download PNG */
+    /* Fallback: */
+    background: #121212;
+  }
+  .bg-mesh-9 {
+    background-color: #046dfa;
+    background-image: radial-gradient(circle at 29% 23%, #a24991, transparent 67.8%),
+                      radial-gradient(circle at 28% 86%, #d196c3, transparent 34.8%),
+                      radial-gradient(circle at 71% 24%, #abd9c0, transparent 41.4%);
+  }
+  .bg-mesh-10 {
+    background-color: #bf30be;
+    background-image: radial-gradient(circle at 70% 0%, #95b37e, transparent 33.2%),
+                      radial-gradient(circle at 4% 26%, #dd049a, transparent 41%),
+                      radial-gradient(circle at 34% 39%, #af3c67, transparent 37.4%);
+  }
+  .bg-mesh-11 {
+    background-color: #f3f8ff;
+    background-image: radial-gradient(at 68% 85%, #f3f8ff 0%, transparent 60%),
+                      radial-gradient(at 20% 52%, #e26ee5 0%, transparent 50%),
+                      radial-gradient(at 47% 71%, #7e30e1 0%, transparent 40%),
+                      radial-gradient(at 99% 30%, #49108b 0%, transparent 30%);
+  }
+
+  
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  animation: gradient 6s ease infinite;
+  background-size: 200% 200%;
+}

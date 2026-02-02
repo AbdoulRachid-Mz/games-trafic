@@ -1,0 +1,156 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Typography } from "@/components/ui/typography";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Store,
+  Trophy,
+  ShoppingBag,
+  CreditCard,
+  User,
+  Clock,
+} from "lucide-react";
+import { formatDate } from "@/lib/utils";
+
+interface Activity {
+  id: string;
+  type: "shop" | "tournament" | "purchase" | "transaction";
+  title: string;
+  description: string;
+  timestamp: Date;
+  icon?: any;
+  status?: "success" | "pending" | "failed";
+}
+
+interface ActivityFeedProps {
+  activities?: Activity[];
+}
+
+const activityIcons = {
+  shop: Store,
+  tournament: Trophy,
+  purchase: ShoppingBag,
+  transaction: CreditCard,
+};
+
+const statusColors = {
+  success: "bg-green-500",
+  pending: "bg-yellow-500",
+  failed: "bg-red-500",
+};
+
+export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
+  // Mock data if no activities provided
+  const mockActivities: Activity[] = [
+    {
+      id: "1",
+      type: "shop",
+      title: "Nouvelle boutique créée",
+      description: "Votre boutique 'Gaming Store' a été créée avec succès",
+      timestamp: new Date(Date.now() - 1000 * 60 * 30),
+      status: "success",
+    },
+    {
+      id: "2",
+      type: "tournament",
+      title: "Inscription au tournoi",
+      description: "Vous êtes inscrit au tournoi 'Championship 2024'",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+      status: "success",
+    },
+    {
+      id: "3",
+      type: "purchase",
+      title: "Achat effectué",
+      description: "Vous avez acheté 'Epic Game Key' pour 50 GTC",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
+      status: "success",
+    },
+    {
+      id: "4",
+      type: "transaction",
+      title: "Rechargement en attente",
+      description: "Votre rechargement de 100 GTC est en cours de traitement",
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+      status: "pending",
+    },
+  ];
+
+  const displayActivities = activities.length > 0 ? activities : mockActivities;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Activité Récente
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {displayActivities.map((activity, index) => {
+            const Icon = activityIcons[activity.type];
+            const statusColor = activity.status
+              ? statusColors[activity.status]
+              : "bg-gray-500";
+
+            return (
+              <motion.div
+                key={activity.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                {/* Icon */}
+                <div className="relative">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  {activity.status && (
+                    <div
+                      className={`absolute -top-1 -right-1 h-3 w-3 rounded-full ${statusColor} border-2 border-background`}
+                    />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <Typography
+                    variant="body-sm"
+                    weight="semibold"
+                    className="mb-1"
+                  >
+                    {activity.title}
+                  </Typography>
+                  <Typography
+                    variant="caption2"
+                    theme="muted"
+                    className="line-clamp-2"
+                  >
+                    {activity.description}
+                  </Typography>
+                  <Typography variant="caption2" theme="muted" className="mt-1">
+                    {formatDate(activity.timestamp)}
+                  </Typography>
+                </div>
+              </motion.div>
+            );
+          })}
+
+          {displayActivities.length === 0 && (
+            <div className="text-center py-12">
+              <Clock className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <Typography variant="body-lg" theme="muted">
+                Aucune activité récente
+              </Typography>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

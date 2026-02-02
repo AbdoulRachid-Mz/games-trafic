@@ -1,0 +1,628 @@
+// app/(main)/shops/[id]/page.tsx
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { motion } from "framer-motion";
+import {
+  TrendingUp,
+  Package,
+  ShoppingBag,
+  Users,
+  DollarSign,
+  Eye,
+  Star,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  BarChart3,
+  PieChart,
+  Download,
+  Filter,
+  MoreVertical,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Typography } from "@/components/ui/typography";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getShopStats, getShopStatsById } from "@/actions/shops";
+import { getOrderStats } from "@/actions/orders";
+import { getProductStats } from "@/actions/products";
+import { AdvancedChart } from "@/components/ui/advanced-chart";
+
+// Données pour les charts
+const salesData = [
+  { month: "Jan", ventes: 4000, commandes: 24, visiteurs: 2400 },
+  { month: "Fév", ventes: 3000, commandes: 19, visiteurs: 2210 },
+  { month: "Mar", ventes: 5000, commandes: 28, visiteurs: 2290 },
+  { month: "Avr", ventes: 2780, commandes: 15, visiteurs: 2000 },
+  { month: "Mai", ventes: 3890, commandes: 22, visiteurs: 2181 },
+  { month: "Juin", ventes: 4390, commandes: 26, visiteurs: 2500 },
+  { month: "Juil", ventes: 3490, commandes: 21, visiteurs: 2100 },
+];
+
+const categoryData = [
+  { name: "Comptes", value: 35, color: "#8884d8" },
+  { name: "Items", value: 25, color: "#82ca9d" },
+  { name: "Skins", value: 20, color: "#ffc658" },
+  { name: "Services", value: 15, color: "#ff8042" },
+  { name: "Autres", value: 5, color: "#0088FE" },
+];
+
+const revenueData = [
+  { day: "Lun", revenu: 400, objectif: 500 },
+  { day: "Mar", revenu: 600, objectif: 500 },
+  { day: "Mer", revenu: 300, objectif: 500 },
+  { day: "Jeu", revenu: 800, objectif: 500 },
+  { day: "Ven", revenu: 700, objectif: 500 },
+  { day: "Sam", revenu: 900, objectif: 500 },
+  { day: "Dim", revenu: 600, objectif: 500 },
+];
+
+export default function ShopOverviewPage() {
+  const params = useParams();
+  const [timeRange, setTimeRange] = useState("7j");
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    revenue: { current: 0, change: 0 },
+    orders: { current: 0, change: 0 },
+    products: { current: 0, change: 0 },
+    visitors: { current: 0, change: 0 },
+  });
+
+  useEffect(() => {
+    loadStats();
+  }, [timeRange]);
+
+  const loadStats = async () => {
+    setLoading(true);
+    try {
+      // Ici, vous intégrerez les vraies données
+      const [shopStats, orderStats, productStats] = await Promise.all([
+        getShopStatsById(params.id as string),
+        getOrderStats({ shopId: params.id as string }),
+        getProductStats({ shopId: params.id as string }),
+      ]);
+
+      setStats({
+        revenue: { current: 2450, change: 12.5 },
+        orders: { current: orderStats?.total || 24, change: 8.2 },
+        products: { current: productStats?.total || 18, change: 5.4 },
+        visitors: { current: 1242, change: -2.1 },
+      });
+    } catch (error) {
+      console.error("Erreur chargement stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const StatCard = ({
+    title,
+    value,
+    change,
+    icon: Icon,
+    color = "primary",
+  }: any) => {
+    const isPositive = change >= 0;
+
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className={`p-3 rounded-lg bg-${color}/10`}>
+              <Icon className={`h-6 w-6 text-${color}`} />
+            </div>
+            <Badge
+              variant={isPositive ? "default" : "destructive"}
+              className="gap-1"
+            >
+              {isPositive ? (
+                <ArrowUpRight className="h-3 w-3" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3" />
+              )}
+              {Math.abs(change)}%
+            </Badge>
+          </div>
+
+          <Typography variant="h3" weight="bold" className="mb-1">
+            {typeof value === "number" ? value.toLocaleString() : value}
+          </Typography>
+          <Typography variant="body-sm" theme="muted">
+            {title}
+          </Typography>
+
+          <div className="mt-4 pt-4 border-t">
+            <Typography variant="caption2" theme="muted">
+              vs période précédente
+            </Typography>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  if (loading) {
+    return <OverviewSkeleton />;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* En-tête */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <Typography variant="h2" weight="bold" className="mb-1">
+            Tableau de bord
+          </Typography>
+          <Typography variant="body-base" theme="muted">
+            Performance et statistiques de votre boutique
+          </Typography>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Période" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24h">24 dernières heures</SelectItem>
+              <SelectItem value="7j">7 derniers jours</SelectItem>
+              <SelectItem value="30j">30 derniers jours</SelectItem>
+              <SelectItem value="90j">90 derniers jours</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="sm" className="gap-2">
+            <Download className="h-4 w-4" />
+            Exporter
+          </Button>
+
+          <Button variant="outline" size="sm" className="gap-2">
+            <Filter className="h-4 w-4" />
+            Filtres
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats principales */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+      >
+        <StatCard
+          title="Revenus totaux"
+          value={`${stats.revenue.current} GTC`}
+          change={stats.revenue.change}
+          icon={DollarSign}
+          color="green"
+        />
+
+        <StatCard
+          title="Commandes"
+          value={stats.orders.current}
+          change={stats.orders.change}
+          icon={ShoppingBag}
+          color="blue"
+        />
+
+        <StatCard
+          title="Produits actifs"
+          value={stats.products.current}
+          change={stats.products.change}
+          icon={Package}
+          color="purple"
+        />
+
+        <StatCard
+          title="Visiteurs"
+          value={stats.visitors.current}
+          change={stats.visitors.change}
+          icon={Users}
+          color="amber"
+        />
+      </motion.div>
+
+      {/* Onglets de performance */}
+      <Tabs defaultValue="sales" className="space-y-4">
+        <TabsList className="grid grid-cols-4">
+          <TabsTrigger value="sales" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Ventes
+          </TabsTrigger>
+          <TabsTrigger value="revenue" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Revenus
+          </TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2">
+            <PieChart className="h-4 w-4" />
+            Catégories
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="gap-2">
+            <Star className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Chart des ventes */}
+        <TabsContent value="sales" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Ventes mensuelles</CardTitle>
+                  <CardDescription>
+                    Performance des ventes sur la période
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AdvancedChart
+                data={salesData.map((d) => ({
+                  name: d.month,
+                  ventes: d.ventes,
+                  commandes: d.commandes,
+                }))}
+                kind="bar"
+                series={[
+                  {
+                    key: (r: any) => r["ventes"],
+                    label: "Ventes (GTC)",
+                    color: "hsl(var(--primary))",
+                  },
+                  {
+                    key: (r: any) => r["commandes"],
+                    label: "Commandes",
+                    color: "hsl(var(--secondary))",
+                  },
+                ]}
+                showLegend
+                showTooltip
+                height={350}
+                title="Ventes mensuelles"
+                description="Performance des ventes sur la période"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Chart des revenus */}
+        <TabsContent value="revenue" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Revenus hebdomadaires</CardTitle>
+                  <CardDescription>
+                    Suivi des revenus vs objectifs
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="gap-1">
+                  <ArrowUpRight className="h-3 w-3" />
+                  +12% vs semaine dernière
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AdvancedChart
+                data={revenueData.map((d) => ({
+                  name: d.day,
+                  revenu: d.revenu,
+                  objectif: d.objectif,
+                }))}
+                kind="area"
+                series={[
+                  {
+                    key: (r: any) => r["revenu"],
+                    label: "Revenus réels",
+                    color: "hsl(var(--primary))",
+                  },
+                  {
+                    key: (r: any) => r["objectif"],
+                    label: "Objectif",
+                    color: "hsl(var(--secondary))",
+                  },
+                ]}
+                showLegend
+                showTooltip
+                height={350}
+                title="Revenus hebdomadaires"
+                description="Suivi des revenus vs objectifs"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Chart des catégories */}
+        <TabsContent value="categories" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Répartition par catégorie</CardTitle>
+                  <CardDescription>
+                    Distribution des ventes par type de produit
+                  </CardDescription>
+                </div>
+                <Badge variant="outline">Total: 100%</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="h-[350px]">
+                  <AdvancedChart
+                    data={categoryData}
+                    kind="pie"
+                    series={categoryData.map((c, i) => ({
+                      key: (r: any) => r["value"],
+                      label: i === 0 ? "value" : `value${i}`,
+                      color: c.color,
+                    }))}
+                    showLegend={false}
+                    showTooltip
+                    height={350}
+                    title="Répartition par catégorie"
+                    description="Distribution des ventes par type de produit"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <Typography variant="h4" weight="semibold" className="mb-4">
+                    Détails par catégorie
+                  </Typography>
+                  {categoryData.map((category) => (
+                    <div
+                      key={category.name}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: category.color }}
+                        />
+                        <Typography variant="body-sm" weight="medium">
+                          {category.name}
+                        </Typography>
+                      </div>
+                      <div className="text-right">
+                        <Typography variant="body-sm" weight="bold">
+                          {category.value}%
+                        </Typography>
+                        <Typography variant="caption2" theme="muted">
+                          {Math.round(
+                            (category.value / 100) * stats.revenue.current,
+                          )}{" "}
+                          GTC
+                        </Typography>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Chart de performance */}
+        <TabsContent value="performance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Performance des produits</CardTitle>
+                  <CardDescription>
+                    Top produits et taux de conversion
+                  </CardDescription>
+                </div>
+                <Button variant="outline" size="sm">
+                  Voir le détail
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <AdvancedChart
+                data={salesData.map((d) => ({
+                  name: d.month,
+                  visiteurs: d.visiteurs,
+                  commandes: d.commandes,
+                }))}
+                kind="line"
+                series={[
+                  {
+                    key: (r: any) => r["visiteurs"],
+                    label: "Visiteurs",
+                    color: "hsl(var(--primary))",
+                  },
+                  {
+                    key: (r: any) => r["commandes"],
+                    label: "Commandes",
+                    color: "hsl(var(--secondary))",
+                  },
+                ]}
+                showLegend
+                showTooltip
+                height={350}
+                title="Performance des produits"
+                description="Top produits et taux de conversion"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Insights et recommandations */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+      >
+        {/* Insights rapides */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Insights rapides</CardTitle>
+            <CardDescription>
+              Recommandations basées sur vos performances
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              {
+                title: "Boostez vos ventes",
+                description:
+                  "Ajoutez 3 nouveaux produits cette semaine pour augmenter vos revenus de 15%",
+                icon: TrendingUp,
+                color: "text-green-500",
+              },
+              {
+                title: "Engagement clients",
+                description:
+                  "Répondez aux avis non lus dans les 24h pour améliorer votre note",
+                icon: Star,
+                color: "text-amber-500",
+              },
+              {
+                title: "Optimisation SEO",
+                description:
+                  "Ajoutez des descriptions détaillées à 5 de vos meilleurs produits",
+                icon: Eye,
+                color: "text-blue-500",
+              },
+            ].map((insight, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-3 p-3 rounded-lg bg-muted/30"
+              >
+                <div
+                  className={`p-2 rounded-lg ${insight.color} bg-opacity-10`}
+                >
+                  <insight.icon className={`h-5 w-5 ${insight.color}`} />
+                </div>
+                <div className="flex-1">
+                  <Typography
+                    variant="body-sm"
+                    weight="semibold"
+                    className="mb-1"
+                  >
+                    {insight.title}
+                  </Typography>
+                  <Typography variant="caption2" theme="muted">
+                    {insight.description}
+                  </Typography>
+                </div>
+                <Button size="sm" variant="ghost">
+                  Appliquer
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Activité récente */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Activité récente</CardTitle>
+            <CardDescription>
+              Dernières actions dans votre boutique
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[
+                {
+                  action: "Nouvelle commande",
+                  details: "Commande #ORD-482",
+                  time: "Il y a 2 minutes",
+                  color: "bg-green-500",
+                },
+                {
+                  action: "Produit ajouté",
+                  details: "Compte Fortnite Level 200",
+                  time: "Il y a 15 minutes",
+                  color: "bg-blue-500",
+                },
+                {
+                  action: "Avis reçu",
+                  details: "⭐️⭐️⭐️⭐️⭐️ - Excellent service",
+                  time: "Il y a 1 heure",
+                  color: "bg-amber-500",
+                },
+                {
+                  action: "Paramètres mis à jour",
+                  details: "Informations de paiement",
+                  time: "Il y a 3 heures",
+                  color: "bg-purple-500",
+                },
+              ].map((activity, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/30 transition-colors"
+                >
+                  <div className={`w-2 h-2 rounded-full ${activity.color}`} />
+                  <div className="flex-1">
+                    <Typography variant="body-sm" weight="medium">
+                      {activity.action}
+                    </Typography>
+                    <Typography variant="caption2" theme="muted">
+                      {activity.details}
+                    </Typography>
+                  </div>
+                  <Typography variant="caption2" theme="muted">
+                    {activity.time}
+                  </Typography>
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" className="w-full mt-4">
+              Voir toute l'activité
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
+}
+
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-10 w-40" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-32 rounded-xl" />
+        ))}
+      </div>
+
+      <Skeleton className="h-[400px] rounded-xl" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    </div>
+  );
+}

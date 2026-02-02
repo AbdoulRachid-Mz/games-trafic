@@ -1,0 +1,300 @@
+"use client";
+
+import type React from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useEffect, useState, useCallback } from "react";
+import { MainLayout } from "./main-layout";
+import { useApp } from "@/contexts/app-context";
+import { useAuthContext } from "@/contexts/auth-context";
+import { AnnouncementDialog } from "@/components/announcements/announcement-dialog";
+import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
+import { resolveRoute } from "@/lib/routes/resolver";
+import type { UserRoles } from "@/types/routes";
+import { motion, AnimatePresence } from "framer-motion";
+
+// Loading Screen Premium
+function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
+      <div className="text-center space-y-8">
+        <div className="relative">
+          <motion.div
+            animate={{ 
+              rotate: 360,
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ 
+              rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+              scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
+            }}
+            className="w-24 h-24 mx-auto mb-6 relative"
+          >
+            <div className="absolute inset-0 rounded-full border-4 border-primary/10"></div>
+            <div className="absolute inset-4 rounded-full border-4 border-primary border-t-transparent"></div>
+            <div className="absolute inset-8 rounded-full border-4 border-primary/30 border-b-transparent"></div>
+            
+            {/* Logo in center */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+        <div className="space-y-3">
+          <motion.h2 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent"
+          >
+            {message}
+          </motion.h2>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-muted-foreground max-w-sm mx-auto"
+          >
+            Préparation de votre expérience gaming
+          </motion.p>
+        </div>
+        
+        {/* Progress dots */}
+        <motion.div 
+          className="flex items-center justify-center gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+        >
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="h-2 w-2 rounded-full bg-primary/30"
+              animate={{ 
+                scale: [1, 1.5, 1],
+                opacity: [0.3, 1, 0.3]
+              }}
+              transition={{ 
+                duration: 1.5,
+                repeat: Infinity,
+                delay: i * 0.2
+              }}
+            />
+          ))}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const {
+    user,
+    loading: authLoading,
+    isAuthenticated,
+    isAdmin,
+    isVip,
+    refreshUser,
+  } = useAuthContext();
+
+  const {
+    settings,
+    unreadAnnouncements,
+    showAnnouncements,
+    toggleAnnouncements,
+    maintenanceMode,
+    maintenanceMessage,
+  } = useApp();
+
+  const [isChecking, setIsChecking] = useState(true);
+  const [hasAccess, setHasAccess] = useState(true);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Calculate user roles
+  const userRoles: UserRoles = useMemo(
+    () => ({
+      isAuthenticated,
+      isAdmin,
+      isVip,
+      userId: user?.id,
+      hasWallet: (user as any)?.hasWallet || false,
+    }),
+    [isAuthenticated, isAdmin, isVip, user?.id]
+  );
+
+  // Resolve route
+  const resolved = useMemo(() => {
+    if (!isInitialized) return null;
+    return resolveRoute(pathname, userRoles);
+  }, [pathname, userRoles, isInitialized]);
+
+  // Initialize app
+  useEffect(() => {
+    const init = async () => {
+      try {
+        // Refresh user data on load
+        await refreshUser();
+      } catch (error) {
+        console.error("Error initializing app:", error);
+      } finally {
+        setIsInitialized(true);
+        setIsChecking(false);
+      }
+    };
+
+    init();
+  }, [refreshUser]);
+
+  // Check access when route is resolved
+  useEffect(() => {
+    if (!resolved) return;
+
+    if (!resolved.hasAccess) {
+      setHasAccess(false);
+      if (resolved.redirectTo) {
+        setRedirectTo(resolved.redirectTo);
+      }
+    } else {
+      setHasAccess(true);
+      setRedirectTo(null);
+    }
+  }, [resolved]);
+
+  // Handle redirects
+  useEffect(() => {
+    if (redirectTo && redirectTo !== pathname) {
+      router.push(redirectTo);
+    }
+  }, [redirectTo, router, pathname]);
+
+  // Handle announcements
+  useEffect(() => {
+    if (
+      isInitialized &&
+      !authLoading &&
+      settings.showAnnouncementsOnStartup &&
+      unreadAnnouncements.length > 0 &&
+      !showAnnouncements &&
+      isAuthenticated
+    ) {
+      const timer = setTimeout(() => {
+        toggleAnnouncements();
+      }, 1500); // Small delay for better UX
+
+      return () => clearTimeout(timer);
+    }
+  }, [
+    isInitialized,
+    authLoading,
+    settings.showAnnouncementsOnStartup,
+    unreadAnnouncements.length,
+    showAnnouncements,
+    toggleAnnouncements,
+    isAuthenticated,
+  ]);
+
+  // Handle maintenance mode
+  useEffect(() => {
+    if (maintenanceMode && !isAdmin && isInitialized) {
+      const isPublicRoute = resolved && !resolved.requireAuth && !resolved.requireAdmin;
+      
+      if (!isPublicRoute && pathname !== "/maintenance") {
+        router.push("/maintenance");
+      }
+    }
+  }, [maintenanceMode, isAdmin, isInitialized, resolved, pathname, router]);
+
+  // Show loading during initialization
+  if (!isInitialized || isChecking) {
+    return <LoadingScreen message="Initialisation..." />;
+  }
+
+  // Show loading during auth check for protected routes
+  if (authLoading && resolved?.requireAuth) {
+    return <LoadingScreen message="Vérification..." />;
+  }
+
+  // Show loading during redirect
+  if (redirectTo && redirectTo !== pathname) {
+    return <LoadingScreen message="Redirection..." />;
+  }
+
+  // No access
+  if (!hasAccess) {
+    return <LoadingScreen message="Vérification des accès..." />;
+  }
+
+  // Special layout routes
+  if (resolved?.layout === "none") {
+    return (
+      <>
+        {maintenanceMode && (
+          <MaintenanceBanner message={maintenanceMessage} isAdmin={isAdmin} />
+        )}
+
+        {showAnnouncements && unreadAnnouncements.length > 0 && (
+          <AnnouncementDialog
+            announcements={unreadAnnouncements.slice(
+              0,
+              settings.maxAnnouncementsToShow,
+            )}
+            onClose={() => {
+              toggleAnnouncements();
+            }}
+          />
+        )}
+
+        {children}
+      </>
+    );
+  }
+
+  // Normal layout
+  return (
+    <>
+      <AnimatePresence mode="wait">
+        {maintenanceMode && (
+          <MaintenanceBanner key="maintenance" message={maintenanceMessage} isAdmin={isAdmin} />
+        )}
+
+        {showAnnouncements && unreadAnnouncements.length > 0 && (
+          <AnnouncementDialog
+            key="announcements"
+            announcements={unreadAnnouncements.slice(
+              0,
+              settings.maxAnnouncementsToShow,
+            )}
+            onClose={() => {
+              toggleAnnouncements();
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <MainLayout
+        breadcrumbs={resolved?.topMiddle.enabled}
+        footer={resolved?.footer.enabled}
+        topMiddle={resolved?.topMiddle.enabled}
+        leftBar={resolved?.leftBar.enabled}
+        rightBar={resolved?.rightBar.enabled}
+        navigationLinks={resolved?.navigationLinks}
+        floatingActions={resolved?.fabActions.actions || []}
+        floatingActiveActionId={resolved?.activeFabActionId as string}
+        maintenanceMode={maintenanceMode}
+        showAIAssistant={resolved?.aiAssistant.enabled}
+        hideTopMiddleOnScroll={resolved?.topMiddle.hideOnScroll}
+        breadcrumbItems={resolved?.topMiddle.breadcrumbs || []}
+        floatingDockLinks={resolved?.floatingDock.links || []}
+      >
+        {children}
+      </MainLayout>
+    </>
+  );
+}
