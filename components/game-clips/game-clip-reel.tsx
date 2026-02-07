@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Loader2, Volume2, VolumeX } from "lucide-react";
-import { GameClipWithRelations } from "@/types/clips";
 import { GameClipPlayer } from "./game-clip-player";
 import { cn } from "@/lib/utils";
+import { GameClipWithRelations } from "@/types/game-clips";
 
 interface GameClipReelProps {
   initialClipId?: string;
@@ -29,7 +29,6 @@ export function GameClipReel({
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
-// @/components/game-clips/game-clip-reel.tsx
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Initial scroll to starting clip if provided

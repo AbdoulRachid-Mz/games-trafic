@@ -35,7 +35,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
     hasWallet: boolean;
     isLocked: boolean;
     isActive: boolean;
-    verificationStatus: string;
+    verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
     failedAttempts: number;
   } | null>(null);
 
@@ -49,10 +49,10 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
 
       setWalletStatus({
         hasWallet,
-        isLocked: wallet?.isLocked || false,
-        isActive: wallet?.isActive || false,
-        verificationStatus: wallet?.verificationStatus || "PENDING",
-        failedAttempts: wallet?.failedAttempts || 0,
+        isLocked: wallet?.isLocked ?? false,
+        isActive: wallet?.isActive ?? false,
+        verificationStatus: wallet?.verificationStatus ?? "PENDING",
+        failedAttempts: wallet?.failedAttempts ?? 0,
       });
 
       setWalletCheckComplete(true);
@@ -93,7 +93,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
 
   // Si pas de wallet, on retourne null en attendant la redirection (pour éviter le flash)
   if (walletCheckComplete && !walletStatus?.hasWallet) {
-    return null;
+    return <WalletCreationScreen user={user} />;
   }
 
   if (walletStatus?.isLocked) {
@@ -115,7 +115,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
   // Tout est bon, afficher le layout normal
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-8">
+      <div className="mx-auto p-3">
         <Suspense fallback={<WalletSkeleton />}>
           <AnimatePresence mode="wait">
             {/* Navigation spécifique au wallet */}

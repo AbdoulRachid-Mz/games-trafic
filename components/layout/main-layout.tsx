@@ -27,6 +27,7 @@ interface MainLayoutProps {
   showAIAssistant?: boolean;
   breadcrumbItems?: Array<{ name: string; path: string }>;
   floatingDockLinks?: NavItem[];
+  shouldExcludeContainer?: boolean;
 }
 
 export function MainLayout({
@@ -43,6 +44,7 @@ export function MainLayout({
   showAIAssistant = true,
   breadcrumbItems = [],
   floatingDockLinks = [],
+  shouldExcludeContainer = false,
 }: MainLayoutProps) {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -53,7 +55,7 @@ export function MainLayout({
   return (
     <div className="relative min-h-screen bg-background">
       {/* Top bar */}
-      {topMiddle && (
+      {topMiddle && !shouldExcludeContainer && (
         <TopMiddle
           onToggleSidebar={() => setLeftOpen((v) => !v)}
           onToggleRightBar={() => setRightOpen((v) => !v)}
@@ -67,12 +69,12 @@ export function MainLayout({
       )}
 
       {/* LEFT BAR — toujours Sheet */}
-      {leftBar && (
+      {leftBar && !shouldExcludeContainer && (
         <Sheet open={leftOpen} onOpenChange={setLeftOpen}>
           <SheetTitle className="hidden" />
           <SheetContent side="left" className="w-80 p-0 border-r bg-background">
             <LeftBar
-              isOpen
+              isOpen={leftOpen}
               onClose={closeLeft}
               requireAuth={false}
               isUserOwnerPage={false}
@@ -82,13 +84,13 @@ export function MainLayout({
       )}
 
       {/* RIGHT BAR — toujours Sheet */}
-      {rightBar && (
+      {rightBar && !shouldExcludeContainer && (
         <Sheet open={rightOpen} onOpenChange={setRightOpen}>
           <SheetContent
             side="right"
             className="w-80 p-0 border-l bg-background"
           >
-            <RightBar isRightOpen onClose={closeRight} />
+            <RightBar isRightOpen={rightOpen} onClose={closeRight} />
           </SheetContent>
         </Sheet>
       )}
@@ -102,7 +104,9 @@ export function MainLayout({
             </div>
           }
         >
-          <div className="container mx-auto px-4 lg:px-6 py-6">
+          <div
+            className={`${!shouldExcludeContainer && "container mx-auto px-4 lg:px-6 py-6"} ${topMiddle && "pt-16"}`}
+          >
             {maintenanceMode ? (
               <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
                 <h2 className="mb-2 text-2xl font-bold">Mode maintenance</h2>
@@ -116,19 +120,15 @@ export function MainLayout({
           </div>
         </Suspense>
 
-        {footer && (
-          <footer className="border-t bg-background">
-            <Footer />
-          </footer>
-        )}
+        {footer && !shouldExcludeContainer && <Footer />}
       </main>
 
-      {/* Floating actions */}
-      {floatingActions.length > 0 && (
+      {/* Floating Action Button avec dock */}
+      {!shouldExcludeContainer && (
         <FloatingActionButton
           actions={floatingActions}
           activeActionId={floatingActiveActionId}
-          isFixed
+          isFixed={true}
           navItems={floatingDockLinks}
         />
       )}

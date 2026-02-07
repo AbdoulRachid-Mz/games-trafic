@@ -4,7 +4,7 @@ import React from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { GameClipReel } from "./game-clip-reel";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
-import { GameClipWithStats } from "@/types/clips";
+import { GameClipWithStats } from "@/types/game-clips";
 
 interface GameClipViewerModalProps {
   isOpen: boolean;

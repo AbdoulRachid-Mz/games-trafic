@@ -49,7 +49,7 @@ export function EnhancedDashboard({
         {sidebar}
         <SidebarInset className="flex-1">
           {header}
-          <main className="flex-1 p-6 max-md:p-3 max-md:space-y-4 space-y-6">
+          <main className="flex-1 p-4 max-md:p-3 max-md:space-y-4 space-y-3">
             {children}
           </main>
         </SidebarInset>

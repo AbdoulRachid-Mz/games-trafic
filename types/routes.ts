@@ -1,5 +1,7 @@
 // types/routes.ts
-import { LucideIcon } from "lucide-react";
+import { Bell, Home, LucideIcon, MessageSquare, Package, Palette, Settings, Shield, ShoppingBag, Store, Trophy, User, Users, Wallet } from "lucide-react";
+
+import { IconKey } from "@/types/icons";
 
 export interface NavItem {
   href: string;
@@ -89,3 +91,27 @@ export interface UserRoles {
   userId?: string;
   hasWallet?: boolean;
 }
+
+
+const ICON_MAP: Record<IconKey, LucideIcon> = {
+  home: Home,
+  marketplace: Store,
+  shops: ShoppingBag,
+  products: Package,
+  tournaments: Trophy,
+  themes: Palette,
+  wallet: Wallet,
+  profile: User,
+  settings: Settings,
+  messages: MessageSquare,
+  notifications: Bell,
+  communities: Users,
+  admin: Shield,  games: Package,
+  gameClips: Trophy,
+  blogs: MessageSquare,
+  guides: MessageSquare,
+  clips: Trophy,
+  transactions: Wallet,
+  history: Trophy,
+  claims: Shield,
+};

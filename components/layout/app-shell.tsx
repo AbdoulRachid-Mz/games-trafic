@@ -292,6 +292,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         hideTopMiddleOnScroll={resolved?.topMiddle.hideOnScroll}
         breadcrumbItems={resolved?.topMiddle.breadcrumbs || []}
         floatingDockLinks={resolved?.floatingDock.links || []}
+        shouldExcludeContainer={resolved?.layout !== "public"}
       >
         {children}
       </MainLayout>

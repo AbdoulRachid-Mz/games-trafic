@@ -91,7 +91,7 @@ export default async function BlogsPage() {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      {formatDate(featuredBlog.createdAt)}
+                      {formatDate(featuredBlog.createdAt ?? '')}
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4" />5 min de lecture
@@ -156,7 +156,7 @@ export default async function BlogsPage() {
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      {formatDate(blog.createdAt)}
+                      {formatDate(blog.createdAt ?? '')}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />5 min

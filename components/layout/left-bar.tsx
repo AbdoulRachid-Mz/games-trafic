@@ -51,7 +51,7 @@ interface MenuItem {
   badgeCount?: number;
   requiresAuth?: boolean;
   adminOnly?: boolean;
-  group?: "main" | "social" | "tools" | "admin";
+  group?: "main" | "social" | "tools" | "admin" | "vip" | "games" | "application";
   new?: boolean;
 }
 
@@ -87,13 +87,6 @@ const defaultMenuItems: MenuItem[] = [
     group: "main",
   },
   {
-    id: "products",
-    label: "Produits",
-    link: "/products",
-    icon: Package,
-    group: "main",
-  },
-  {
     id: "tournaments",
     label: "Tournois",
     link: "/tournaments",
@@ -108,17 +101,50 @@ const defaultMenuItems: MenuItem[] = [
     group: "main",
   },
 
-  // Social & Communication
+  // Games & Clips
   {
-    id: "messages",
-    label: "Messages",
-    link: "/messages",
+    id: "games",
+    label: "Jeux",
+    link: "/games",
+    icon: Gamepad2,
+    group: "games",
+  },
+  {
+    id: "game-clips",
+    label: "Clips",
+    link: "/game-clips",
     icon: MessageSquare,
-    group: "social",
-    badge: true,
-    badgeCount: 3,
+    group: "games",
+  },
+
+  // Application Features
+  {
+    id: "blog",
+    label: "Blog",
+    link: "/blog",
+    icon: MessageSquare,
+    group: "application",
     requiresAuth: true,
   },
+  {
+    id: "services",
+    label: "Services",
+    link: "/services",
+    icon: Package,
+    group: "application",
+    requiresAuth: true,
+  },
+  {
+    id: "partners",
+    label: "Partenaires",
+    link: "/partners",
+    icon: Users,
+    group: "application",
+    requiresAuth: true,
+  },
+
+  // Social & Communication
+
   {
     id: "notifications",
     label: "Notifications",
@@ -127,14 +153,6 @@ const defaultMenuItems: MenuItem[] = [
     group: "social",
     badge: true,
     badgeCount: 12,
-    requiresAuth: true,
-  },
-  {
-    id: "communities",
-    label: "Communautés",
-    link: "/communities",
-    icon: Users,
-    group: "social",
     requiresAuth: true,
   },
 
@@ -158,8 +176,18 @@ const defaultMenuItems: MenuItem[] = [
   {
     id: "settings",
     label: "Paramètres",
-    link: "/settings",
+    link: "/profile/settings",
     icon: Settings,
+    group: "tools",
+    requiresAuth: true,
+  },
+
+  // vip/pricing
+  {
+    id: "vip",
+    label: "VIP",
+    link: "/vip",
+    icon: Sparkles,
     group: "tools",
     requiresAuth: true,
   },

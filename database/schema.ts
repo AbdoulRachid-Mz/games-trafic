@@ -1536,7 +1536,7 @@ export const gameClips = pgTable('game_clips', {
   gameId: text('game_id').references(() => games.id),
 
   caption: text('caption'),
-  videoUrl: text('video_url').notNull(),
+  videoUrl: text('video_url'),
   images: text('images').array().default([]),
   isPublic: boolean('is_public').default(true),
   thumbnailUrl: text('thumbnail_url'),

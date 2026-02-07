@@ -24,7 +24,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { GameClipWithRelations } from "@/types/clips";
+import { GameClipWithRelations } from "@/types/game-clips";
 
 interface GameClipPlayerProps {
   clip: GameClipWithRelations;

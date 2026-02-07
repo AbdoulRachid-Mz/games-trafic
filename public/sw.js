@@ -1,6 +1,21 @@
-const CACHE_VERSION = "v5";
+// ws.js
+const CACHE_VERSION = "v6";
 const CACHE_NAME = `gtc-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `gtc-runtime-${CACHE_VERSION}`;
+const IMAGE_CACHE = `gtc-images-${CACHE_VERSION}`;
+const MAX_IMAGE_AGE = 14 * 24 * 60 * 60 * 1000; // 14 jours
+
+const IMAGE_PATTERNS = [
+  /\.(png|jpg|jpeg|webp|gif|avif)$/i,
+  /\/uploads\//,
+  /\/avatars\//,
+  /\/covers\//,
+  /\/clips\//,
+  /firebasestorage\.googleapis\.com/,
+  /res\.cloudinary\.com/,
+];
+
+
 
 // ✅ Ressources essentielles à mettre en cache
 const ESSENTIAL_RESOURCES = [
@@ -9,8 +24,14 @@ const ESSENTIAL_RESOURCES = [
   "/icon-192x192.png",
   "/icon-512x512.png",
   "/manifest.webmanifest",
+
+  // 🖼️ fallback image offline
+  "/images/image-offline.png",
+
+  // Fonts
   "/fonts/"
 ];
+
 
 // 🚫 Domaines et patterns à JAMAIS intercepter
 const NEVER_CACHE_PATTERNS = [
@@ -49,7 +70,7 @@ const CACHE_PATTERNS = [
 
 // Installation
 self.addEventListener("install", (event) => {
-  console.log("🔧 Installation Service Worker v5");
+  console.log("🔧 Installation Service Worker v6");
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -65,7 +86,7 @@ self.addEventListener("install", (event) => {
 
 // Activation
 self.addEventListener("activate", (event) => {
-  console.log("🎯 Activation Service Worker v5");
+  console.log("🎯 Activation Service Worker v6");
   event.waitUntil(
     Promise.all([
       self.clients.claim(),
@@ -100,10 +121,49 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+async function handleImageRequest(request) {
+  const cache = await caches.open(IMAGE_CACHE);
+  const cached = await cache.match(request);
+
+  if (cached) {
+    // Vérifier l'âge
+    const dateHeader = cached.headers.get("date");
+    if (dateHeader) {
+      const age = Date.now() - new Date(dateHeader).getTime();
+      if (age < MAX_IMAGE_AGE) {
+        return cached;
+      }
+    }
+  }
+
+  try {
+    const networkResponse = await fetch(request, { mode: "cors" });
+
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+
+    return networkResponse;
+  } catch (error) {
+    // Offline fallback
+    if (cached) return cached;
+
+    return caches.match("/images/image-offline.png");
+  }
+}
+
+
 // Stratégie de fetch intelligente
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // 🎮 Images → Cache First (style cached_network_image)
+if (IMAGE_PATTERNS.some(pattern => pattern.test(request.url))) {
+  event.respondWith(handleImageRequest(request));
+  return;
+}
+
 
   // 🚫 Ne JAMAIS intercepter certains patterns
   if (NEVER_CACHE_PATTERNS.some(pattern => pattern.test(request.url))) {

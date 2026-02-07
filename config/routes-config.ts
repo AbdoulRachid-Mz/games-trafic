@@ -1,5 +1,10 @@
 // config/routes-config.ts
 
+// import { NavItem } from "@/components/layout/floating-dock";
+import { IconKey } from "@/types/icons";
+import { NavItem } from "@/types/routes";
+
+
 export interface RouteConfig {
   path: string | string[];
   name: string;
@@ -22,12 +27,7 @@ export interface RouteConfig {
   menuOrder?: number;
   hideTopMiddleOnScroll?: boolean; // Nouveau: cacher top-middle au scroll
   hideFloatingActions?: boolean; // Nouveau: cacher FAB
-  dockLinks?: Array<{
-    href: string;
-    label: string;
-    icon: string; // Icon name from the ICON_MAP
-    requireAuth?: boolean;
-  }>;
+dockLinks?: DockLinkConfig[]
 }
 
 export interface FABAction {
@@ -50,6 +50,52 @@ export interface UserRoles {
   isVip: boolean;
   userId?: string;
 }
+
+export interface DockLinkConfig {
+  href: string;
+  label: string;
+  icon: IconKey;
+  requireAuth?: boolean;
+}
+
+export const defaultDockLinks: DockLinkConfig[] = [
+  {
+    href: "/",
+    label: "Accueil",
+    icon: "home",
+    requireAuth: false,
+  },
+  {
+    href: "/games",
+    label: "Jeux",
+    icon: "games",
+    requireAuth: false,
+  },
+  {
+    href: "/game-clips",
+    label: "Clips",
+    icon: "gameClips",
+    requireAuth: false,
+  },
+  {
+    href: "/marketplace",
+    label: "Boutique",
+    icon: "marketplace",
+    requireAuth: false,
+  },
+  {
+    href: "/tournaments",
+    label: "Tournois",
+    icon: "tournaments",
+    requireAuth: false,
+  },
+  {
+    href: "/wallet",
+    label: "Wallet",
+    icon: "wallet",
+    requireAuth: true,
+  },
+];
 
 // =============================================
 // CONFIGURATION HIÉRARCHIQUE SANS CONFLITS
@@ -83,23 +129,31 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     excludeLayout: true,
     styleGroup: "docs",
   },
+  {
+    path: ["/admin", "/admin/**"],
+    name: "Admin",
+    excludeLayout: true,
+    requireAuth: true,
+    requireAdmin: true,
+    styleGroup: "admin",
+  },
 
   // =============================================
   // ADMIN (sans layout spécial)
   // =============================================
-  {
-    path: "/admin/**",
-    name: "Administration",
-    excludeLayout: true, // Layout exclus pour utiliser le layout admin spécifique
-    requireAuth: true,
-    requireAdmin: true,
-    styleGroup: "admin",
-    leftBar: false,
-    rightBar: false,
-    topMiddle: true,
-    breadcrumbs: false,
-    footer: false,
-  },
+  // {
+  //   path: "/admin/**",
+  //   name: "Administration",
+  //   excludeLayout: true, // Layout exclus pour utiliser le layout admin spécifique
+  //   requireAuth: true,
+  //   requireAdmin: true,
+  //   styleGroup: "admin",
+  //   leftBar: false,
+  //   rightBar: false,
+  //   topMiddle: true,
+  //   breadcrumbs: false,
+  //   footer: false,
+  // },
 
   // =============================================
   // DASHBOARDS (sans layout normal)
@@ -151,16 +205,48 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     styleGroup: "profile",
   },
   {
-    path: "/wallet/**",
+    path: ["/wallet", "/wallet/**"],
     name: "Wallet",
     excludeLayout: true,
     hideFloatingActions: false,
+    dockLinks: [
+      {
+        href: "/wallet",
+        label: "Wallet",
+        icon: "wallet",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/transactions",
+        label: "Transactions",
+        icon: "transactions",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/transactions/history",
+        label: "Historique",
+        icon: "history",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/claims",
+        label: "Réclamations",
+        icon: "claims",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/settings",
+        label: "Paramètres",
+        icon: "settings",
+        requireAuth: true,
+      },
+    ],
     floatingActions: true,
     requireAuth: true,
     styleGroup: "wallet",
   },
   {
-    path: ["/chat", "/messages"],
+    path: ["/chat", "/messages", "/chat/**", "/messages/**"],
     name: "Messagerie",
     excludeLayout: true,
     requireAuth: true,
@@ -308,6 +394,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         requiresAuth: true,
       },
     ],
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: false,
+      },
+      { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
     leftBar: true,
     rightBar: false,
     navigationLinks: true,
@@ -324,6 +423,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     hideFloatingActions: true,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: false,
+      },
+      { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
   },
 
   // =============================================
@@ -340,6 +452,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     menu: true,
     menuOrder: 4,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
   },
   {
     path: "/tournaments/[tournamentId]",
@@ -351,6 +470,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: true,
     navigationLinks: true,
     hideFloatingActions: true,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
   },
 
   // =============================================
@@ -367,6 +493,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     menu: true,
     menuOrder: 5,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
   },
 
   // =============================================
@@ -383,6 +516,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     menu: true,
     menuOrder: 6,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
   },
 
   // =============================================
@@ -426,6 +566,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     menu: false,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
+      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+      { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+    ],
   },
   {
     path: ["/services", "/services/**"],
@@ -437,6 +584,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     menu: false,
+    dockLinks: defaultDockLinks,
   },
   {
     path: ["/guides", "/guides/**"],
@@ -453,28 +601,6 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   // =============================================
   // ROUTES UTILISATEUR (avec layout normal)
   // =============================================
-  {
-    path: ["/orders", "/orders/**"],
-    name: "Mes Commandes",
-    breadcrumbs: true,
-    footer: true,
-    topMiddle: true,
-    leftBar: true,
-    rightBar: false,
-    navigationLinks: true,
-    requireAuth: true,
-  },
-  {
-    path: ["/favorites", "/favorites/**"],
-    name: "Favoris",
-    breadcrumbs: true,
-    footer: true,
-    topMiddle: true,
-    leftBar: true,
-    rightBar: false,
-    navigationLinks: true,
-    requireAuth: true,
-  },
   {
     path: ["/profile/settings", "/profile/settings/**"],
     name: "Paramètres",
@@ -527,6 +653,21 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         requireAuth: false,
       },
     ],
+    hideTopMiddleOnScroll: true,
+  },
+
+  // partners
+  {
+    path: "/partners",
+    name: "Partners",
+    breadcrumbs: false,
+    footer: false,
+    topMiddle: false,
+    leftBar: false,
+    rightBar: false,
+    navigationLinks: false,
+    floatingActions: true,
+    dockLinks: defaultDockLinks,
     hideTopMiddleOnScroll: true,
   },
 

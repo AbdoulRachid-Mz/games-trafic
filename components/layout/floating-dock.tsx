@@ -10,7 +10,7 @@ import { Wallet, History, CreditCard, Shield, Settings } from "lucide-react";
 export type NavItem = {
   href: string;
   label: string;
-  icon: React.ElementType;
+  icon: React.ElementType | string;
   requireAuth?: boolean;
 };
 

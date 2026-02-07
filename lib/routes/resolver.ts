@@ -96,7 +96,6 @@ function generateFloatingDockLinks(
   routeConfig: RouteConfig,
   userRoles: OriginalUserRoles,
 ): NavItem[] {
-  // Vérifier si le FAB est désactivé
   if (
     routeConfig.hideFloatingActions ||
     routeConfig.floatingActions === false
@@ -104,48 +103,21 @@ function generateFloatingDockLinks(
     return [];
   }
 
-  // Utiliser les dockLinks de la config si disponibles
-  if (routeConfig.dockLinks && routeConfig.dockLinks.length > 0) {
+  if (routeConfig.dockLinks?.length) {
     return routeConfig.dockLinks
       .filter((link) => {
         if (link.requireAuth && !userRoles.isAuthenticated) return false;
         return true;
       })
-      .map((link) => ({
+      .map<NavItem>((link) => ({
         href: link.href,
         label: link.label,
-        icon: ICON_MAP[link.icon] || Home,
-        requireAuth: link.requireAuth || false,
+        icon: ICON_MAP[link.icon],
+        requireAuth: link.requireAuth ?? false,
       }));
   }
 
-  // Fallback: liens par défaut
-  const defaultLinks: NavItem[] = [
-    { href: "/", label: "Accueil", icon: Home, requireAuth: false },
-    {
-      href: "/marketplace",
-      label: "Marketplace",
-      icon: Store,
-      requireAuth: false,
-    },
-    {
-      href: "/shops",
-      label: "Boutiques",
-      icon: ShoppingBag,
-      requireAuth: false,
-    },
-    {
-      href: "/tournaments",
-      label: "Tournois",
-      icon: Trophy,
-      requireAuth: false,
-    },
-  ];
-
-  return defaultLinks.filter((link) => {
-    if (link.requireAuth && !userRoles.isAuthenticated) return false;
-    return true;
-  });
+  return [];
 }
 
 // Génère les actions FAB

@@ -58,7 +58,7 @@ export default function Footer() {
                 Gamers Trafics
               </span>
             </Link>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm text-secondary/80 leading-relaxed">
               L'infrastructure gaming complète pour connecter, compétiter et
               monétiser votre passion. Rejoignez l'élite du gaming francophone.
             </p>
@@ -67,7 +67,7 @@ export default function Footer() {
                 <Link
                   key={i}
                   href="#"
-                  className="h-10 w-10 flex items-center justify-center rounded-lg bg-background border border-border/50 hover:border-primary/50 hover:text-primary transition-all"
+                  className="h-10 w-10 flex items-center justify-center rounded-lg bg-primary text-white backdrop-blur-md border border-border/50 hover:bg-secondary hover:border-primary/50 hover:text-primary transition-all"
                 >
                   <Icon className="w-5 h-5" />
                 </Link>
@@ -78,7 +78,7 @@ export default function Footer() {
           {/* Links */}
           {footerLinks.map((section, idx) => (
             <div key={idx}>
-              <h3 className="font-bold mb-6 uppercase tracking-wider text-xs text-muted-foreground/60">
+              <h3 className="font-bold mb-6 uppercase tracking-wider text-xs text-primary">
                 {section.title}
               </h3>
               <ul className="space-y-4">
@@ -86,7 +86,7 @@ export default function Footer() {
                   <li key={lIdx}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 group"
+                      className="text-sm text-secondary hover:text-primary transition-colors flex items-center gap-1 group"
                     >
                       <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
                       {link.name}
@@ -102,15 +102,15 @@ export default function Footer() {
           <div className="flex items-center gap-4">
             <Badge
               variant="outline"
-              className="rounded-full px-4 py-1 border-primary/20 text-[10px] font-bold"
+              className="rounded-full px-3 py-1 bg-primary text-white border-primary/20 text-[10px] font-bold"
             >
               PLATFORME CERTIFIÉE
             </Badge>
-            <span className="text-sm text-muted-foreground font-medium">
+            <span className="text-sm text-secondary/80 font-medium">
               © {currentYear} Gamers Trafics. Tous droits réservés.
             </span>
           </div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+          <p className="text-[10px] text-secondary uppercase tracking-widest font-bold">
             BUILD WITH ❤️ FOR THE COMMUNITY
           </p>
         </div>

@@ -509,9 +509,9 @@ export async function getGlobalStats(
         .select({
           total: count(),
           views: sql<number>`COALESCE(SUM(${gameClips.viewCount}), 0)`,
-          likes: sql<number>`COALESCE(SUM(${interactions.id}), 0)`,
         })
-        .from(gameClips),
+        .from(gameClips)
+        .where(buildWhereConditions(filters, gameClips)),
 
       // Today's stats
       db
@@ -582,7 +582,7 @@ export async function getGlobalStats(
       // Game Clips
       total_game_clips: Number(gameClipsStats[0]?.total || 0),
       total_clip_views: Number(gameClipsStats[0]?.views || 0),
-      total_clip_likes: Number(gameClipsStats[0]?.likes || 0),
+      total_clip_likes: Number(interactionsStats[0]?.likes || 0),
 
       // Interactions
       total_interactions: Number(interactionsStats[0]?.total || 0),

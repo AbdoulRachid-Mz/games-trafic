@@ -1,27 +1,22 @@
-// @/types/game-clips.ts
 import { GameClip, User, Shop, Game } from "@/database/schema";
+// ============================================================================
+// TYPES EXTENDUS POUR GAME-CLIPS AVEC STATS
+// ============================================================================
 
-export interface GameClipWithStats extends GameClip {
+export type GameClipWithStats = GameClip & {
   author?: User;
   shop?: Shop;
   game?: Game;
   likesCount: number;
   commentsCount: number;
   viewsCount: number;
-  sharesCount: number;
-  savesCount: number;
-  isLiked: boolean;
-  isSaved: boolean;
-  metadata?: {
-    resolution?: string;
-    frameRate?: number;
-    size?: number;
-    format?: string;
-    aspectRatio?: number;
+  userInteractions?: {
+    liked: boolean;
+    bookmarked: boolean;
   };
-}
+};
 
-export interface GameClipWithRelations extends Omit<GameClipWithStats, 'likesCount' | 'commentsCount' | 'viewsCount' | 'sharesCount' | 'savesCount' | 'isLiked' | 'isSaved'> {
+export type GameClipWithRelations = Omit<GameClipWithStats, 'likesCount' | 'commentsCount' | 'viewsCount' | 'userInteractions'> & {
   likesCount: number;
   viewsCount: number;
   commentsCount?: number;
@@ -29,8 +24,9 @@ export interface GameClipWithRelations extends Omit<GameClipWithStats, 'likesCou
     liked: boolean;
     bookmarked: boolean;
   };
-}
+};
 
+// Types pour les filtres
 export interface ClipFilters {
   authorId?: string;
   shopId?: string;
