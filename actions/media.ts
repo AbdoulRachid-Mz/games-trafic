@@ -172,23 +172,7 @@ export async function getUserMedias(
  */
 export async function getEntityMedias(
   entityId: string,
-  entityType:
-    | "PRODUCT"
-    | "POST"
-    | "SHOP"
-    | "TOURNAMENT"
-    | "USER"
-    | "BLOG"
-    | "MESSAGE"
-    | "TEAM"
-    | "THEME"
-    | "NEWS"
-    | "GROUP"
-    | "ANNOUNCEMENT"
-    | "SERVICE"
-    | "GUIDE"
-    | "COMMENT"
-    | "MATCH",
+  entityType: EntityType,
   filters?: MediaFilters,
   options?: QueryOptions
 ): Promise<Media[]> {

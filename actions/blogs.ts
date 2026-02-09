@@ -1,6 +1,6 @@
 'use server';
 
-import { blogs, type Blog, type NewBlog, users, interactions, viewers } from '@/database/schema';
+import { blogs, type Blog, type NewBlog, users, interactions, viewers, BlogWithRelations } from '@/database/schema';
 import { eq, and, or, like, ilike, desc, asc, sql, count, gte, lte, isNull } from 'drizzle-orm';
 import { type BlogFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
@@ -15,7 +15,7 @@ import { db } from '@/lib/db';
 export async function getBlogById(
   id: string,
   options?: { populate?: string[] }
-): Promise<Blog | null> {
+): Promise<BlogWithRelations | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.blogs.findFirst({

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
+import { Suspense } from "react";
 
-export default function NotFound() {
+function NotFoundContent() {
   return (
     <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-center p-4 text-center">
       <div className="space-y-6">
@@ -24,5 +25,13 @@ export default function NotFound() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NotFound() {
+  return (
+    <Suspense fallback={null}>
+      <NotFoundContent />
+    </Suspense>
   );
 }

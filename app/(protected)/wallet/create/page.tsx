@@ -82,7 +82,7 @@ export default function CreateWalletPage() {
       if (!canCreate.canCreate && canCreate.reason) {
         toast.error(canCreate.reason);
         if (canCreate.reason === "Vous avez déjà un wallet") {
-          router.push("/wallet/dashboard");
+          router.push("/wallet");
         }
       }
     }

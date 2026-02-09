@@ -5,7 +5,7 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Empty } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ConversationItem } from "./conversation-item";
 import type { Conversation, ChatId } from "@/types/chat";
 import { MessageSquare } from "lucide-react";
@@ -46,11 +46,15 @@ export function ConversationList({
   if (conversations.length === 0) {
     return (
       <div className="flex items-center justify-center h-full p-8">
-        <Empty
-          icon={MessageSquare}
-          title="No conversations"
-          description={emptyMessage}
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageSquare className="size-4" />
+            </EmptyMedia>
+            <EmptyTitle>No conversations</EmptyTitle>
+            <EmptyDescription>{emptyMessage}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }

@@ -58,7 +58,6 @@ export default function AdminGamesPage() {
     onResetFilters,
   } = useEntityList<Game>({
     entityType: "games",
-    fetchMethod: "server-action",
     // initialData: gamesData?.pages.flatMap((page) => page.data),
     defaultFilters: {
       isActive: true,

@@ -42,17 +42,6 @@ export default function SubscriptionsDashboardPage() {
   } = useEntityList<VipSubscription>({
     entityType: "subscriptions",
     defaultLimit: isSmallScreen ? 10 : isMediumScreen ? 15 : 20,
-    fetchFunction: async (params) => {
-      const res = await getVipSubscriptions({
-        pagination: { page: params.page, limit: params.limit },
-        filters: params,
-      });
-      return {
-        success: true,
-        data: res.data,
-        pagination: res.pagination,
-      };
-    },
   });
 
   const renderSubscriptionCard = (s: VipSubscription, index: number) => {

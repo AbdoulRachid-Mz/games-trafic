@@ -23,6 +23,16 @@ import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { QrCode } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { TransactionQRCode } from "@/components/shared/qr-code";
+import { encodeTransactionQR } from "@/utils/qr-utils";
 
 interface ProductCardProps {
   product: {
@@ -197,7 +207,7 @@ export function ProductCard({
             className={cn(
               "text-xs px-2.5 py-1 backdrop-blur-md border font-medium",
               statusColors[product.status] ||
-                "bg-gray-500/10 text-gray-600 border-gray-500/20"
+              "bg-gray-500/10 text-gray-600 border-gray-500/20"
             )}
           >
             {statusLabels[product.status] || product.status}
@@ -418,17 +428,52 @@ export function ProductCard({
         </div>
 
         {showActions && (
-          <Button
-            size={isCompact ? "sm" : "default"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onBuy?.();
-            }}
-            className="rounded-xl shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
-          >
-            <ShoppingBag className="h-4 w-4 mr-2" />
-            Acheter
-          </Button>
+          <div className="flex items-center gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size={isCompact ? "sm" : "default"}
+                  className="rounded-xl h-10 w-10 p-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50 rounded-[2.5rem] p-0 overflow-hidden">
+                <div className="p-8">
+                  <DialogHeader className="mb-6">
+                    <DialogTitle className="font-black italic uppercase tracking-tighter text-2xl">Achat Rapide</DialogTitle>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Scannez pour acheter ce produit</p>
+                  </DialogHeader>
+                  <div className="flex justify-center">
+                    <TransactionQRCode
+                      data={encodeTransactionQR({
+                        t: "PRODUCT_PURCHASE",
+                        id: product.id,
+                        a: typeof product.price === "number" ? product.price : parseFloat(product.price as string),
+                        m: { name: product.name }
+                      })}
+                      label={product.name}
+                      className="shadow-none border-none p-0 bg-transparent"
+                    />
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              size={isCompact ? "sm" : "default"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onBuy?.();
+              }}
+              className="rounded-xl shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+            >
+              <ShoppingBag className="h-4 w-4 mr-2" />
+              Acheter
+            </Button>
+          </div>
         )}
       </div>
     </div>

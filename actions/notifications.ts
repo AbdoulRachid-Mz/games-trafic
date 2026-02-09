@@ -239,13 +239,33 @@ export async function markNotificationAsRead(
   }
 }
 
-// lib/actions/notifications.ts
 /**
  * Récupère le nombre de notifications non lues pour un utilisateur
  * Alias de getUnreadNotificationsCount pour compatibilité
  */
 export async function getUnreadCount(userId: string) {
   return getUnreadNotificationsCount(userId);
+}
+
+/**
+ * Récupère une notification par son ID
+ */
+export async function getNotificationById(id: string) {
+  try {
+    const notification = await db.query.notifications.findFirst({
+      where: (notifications, { eq }) => eq(notifications.id, id),
+      with: {
+        user: true,
+        shop: true,
+        tournament: true,
+      },
+    });
+
+    return notification || null;
+  } catch (error) {
+    console.error("Error getting notification by ID:", error);
+    throw new Error("Failed to fetch notification");
+  }
 }
 
 
@@ -303,6 +323,31 @@ export async function deleteNotification(
   } catch (error) {
     console.error("Error deleting notification:", error);
     return { success: false, error: "Failed to delete notification" };
+  }
+}
+
+/**
+ * Met à jour une notification
+ */
+export async function updateNotification(
+  id: string,
+  notificationData: Partial<typeof notifications.$inferInsert>
+) {
+  try {
+    const [updatedNotification] = await db
+      .update(notifications)
+      .set({
+        ...notificationData,
+        updatedAt: new Date(),
+      })
+      .where(eq(notifications.id, id))
+      .returning();
+
+    revalidatePath("/admin/notifications");
+    return { success: true, data: updatedNotification };
+  } catch (error) {
+    console.error("Error updating notification:", error);
+    return { success: false, error: "Failed to update notification" };
   }
 }
 

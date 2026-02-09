@@ -19,8 +19,9 @@ const updateBalanceSchema = z.object({
 const toggleLockSchema = z.object({
   isLocked: z.boolean(),
 });
+
 interface Props {
-    params: Promise<{id: string}>
+  params: Promise<{ id: string }>;
 }
 
 // GET /api/wallets/[id] - Get wallet by ID
@@ -29,9 +30,9 @@ export async function GET(
   { params }: Props
 ) {
   try {
-    const {id} = await params
+    const { id } = await params;
     const wallet = await getUserWalletById(id);
-    
+
     if (!wallet) {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
@@ -53,13 +54,13 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    
+
     // Validate input
     const validatedData = updateWalletSchema.parse(body);
 
-     const {id} = await params
+    const { id } = await params;
     const updatedWallet = await updateUserWallet(id, validatedData);
-    
+
     return NextResponse.json(updatedWallet);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -68,11 +69,11 @@ export async function PUT(
         { status: 400 }
       );
     }
-    
+
     if (error instanceof Error && error.message === 'Wallet not found') {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
-    
+
     console.error('Error updating wallet:', error);
     return NextResponse.json(
       { error: 'Failed to update wallet' },
@@ -88,13 +89,13 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    
+
     // Validate input
     const { balance } = updateBalanceSchema.parse(body);
-    const {id} = await params
-    
+    const { id } = await params;
+
     const updatedWallet = await updateWalletBalance(id, balance);
-    
+
     return NextResponse.json(updatedWallet);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -103,11 +104,11 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    
+
     if (error instanceof Error && error.message === 'Wallet not found') {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
-    
+
     console.error('Error updating wallet balance:', error);
     return NextResponse.json(
       { error: 'Failed to update wallet balance' },
@@ -119,16 +120,17 @@ export async function PATCH(
 // POST /api/wallets/[id]/toggle-lock - Toggle wallet lock status
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Props
 ) {
   try {
     const body = await request.json();
-    
+
     // Validate input
     const { isLocked } = toggleLockSchema.parse(body);
-    
-    const updatedWallet = await toggleWalletLock(params.id, isLocked);
-    
+
+    const { id } = await params;
+    const updatedWallet = await toggleWalletLock(id, isLocked);
+
     return NextResponse.json(updatedWallet);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -137,11 +139,11 @@ export async function POST(
         { status: 400 }
       );
     }
-    
+
     if (error instanceof Error && error.message === 'Wallet not found') {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
-    
+
     console.error('Error toggling wallet lock:', error);
     return NextResponse.json(
       { error: 'Failed to toggle wallet lock' },

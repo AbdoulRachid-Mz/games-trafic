@@ -39,6 +39,38 @@ const ICON_MAP: Record<string, any> = {
   admin: Shield,
 };
 
+// Calcule la profondeur d'une route (nombre de segments)
+function getRouteDepth(path: string): number {
+  // Nettoyer le path
+  const cleanPath = path.replace(/\/+$/, "").replace(/^\/+/, "");
+  if (!cleanPath) return 0;
+
+  // Compter les segments
+  const segments = cleanPath.split("/").filter(Boolean);
+
+  // Les wildcards ont moins de priorité
+  let depth = segments.length;
+  if (path.includes("**")) depth -= 0.5;
+  if (path.includes("*") && !path.includes("**")) depth -= 0.3;
+
+  return depth;
+}
+
+// Vérifie si currentPath est une sous-route de configPath
+function matchesSubRoute(currentPath: string, configPath: string): boolean {
+  // Nettoyer les paths
+  const cleanCurrent = currentPath.replace(/\/+$/, "");
+  const cleanConfig = configPath.replace(/\/+$/, "");
+
+  // Si le config path se termine par /**, c'est une route parente
+  if (cleanConfig.endsWith("/**")) {
+    const parentPath = cleanConfig.slice(0, -3);
+    return cleanCurrent === parentPath || cleanCurrent.startsWith(parentPath + "/");
+  }
+
+  return false;
+}
+
 // Vérifie si une route correspond exactement
 function isExactMatch(
   currentPath: string,
@@ -61,11 +93,16 @@ function isExactMatch(
       return regex.test(currentPath);
     }
 
-    // Gérer les wildcards
+    // Gérer les wildcards et sous-routes
     if (path.includes("*")) {
       const pattern = path.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*");
       const regex = new RegExp(`^${pattern}$`);
       return regex.test(currentPath);
+    }
+
+    // Vérifier si c'est une sous-route
+    if (matchesSubRoute(currentPath, path)) {
+      return true;
     }
 
     return false;
@@ -79,15 +116,49 @@ function findBestRouteConfig(pathname: string): RouteConfig {
       ? pathname.slice(0, -1)
       : pathname;
 
-  // Chercher une correspondance exacte d'abord
+  // Collecter toutes les routes qui correspondent
+  const matches: Array<{ config: RouteConfig; depth: number; priority: number }> = [];
+
   for (const config of ROUTE_CONFIG) {
     if (isExactMatch(normalizedPath, config.path)) {
-      return config;
+      const paths = Array.isArray(config.path) ? config.path : [config.path];
+
+      // Trouver le path le plus spécifique parmi les paths de cette config
+      let maxDepth = 0;
+      let bestPath = paths[0];
+
+      for (const path of paths) {
+        if (isExactMatch(normalizedPath, path)) {
+          const depth = getRouteDepth(path);
+          if (depth > maxDepth) {
+            maxDepth = depth;
+            bestPath = path;
+          }
+        }
+      }
+
+      // Calculer la priorité (exact match > paramètres > wildcards)
+      let priority = 0;
+      if (bestPath === normalizedPath) priority = 3; // Exact match
+      else if (bestPath.includes("[")) priority = 2; // Paramètres dynamiques
+      else if (bestPath.includes("*")) priority = 1; // Wildcards
+
+      matches.push({ config, depth: maxDepth, priority });
     }
   }
 
-  // Retourner la config par défaut
-  return ROUTE_CONFIG[ROUTE_CONFIG.length - 1];
+  // Si aucune correspondance, retourner la config par défaut
+  if (matches.length === 0) {
+    return ROUTE_CONFIG[ROUTE_CONFIG.length - 1];
+  }
+
+  // Trier par priorité puis par profondeur (plus spécifique en premier)
+  matches.sort((a, b) => {
+    if (a.priority !== b.priority) return b.priority - a.priority;
+    return b.depth - a.depth;
+  });
+
+  return matches[0].config;
 }
 
 // Génère les liens du dock flottant
@@ -112,7 +183,7 @@ function generateFloatingDockLinks(
       .map<NavItem>((link) => ({
         href: link.href,
         label: link.label,
-        icon: ICON_MAP[link.icon],
+        icon: ICON_MAP[link.icon] || Home,
         requireAuth: link.requireAuth ?? false,
       }));
   }

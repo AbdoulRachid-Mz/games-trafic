@@ -62,14 +62,14 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         <DashboardHeader
           title="Dashboard Utilisateur"
           description="Aperçu personnalisé de votre activité"
-          actions={
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                Exporter
-              </Button>
-              <Button size="sm">Créer</Button>
-            </div>
-          }
+          // actions={
+          //   <div className="flex items-center gap-2">
+          //     <Button variant="outline" size="sm">
+          //       Exporter
+          //     </Button>
+          //     <Button size="sm">Créer</Button>
+          //   </div>
+          // }
         />
       }
     >

@@ -51,7 +51,7 @@ export default async function BlogDetailPage({
             {blog.author && (
               <div className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={blog.author.image || ""} />
+                  <AvatarImage src={blog.author?.profileImage || ""} />
                   <AvatarFallback>
                     <User className="h-4 w-4" />
                   </AvatarFallback>
@@ -62,7 +62,7 @@ export default async function BlogDetailPage({
 
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              {formatDate(blog.createdAt)}
+              {formatDate(blog.createdAt || new Date())}
             </div>
 
             <div className="flex items-center gap-2">

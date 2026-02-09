@@ -1,7 +1,8 @@
+// @/components/pages/games/games-hero.tsx
 'use client';
 
 import React from 'react';
-import { Search, Gamepad2, Sparkles, TrendingUp } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
@@ -14,68 +15,72 @@ interface GamesHeroProps {
 
 export function GamesHero({ searchQuery, onSearch }: GamesHeroProps) {
   return (
-    <div className="relative w-full overflow-hidden bg-[#0a0a0b] py-16 md:py-24">
-      {/* Background with animated gradients */}
+    <div className="relative w-full overflow-hidden bg-[#0a0a0b] dark:bg-[#020203] py-20 md:py-32 border-b border-white/5">
+      {/* Background with animated gradients - Premium Dark Hero is often preferred for gaming even in light theme pages */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/4 -right-1/4 w-1/2 h-full bg-blue-500/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute -bottom-1/4 -left-1/4 w-1/2 h-full bg-purple-500/10 blur-[120px] rounded-full animate-pulse delay-700" />
+        <div className="absolute -top-1/4 -right-1/4 w-3/4 h-full bg-primary/20 blur-[130px] rounded-full animate-pulse" />
+        <div className="absolute -bottom-1/4 -left-1/4 w-3/4 h-full bg-purple-600/10 blur-[130px] rounded-full animate-pulse delay-700" />
+
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
       </div>
 
       <div className="container relative mx-auto px-4 z-10 text-center">
         <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.5 }}
-           className="space-y-6 max-w-4xl mx-auto"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="space-y-8 max-w-4xl mx-auto"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary mb-2">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span className="text-xs font-bold uppercase tracking-wider">Marché de jeux et d'items</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 border border-primary/20 text-primary mb-2 shadow-[0_0_20px_rgba(var(--primary),0.1)]">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Marché de jeux & Items</span>
           </div>
 
-          <Typography variant="h1" weight="bold" className="text-4xl md:text-6xl text-white">
-            Boostez votre expérience de <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Gaming</span>
+          <Typography variant="h1" className="text-4xl md:text-7xl font-black text-white leading-[1.1] tracking-tighter">
+            Dominez vos mondes <br />
+            <span className="bg-gradient-to-r from-primary via-blue-400 to-purple-500 bg-clip-text text-transparent italic drop-shadow-sm">Favoris</span>
           </Typography>
 
-          <Typography variant="lead" theme="muted" className="text-gray-400 max-w-2xl mx-auto text-lg">
-            Achetez des monnaies de jeu, des skins et des items rares pour vos titres préférés. Rapide, sécurisé et au meilleur prix.
+          <Typography className="text-white/60 max-w-2xl mx-auto text-lg md:text-xl font-medium leading-relaxed">
+            Équipez-vous du meilleur : monnaies, skins et items rares livrés instantanément.
           </Typography>
 
-          <div className="relative max-w-2xl mx-auto mt-8 group">
-            <div className="absolute inset-0 bg-primary/20 blur-xl group-hover:bg-primary/30 transition-all rounded-2xl" />
-            <div className="relative flex items-center bg-background/80 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-2xl">
+          <div className="relative max-w-2xl mx-auto mt-12 group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
+            <div className="relative flex items-center bg-black/40 backdrop-blur-2xl border border-white/10 p-2 rounded-2xl shadow-2xl">
               <div className="flex-1 flex items-center px-4">
-                <Search className="h-5 w-5 text-muted-foreground" />
+                <Search className="h-6 w-6 text-white/40" />
                 <Input
                   type="text"
-                  placeholder="Rechercher un jeu ou un item (ex: FC 24, Gems...)"
-                  className="border-none focus-visible:ring-0 text-lg h-12 bg-transparent placeholder:text-muted-foreground/50"
+                  placeholder="Rechercher FC 25, GTA, Robux..."
+                  className="border-none focus-visible:ring-0 text-lg h-14 bg-transparent text-white placeholder:text-white/20 font-medium"
                   value={searchQuery}
                   onChange={(e) => onSearch(e.target.value)}
                 />
               </div>
-              <Button size="lg" className="rounded-xl px-8 h-12 font-bold shadow-lg shadow-primary/20">
-                Explorer
+              <Button size="lg" className="rounded-xl px-10 h-14 font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">
+                Rechercher
               </Button>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-12 text-sm text-gray-400">
-            <div className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                <span>+50 Jeux supportés</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-                <span>Livraison en moins de 1h</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
-                <span>Paiements sécurisés</span>
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6 mt-16">
+            {[
+              { label: "+50 Jeux", color: "bg-green-500" },
+              { label: "Livraison < 1h", color: "bg-blue-500" },
+              { label: "100% Sécurisé", color: "bg-primary" }
+            ].map((stat, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={cn("h-2 w-2 rounded-full", stat.color, "shadow-[0_0_10px_currentColor]")} />
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-white/40">{stat.label}</span>
+              </div>
+            ))}
           </div>
         </motion.div>
       </div>
     </div>
   );
 }
+
+import { cn } from '@/lib/utils';

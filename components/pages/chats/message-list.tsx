@@ -4,7 +4,7 @@
 import React, { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Empty } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { MessageBubble } from "./message-bubble";
 import type { ChatMessage } from "@/types/chat";
 import {
@@ -82,9 +82,8 @@ export function MessageList({
         {Array.from({ length: 10 }).map((_, i) => (
           <div
             key={i}
-            className={`flex gap-2 ${
-              i % 2 === 0 ? "flex-row" : "flex-row-reverse"
-            }`}
+            className={`flex gap-2 ${i % 2 === 0 ? "flex-row" : "flex-row-reverse"
+              }`}
           >
             <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
             <div className="space-y-2 max-w-[70%]">
@@ -100,11 +99,15 @@ export function MessageList({
   if (messages.length === 0 && !isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
-        <Empty
-          icon={MessageSquare}
-          title="No messages yet"
-          description="Start the conversation by sending a message"
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageSquare className="size-4" />
+            </EmptyMedia>
+            <EmptyTitle>No messages yet</EmptyTitle>
+            <EmptyDescription>Start the conversation by sending a message</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }

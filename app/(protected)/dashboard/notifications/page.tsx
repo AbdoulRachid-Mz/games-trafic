@@ -33,30 +33,6 @@ export default function NotificationsDashboardPage() {
   } = useEntityList<Notification>({
     entityType: "notifications",
     defaultLimit: isSmallScreen ? 10 : isMediumScreen ? 15 : 20,
-    fetchFunction: async (params) => {
-      if (!user?.id) {
-        return {
-          success: true,
-          data: [],
-          pagination: { page: 1, limit: params.limit ?? 20, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
-        };
-      }
-      const res = await getUserNotifications(user.id, {
-        page: params.page,
-        limit: params.limit,
-        unreadOnly: params.unreadOnly,
-        types: params.types,
-      });
-      return {
-        success: true,
-        data: res.notifications,
-        pagination: {
-          ...res.pagination,
-          hasNext: res.pagination.totalPages > res.pagination.page,
-          hasPrev: res.pagination.page > 1,
-        },
-      };
-    },
   });
 
   const renderNotificationCard = (n: Notification) => (

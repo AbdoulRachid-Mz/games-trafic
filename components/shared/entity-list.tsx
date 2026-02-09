@@ -686,8 +686,8 @@ export function EntityList<T>({
                 {/* Filtres avancés */}
                 {showAdvancedFilters && allFilters.length > 3 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
-                    {allFilters.slice(3).map((filter) => (
-                      <div key={filter.key}>
+                    {allFilters.slice(3).map((filter, index) => (
+                      <div key={`${filter.key}-${index}`}>
                         <label className="text-sm font-medium mb-2 block">
                           {filter.label}
                         </label>

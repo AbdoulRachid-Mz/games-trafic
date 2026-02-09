@@ -25,9 +25,10 @@ import {
   TrendingUp,
   BarChart,
 } from "lucide-react";
-import {  updateTournamentMember } from "@/actions/tournaments";
+import { getTournamentMemberById, updateTournamentMember } from "@/actions/members";
 import { useAuthContext } from "@/contexts/auth-context";
 import type { TournamentMember } from "@/database/schema";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MemberDetailPage() {
   const params = useParams();
@@ -47,47 +48,10 @@ export default function MemberDetailPage() {
   const loadMember = async () => {
     setLoading(true);
     try {
-      // Note: Vous devrez créer cette fonction dans vos actions
-      // const data = await getTournamentMemberById(memberId);
-      // setMember(data);
-      
-      // Pour l'instant, simulation
-      const mockMember = {
-        id: memberId,
-        tournamentId,
-        userId: "user-123",
-        role: "PARTICIPANT",
-        displayName: "ProPlayer",
-        gameTag: "Pro#1234",
-        avatar: null,
-        banner: null,
-        contactEmail: "pro@example.com",
-        contactPhone: "+33 1 23 45 67 89",
-        discordId: "proplayer#1234",
-        clubName: "Elite Gaming",
-        biography: "Joueur professionnel avec 5 ans d'expérience",
-        achievements: ["Champion 2023", "Top 10 Mondial", "MVP Saison 2024"],
-        totalEditions: 12,
-        totalWins: 45,
-        totalLosses: 15,
-        totalMatches: 60,
-        rankingPoints: 1250,
-        winRate: 75.0,
-        bestPosition: 1,
-        isVerified: true,
-        verificationLevel: "ADVANCED",
-        isActive: true,
-        isBanned: false,
-        metadata: {},
-        preferences: {
-          notifications: true,
-          emailUpdates: true,
-          publicProfile: true,
-        },
-        joinedAt: new Date("2023-01-15"),
-        lastActive: new Date(),
-      };
-      setMember(mockMember as any);
+      const data = await getTournamentMemberById(memberId);
+      if (data) {
+        setMember(data);
+      }
     } catch (error) {
       console.error("Erreur chargement membre:", error);
     } finally {
@@ -96,14 +60,29 @@ export default function MemberDetailPage() {
   };
 
   const isOwner = user?.id === member?.userId;
-  const isOrganizer = false; // À vérifier dans votre logique
+  const isOrganizer = member?.role === "ORGANIZER";
 
   if (loading) {
-    return <div>Chargement...</div>;
+    return (
+      <div className="mx-auto px-4 py-8 space-y-6">
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Skeleton className="h-64 rounded-xl" />
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-96 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!member) {
-    return <div>Membre non trouvé</div>;
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
+        <Typography variant="h4">Membre non trouvé</Typography>
+        <Button onClick={() => router.back()}>Retour</Button>
+      </div>
+    );
   }
 
   return (
@@ -120,7 +99,7 @@ export default function MemberDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-purple-500/20" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        
+
         <div className="absolute bottom-0 left-0 w-full p-6">
           <div className="flex items-end gap-6">
             <Avatar className="h-24 w-24 border-4 border-background">
@@ -129,7 +108,7 @@ export default function MemberDetailPage() {
                 {member.displayName?.[0] || "M"}
               </AvatarFallback>
             </Avatar>
-            
+
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <Typography variant="h1" weight="bold" className="text-3xl">
@@ -148,12 +127,12 @@ export default function MemberDetailPage() {
                   </Badge>
                 )}
               </div>
-              
+
               <Typography variant="body-lg" theme="muted">
                 {member.gameTag} • {member.clubName || "Sans club"}
               </Typography>
             </div>
-            
+
             <div className="ml-auto flex items-center gap-3">
               {(isOwner || isOrganizer) && (
                 <Button variant="outline" onClick={() => setIsEditing(true)}>
@@ -194,7 +173,7 @@ export default function MemberDetailPage() {
                     Victoires
                   </Typography>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1">
                     <Sword className="h-5 w-5 text-blue-500" />
@@ -206,7 +185,7 @@ export default function MemberDetailPage() {
                     Matchs
                   </Typography>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1">
                     <TrendingUp className="h-5 w-5 text-green-500" />
@@ -218,7 +197,7 @@ export default function MemberDetailPage() {
                     Win Rate
                   </Typography>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1">
                     <Award className="h-5 w-5 text-purple-500" />
@@ -250,7 +229,7 @@ export default function MemberDetailPage() {
                   </Typography>
                 </div>
               )}
-              
+
               {member.contactPhone && (
                 <div>
                   <Typography variant="caption2" theme="muted">
@@ -261,7 +240,7 @@ export default function MemberDetailPage() {
                   </Typography>
                 </div>
               )}
-              
+
               {member.discordId && (
                 <div>
                   <Typography variant="caption2" theme="muted">
@@ -284,7 +263,7 @@ export default function MemberDetailPage() {
               <TabsTrigger value="achievements">Réussites</TabsTrigger>
               <TabsTrigger value="history">Historique</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="profile" className="space-y-6">
               {/* Biography */}
               <Card>
@@ -329,7 +308,7 @@ export default function MemberDetailPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="achievements" className="space-y-6">
               <Card>
                 <CardHeader>

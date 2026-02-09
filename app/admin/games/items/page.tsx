@@ -89,10 +89,7 @@ export default function GameItemsAdminPage() {
     defaultFilters: {
       isDeleted: false,
     },
-    initialData: data?.pages.flatMap((page) => page.data),
     defaultLimit: 20,
-    fetchMethod: "server-action",
-    withRelations: true,
   });
 
   const { mutate: deleteItem } = useDeleteGameItem();

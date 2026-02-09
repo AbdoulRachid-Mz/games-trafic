@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Typography } from "@/components/ui/typography";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { TransactionType } from "@/types/transaction-types";
 import { cn } from "@/lib/utils";
+import { useEntityList, type EntityType } from "@/hooks/use-entity-list";
 
 interface TransactionEntity {
   id: string;
@@ -43,54 +44,38 @@ export function TransactionEntitySelector({
   onBack,
 }: TransactionEntitySelectorProps) {
   const [search, setSearch] = useState("");
-  const [entities, setEntities] = useState<TransactionEntity[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchEntities();
-  }, [type]);
-
-  const fetchEntities = async () => {
-    setLoading(true);
-    try {
-      let endpoint = "";
-      const params = new URLSearchParams();
-
-      switch (type) {
-        case "THEME_PURCHASE":
-          endpoint = "/api/themes";
-          params.append("public", "true");
-          params.append("isPremium", "true");
-          break;
-        case "PRODUCT_PURCHASE":
-          endpoint = "/api/products";
-          params.append("available", "true");
-          params.append("status", "NON_VENDU");
-          break;
-        case "TOURNAMENT_PARTICIPATION":
-          endpoint = "/api/tournaments";
-          params.append("upcoming", "true");
-          params.append("registrationOpen", "true");
-          break;
-        case "GAME_ITEM_PURCHASE":
-          endpoint = "/api/game-items";
-          params.append("available", "true");
-          params.append("isActive", "true");
-          break;
-        default:
-          setEntities([]);
-          return;
-      }
-
-      const response = await fetch(`${endpoint}?${params.toString()}`);
-      const data = await response.json();
-      setEntities(data.data || []);
-    } catch (error) {
-      console.error("Error fetching entities:", error);
-    } finally {
-      setLoading(false);
-    }
+  // Mapper les types de transactions vers les EntityType
+  const entityTypeMap: Record<TransactionType, EntityType | null> = {
+    THEME_PURCHASE: "themes",
+    PRODUCT_PURCHASE: "products",
+    TOURNAMENT_PARTICIPATION: "tournaments",
+    GAME_ITEM_PURCHASE: "game-items",
+    VIP_SUBSCRIPTION: null,
+    DEPOSIT: null,
+    WITHDRAWAL: null,
+    TRANSFER: null,
   };
+
+  const entityType = entityTypeMap[type];
+
+  // Utiliser useEntityList pour fetcher les entités
+  const {
+    data: entities,
+    loading,
+    error,
+    setSearchTerm,
+  } = useEntityList<TransactionEntity>({
+    entityType: entityType || "products", // Fallback to products
+    defaultLimit: 50,
+    enabled: !!entityType,
+    defaultFilters: {
+      isActive: true,
+      // Filtres spécifiques selon le type
+      ...(type === "PRODUCT_PURCHASE" && { status: "NON_VENDU" }),
+      ...(type === "THEME_PURCHASE" && { isPremium: true }),
+    },
+  });
 
   const getEntityIcon = () => {
     switch (type) {
@@ -122,11 +107,14 @@ export function TransactionEntitySelector({
     }
   };
 
-  const filteredEntities = entities.filter(
-    (entity) =>
-      entity.name?.toLowerCase().includes(search.toLowerCase()) ||
-      entity.description?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEntities = useMemo(() => {
+    return entities.filter(
+      (entity) =>
+        entity.name?.toLowerCase().includes(search.toLowerCase()) ||
+        entity.description?.toLowerCase().includes(search.toLowerCase()) ||
+        entity.id.toLowerCase() === search.toLowerCase()
+    );
+  }, [entities, search]);
 
   const Icon = getEntityIcon();
   const entityLabel = getEntityLabel();

@@ -6,7 +6,6 @@ import {
   getUserWallets, 
   updateUserWallet,
   getWalletStats,
-  getTotalPlatformBalance
 } from '@/actions/wallets';
 
 // GET /api/wallets - Lister les wallets avec pagination et filtres

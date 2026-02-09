@@ -100,7 +100,7 @@ export default function AdminLayout({
 
   // Construire la sidebar
   const AdminSidebar = (
-    <SidebarContainer sidebarBgType="gradient">
+    <SidebarContainer sidebarBgType='default'>
       <SidebarHeader
         title="Administration"
         subtitle={`Niveau ${adminLevel}`}
@@ -108,7 +108,7 @@ export default function AdminLayout({
           username: user?.username || "Admin",
           level: adminLevel,
         }}
-        sidebarBgType="gradient"
+        sidebarBgType="default"
       />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">

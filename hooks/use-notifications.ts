@@ -13,6 +13,9 @@ import {
   markAllNotificationsAsRead,
   deleteNotification,
   getUnreadCount,
+  getNotificationById,
+  createNotification,
+  updateNotification,
 } from "@/actions/notifications";
 import type { NotificationFilters } from "@/actions/notifications";
 
@@ -27,6 +30,42 @@ const notificationKeys = {
   unread: (userId: string) => [...notificationKeys.all, "unread", userId] as const,
   detail: (id: string) => [...notificationKeys.all, "detail", id] as const,
 };
+
+/**
+ * Hook for a single notification
+ */
+export function useNotification(id: string) {
+  return useQuery({
+    queryKey: notificationKeys.detail(id),
+    queryFn: () => getNotificationById(id),
+    enabled: !!id,
+  });
+}
+
+/**
+ * Mutation for updating a notification
+ */
+export function useUpdateNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      updateNotification(id, data),
+    onSuccess: (result) => {
+      if (result.success && result.data?.userId) {
+        queryClient.invalidateQueries({
+          queryKey: notificationKeys.infinite(result.data.userId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: notificationKeys.unread(result.data.userId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: notificationKeys.detail(result.data.id),
+        });
+      }
+    },
+  });
+}
 
 /**
  * Hook optimized for infinite scroll of user notifications
@@ -292,6 +331,27 @@ export function useDeleteNotification() {
       queryClient.invalidateQueries({
         queryKey: notificationKeys.unread(vars.userId),
       });
+    },
+  });
+}
+
+/**
+ * Mutation for creating a notification
+ */
+export function useCreateNotification() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (notificationData: any) => createNotification(notificationData),
+    onSuccess: (result) => {
+      if (result.success && result.data?.userId) {
+        queryClient.invalidateQueries({
+          queryKey: notificationKeys.infinite(result.data.userId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: notificationKeys.unread(result.data.userId),
+        });
+      }
     },
   });
 }

@@ -9,19 +9,19 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import { getTournamentEditionWithRelations } from "@/actions/editions";
 import { getTournamentById, getTournamentEditionById, getTournamentMembers, getTournamentPhases } from "@/actions/tournaments";
-// import { getTournamentById, getTournamentEditionById, getTournamentMembers, getTournamentPhases } from "@/actions/tournanents";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     tournamentId: string;
     editionId: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const edition = await getTournamentEditionById(params.editionId);
+  const { editionId } = await params;
+  const edition = await getTournamentEditionById(editionId);
   return {
     title: edition
       ? `Édition ${edition.name || `#${edition.editionNumber}`}`
@@ -30,7 +30,7 @@ export async function generateMetadata({
 }
 
 export default async function EditionPage({ params }: PageProps) {
-  const { tournamentId, editionId } = params;
+  const { tournamentId, editionId } = await params;
   const user = await getCurrentUser();
 
   const [tournament, editionWithRelations] = await Promise.all([

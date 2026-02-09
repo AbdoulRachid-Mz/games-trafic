@@ -50,6 +50,13 @@
       "when": 1770064348815,
       "tag": "0006_last_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770556516021,
+      "tag": "0007_nostalgic_tombstone",
+      "breakpoints": true
     }
   ]
 }

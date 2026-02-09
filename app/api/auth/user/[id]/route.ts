@@ -3,18 +3,18 @@ import { AuthService } from '@/lib/auth/service';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = params.id;
+    const { id } = await params;
     
     // Vérifier que l'utilisateur a accès à ces données
     const session = await AuthService.getSession();
-    if (!session || session.user.id !== userId) {
+    if (!session || session.user.id !== id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userData = await AuthService.getCompleteUserData(userId);
+    const userData = await AuthService.getCompleteUserData(id);
     
     if (!userData) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

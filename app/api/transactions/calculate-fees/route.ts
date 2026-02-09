@@ -1,67 +1,99 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { appSettings } from "@/database/schema";
 
 export async function POST(request: NextRequest) {
   try {
+    const contentType = request.headers.get("content-type");
+
+    if (!contentType?.includes("application/json")) {
+      return NextResponse.json(
+        { error: "Content-Type invalide" },
+        { status: 415 }
+      );
+    }
+
     const data = await request.json();
-    
-    if (!data.type || !data.amount) {
+
+    if (!data?.type || typeof data.amount !== "number") {
       return NextResponse.json(
         { error: "Type et montant requis" },
         { status: 400 }
       );
     }
 
-    // Récupérer les paramètres d'application
     const settings = await db.query.appSettings.findFirst();
-    
-    let feePercentage = 0;
-    const amount = parseFloat(data.amount);
 
-    // Déterminer le pourcentage selon le type
-    switch (data.type) {
-      case "THEME_PURCHASE":
-        feePercentage = parseFloat(settings?.purchaseFeePercentage?.toString() || "0.01");
-        break;
-      case "VIP_SUBSCRIPTION":
-        feePercentage = parseFloat(settings?.transactionFeePercentage?.toString() || "0.005");
-        break;
-      case "PRODUCT_PURCHASE":
-        feePercentage = parseFloat(settings?.purchaseFeePercentage?.toString() || "0.02");
-        break;
-      case "TOURNAMENT_PARTICIPATION":
-        feePercentage = parseFloat(settings?.tournamentParticipationFeePercentage?.toString() || "0.015");
-        break;
-      case "GAME_ITEM_PURCHASE":
-        feePercentage = parseFloat(settings?.gameItemCommissionPercentage?.toString() || "0.03");
-        break;
-      case "DEPOSIT":
-        feePercentage = parseFloat(settings?.depositFeePercentage?.toString() || "0.001");
-        break;
-      case "WITHDRAWAL":
-        feePercentage = parseFloat(settings?.withdrawalFeePercentage?.toString() || "0.02");
-        break;
-      case "TRANSFER":
-        feePercentage = parseFloat(settings?.transferFeePercentage?.toString() || "0.005");
-        break;
-      default:
-        feePercentage = 0.01;
+    if (!settings) {
+      return NextResponse.json(
+        { error: "Paramètres de l'application introuvables" },
+        { status: 500 }
+      );
     }
 
-    const fees = amount * feePercentage;
-    const totalAmount = amount + fees;
+    let feePercentage = 0;
+    const amount = Number(data.amount);
+
+    if (isNaN(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: "Montant invalide" },
+        { status: 400 }
+      );
+    }
+
+    switch (data.type) {
+      case "THEME_PURCHASE":
+      case "PRODUCT_PURCHASE":
+        feePercentage = Number(settings.purchaseFeePercentage ?? 0.01);
+        break;
+
+      case "VIP_SUBSCRIPTION":
+        feePercentage = Number(settings.transactionFeePercentage ?? 0.005);
+        break;
+
+      case "TOURNAMENT_PARTICIPATION":
+        feePercentage = Number(settings.tournamentParticipationFeePercentage ?? 0.015);
+        break;
+
+      case "GAME_ITEM_PURCHASE":
+        feePercentage = Number(settings.gameItemCommissionPercentage ?? 0.03);
+        break;
+
+      case "DEPOSIT":
+        feePercentage = Number(settings.depositFeePercentage ?? 0.001);
+        break;
+
+      case "WITHDRAWAL":
+        feePercentage = Number(settings.withdrawalFeePercentage ?? 0.02);
+        break;
+
+      case "TRANSFER":
+        feePercentage = Number(settings.transferFeePercentage ?? 0.005);
+        break;
+
+      default:
+        return NextResponse.json(
+          { error: "Type de transaction invalide" },
+          { status: 400 }
+        );
+    }
+
+    const fees = Number((amount * feePercentage).toFixed(2));
+    const totalAmount = Number((amount + fees).toFixed(2));
 
     return NextResponse.json({
       feePercentage,
       fees,
       totalAmount,
-      currency: "GTC"
+      currency: "GTC",
     });
   } catch (error) {
     console.error("Error calculating fees:", error);
+
     return NextResponse.json(
-      { error: "Erreur lors du calcul des frais" },
+      {
+        error: "Erreur lors du calcul des frais",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

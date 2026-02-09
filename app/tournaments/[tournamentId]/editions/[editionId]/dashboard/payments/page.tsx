@@ -27,26 +27,24 @@ import {
   WalletTransaction,
 } from "@/database/schema";
 
-interface DashboardPaymentsPageProps {
-  params: {
+interface PageProps {
+  params: Promise<{
     tournamentId: string;
     editionId: string;
-  };
+  }>;
 }
 
 type RegistrationWithPayment = EditionRegistration & {
   member: TournamentMember;
   payment:
-    | (RegistrationPayment & {
-        transaction?: WalletTransaction;
-      })
-    | null;
+  | (RegistrationPayment & {
+    transaction?: WalletTransaction;
+  })
+  | null;
 };
 
-export default async function DashboardPaymentsPage({
-  params,
-}: DashboardPaymentsPageProps) {
-  const { editionId } = params;
+export default async function DashboardPaymentsPage({ params }: PageProps) {
+  const { editionId } = await params;
 
   const registrationsResponse = await getEditionRegistrations({
     filters: { editionId },
@@ -113,16 +111,16 @@ export default async function DashboardPaymentsPage({
                         payment.status === "COMPLETED"
                           ? "default"
                           : payment.status === "PENDING"
-                          ? "secondary"
-                          : "destructive"
+                            ? "secondary"
+                            : "destructive"
                       }
                       className="font-normal"
                     >
                       {payment.status === "COMPLETED"
                         ? "Complété"
                         : payment.status === "PENDING"
-                        ? "En attente"
-                        : payment.status}
+                          ? "En attente"
+                          : payment.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">

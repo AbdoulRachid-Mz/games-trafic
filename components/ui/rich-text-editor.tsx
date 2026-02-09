@@ -89,6 +89,7 @@ export function RichTextEditor({
       onChange(html);
     },
     editable: !disabled,
+    immediatelyRender: false,
   });
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -128,34 +129,34 @@ export function RichTextEditor({
     <div className="relative">
       {/* Top Toolbar */}
       {showToolbar && toolbarPosition === 'top' && editor && (
-        <Toolbar 
-          editor={editor} 
+        <Toolbar
+          editor={editor}
           variant={variant}
           allowedFormats={allowedFormats}
           onAddLink={() => setShowLinkDialog(true)}
           onAddImage={() => setShowImageDialog(true)}
         />
       )}
-      
+
       {/* Editor Content */}
-      <div 
+      <div
         className={editorClasses}
-        style={{ 
-          minHeight: minHeight, 
+        style={{
+          minHeight: minHeight,
           maxHeight: maxHeight,
-          overflowY: 'auto' 
+          overflowY: 'auto'
         }}
       >
-        <EditorContent 
-          editor={editor} 
+        <EditorContent
+          editor={editor}
           onKeyDown={handleKeyDown}
         />
       </div>
 
       {/* Bottom Toolbar */}
       {showToolbar && toolbarPosition === 'bottom' && editor && (
-        <Toolbar 
-          editor={editor} 
+        <Toolbar
+          editor={editor}
           variant={variant}
           allowedFormats={allowedFormats}
           onAddLink={() => setShowLinkDialog(true)}
@@ -167,8 +168,8 @@ export function RichTextEditor({
       {/* Floating Toolbar */}
       {showToolbar && toolbarPosition === 'floating' && editor && (
         <div className="absolute bottom-2 left-2 right-2">
-          <Toolbar 
-            editor={editor} 
+          <Toolbar
+            editor={editor}
             variant={variant}
             allowedFormats={allowedFormats}
             onAddLink={() => setShowLinkDialog(true)}

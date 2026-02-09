@@ -31,7 +31,7 @@ export const entityTypeEnum = pgEnum('entity_type', [
   'PARTNER'
 ]);
 export const productStatusEnum = pgEnum('product_status', ['NON_VENDU', 'RESERVE', 'EN_ECHANGE', 'LIVRE', 'VENDU', 'ANNULER']);
-export const interactionTypeEnum = pgEnum('interaction_type', ['LIKE', 'FOLLOW', 'BOOKMARK', 'VIEW']);
+export const interactionTypeEnum = pgEnum('interaction_type', ['LIKE', 'FOLLOW', 'BOOKMARK', 'VIEW', 'SHARE']);
 export const platformEnum = pgEnum('platform', ['PC', 'PLAYSTATION', 'XBOX', 'NINTENDO_SWITCH', 'MOBILE', 'VR', 'OTHER']);
 export const gameItemTypeEnum = pgEnum('game_item_type', ['COIN', 'ITEM', 'SKIN', 'EQUIPMENT', 'CURRENCY']);
 export const gameItemStatusEnum = pgEnum('game_item_status', ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED']);
@@ -1736,6 +1736,7 @@ export const notifications = pgTable('notifications', {
   isDeleted: boolean('is_deleted').default(false),
 
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const pushSubscriptions = pgTable('push_subscriptions', {

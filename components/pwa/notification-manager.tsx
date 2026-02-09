@@ -8,9 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, BellOff, Settings, CheckCircle, X } from "lucide-react";
 import { toast } from "sonner";
+import { useUserProfile } from "@/hooks/use-profile";
+import { useMarkAllAsRead, useNotification } from "@/hooks/use-notifications";
+
 
 export default function NotificationManager() {
-  const { user, isAuthenticated, notifications, refreshNotifications } = useAuthContext();
+  const { user, isAuthenticated } = useAuthContext();
+  const { data: profile, loading: profileLoading, error: profileError } = useUserProfile(
+    { mode: "partial", relations: ["notifications"] }
+  );
+
   const push = usePushNotifications();
   
   const [showManager, setShowManager] = useState(false);
@@ -18,10 +25,12 @@ export default function NotificationManager() {
 
   // Mettre à jour le compteur de notifications non lues
   useEffect(() => {
-    if (notifications?.unread) {
-      setUnreadCount(notifications.unread.length);
+    if (profile?.notifications?.unread) {
+      setUnreadCount(profile.notifications.unread.length);
     }
-  }, [notifications]);
+  }, [profile]);
+
+  const { mutate: markAllNotificationsAsRead } = useMarkAllAsRead();
 
   // Vérifier si les notifications sont supportées au démarrage
   useEffect(() => {
@@ -62,8 +71,8 @@ export default function NotificationManager() {
   const handleMarkAllAsRead = async () => {
     try {
       // Implémentez cette action selon votre backend
-      // await markAllNotificationsAsRead(user.id);
-      await refreshNotifications();
+      await markAllNotificationsAsRead(user?.id ?? '');
+      await push.unsubscribe();
       toast.success("Toutes les notifications marquées comme lues");
     } catch (error) {
       toast.error("Erreur lors du marquage des notifications");
@@ -167,17 +176,17 @@ export default function NotificationManager() {
               </div>
 
               {/* Notifications non lues */}
-              {isAuthenticated && notifications?.unread && notifications.unread.length > 0 && (
+              {isAuthenticated && profile?.notifications?.unread && profile.notifications.unread.length > 0 && (
                 <div className="border-t pt-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Notifications non lues</span>
                     <Badge variant="destructive">
-                      {notifications.unread.length}
+                      {profile.notifications.unread.length}
                     </Badge>
                   </div>
                   
                   <div className="max-h-48 overflow-y-auto space-y-2">
-                    {notifications.unread.slice(0, 3).map((notification: any) => (
+                    {profile.notifications.unread.slice(0, 3).map((notification: any) => (
                       <div 
                         key={notification.id}
                         className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded text-sm"
@@ -190,9 +199,9 @@ export default function NotificationManager() {
                     ))}
                   </div>
                   
-                  {notifications.unread.length > 3 && (
+                  {profile.notifications.unread.length > 3 && (
                     <p className="text-xs text-muted-foreground text-center">
-                      + {notifications.unread.length - 3} autres notifications
+                      + {profile.notifications.unread.length - 3} autres notifications
                     </p>
                   )}
                   

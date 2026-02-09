@@ -100,6 +100,15 @@ const transactionTypes = [
     iconColor: "text-pink-400",
     bg: "bg-pink-500/10",
   },
+  {
+    id: "QR_SCAN" as any,
+    label: "Scanner QR",
+    icon: CreditCard,
+    description: "Scanner pour payer",
+    color: "from-cyan-400 to-blue-500",
+    iconColor: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+  },
 ];
 
 export function TransactionTypeSelector({
@@ -123,7 +132,7 @@ export function TransactionTypeSelector({
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {transactionTypes.map((type, index) => {
-          const config = TRANSACTION_CONFIGS[type.id];
+          const config = TRANSACTION_CONFIGS[type.id as TransactionType];
           return (
             <motion.button
               key={type.id}

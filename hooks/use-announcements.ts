@@ -1,7 +1,61 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { getAnnouncementById, getAnnouncements, getAnnouncementStats, hasUserReadAnnouncement } from '@/actions/announcements';
+import {
+  getAnnouncementById,
+  getAnnouncements,
+  getAnnouncementStats,
+  hasUserReadAnnouncement,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+} from '@/actions/announcements';
 import type { AnnouncementFilters, ListQuery, PaginationResponse } from '@/types/api';
-import type { Announcement } from '@/database/schema';
+import type { Announcement, NewAnnouncement } from '@/database/schema';
+
+
+/**
+ * Hook to create a new announcement
+ */
+export function useCreateAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: NewAnnouncement) => createAnnouncement(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.stats() });
+    },
+  });
+}
+
+/**
+ * Hook to update an existing announcement
+ */
+export function useUpdateAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<NewAnnouncement> }) =>
+      updateAnnouncement(id, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.stats() });
+    },
+  });
+}
+
+/**
+ * Hook to delete an announcement
+ */
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteAnnouncement(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: announcementKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: announcementKeys.stats() });
+    },
+  });
+}
 
 // Query keys factory for announcements
 const announcementKeys = {

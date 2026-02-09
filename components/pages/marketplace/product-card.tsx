@@ -31,6 +31,16 @@ import {
 } from "lucide-react";
 import type { Product } from "@/database/schema";
 import { useRouter } from "next/navigation";
+import { QrCode, ShoppingCart } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { TransactionQRCode } from "@/components/shared/qr-code";
+import { encodeTransactionQR } from "@/utils/qr-utils";
 
 interface ProductCardProps {
   product: Product & {
@@ -203,7 +213,7 @@ export function ProductCard({
           className={cn(
             "border-none text-xs font-bold",
             statusConfig[product.status as keyof typeof statusConfig]?.color ||
-              "bg-gray-600",
+            "bg-gray-600",
           )}
         >
           {statusConfig[product.status as keyof typeof statusConfig]?.label ||
@@ -388,10 +398,45 @@ export function ProductCard({
               />
             )}
             {showBuyButton && product.status === "NON_VENDU" && (
-              <Button size="sm" onClick={handleBuy} className="gap-2">
-                <ShoppingBag className="w-4 h-4" />
-                Acheter
-              </Button>
+              <div className="flex items-center gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 w-9 p-0 rounded-xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50 rounded-[2.5rem] p-0 overflow-hidden">
+                    <div className="p-8">
+                      <DialogHeader className="mb-6">
+                        <DialogTitle className="font-black italic uppercase tracking-tighter text-2xl">Achat Rapide</DialogTitle>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Scannez pour acheter ce produit</p>
+                      </DialogHeader>
+                      <div className="flex justify-center">
+                        <TransactionQRCode
+                          data={encodeTransactionQR({
+                            t: "PRODUCT_PURCHASE",
+                            id: product.id,
+                            a: typeof product.price === "number" ? product.price : parseFloat(product.price as string),
+                            m: { name: product.name }
+                          })}
+                          label={product.name}
+                          className="shadow-none border-none p-0 bg-transparent"
+                        />
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Button size="sm" onClick={handleBuy} className="gap-2 px-4 rounded-xl font-bold">
+                  <ShoppingBag className="w-4 h-4" />
+                  Acheter
+                </Button>
+              </div>
             )}
           </div>
         )}

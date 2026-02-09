@@ -30,10 +30,12 @@ import { SuccessDialog, ErrorDialog } from "@/components/shared/result-dialog";
 import { createShop } from "@/actions/shops";
 import { getCurrentUserWallet } from "@/actions/wallets";
 import { useScreenSize } from "@/hooks/use-screen";
+import { useUserProfile } from "@/hooks/use-profile";
 
 export default function CreateShopPage() {
   const router = useRouter();
-  const { user, completeData } = useAuthContext();
+  const { user } = useAuthContext();
+  const { data: completeData } = useUserProfile();
   const { isSmallScreen, isXLargeScreen } = useScreenSize();
   const [isLoading, setIsLoading] = useState(false);
   const [hasWallet, setHasWallet] = useState(false);

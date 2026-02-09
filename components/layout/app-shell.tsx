@@ -199,7 +199,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     toggleAnnouncements,
     isAuthenticated,
   ]);
-
+console.log("resolved:", resolved);
   // Handle maintenance mode
   useEffect(() => {
     if (maintenanceMode && !isAdmin && isInitialized) {

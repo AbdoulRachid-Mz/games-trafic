@@ -56,7 +56,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProfileTabs } from "./profile-tabs";
-import { QRCodeDisplay } from "@/components/shared/qr-code";
+import { QRCodeDisplay } from "@/components/shared/qr-code-2";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface UserProfileProps {

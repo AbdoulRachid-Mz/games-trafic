@@ -44,17 +44,6 @@ export default function TournamentsDashboardPage() {
   } = useEntityList<Tournament>({
     entityType: "tournaments",
     defaultLimit: isSmallScreen ? 12 : isMediumScreen ? 15 : 20,
-    fetchFunction: async (params) => {
-      const res = await getTournaments({
-        pagination: { page: params.page, limit: params.limit },
-        filters: params,
-      });
-      return {
-        success: true,
-        data: res.data,
-        pagination: res.pagination,
-      };
-    },
   });
 
   const renderTournamentCard = (t: Tournament, index: number) => {

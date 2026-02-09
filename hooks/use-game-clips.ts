@@ -2,7 +2,7 @@
 "use client";
 
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getGameClips, getGameClipById, createGameClip } from "@/actions/game-clips";
+import { getGameClips, getGameClipById, createGameClip, shareGameClip } from "@/actions/game-clips";
 import { useAuthContext } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { useCallback } from "react";
@@ -77,6 +77,21 @@ export function useGameClips(filters: ClipFilters = {}) {
     },
   });
 
+  const shareMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user?.id) throw new Error("User required");
+      return await shareGameClip({ id, userId: user.id });
+    },
+    onSuccess: () => {
+      toast.success("Clip partagé avec succès");
+      queryClient.invalidateQueries({ queryKey: ["game-clips"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Erreur lors du partage du clip");
+      console.error(error);
+    },
+  });
+
   const getClip = useCallback(
     async (id: string) => {
       return await getGameClipById(id, user?.id);
@@ -93,6 +108,8 @@ export function useGameClips(filters: ClipFilters = {}) {
     refresh: refetch,
     createClip: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
+    shareClip: shareMutation.mutateAsync,
+    isSharing: shareMutation.isPending,
     getClip,
   };
 }

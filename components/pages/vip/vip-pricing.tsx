@@ -15,6 +15,16 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { QrCode } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { TransactionQRCode } from "@/components/shared/qr-code";
+import { encodeTransactionQR } from "@/utils/qr-utils";
 
 import { useUserProfile } from "@/hooks/use-profile";
 
@@ -232,6 +242,35 @@ export function VipPricing({ prices, highlightedPlan }: VipPricingProps) {
                     "Choisir ce plan"
                   )}
                 </Button>
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full mt-2 h-10 rounded-xl gap-2 font-bold text-muted-foreground hover:text-primary">
+                      <QrCode className="h-4 w-4" />
+                      Payer par QR
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50 rounded-[2.5rem] p-0 overflow-hidden">
+                    <div className="p-8">
+                      <DialogHeader className="mb-6">
+                        <DialogTitle className="font-black italic uppercase tracking-tighter text-2xl">Paiement VIP</DialogTitle>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Scannez pour activer votre abonnement {plan.name}</p>
+                      </DialogHeader>
+                      <div className="flex justify-center">
+                        <TransactionQRCode
+                          data={encodeTransactionQR({
+                            t: "VIP_SUBSCRIPTION",
+                            id: plan.id,
+                            a: plan.price,
+                            m: { plan: plan.id }
+                          })}
+                          label={`VIP ${plan.name}`}
+                          className="shadow-none border-none p-0 bg-transparent"
+                        />
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardFooter>
             </Card>
           </motion.div>

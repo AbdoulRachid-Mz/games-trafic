@@ -348,3 +348,138 @@ export function TournamentStatsChart({
     </ChartContainer>
   );
 }
+
+// --- Generic Distribution Pie Chart ---
+
+export function StatusDistributionChart({
+  data,
+  config,
+  height = 300,
+}: {
+  data: { name: string; value: number }[];
+  config: ChartConfig;
+  height?: number;
+}) {
+  return (
+    <ChartContainer config={config} className="w-full">
+      <ResponsiveContainer width="100%" height={height}>
+        <PieChart>
+          <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={2}
+          >
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={`var(--color-${entry.name.toLowerCase()})`}
+              />
+            ))}
+          </Pie>
+          <ChartLegend
+            content={<ChartLegendContent />}
+            className="flex-wrap gap-2"
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// --- Generic growth Chart ---
+
+export function EntityGrowthChart({
+  data,
+  dataKey,
+  label,
+  color = "hsl(var(--primary))",
+  height = 300,
+}: {
+  data: any[];
+  dataKey: string;
+  label: string;
+  color?: string;
+  height?: number;
+}) {
+  const config = {
+    [dataKey]: {
+      label,
+      color,
+    },
+  };
+
+  return (
+    <ChartContainer config={config} className="w-full">
+      <ResponsiveContainer width="100%" height={height}>
+        <AreaChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+          />
+          <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Area
+            type="monotone"
+            dataKey={dataKey}
+            stroke={`var(--color-${dataKey})`}
+            fill={`var(--color-${dataKey})`}
+            fillOpacity={0.2}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// --- Generic Vertical Bar Chart ---
+
+export function TypeDistributionBarChart({
+  data,
+  dataKey,
+  label,
+  color = "hsl(var(--primary))",
+  height = 300,
+}: {
+  data: any[];
+  dataKey: string;
+  label: string;
+  color?: string;
+  height?: number;
+}) {
+  const config = {
+    [dataKey]: {
+      label,
+      color,
+    },
+  };
+
+  return (
+    <ChartContainer config={config} className="w-full">
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+          />
+          <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Bar
+            dataKey={dataKey}
+            fill={`var(--color-${dataKey})`}
+            radius={[4, 4, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}

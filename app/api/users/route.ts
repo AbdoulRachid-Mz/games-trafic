@@ -15,14 +15,64 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const search = searchParams.get('search') || undefined;
+    const id = searchParams.get('id') || undefined;
+    const authUid = searchParams.get('authUid') || undefined;
+    const email = searchParams.get('email') || undefined;
+    const emailVerified = searchParams.get('emailVerified') === 'true';
+    const username = searchParams.get('username') || undefined;
+    const fullName = searchParams.get('fullName') || undefined;
     const country = searchParams.get('country') || undefined;
-    const isVerified = searchParams.get('isVerified') === 'true';
+    const countryCode = searchParams.get('countryCode') || undefined;
+    const isPublicProfile = searchParams.get('isPublicProfile') === 'true';
     const isVip = searchParams.get('isVip') === 'true';
-    const isActive = searchParams.get('isActive') === 'true';
+    const isAdmin = searchParams.get('isAdmin') === 'true';
+    const isAnonymous = searchParams.get('isAnonymous') === 'true';
+    const role = searchParams.get('role') || undefined;
+    const banned = searchParams.get('banned') === 'true';
+    const accountTypes = searchParams.get('accountTypes')?.split(',') || undefined;
+    const level = searchParams.get('level')?.split(',') as ("A" | "B" | "C")[] || undefined;
+    const shopsCreatedCountMin = searchParams.get('shopsCreatedCountMin') ? parseInt(searchParams.get('shopsCreatedCountMin')!, 10) : undefined;
+    const shopsCreatedCountMax = searchParams.get('shopsCreatedCountMax') ? parseInt(searchParams.get('shopsCreatedCountMax')!, 10) : undefined;
+    const tournamentsCreatedCountMin = searchParams.get('tournamentsCreatedCountMin') ? parseInt(searchParams.get('tournamentsCreatedCountMin')!, 10) : undefined;
+    const tournamentsCreatedCountMax = searchParams.get('tournamentsCreatedCountMax') ? parseInt(searchParams.get('tournamentsCreatedCountMax')!, 10) : undefined;
+    const postsCreatedCountMin = searchParams.get('postsCreatedCountMin') ? parseInt(searchParams.get('postsCreatedCountMin')!, 10) : undefined;
+    const postsCreatedCountMax = searchParams.get('postsCreatedCountMax') ? parseInt(searchParams.get('postsCreatedCountMax')!, 10) : undefined;
+    const lastLoginFrom = searchParams.get('lastLoginFrom') || undefined;
+    const lastLoginTo = searchParams.get('lastLoginTo') || undefined;
+    const createdFrom = searchParams.get('createdFrom') || undefined;
+    const createdTo = searchParams.get('createdTo') || undefined;
 
     const result = await getUsers({
       pagination: { page, limit },
-      filters: { search, country, isVerified, isVip, isActive },
+      filters: {
+        search,
+        id,
+        authUid,
+        email,
+        emailVerified,
+        username,
+        fullName,
+        country,
+        countryCode,
+        isPublicProfile,
+        isVip,
+        isAdmin,
+        isAnonymous,
+        role,
+        banned,
+        accountTypes,
+        level,
+        shopsCreatedCountMin,
+        shopsCreatedCountMax,
+        tournamentsCreatedCountMin,
+        tournamentsCreatedCountMax,
+        postsCreatedCountMin,
+        postsCreatedCountMax,
+        lastLoginFrom,
+        lastLoginTo,
+        createdFrom,
+        createdTo,
+      },
       options: { sortBy: 'createdAt', sortOrder: 'desc' }
     });
 

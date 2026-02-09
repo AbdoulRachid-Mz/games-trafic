@@ -81,7 +81,6 @@ export function CommentList({
             entityType={entityType}
             onDelete={() => handleDelete(comment.id)}
             onReply={() => handleReply(comment.id)}
-            onMarkAsRead={() => handleMarkAsRead(comment.id)}
             isReplying={replyingTo === comment.id}
             replies={repliesByParent[comment.id] || []}
             onCommentAdded={onCommentAdded}
@@ -98,7 +97,6 @@ export function CommentList({
                   entityType={entityType}
                   onDelete={() => handleDelete(reply.id)}
                   onReply={() => handleReply(reply.id)}
-                  onMarkAsRead={() => handleMarkAsRead(reply.id)}
                   isReplying={replyingTo === reply.id}
                   depth={1}
                   onCommentAdded={onCommentAdded}

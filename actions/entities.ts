@@ -18,7 +18,7 @@ import {
   isNull,
   isNotNull,
 } from "drizzle-orm";
-import type { PaginationResponse, BaseFilters, SortOptions } from "@/types/api";
+import { PaginationResponse, EntityQueryParams, TableName, entityFetchers } from "@/types/api";
 
 /**
  * Fonction utilitaire pour vérifier si un export est une table Drizzle
@@ -27,16 +27,6 @@ function isTable(val: any): val is PgTable<any> {
   return !!val && typeof val === "object" && ("_" in val || "pgConfig" in val);
 }
 
-// Type pour les noms de tables
-export type TableName = keyof typeof schema;
-
-// Type pour les paramètres de requête
-export interface EntityQueryParams extends BaseFilters, SortOptions {
-  page?: number;
-  limit?: number;
-  offset?: number;
-  [key: string]: any;
-}
 
 // Fonction utilitaire pour construire les conditions WHERE
 function buildWhereConditions(table: any, filters: EntityQueryParams) {
@@ -512,15 +502,201 @@ export async function getGameClips(params: EntityQueryParams = {}) {
   };
 }
 
-// Export d'une map pour faciliter l'accès aux fonctions spécifiques
-export const entityFetchers = {
-  users: getUsers,
-  shops: getShops,
-  products: getProducts,
-  tournaments: getTournaments,
-  gameClips: getGameClips,
-  // Ajouter d'autres fonctions spécifiques ici au besoin
-} as const;
+/**
+ * Fonction optimisée pour récupérer des orders
+ */
+export async function getOrders(params: EntityQueryParams = {}) {
+  const table = schema.orders;
+  const conditions: any[] = [];
+
+  if (params.buyerId) {
+    conditions.push(eq(table.buyerId, params.buyerId));
+  }
+
+  if (params.productId) {
+    conditions.push(eq(table.productId, params.productId));
+  }
+
+  if (params.shopId) {
+    conditions.push(eq(table.shopId, params.shopId));
+  }
+
+  if (params.status) {
+    conditions.push(eq(table.status, params.status));
+  }
+
+  if (params.search) {
+    // Recherche dans les notes ou autres champs texte
+    if (table.message) {
+      conditions.push(like(table.message, `%${params.search}%`));
+    }
+  }
+
+
+  if (table.isDeleted) {
+    conditions.push(eq(table.isDeleted, params.isDeleted ?? false));
+  }
+
+  const page = params.page || 1;
+  const limit = params.limit || 20;
+  const offset = (page - 1) * limit;
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(table)
+    .where(whereClause);
+
+  const orderBy = buildOrderBy(table, params.sortBy, params.sortOrder);
+  let query = db.select().from(table).where(whereClause);
+
+  if (orderBy) {
+    query = query.orderBy(orderBy) as any;
+  }
+
+  const data = await query.limit(limit).offset(offset);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total: Number(total),
+      totalPages: Math.ceil(Number(total) / limit),
+      hasNext: page < Math.ceil(Number(total) / limit),
+      hasPrev: page > 1,
+    },
+  };
+}
+
+/**
+ * Fonction optimisée pour récupérer des themes
+ */
+export async function getThemes(params: EntityQueryParams = {}) {
+  const table = schema.themes;
+  const conditions: any[] = [];
+
+  if (params.creatorId) {
+    conditions.push(eq(table.creatorId, params.creatorId));
+  }
+
+  if (params.search) {
+    conditions.push(
+      or(
+        like(table.name, `%${params.search}%`),
+        like(table.description, `%${params.search}%`),
+      )!,
+    );
+  }
+
+  if (params.isActive !== undefined) {
+    conditions.push(eq(table.isActive, params.isActive));
+  }
+
+  if (table.isDeleted) {
+    conditions.push(eq(table.isDeleted, params.isDeleted ?? false));
+  }
+
+  const page = params.page || 1;
+  const limit = params.limit || 20;
+  const offset = (page - 1) * limit;
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(table)
+    .where(whereClause);
+
+  const orderBy = buildOrderBy(table, params.sortBy, params.sortOrder);
+  let query = db.select().from(table).where(whereClause);
+
+  if (orderBy) {
+    query = query.orderBy(orderBy) as any;
+  }
+
+  const data = await query.limit(limit).offset(offset);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total: Number(total),
+      totalPages: Math.ceil(Number(total) / limit),
+      hasNext: page < Math.ceil(Number(total) / limit),
+      hasPrev: page > 1,
+    },
+  };
+}
+
+/**
+ * Fonction optimisée pour récupérer des game items
+ */
+export async function getGameItems(params: EntityQueryParams = {}) {
+  const table = schema.gameItems;
+  const conditions: any[] = [];
+
+  if (params.gameId) {
+    conditions.push(eq(table.gameId, params.gameId));
+  }
+
+  if (params.type) {
+    conditions.push(eq(table.type, params.type));
+  }
+
+  if (params.status) {
+    conditions.push(eq(table.processingTime, params.status));
+  }
+
+  if (params.search) {
+    conditions.push(
+      or(
+        like(table.name, `%${params.search}%`),
+        like(table.description, `%${params.search}%`),
+      )!,
+    );
+  }
+
+  if (params.isActive !== undefined) {
+    conditions.push(eq(table.isActive, params.isActive));
+  }
+
+  if (table.isDeleted) {
+    conditions.push(eq(table.isDeleted, params.isDeleted ?? false));
+  }
+
+  const page = params.page || 1;
+  const limit = params.limit || 20;
+  const offset = (page - 1) * limit;
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(table)
+    .where(whereClause);
+
+  const orderBy = buildOrderBy(table, params.sortBy, params.sortOrder);
+  let query = db.select().from(table).where(whereClause);
+
+  if (orderBy) {
+    query = query.orderBy(orderBy) as any;
+  }
+
+  const data = await query.limit(limit).offset(offset);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total: Number(total),
+      totalPages: Math.ceil(Number(total) / limit),
+      hasNext: page < Math.ceil(Number(total) / limit),
+      hasPrev: page > 1,
+    },
+  };
+}
+
 
 /**
  * Fonction principale pour récupérer des entités
@@ -552,7 +728,7 @@ export async function deleteEntity(
     const table =
       (schema as any)[tableName] ||
       (schema as any)[
-        tableName.replace(/-([a-z])/g, (g) => g[1].toUpperCase())
+      tableName.replace(/-([a-z])/g, (g) => g[1].toUpperCase())
       ];
 
     if (!table || !isTable(table)) {
@@ -576,6 +752,89 @@ export async function deleteEntity(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to delete entity",
+    };
+  }
+}
+
+/**
+ * Calculer les frais de transaction
+ */
+export async function calculateTransactionFees(
+  type: string,
+  amount: number,
+): Promise<{ fees: number; total: number }> {
+  // Structure de frais basée sur le type de transaction
+  const feeStructure: Record<string, number> = {
+    PURCHASE: 0.02, // 2%
+    VIP_SUBSCRIPTION: 0.0, // Pas de frais
+    GAME_ITEM_PURCHASE: 0.015, // 1.5%
+    THEME_PURCHASE: 0.01, // 1%
+    DEPOSIT: 0.0, // Pas de frais
+    WITHDRAWAL: 0.03, // 3%
+    REFUND: 0.0, // Pas de frais
+    TRANSFER: 0.01, // 1%
+    ORDER_PURCHASE: 0.025, // 2.5%
+    TOURNAMENT_PARTICIPATION: 0.015, // 1.5%
+    BONUS: 0.0, // Pas de frais
+  };
+
+  const feePercentage = feeStructure[type] || 0.02; // 2% par défaut
+  const fees = amount * feePercentage;
+  const total = amount + fees;
+
+  return { fees, total };
+}
+
+/**
+ * Approuver une commande
+ */
+export async function approveOrder(
+  orderId: string,
+  notes: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await db
+      .update(schema.orders)
+      .set({
+        status: "ACCEPTED" as any,
+        message: notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.orders.id, orderId));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error approving order:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to approve order",
+    };
+  }
+}
+
+/**
+ * Rejeter une commande
+ */
+export async function rejectOrder(
+  orderId: string,
+  reason: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await db
+      .update(schema.orders)
+      .set({
+        status: "REJECTED" as any,
+        rejectionReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.orders.id, orderId));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error rejecting order:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to reject order",
     };
   }
 }

@@ -28,15 +28,19 @@ interface WalletLayoutProps {
 
 export default function WalletLayout({ children }: WalletLayoutProps) {
   const { user, loading, isAuthenticated } = useAuthContext();
-  const { data: completeData } = useUserProfile(!!user?.id);
+  const { data: completeData } = useUserProfile({
+    enabled: true,
+    mode: "partial",
+    relations: ["wallet"],
+  });
   const router = useRouter();
   const [walletCheckComplete, setWalletCheckComplete] = useState(false);
   const [walletStatus, setWalletStatus] = useState<{
     hasWallet: boolean;
-    isLocked: boolean;
-    isActive: boolean;
-    verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
-    failedAttempts: number;
+    is_locked: boolean;
+    is_active: boolean;
+    verification_status: "PENDING" | "VERIFIED" | "REJECTED";
+    failed_attempts: number;
   } | null>(null);
 
   // Vérifier l'état du wallet
@@ -49,18 +53,16 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
 
       setWalletStatus({
         hasWallet,
-        isLocked: wallet?.isLocked ?? false,
-        isActive: wallet?.isActive ?? false,
-        verificationStatus: wallet?.verificationStatus ?? "PENDING",
-        failedAttempts: wallet?.failedAttempts ?? 0,
+        is_locked: wallet?.isLocked ?? false,
+        is_active: wallet?.isActive ?? false,
+        verification_status: wallet?.verificationStatus ?? "PENDING",  
+        failed_attempts: wallet?.failedAttempts ?? 0,
       });
-
       setWalletCheckComplete(true);
     };
 
     checkWallet();
   }, [completeData, loading]);
-
   // Redirection si non authentifié ou pas de wallet
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -95,19 +97,20 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
   if (walletCheckComplete && !walletStatus?.hasWallet) {
     return <WalletCreationScreen user={user} />;
   }
+  // console.log(walletStatus);
 
-  if (walletStatus?.isLocked) {
+  if (walletStatus?.is_locked) {
     return <WalletLockedScreen walletStatus={walletStatus} />;
   }
 
-  if (walletStatus?.isActive === false) {
+  if (walletStatus?.is_active === false) {
     // Explicite false check
     return <WalletInactiveScreen walletStatus={walletStatus} />;
   }
 
   if (
-    walletStatus?.verificationStatus &&
-    walletStatus.verificationStatus !== "VERIFIED"
+    walletStatus?.verification_status &&
+    walletStatus.verification_status !==  "VERIFIED"
   ) {
     return <WalletVerificationScreen walletStatus={walletStatus} />;
   }
@@ -119,7 +122,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
         <Suspense fallback={<WalletSkeleton />}>
           <AnimatePresence mode="wait">
             {/* Navigation spécifique au wallet */}
-            <WalletNavigation />
+            {/* <WalletNavigation /> */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

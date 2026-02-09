@@ -45,30 +45,30 @@ export default function ServicesPage() {
     defaultFilters: {
       limit: 20,
     },
-    fetchMethod: "server-action",
-    fetchFunction: async (params) => {
-      const result = await getServices({
-        pagination: { page: params.page, limit: params.limit },
-        filters: {
-          title: params.search, // Use title instead of search
-          isActive:
-            params.isActive === "true"
-              ? true
-              : params.isActive === "false"
-                ? false
-                : undefined,
-        },
-        options: {
-          sortBy: params.sortBy,
-          sortOrder: params.sortOrder,
-        },
-      });
-      return {
-        success: true,
-        data: result.data,
-        pagination: result.pagination,
-      };
-    },
+    // fetchMethod: "server-action",
+    // fetchFunction: async (params) => {
+    //   const result = await getServices({
+    //     pagination: { page: params.page, limit: params.limit },
+    //     filters: {
+    //       title: params.search, // Use title instead of search
+    //       isActive:
+    //         params.isActive === "true"
+    //           ? true
+    //           : params.isActive === "false"
+    //             ? false
+    //             : undefined,
+    //     },
+    //     options: {
+    //       sortBy: params.sortBy,
+    //       sortOrder: params.sortOrder,
+    //     },
+    //   });
+    //   return {
+    //     success: true,
+    //     data: result.data,
+    //     pagination: result.pagination,
+    //   };
+    // },
   });
 
   const handleToggleActive = async (service: any) => {

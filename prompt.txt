@@ -1,1 +1,2 @@
-il faut me faire une action pour toutes les entites avec pagination, filtres etc... de maniere tres optimiser que le hook entity-list va utiliser. voila les schema:"
+# Cleaned up prompt.txt
+Old errors resolved.

@@ -2,7 +2,8 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-function Empty({ className, ...props }: React.ComponentProps<"div">) {
+type EmptyProps = React.ComponentProps<"div">
+function Empty({ className, ...props }: EmptyProps) {
   return (
     <div
       data-slot="empty"
@@ -15,7 +16,8 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
+type EmptyHeaderProps = React.ComponentProps<"div">
+function EmptyHeader({ className, ...props }: EmptyHeaderProps) {
   return (
     <div
       data-slot="empty-header"
@@ -43,11 +45,12 @@ const emptyMediaVariants = cva(
   }
 )
 
+type EmptyMediaProps = React.ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>
 function EmptyMedia({
   className,
   variant = "default",
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>) {
+}: EmptyMediaProps) {
   return (
     <div
       data-slot="empty-icon"
@@ -58,7 +61,8 @@ function EmptyMedia({
   )
 }
 
-function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
+type EmptyTitleProps = React.ComponentProps<"div">
+function EmptyTitle({ className, ...props }: EmptyTitleProps) {
   return (
     <div
       data-slot="empty-title"
@@ -68,7 +72,8 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
+type EmptyDescriptionProps = React.ComponentProps<"p">
+function EmptyDescription({ className, ...props }: EmptyDescriptionProps) {
   return (
     <div
       data-slot="empty-description"
@@ -81,7 +86,8 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
-function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
+type EmptyContentProps = React.ComponentProps<"div">
+function EmptyContent({ className, ...props }: EmptyContentProps) {
   return (
     <div
       data-slot="empty-content"

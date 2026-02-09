@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const action = searchParams.get("action") || "categories";
   
   // Paramètres de filtrage
-  const withSubfolders = searchParams.get("withSubfolders") != false;
+  const withSubfolders = searchParams.get("withSubfolders") !== "false";
   const maxSize = searchParams.get("maxSize") ? parseInt(searchParams.get("maxSize")!) : null;
   const minSize = searchParams.get("minSize") ? parseInt(searchParams.get("minSize")!) : null;
   const extensions = searchParams.get("extensions")?.split(",") || null;

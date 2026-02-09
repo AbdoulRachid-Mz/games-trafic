@@ -46,9 +46,19 @@ export async function GET(request: NextRequest) {
   const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
   const includeDeleted = searchParams.has('includeDeleted');
 
-  const filters = Object.fromEntries(
-    searchParams.entries()
-  ) as Parameters<typeof getGames>[0]['filters'];
+  // Build filters object compatible with GameFilters
+  const filters: Record<string, unknown> = {};
+  searchParams.forEach((value, key) => {
+    if (
+      key !== 'page' &&
+      key !== 'limit' &&
+      key !== 'sortBy' &&
+      key !== 'sortOrder' &&
+      key !== 'includeDeleted'
+    ) {
+      filters[key] = value;
+    }
+  });
 
   const result = await getGames({
     pagination: { page, limit },

@@ -39,26 +39,26 @@ export default function BlogsAdminPage() {
     defaultFilters: {
       limit: 20,
     },
-    fetchMethod: "server-action",
-    fetchFunction: async (params) => {
-      const result = await getBlogs({
-        pagination: { page: params.page, limit: params.limit },
-        filters: {
-          title: params.search,
-        },
-        options: {
-          sortBy: params.sortBy,
-          sortOrder: params.sortOrder,
-          includeDeleted: false,
-          includeInactive: true,
-        },
-      });
-      return {
-        success: true,
-        data: result.data,
-        pagination: result.pagination,
-      };
-    },
+    // fetchMethod: "server-action",
+    // fetchFunction: async (params) => {
+    //   const result = await getBlogs({
+    //     pagination: { page: params.page, limit: params.limit },
+    //     filters: {
+    //       title: params.search,
+    //     },
+    //     options: {
+    //       sortBy: params.sortBy,
+    //       sortOrder: params.sortOrder,
+    //       includeDeleted: false,
+    //       includeInactive: true,
+    //     },
+    //   });
+    //   return {
+    //     success: true,
+    //     data: result.data,
+    //     pagination: result.pagination,
+    //   };
+    // },
   });
 
   const handleToggleStatus = async (blog: any) => {

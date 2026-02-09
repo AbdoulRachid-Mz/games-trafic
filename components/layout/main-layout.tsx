@@ -48,6 +48,7 @@ export function MainLayout({
 }: MainLayoutProps) {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+  // console.log("shouldExcludeContainer:", shouldExcludeContainer);
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);
   const closeRight = useCallback(() => setRightOpen(false), []);
@@ -55,7 +56,7 @@ export function MainLayout({
   return (
     <div className="relative min-h-screen bg-background">
       {/* Top bar */}
-      {topMiddle && !shouldExcludeContainer && (
+      {(topMiddle && !shouldExcludeContainer) && (
         <TopMiddle
           onToggleSidebar={() => setLeftOpen((v) => !v)}
           onToggleRightBar={() => setRightOpen((v) => !v)}
@@ -96,7 +97,7 @@ export function MainLayout({
       )}
 
       {/* MAIN CONTENT */}
-      <main className={cn("min-h-screen", topMiddle && "pt-16")}>
+      <main className={cn("min-h-screen", topMiddle && !shouldExcludeContainer && "pt-16")}>
         <Suspense
           fallback={
             <div className="flex min-h-[60vh] items-center justify-center">
@@ -105,7 +106,10 @@ export function MainLayout({
           }
         >
           <div
-            className={`${!shouldExcludeContainer && "container mx-auto px-4 lg:px-6 py-6"} ${topMiddle && "pt-16"}`}
+            className={cn(
+              shouldExcludeContainer ? "mx-auto px-4 lg:px-6 py-6" : 'container mx-auto px-4 lg:px-6 py-6',
+              topMiddle && !shouldExcludeContainer && "pt-16"
+            )}
           >
             {maintenanceMode ? (
               <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
@@ -134,7 +138,7 @@ export function MainLayout({
       )}
 
       {/* AI assistant */}
-      {showAIAssistant && <AIAssistant />}
+      {!shouldExcludeContainer && showAIAssistant && <AIAssistant />}
     </div>
   );
 }

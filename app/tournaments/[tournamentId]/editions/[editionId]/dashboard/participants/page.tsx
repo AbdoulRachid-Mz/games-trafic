@@ -21,11 +21,11 @@ import {
   Team,
 } from "@/database/schema";
 
-interface DashboardParticipantsPageProps {
-  params: {
+interface PageProps {
+  params: Promise<{
     tournamentId: string;
     editionId: string;
-  };
+  }>;
 }
 
 type RegistrationWithMember = EditionRegistration & {
@@ -35,10 +35,8 @@ type RegistrationWithMember = EditionRegistration & {
   };
 };
 
-export default async function DashboardParticipantsPage({
-  params,
-}: DashboardParticipantsPageProps) {
-  const { editionId } = params;
+export default async function DashboardParticipantsPage({ params }: PageProps) {
+  const { editionId } = await params;
 
   const registrationsResponse = await getEditionRegistrations({
     filters: { editionId },
@@ -110,16 +108,16 @@ export default async function DashboardParticipantsPage({
                         reg.status === "REGISTERED"
                           ? "default"
                           : reg.status === "PARTICIPATED"
-                          ? "secondary"
-                          : "outline"
+                            ? "secondary"
+                            : "outline"
                       }
                       className="font-normal"
                     >
                       {reg.status === "REGISTERED"
                         ? "Inscrit"
                         : reg.status === "PARTICIPATED"
-                        ? "Confirmé"
-                        : reg.status}
+                          ? "Confirmé"
+                          : reg.status}
                     </Badge>
                   </TableCell>
                   <TableCell>

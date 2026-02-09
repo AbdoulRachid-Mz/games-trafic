@@ -8,6 +8,10 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { useCreateMessage, useMessages, useUpdateMessage } from "@/hooks/use-messages";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { NewMessage } from "@/database/schema";
+import { createMessage, updateMessage } from "@/actions/messages";
 // import { RichTextEditor } from "./rich-text-editor";
 
 interface CommentFormProps {
@@ -44,6 +48,8 @@ export function CommentForm({
   const formRef = useRef<HTMLFormElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
+
+
   const isEditMode = !!commentId;
 
   useEffect(() => {
@@ -71,6 +77,9 @@ export function CommentForm({
     setContent(prev => prev + emojiData.emoji);
   };
 
+  const { mutate: createComment } = useCreateMessage();
+  const { mutate: updateComment } = useUpdateMessage();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedContent = content.trim();
@@ -86,35 +95,43 @@ export function CommentForm({
     }
 
     setIsSubmitting(true);
-    try {
-      const response = await fetch("/api/comments", {
-        method: isEditMode ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+
+    if (isEditMode && commentId) {
+      updateComment(
+        { id: commentId, data: { content: trimmedContent } },
+        {
+          onSuccess: () => {
+            setContent("");
+            if (onCommentAdded) onCommentAdded();
+            if (onCancel) onCancel();
+            setIsSubmitting(false);
+          },
+          onError: () => {
+            setIsSubmitting(false);
+          },
+        }
+      );
+    } else {
+      createComment(
+        {
           content: trimmedContent,
+          senderId: parentId,
           entityId,
           entityType,
           parentId,
-          commentId: isEditMode ? commentId : undefined,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Failed to save comment");
-
-      setContent("");
-      toast.success(isEditMode ? "Commentaire modifié !" : "Commentaire ajouté !");
-      
-      if (onCommentAdded) {
-        onCommentAdded();
-      }
-      if (onCancel) {
-        onCancel();
-      }
-    } catch (error: any) {
-      console.error("Failed to save comment:", error);
-      toast.error(error.message || "Impossible d'enregistrer le commentaire.");
-    } finally {
-      setIsSubmitting(false);
+        } as NewMessage,
+        {
+          onSuccess: () => {
+            setContent("");
+            if (onCommentAdded) onCommentAdded();
+            if (onCancel) onCancel();
+            setIsSubmitting(false);
+          },
+          onError: () => {
+            setIsSubmitting(false);
+          },
+        }
+      );
     }
   };
 
@@ -130,27 +147,27 @@ export function CommentForm({
   };
 
   return (
-    <form 
-      ref={formRef} 
-      onSubmit={handleSubmit} 
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
       className={cn("relative", className)}
     >
       <div className="relative rounded-2xl border border-input bg-background p-3 shadow-sm transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
         <RichTextEditor
-  value={content}
-  onChange={setContent}
-  placeholder={placeholder}
-  onKeyDown={handleKeyDown}
-  disabled={isSubmitting}
-  maxLength={1000}
-  className="min-h-[80px]"
-  variant="compact"
-  toolbarPosition="bottom"
-  allowedFormats={['bold', 'italic', 'underline', 'link', 'image']}
-  minHeight="80px"
-  maxHeight="200px"
-/>
-        
+          value={content}
+          onChange={setContent}
+          placeholder={placeholder}
+          onKeyDown={handleKeyDown}
+          disabled={isSubmitting}
+          maxLength={1000}
+          className="min-h-[80px]"
+          variant="compact"
+          toolbarPosition="bottom"
+          allowedFormats={['bold', 'italic', 'underline', 'link', 'image']}
+          minHeight="80px"
+          maxHeight="200px"
+        />
+
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-center gap-1">
             <Button
@@ -162,7 +179,7 @@ export function CommentForm({
             >
               <Smile className="h-4 w-4" />
             </Button>
-            
+
             <Button
               type="button"
               variant="ghost"
@@ -171,7 +188,7 @@ export function CommentForm({
             >
               <Image className="h-4 w-4" />
             </Button>
-            
+
             <Button
               type="button"
               variant="ghost"
@@ -180,7 +197,7 @@ export function CommentForm({
             >
               <Link className="h-4 w-4" />
             </Button>
-            
+
             <Button
               type="button"
               variant="ghost"
@@ -189,12 +206,12 @@ export function CommentForm({
             >
               <Hash className="h-4 w-4" />
             </Button>
-            
+
             <span className="text-xs text-muted-foreground ml-2">
               {content.length}/1000
             </span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {onCancel && (
               <Button
@@ -207,7 +224,7 @@ export function CommentForm({
                 Annuler
               </Button>
             )}
-            
+
             <Button
               type="submit"
               size="sm"

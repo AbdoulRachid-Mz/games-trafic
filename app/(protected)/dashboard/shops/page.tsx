@@ -44,17 +44,6 @@ export default function ShopsDashboardPage() {
   } = useEntityList<Shop>({
     entityType: "shops",
     defaultLimit: isSmallScreen ? 12 : isMediumScreen ? 15 : 20,
-    fetchFunction: async (params) => {
-      const res = await getShops({
-        pagination: { page: params.page, limit: params.limit },
-        filters: params,
-      });
-      return {
-        success: true,
-        data: res.data,
-        pagination: res.pagination,
-      };
-    },
   });
 
   const renderShopCard = (s: Shop, index: number) => (

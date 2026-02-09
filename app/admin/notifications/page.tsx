@@ -85,31 +85,6 @@ export default function NotificationsPage() {
     defaultFilters: {
       limit: 20,
     },
-    fetchMethod: "server-action",
-    fetchFunction: async (params) => {
-      const result = await getNotifications({
-        pagination: { page: params.page, limit: params.limit },
-        filters: {
-          search: params.search,
-          type: params.type,
-          read:
-            params.read === "true"
-              ? true
-              : params.read === "false"
-                ? false
-                : undefined,
-        },
-        options: {
-          sortBy: params.sortBy,
-          sortOrder: params.sortOrder,
-        },
-      });
-      return {
-        success: true,
-        data: result.data,
-        pagination: result.pagination,
-      };
-    },
   });
 
   const handleCreate = async () => {

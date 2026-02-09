@@ -1,44 +1,55 @@
 // @/app/admin/partners/page.tsx
+"use client";
+
 import { Metadata } from "next";
-import { getPartners } from "@/actions/partners";
 import type { Partner } from "@/database/schema";
 import { Badge } from "@/components/ui/badge";
 import { Building2, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
 import Image from "next/image";
 import { EntityList } from "@/components/shared/entity-list";
+import { useEntityList } from "@/hooks/use-entity-list";
+import { useRouter } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Partners Management | Admin",
-  description: "Manage platform partners and sponsorships",
-};
+export default function PartnersAdminPage() {
+  const router = useRouter();
 
-export default async function PartnersAdminPage() {
-  const result = await getPartners({
-    limit: 50,
-    offset: 0,
-    sortBy: "createdAt",
-    sortOrder: "desc",
+  const {
+    data: partners,
+    total,
+    page,
+    limit,
+    searchTerm,
+    filters,
+    loading,
+    setPage,
+    setLimit,
+    setSearchTerm,
+    setFilters,
+  } = useEntityList<Partner>({
+    entityType: "partners",
+    defaultLimit: 20,
   });
-  const partners = result.data || [];
 
   return (
     <div className="container py-8">
       <EntityList<Partner>
-        total={result.total || 0}
-        page={1}
-        limit={50}
-        searchTerm=""
-        filters={{}}
+        total={total}
+        page={page}
+        limit={limit}
+        searchTerm={searchTerm}
+        filters={filters}
         viewMode="table"
-        onPageChange={async () => {}}
-        onLimitChange={async () => {}}
-        onSearchChange={async () => {}}
-        onFilterChange={async () => {}}
+        onPageChange={setPage}
+        onLimitChange={setLimit}
+        onSearchChange={setSearchTerm}
+        onFilterChange={setFilters}
         renderCard={(partner) => <PartnerCard partner={partner} />}
         title="Partners"
         description="Manage platform partners and sponsorships"
         data={partners}
         entityType="partners"
+        loading={loading}
+        onAdd={() => router.push("/admin/partners/create")}
         renderTableHeader={() => (
           <tr>
             <th className="px-4 py-3 text-left text-sm font-medium">Partner</th>

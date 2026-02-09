@@ -28,6 +28,10 @@ import {
   userWallets,
   requests,
   gameClips,
+  partners,
+  services,
+  blogs,
+  guides,
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import {
@@ -165,6 +169,23 @@ export interface GlobalStats {
   pinned_announcements: number;
   active_announcements: number;
 
+  // Partenaires
+  total_partners: number;
+  active_partners: number;
+  verified_partners: number;
+
+  // Services
+  total_services: number;
+  active_services: number;
+
+  // Blogs
+  total_blogs: number;
+  active_blogs: number;
+
+  // Guides
+  total_guides: number;
+  active_guides: number;
+
   // Autres
   total_claims: number;
   pending_claims: number;
@@ -182,17 +203,17 @@ export interface GlobalStats {
 export interface RecentActivity {
   id: string;
   type:
-    | "user"
-    | "shop"
-    | "product"
-    | "tournament"
-    | "order"
-    | "post"
-    | "message"
-    | "transaction"
-    | "vip"
-    | "match"
-    | "team";
+  | "user"
+  | "shop"
+  | "product"
+  | "tournament"
+  | "order"
+  | "post"
+  | "message"
+  | "transaction"
+  | "vip"
+  | "match"
+  | "team";
   action: string;
   description: string;
   entity_id: string;
@@ -292,7 +313,24 @@ export async function getGlobalStats(
       vipStats,
       gamesStats,
       themesStats,
-      announcementsStats,
+      announcementsCount,
+      activeAnnouncementsCount,
+      pinnedAnnouncementsCount,
+
+      partnersCount,
+      activePartnersCount,
+      verifiedPartnersCount,
+
+      servicesCount,
+      activeServicesCount,
+
+      blogsCount,
+      activeBlogsCount,
+
+      guidesCount,
+      activeGuidesCount,
+
+      claimsCount,
       claimsStats,
       searchStats,
       traceStats,
@@ -302,6 +340,9 @@ export async function getGlobalStats(
       matchesStats,
       gameClipsStats,
       todayStats,
+      newOrdersToday,
+      newProductsToday,
+      newPostsToday,
     ] = await Promise.all([
       // Users
       db
@@ -438,16 +479,44 @@ export async function getGlobalStats(
         .where(buildWhereConditions(filters, themes)),
 
       // Announcements
+      db.select({ count: count() }).from(announcements),
       db
-        .select({
-          total: count(),
-          pinned: sql<number>`count(CASE WHEN ${announcements.isPinned} = true THEN 1 END)`,
-          active: sql<number>`count(CASE WHEN ${announcements.isActive} = true THEN 1 END)`,
-        })
+        .select({ count: count() })
         .from(announcements)
-        .where(buildWhereConditions(filters, announcements)),
+        .where(eq(announcements.isActive, true)),
+      db
+        .select({ count: count() })
+        .from(announcements)
+        .where(eq(announcements.isPinned, true)),
+
+      // Partners
+      db.select({ count: count() }).from(partners),
+      db
+        .select({ count: count() })
+        .from(partners)
+        .where(eq(partners.isActive, true)),
+      db
+        .select({ count: count() })
+        .from(partners)
+        .where(eq(partners.verified, true)),
+
+      // Services
+      db.select({ count: count() }).from(services),
+      db
+        .select({ count: count() })
+        .from(services)
+        .where(eq(services.isActive, true)),
+
+      // Blogs
+      db.select({ count: count() }).from(blogs),
+      db.select({ count: count() }).from(blogs).where(eq(blogs.isActive, true)),
+
+      // Guides
+      db.select({ count: count() }).from(guides),
+      db.select({ count: count() }).from(guides).where(eq(guides.isActive, true)),
 
       // Claims
+      db.select({ count: count() }).from(claims),
       db
         .select({
           total: count(),
@@ -611,12 +680,29 @@ export async function getGlobalStats(
       total_theme_purchases: Number(themesStats[0]?.purchases || 0),
 
       // Announcements
-      total_announcements: Number(announcementsStats[0]?.total || 0),
-      pinned_announcements: Number(announcementsStats[0]?.pinned || 0),
-      active_announcements: Number(announcementsStats[0]?.active || 0),
+      total_announcements: Number(announcementsCount[0].count),
+      pinned_announcements: Number(pinnedAnnouncementsCount[0].count),
+      active_announcements: Number(activeAnnouncementsCount[0].count),
+
+      // Partenaires
+      total_partners: Number(partnersCount[0].count),
+      active_partners: Number(activePartnersCount[0].count),
+      verified_partners: Number(verifiedPartnersCount[0].count),
+
+      // Services
+      total_services: Number(servicesCount[0].count),
+      active_services: Number(activeServicesCount[0].count),
+
+      // Blogs
+      total_blogs: Number(blogsCount[0].count),
+      active_blogs: Number(activeBlogsCount[0].count),
+
+      // Guides
+      total_guides: Number(guidesCount[0].count),
+      active_guides: Number(activeGuidesCount[0].count),
 
       // Claims
-      total_claims: Number(claimsStats[0]?.total || 0),
+      total_claims: Number(claimsCount[0].count),
       pending_claims: Number(claimsStats[0]?.pending || 0),
 
       // Search & Traces
@@ -626,9 +712,9 @@ export async function getGlobalStats(
 
       // Today's stats
       new_users_today: Number(todayStats[0]?.new_users || 0),
-      new_orders_today: Number((todayStats[1] as any)?.new_orders || 0),
-      new_products_today: Number((todayStats[2] as any)?.new_products || 0),
-      new_posts_today: Number((todayStats[3] as any)?.new_posts || 0),
+      new_orders_today: Number(newOrdersToday[0]?.new_orders || 0),
+      new_products_today: Number(newProductsToday[0]?.new_products || 0),
+      new_posts_today: Number(newPostsToday[0]?.new_posts || 0),
     };
   } catch (error) {
     console.error("Error in getGlobalStats:", error);
@@ -695,9 +781,8 @@ export async function getUserStats(
       const groupBy = filters.group_by || "month";
       const growth = await db
         .select({
-          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${
-            users.createdAt
-          })`,
+          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${users.createdAt
+            })`,
           count: count(),
         })
         .from(users)
@@ -777,17 +862,17 @@ export async function getUserStats(
         statId: "summary",
         data: summary[0]
           ? {
-              total: Number(summary[0].total),
-              active: Number(summary[0].active),
-              verified: Number(summary[0].verified),
-              vip: Number(summary[0].vip),
-              admin: Number(summary[0].admin),
-              anonymous: Number(summary[0].anonymous),
-              last_month: Number(summary[0].last_month),
-              avg_shops: Number(summary[0].avg_shops || 0),
-              avg_tournaments: Number(summary[0].avg_tournaments || 0),
-              avg_posts: Number(summary[0].avg_posts || 0),
-            }
+            total: Number(summary[0].total),
+            active: Number(summary[0].active),
+            verified: Number(summary[0].verified),
+            vip: Number(summary[0].vip),
+            admin: Number(summary[0].admin),
+            anonymous: Number(summary[0].anonymous),
+            last_month: Number(summary[0].last_month),
+            avg_shops: Number(summary[0].avg_shops || 0),
+            avg_tournaments: Number(summary[0].avg_tournaments || 0),
+            avg_posts: Number(summary[0].avg_posts || 0),
+          }
           : null,
         metadata: { total: Number(summary[0]?.total || 0) },
       };
@@ -852,9 +937,8 @@ export async function getShopStats(
       const groupBy = filters.group_by || "month";
       const growth = await db
         .select({
-          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${
-            shops.createdAt
-          })`,
+          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${shops.createdAt
+            })`,
           count: count(),
           total_products: sum(shops.productCount),
         })
@@ -896,18 +980,18 @@ export async function getShopStats(
         statId: "summary",
         data: summary[0]
           ? {
-              total: Number(summary[0].total),
-              active: Number(summary[0].active),
-              verified: Number(summary[0].verified),
-              featured: Number(summary[0].featured),
-              total_products: Number(summary[0].total_products || 0),
-              total_views: Number(summary[0].total_views || 0),
-              total_balance: Number(summary[0].total_balance || 0),
-              avg_products: Number(summary[0].avg_products || 0),
-              avg_views: Number(summary[0].avg_views || 0),
-              avg_balance: Number(summary[0].avg_balance || 0),
-              last_month: Number(summary[0].last_month),
-            }
+            total: Number(summary[0].total),
+            active: Number(summary[0].active),
+            verified: Number(summary[0].verified),
+            featured: Number(summary[0].featured),
+            total_products: Number(summary[0].total_products || 0),
+            total_views: Number(summary[0].total_views || 0),
+            total_balance: Number(summary[0].total_balance || 0),
+            avg_products: Number(summary[0].avg_products || 0),
+            avg_views: Number(summary[0].avg_views || 0),
+            avg_balance: Number(summary[0].avg_balance || 0),
+            last_month: Number(summary[0].last_month),
+          }
           : null,
         metadata: { total: Number(summary[0]?.total || 0) },
       };
@@ -997,9 +1081,8 @@ export async function getProductStats(
       const groupBy = filters.group_by || "month";
       const growth = await db
         .select({
-          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${
-            products.createdAt
-          })`,
+          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${products.createdAt
+            })`,
           count: count(),
           avg_price: avg(products.price),
           total_sold: sql<number>`count(CASE WHEN ${products.status} = 'VENDU' THEN 1 END)`,
@@ -1045,20 +1128,20 @@ export async function getProductStats(
         statId: "summary",
         data: summary[0]
           ? {
-              total: Number(summary[0].total),
-              active: Number(summary[0].active),
-              visible: Number(summary[0].visible),
-              featured: Number(summary[0].featured),
-              negotiable: Number(summary[0].negotiable),
-              sold: Number(summary[0].sold),
-              reserved: Number(summary[0].reserved),
-              total_views: Number(summary[0].total_views || 0),
-              avg_price: Number(summary[0].avg_price || 0),
-              max_price: Number(summary[0].max_price || 0),
-              min_price: Number(summary[0].min_price || 0),
-              total_value: Number(summary[0].total_value || 0),
-              last_month: Number(summary[0].last_month),
-            }
+            total: Number(summary[0].total),
+            active: Number(summary[0].active),
+            visible: Number(summary[0].visible),
+            featured: Number(summary[0].featured),
+            negotiable: Number(summary[0].negotiable),
+            sold: Number(summary[0].sold),
+            reserved: Number(summary[0].reserved),
+            total_views: Number(summary[0].total_views || 0),
+            avg_price: Number(summary[0].avg_price || 0),
+            max_price: Number(summary[0].max_price || 0),
+            min_price: Number(summary[0].min_price || 0),
+            total_value: Number(summary[0].total_value || 0),
+            last_month: Number(summary[0].last_month),
+          }
           : null,
         metadata: { total: Number(summary[0]?.total || 0) },
       };
@@ -1174,9 +1257,8 @@ export async function getTournamentStats(
       const groupBy = filters.group_by || "month";
       const growth = await db
         .select({
-          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${
-            tournaments.createdAt
-          })`,
+          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${tournaments.createdAt
+            })`,
           count: count(),
           avg_prize_pool: avg(tournaments.totalPrizePool),
           total_participants: sum(tournaments.totalParticipants),
@@ -1224,22 +1306,22 @@ export async function getTournamentStats(
         statId: "summary",
         data: summary[0]
           ? {
-              total: Number(summary[0].total),
-              active: Number(summary[0].active),
-              featured: Number(summary[0].featured),
-              verified: Number(summary[0].verified),
-              private: Number(summary[0].private),
-              total_editions: Number(summary[0].total_editions || 0),
-              total_participants: Number(summary[0].total_participants || 0),
-              total_prize_pool: Number(summary[0].total_prize_pool || 0),
-              total_views: Number(summary[0].total_views || 0),
-              total_followers: Number(summary[0].total_followers || 0),
-              avg_editions: Number(summary[0].avg_editions || 0),
-              avg_participants: Number(summary[0].avg_participants || 0),
-              avg_prize_pool: Number(summary[0].avg_prize_pool || 0),
-              avg_views: Number(summary[0].avg_views || 0),
-              last_month: Number(summary[0].last_month),
-            }
+            total: Number(summary[0].total),
+            active: Number(summary[0].active),
+            featured: Number(summary[0].featured),
+            verified: Number(summary[0].verified),
+            private: Number(summary[0].private),
+            total_editions: Number(summary[0].total_editions || 0),
+            total_participants: Number(summary[0].total_participants || 0),
+            total_prize_pool: Number(summary[0].total_prize_pool || 0),
+            total_views: Number(summary[0].total_views || 0),
+            total_followers: Number(summary[0].total_followers || 0),
+            avg_editions: Number(summary[0].avg_editions || 0),
+            avg_participants: Number(summary[0].avg_participants || 0),
+            avg_prize_pool: Number(summary[0].avg_prize_pool || 0),
+            avg_views: Number(summary[0].avg_views || 0),
+            last_month: Number(summary[0].last_month),
+          }
           : null,
         metadata: { total: Number(summary[0]?.total || 0) },
       };
@@ -1306,9 +1388,8 @@ export async function getTransactionStats(
       const groupBy = filters.group_by || "month";
       const growth = await db
         .select({
-          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${
-            walletTransactions.createdAt
-          })`,
+          period: sql<string>`DATE_TRUNC('${sql.raw(groupBy)}', ${walletTransactions.createdAt
+            })`,
           count: count(),
           total_amount: sum(walletTransactions.amount),
           total_fees: sum(walletTransactions.fees),
@@ -1378,20 +1459,20 @@ export async function getTransactionStats(
         statId: "summary",
         data: summary[0]
           ? {
-              total: Number(summary[0].total),
-              total_amount: Number(summary[0].total_amount || 0),
-              total_fees: Number(summary[0].total_fees || 0),
-              avg_amount: Number(summary[0].avg_amount || 0),
-              max_amount: Number(summary[0].max_amount || 0),
-              min_amount: Number(summary[0].min_amount || 0),
-              pending: Number(summary[0].pending),
-              completed: Number(summary[0].completed),
-              failed: Number(summary[0].failed),
-              refunded: Number(summary[0].refunded),
-              today: Number(summary[0].today),
-              last_7_days: Number(summary[0].last_7_days),
-              last_30_days: Number(summary[0].last_30_days),
-            }
+            total: Number(summary[0].total),
+            total_amount: Number(summary[0].total_amount || 0),
+            total_fees: Number(summary[0].total_fees || 0),
+            avg_amount: Number(summary[0].avg_amount || 0),
+            max_amount: Number(summary[0].max_amount || 0),
+            min_amount: Number(summary[0].min_amount || 0),
+            pending: Number(summary[0].pending),
+            completed: Number(summary[0].completed),
+            failed: Number(summary[0].failed),
+            refunded: Number(summary[0].refunded),
+            today: Number(summary[0].today),
+            last_7_days: Number(summary[0].last_7_days),
+            last_30_days: Number(summary[0].last_30_days),
+          }
           : null,
         metadata: { total: Number(summary[0]?.total || 0) },
       };
@@ -1425,9 +1506,8 @@ export async function getRecentActivities(
         id: user.id,
         type: "user" as const,
         action: "user_registered",
-        description: `Nouvel utilisateur: ${
-          user.username || user.fullName || "Anonyme"
-        }`,
+        description: `Nouvel utilisateur: ${user.username || user.fullName || "Anonyme"
+          }`,
         entity_id: user.id,
         user_id: user.id,
         user_name: user.username ?? undefined,
@@ -1456,9 +1536,8 @@ export async function getRecentActivities(
         id: product.id,
         type: "product" as const,
         action: "product_created",
-        description: `Nouveau produit: ${product.name} dans ${
-          product.shopName || "boutique inconnue"
-        }`,
+        description: `Nouveau produit: ${product.name} dans ${product.shopName || "boutique inconnue"
+          }`,
         entity_id: product.id,
         user_id: product.shopId,
         timestamp: product.createdAt!,
@@ -1486,9 +1565,8 @@ export async function getRecentActivities(
         id: tournament.id,
         type: "tournament" as const,
         action: "tournament_created",
-        description: `Nouveau tournoi: ${tournament.name} par ${
-          tournament.username || "organisateur inconnu"
-        }`,
+        description: `Nouveau tournoi: ${tournament.name} par ${tournament.username || "organisateur inconnu"
+          }`,
         entity_id: tournament.id,
         user_id: tournament.organizerId ?? undefined,
         user_name: tournament.username ?? undefined,
@@ -1517,9 +1595,8 @@ export async function getRecentActivities(
         id: order.id,
         type: "order" as const,
         action: "order_created",
-        description: `Nouvelle commande: ${order.price} GTC par ${
-          order.username || "acheteur inconnu"
-        }`,
+        description: `Nouvelle commande: ${order.price} GTC par ${order.username || "acheteur inconnu"
+          }`,
         entity_id: order.id,
         user_id: order.buyerId,
         user_name: order.username ?? undefined,
@@ -1555,11 +1632,9 @@ export async function getRecentActivities(
         id: transaction.id as string,
         type: "transaction" as const,
         action: `transaction_${transaction.type?.toLowerCase() || "transfer"}`,
-        description: `Transaction ${transaction.type}: ${
-          transaction.amount
-        } GTC de ${transaction.fromUsername || "expéditeur inconnu"} à ${
-          transaction.toUsername || "destinataire inconnu"
-        }`,
+        description: `Transaction ${transaction.type}: ${transaction.amount
+          } GTC de ${transaction.fromUsername || "expéditeur inconnu"} à ${transaction.toUsername || "destinataire inconnu"
+          }`,
         entity_id: transaction.id as string,
         user_id: (transaction.fromUserId as string) ?? undefined,
         user_name: (transaction.fromUsername as string) ?? undefined,
@@ -1946,12 +2021,12 @@ export async function getPerformanceMetrics(
       })),
       engagement: engagementStats[0]
         ? {
-            total_interactions: Number(engagementStats[0].total_interactions),
-            likes: Number(engagementStats[0].likes),
-            follows: Number(engagementStats[0].follows),
-            posts: Number(engagementStats[0].posts),
-            messages: Number(engagementStats[0].messages),
-          }
+          total_interactions: Number(engagementStats[0].total_interactions),
+          likes: Number(engagementStats[0].likes),
+          follows: Number(engagementStats[0].follows),
+          posts: Number(engagementStats[0].posts),
+          messages: Number(engagementStats[0].messages),
+        }
         : null,
       timeframe,
       generated_at: new Date().toISOString(),

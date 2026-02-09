@@ -25,6 +25,7 @@ import { useTheme } from "next-themes";
 // import { ThemeToggle } from "../shared/ThemeToggle"
 import { motion } from "framer-motion";
 import { ThemeToggle } from "../layout/ThemeToggle";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EnhancedDashboardProps {
   children: React.ReactNode;
@@ -33,6 +34,7 @@ interface EnhancedDashboardProps {
   className?: string;
   sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
   showSidebarTrigger?: boolean;
+  mobileBreakpoint?: number; // Breakpoint en pixels, default: 768
 }
 
 export function EnhancedDashboard({
@@ -42,9 +44,16 @@ export function EnhancedDashboard({
   className,
   sidebarBgType = "default",
   showSidebarTrigger = true,
+  mobileBreakpoint = 768,
 }: EnhancedDashboardProps) {
+  const { screenSize } = useScreenSize();
+
+  // Déterminer si on doit ouvrir la sidebar par défaut
+  // false sur mobile (< mobileBreakpoint), true sur desktop (>= mobileBreakpoint)
+  const defaultOpen = screenSize.width >= mobileBreakpoint;
+
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={defaultOpen}>
       <div className={cn("flex min-h-screen w-full", className)}>
         {sidebar}
         <SidebarInset className="flex-1">
@@ -175,14 +184,14 @@ export function SidebarItem({
         return isActive
           ? "text-primary"
           : isDark
-          ? "text-white/80"
-          : "text-foreground/80";
+            ? "text-white/80"
+            : "text-foreground/80";
       case "solid":
         return isActive
           ? "text-primary"
           : isDark
-          ? "text-white/80"
-          : "text-foreground/80";
+            ? "text-white/80"
+            : "text-foreground/80";
       case "default":
       default:
         return isActive ? "text-primary" : "text-foreground/80";
@@ -216,8 +225,8 @@ export function SidebarItem({
                         ? "text-yellow-300/70"
                         : "text-white/60"
                       : isActive
-                      ? "text-primary/70"
-                      : "text-muted-foreground"
+                        ? "text-primary/70"
+                        : "text-muted-foreground"
                   )}
                 >
                   {description}
@@ -371,9 +380,9 @@ export function SidebarHeader({
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-white";
+        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-foreground";
       case "glass":
-        return "glass border-b border-white/20 text-white";
+        return "glass border-b border-white/20 text-foreground";
       case "neuomorphic":
         return "bg-sidebar neomorphic text-foreground";
       case "solid":
@@ -571,8 +580,8 @@ export function SidebarFooter({
                 {user?.status === "online"
                   ? "En ligne"
                   : user?.status === "busy"
-                  ? "Occupé"
-                  : "Hors ligne"}
+                    ? "Occupé"
+                    : "Hors ligne"}
               </Badge>
             </div>
           </div>

@@ -252,6 +252,7 @@ export function useInfiniteShops(
   InfiniteData<PaginationResponse<Shop>, number>,
   Error
 > {
+  // @ts-ignore
   return useInfiniteQuery<
     PaginationResponse<Shop>,                 // TQueryFnData
     Error,                                   // TError

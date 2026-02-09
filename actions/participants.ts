@@ -751,40 +751,57 @@ function buildTournamentMemberWhereConditions(
     conditions.push(eq(tournamentMembers.userId, filters.userId));
   if (filters.teamId)
     conditions.push(eq(tournamentMembers.teamId, filters.teamId));
-  if (filters.role) conditions.push(eq(tournamentMembers.role, filters.role));
+  if (filters.role) {
+    if (Array.isArray(filters.role)) {
+      conditions.push(inArray(tournamentMembers.role, filters.role));
+    } else {
+      conditions.push(eq(tournamentMembers.role, filters.role));
+    }
+  }
   if (filters.isCoOrganizer !== undefined)
     conditions.push(eq(tournamentMembers.isCoOrganizer, filters.isCoOrganizer));
   if (filters.isVerified !== undefined)
     conditions.push(eq(tournamentMembers.isVerified, filters.isVerified));
-  if (filters.isGuest !== undefined)
-    conditions.push(eq(tournamentMembers.isGuest, filters.isGuest));
   if (filters.gameLevel)
     conditions.push(
-      ilike(tournamentMembers.gameLevel, `%${filters.gameLevel}%`)
+      ilike(tournamentMembers.verificationLevel, `%${filters.gameLevel}%`)
     );
   if (filters.clubName)
     conditions.push(ilike(tournamentMembers.clubName, `%${filters.clubName}%`));
+  if (filters.totalEditionsMin !== undefined)
+    conditions.push(gte(tournamentMembers.totalEditions, filters.totalEditionsMin));
+  if (filters.totalEditionsMax !== undefined)
+    conditions.push(lte(tournamentMembers.totalEditions, filters.totalEditionsMax));
+  if (filters.totalWinsMin !== undefined)
+    conditions.push(gte(tournamentMembers.totalWins, filters.totalWinsMin));
+  if (filters.totalWinsMax !== undefined)
+    conditions.push(lte(tournamentMembers.totalWins, filters.totalWinsMax));
+  if (filters.totalLossesMin !== undefined)
+    conditions.push(gte(tournamentMembers.totalLosses, filters.totalLossesMin));
+  if (filters.totalLossesMax !== undefined)
+    conditions.push(lte(tournamentMembers.totalLosses, filters.totalLossesMax));
+  if (filters.totalMatchesMin !== undefined)
+    conditions.push(gte(tournamentMembers.totalMatches, filters.totalMatchesMin));
+  if (filters.totalMatchesMax !== undefined)
+    conditions.push(lte(tournamentMembers.totalMatches, filters.totalMatchesMax));
+  if (filters.rankingPointsMin !== undefined)
+    conditions.push(gte(tournamentMembers.rankingPoints, filters.rankingPointsMin));
+  if (filters.rankingPointsMax !== undefined)
+    conditions.push(lte(tournamentMembers.rankingPoints, filters.rankingPointsMax));
 
-  if (filters.statuses?.length)
-    conditions.push(inArray(tournamentMembers.status, filters.statuses));
-  if (filters.scoreMin !== undefined)
-    conditions.push(gte(tournamentMembers.score, filters.scoreMin));
-  if (filters.scoreMax !== undefined)
-    conditions.push(lte(tournamentMembers.score, filters.scoreMax));
-
-  if (filters.addedFrom)
+  if (filters.joinedFrom)
     conditions.push(
-      gte(tournamentMembers.addedAt, new Date(filters.addedFrom))
+      gte(tournamentMembers.joinedAt, new Date(filters.joinedFrom))
     );
-  if (filters.addedTo)
-    conditions.push(lte(tournamentMembers.addedAt, new Date(filters.addedTo)));
-  if (filters.addedFrom)
+  if (filters.joinedTo)
+    conditions.push(lte(tournamentMembers.joinedAt, new Date(filters.joinedTo)));
+  if (filters.lastActiveFrom)
     conditions.push(
-      gte(tournamentMembers.createdAt, new Date(filters.addedFrom))
+      gte(tournamentMembers.lastActive, new Date(filters.lastActiveFrom))
     );
-  if (filters.addedTo)
+  if (filters.lastActiveTo)
     conditions.push(
-      lte(tournamentMembers.createdAt, new Date(filters.addedTo))
+      lte(tournamentMembers.lastActive, new Date(filters.lastActiveTo))
     );
 
   return conditions.length > 0 ? and(...conditions) : undefined;

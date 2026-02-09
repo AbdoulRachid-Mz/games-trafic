@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   useQuery,
   keepPreviousData,
@@ -11,9 +11,8 @@ import {
 import {
   fetchEntities,
   deleteEntity,
-  type EntityQueryParams,
 } from "@/actions/entities";
-import type { PaginationResponse } from "@/types/api";
+import type { PaginationResponse, EntityQueryParams } from "@/types/api";
 
 // Types d'entités basés sur votre schéma
 export type EntityType =
@@ -45,7 +44,6 @@ export type EntityType =
   | "claims"
   | "subscriptions"
   | "game-clips"
-  | "gameClips"
   | "partners";
 
 export interface UseEntityListProps<T> {
@@ -57,6 +55,7 @@ export interface UseEntityListProps<T> {
   enabled?: boolean;
   staleTime?: number;
   refetchInterval?: number;
+  fetchFunction?: (params: EntityQueryParams) => Promise<PaginationResponse<T>>;
 }
 
 export function useEntityList<T = any>({
@@ -68,9 +67,9 @@ export function useEntityList<T = any>({
   enabled = true,
   staleTime = 30000, // 30 secondes par défaut
   refetchInterval,
+  fetchFunction,
 }: UseEntityListProps<T>) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   // États locaux pour la pagination et les filtres
@@ -111,7 +110,7 @@ export function useEntityList<T = any>({
       const tableName = entityType.replace(/-([a-z])/g, (g) =>
         g[1].toUpperCase(),
       );
-      return fetchEntities<T>(tableName, queryParams);
+      return fetchFunction ? fetchFunction(queryParams) : fetchEntities<T>(tableName, queryParams);
     },
     placeholderData: keepPreviousData,
     enabled: enabled,

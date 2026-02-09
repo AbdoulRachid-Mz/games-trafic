@@ -38,11 +38,17 @@ export function TransactionAmountInput({
 }: TransactionAmountInputProps) {
   const isDeposit = transactionType === "DEPOSIT";
   const isWithdrawal = transactionType === "WITHDRAWAL";
+  const isTransfer = transactionType === "TRANSFER";
+  const isGameItem = transactionType === "GAME_ITEM_PURCHASE";
+
+  // Selon l'utilisateur: seulement requests (deposit/withdrawal), game-items et transfert 
+  // ont besoin de champ pour le montant/quantité.
   const requiresAmountInput =
-    !entity?.price ||
     isDeposit ||
     isWithdrawal ||
-    transactionType === "TRANSFER";
+    isTransfer ||
+    isGameItem ||
+    !entity?.price;
 
   const hasSufficientBalance =
     isDeposit ||
@@ -51,8 +57,8 @@ export function TransactionAmountInput({
   const quickAmounts = isDeposit
     ? [500, 1000, 5000, 10000]
     : transactionType === "TRANSFER"
-    ? [100, 500, 1000, 2000]
-    : [];
+      ? [100, 500, 1000, 2000]
+      : [];
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-8">

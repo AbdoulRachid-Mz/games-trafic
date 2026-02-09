@@ -32,26 +32,26 @@ export default function InteractionsPage() {
     defaultFilters: {
       limit: 20,
     },
-    fetchMethod: "server-action",
-    fetchFunction: async (params) => {
-      const result = await getInteractions({
-        pagination: { page: params.page, limit: params.limit },
-        filters: {
-          userId: params.userId,
-          types: params.type,
-          entityType: params.entityType,
-        },
-        options: {
-          sortBy: params.sortBy,
-          sortOrder: params.sortOrder,
-        },
-      });
-      return {
-        success: true,
-        data: result.data,
-        pagination: result.pagination,
-      };
-    },
+    // fetchMethod: "server-action",
+    // fetchFunction: async (params) => {
+    //   const result = await getInteractions({
+    //     pagination: { page: params.page, limit: params.limit },
+    //     filters: {
+    //       userId: params.userId,
+    //       types: params.type,
+    //       entityType: params.entityType,
+    //     },
+    //     options: {
+    //       sortBy: params.sortBy,
+    //       sortOrder: params.sortOrder,
+    //     },
+    //   });
+    //   return {
+    //     success: true,
+    //     data: result.data,
+    //     pagination: result.pagination,
+    //   };
+    // },
   });
 
   const getIcon = (type: string) => {

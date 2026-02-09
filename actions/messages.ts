@@ -620,7 +620,8 @@ function buildMessageWhereConditions(
   }
 
   if (filters.entityType && filters.entityType.length > 0) {
-    conditions.push(inArray(messages.entityType, filters.entityType));
+    const validTypes = Array.isArray(filters.entityType) ? filters.entityType : [filters.entityType];
+    conditions.push(inArray(messages.entityType, validTypes));
   }
 
   if (filters.content) {

@@ -284,7 +284,7 @@ export function AdvancedChart<T extends Record<string, any>>({
         }, 0);
         base[
           (s.label || String(typeof s.key === "function" ? "value" : s.key)) +
-            " (prev)"
+          " (prev)"
         ] = sum;
       });
       rows.push(base);
@@ -436,11 +436,13 @@ export function AdvancedChart<T extends Record<string, any>>({
       const key =
         s.label || String(typeof s.key === "function" ? "value" : s.key);
       const color = s.color;
-      const common = { key, dataKey: key, name: key } as const;
+
       if (s.type === "line" || kind === "line") {
         return (
           <Line
-            {...(common as any)}
+            key={key}
+            dataKey={key}
+            name={key}
             type="monotone"
             stroke={color}
             strokeWidth={2}
@@ -452,7 +454,9 @@ export function AdvancedChart<T extends Record<string, any>>({
       if (s.type === "area" || kind === "area") {
         return (
           <Area
-            {...(common as any)}
+            key={key}
+            dataKey={key}
+            name={key}
             type="monotone"
             stroke={color}
             fill={color}
@@ -463,7 +467,9 @@ export function AdvancedChart<T extends Record<string, any>>({
       }
       return (
         <Bar
-          {...(common as any)}
+          key={key}
+          dataKey={key}
+          name={key}
           fill={color}
           stackId={stacked ? s.stackId || "stack" : undefined}
           yAxisId={s.yAxisId}

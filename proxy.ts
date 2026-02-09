@@ -13,11 +13,9 @@ export async function proxy(request: NextRequest) {
     "/wallet",
     "/chat",
     "/messages",
-    "/orders",
     "/favorites",
     "/settings",
     "/notifications",
-    "/communities",
   ];
 
   // Routes spécifiques nécessitant une auth (pas couvertes par les préfixes)
@@ -41,9 +39,9 @@ export async function proxy(request: NextRequest) {
   }
 
   // Cas B: Utilisateur CONNECTÉ tente d'accéder aux pages de login/signup
-  if (authRoutes.includes(pathname) && sessionCookie) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  // if (authRoutes.includes(pathname) && sessionCookie) {
+  //   return NextResponse.redirect(new URL("/dashboard", request.url));
+  // }
 
   // Cas C: Autoriser l'accès
   return NextResponse.next();

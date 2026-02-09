@@ -54,12 +54,12 @@ export function MemberCard({
                     {member.displayName || "Membre"}
                   </Typography>
                   {member.role === "ORGANIZER" && (
-                    <Badge size="sm" className="bg-amber-500">
+                    <Badge className="bg-amber-500">
                       <Crown className="h-3 w-3" />
                     </Badge>
                   )}
                   {member.isCoOrganizer && (
-                    <Badge size="sm" className="bg-purple-500">
+                    <Badge className="bg-purple-500">
                       Organisateur
                     </Badge>
                   )}

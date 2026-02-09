@@ -1,20 +1,18 @@
-import { getTournamentEditionById } from "@/actions/tournaments";
+import { getTournamentEditionWithRelations } from "@/actions/editions";
 import { EditionSettingsForm } from "@/components/pages/tournaments/edition-detail/edition-settings-form";
 import { notFound } from "next/navigation";
 
-interface DashboardSettingsPageProps {
-  params: {
+interface PageProps {
+  params: Promise<{
     tournamentId: string;
     editionId: string;
-  };
+  }>;
 }
 
-export default async function DashboardSettingsPage({
-  params,
-}: DashboardSettingsPageProps) {
-  const { editionId, tournamentId } = params;
+export default async function DashboardSettingsPage({ params }: PageProps) {
+  const { editionId, tournamentId } = await params;
 
-  const edition = await getTournamentEditionById(editionId);
+  const edition = await getTournamentEditionWithRelations(editionId);
 
   if (!edition) {
     notFound();

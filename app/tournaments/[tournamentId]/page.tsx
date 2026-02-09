@@ -234,7 +234,7 @@ function TournamentPageContent() {
 
   const handleJoinTournament = () => {
     if (!isAuthenticated) {
-      router.push("/auth/signin");
+      router.push("/sign-in");
       return;
     }
 
@@ -456,7 +456,7 @@ function TournamentPageContent() {
                     className="gap-2"
                     onClick={() =>
                       router.push(
-                        `/tournaments/${tournamentId}/editions/create`
+                        `/tournaments/${tournamentId}/dashboard/editions`
                       )
                     }
                   >
@@ -472,7 +472,7 @@ function TournamentPageContent() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/tournaments/${tournamentId}/settings`)
+                          router.push(`/tournaments/${tournamentId}/dashboard/settings`)
                         }
                       >
                         <Settings className="h-4 w-4 mr-2" />
@@ -480,7 +480,7 @@ function TournamentPageContent() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/tournaments/${tournamentId}/members`)
+                          router.push(`/tournaments/${tournamentId}/dashboard/members`)
                         }
                       >
                         <Users2 className="h-4 w-4 mr-2" />
@@ -991,7 +991,7 @@ function TournamentPageContent() {
                         className="gap-2"
                         onClick={() =>
                           router.push(
-                            `/tournaments/${tournamentId}/editions/create`
+                            `/tournaments/${tournamentId}/dashboard/editions`
                           )
                         }
                       >
@@ -1008,6 +1008,7 @@ function TournamentPageContent() {
                         key={edition.id}
                         edition={edition}
                         tournamentId={tournamentId}
+                        onView={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}`)}
                       />
                     ))}
                   </div>

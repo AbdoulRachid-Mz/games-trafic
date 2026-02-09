@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useApp } from "@/contexts/app-context";
@@ -21,6 +21,7 @@ import { TransactionConfirmation } from "@/components/pages/transactions/create/
 import { TransactionSuccess } from "@/components/pages/transactions/create/success";
 import { createRequest } from "@/actions/requests";
 import { createTransaction } from "@/actions/transactions";
+import { getEntities } from "@/actions/entities";
 import {
   TRANSACTION_CONFIGS,
   type TransactionType,
@@ -28,6 +29,10 @@ import {
   type TransactionStep,
 } from "@/types/transaction-types";
 import { useUserProfile } from "@/hooks/use-profile";
+import { decodeTransactionQR, isValidTransactionQR } from "@/utils/qr-utils";
+import { QrScanner } from "@/components/shared/qr-scanner";
+import { ArrowLeft, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function CreateTransactionPage() {
   const searchParams = useSearchParams();
@@ -48,11 +53,16 @@ function CreateTransactionContent({
   router: any;
 }) {
   const { user } = useAuthContext();
-  const { data: completeData } = useUserProfile(!!user?.id);
+  const { data: completeData } = useUserProfile({
+    enabled: true,
+    mode: "partial",
+    relations: ["wallet"],
+  });
   const { settings } = useApp();
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [transactionData, setTransactionData] = useState<TransactionData>({
     type: null as any,
     amount: 0,
@@ -65,44 +75,75 @@ function CreateTransactionContent({
   });
   const [transactionId, setTransactionId] = useState<string | null>(null);
 
-  // Récupération des paramètres d'URL
+  // Récupération des paramètres d'URL et fetch de l'entité
   useEffect(() => {
-    const type = searchParams.get("type") as TransactionType;
-    const amount = searchParams.get("amount");
-    const targetId = searchParams.get("targetId");
-    const entityData = searchParams.get("entityData");
+    const loadTransactionFromParams = async () => {
+      const type = searchParams.get("type") as TransactionType;
+      const amount = searchParams.get("amount");
+      const entityId = searchParams.get("entityId");
+      const targetId = searchParams.get("targetId"); // Fallback
 
-    if (type && TRANSACTION_CONFIGS[type]) {
-      const config = TRANSACTION_CONFIGS[type];
+      if (type && TRANSACTION_CONFIGS[type]) {
+        const config = TRANSACTION_CONFIGS[type];
+        const actualEntityId = entityId || targetId;
 
-      const newData: TransactionData = {
-        type,
-        amount: amount ? parseFloat(amount) : 0,
-        metadata: {},
-      };
+        const newData: TransactionData = {
+          type,
+          amount: amount ? parseFloat(amount) : 0,
+          metadata: {},
+        };
 
-      if (targetId && config.needsTargetId) {
-        newData.targetId = targetId;
-        if (entityData) {
-          newData.entity = JSON.parse(entityData);
+        // Fetch entity from database if entityId is provided
+        if (actualEntityId && config.needsTargetId) {
+          try {
+            const entityType = getEntityTypeFromTransactionType(type);
+            if (entityType) {
+              const result = await getEntities(entityType as any, {
+                search: actualEntityId,
+                limit: 1,
+                page: 1,
+              });
+
+              // Find the specific entity by ID
+              const entity = result.data.find((e: any) => e.id === actualEntityId);
+
+              if (entity) {
+                newData.targetId = actualEntityId;
+                newData.entity = entity;
+                if (!newData.amount && entity.priceGtc) {
+                  newData.amount = parseFloat(entity.priceGtc);
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching entity:", error);
+          }
+        }
+
+        setTransactionData(newData);
+
+        // Calculer les étapes initiales
+        const initialStepIndex = getInitialStepForType(
+          type,
+          config,
+          !!newData.targetId
+        );
+        setCurrentStep(initialStepIndex);
+
+        // Calculate fees immediately if amount is provided
+        if (newData.amount > 0) {
+          calculateFees(type, newData.amount);
         }
       }
 
-      setTransactionData(newData);
-
-      // Calculer les étapes initiales
-      const initialStepIndex = getInitialStepForType(type, config, !!targetId);
-      setCurrentStep(initialStepIndex);
-
-      // Calculate fees immediately if amount is provided
-      if (amount && parseFloat(amount) > 0) {
-        calculateFees(type, parseFloat(amount));
+      if (completeData && !completeData?.wallet) {
+        toast.error("Vous devez avoir un wallet pour effectuer des transactions");
+        router.push("/wallet");
       }
-    }
+    };
 
-    if (!completeData?.wallet) {
-      toast.error("Vous devez avoir un wallet pour effectuer des transactions");
-      router.push("/wallet");
+    if (completeData) {
+      loadTransactionFromParams();
     }
   }, [searchParams, completeData, router]);
 
@@ -168,28 +209,28 @@ function CreateTransactionContent({
     }
   };
 
-  const getFeeKey = (type: TransactionType): string => {
+  const getEntityTypeFromTransactionType = (
+    type: TransactionType
+  ): string | null => {
     switch (type) {
       case "THEME_PURCHASE":
+        return "themes";
       case "PRODUCT_PURCHASE":
+        return "products";
       case "GAME_ITEM_PURCHASE":
-        return "purchaseFeePercentage";
-      case "VIP_SUBSCRIPTION":
-        return "transactionFeePercentage";
+        return "gameItems";
       case "TOURNAMENT_PARTICIPATION":
-        return "tournamentParticipationFeePercentage";
-      case "DEPOSIT":
-        return "depositFeePercentage";
-      case "WITHDRAWAL":
-        return "withdrawalFeePercentage";
-      case "TRANSFER":
-        return "transferFeePercentage";
+        return "tournaments";
       default:
-        return "transactionFeePercentage";
+        return null;
     }
   };
 
-  const handleTypeSelect = (type: TransactionType) => {
+  const handleTypeSelect = (type: TransactionType | "QR_SCAN") => {
+    if (type === "QR_SCAN") {
+      setShowScanner(true);
+      return;
+    }
     setTransactionData({
       type,
       amount: 0,
@@ -198,12 +239,66 @@ function CreateTransactionContent({
     setCurrentStep(0);
   };
 
+  const handleQrScan = async (scannedData: string) => {
+    const decoded = decodeTransactionQR(scannedData);
+    if (decoded && isValidTransactionQR(decoded)) {
+      setShowScanner(false);
+
+      const type = decoded.t;
+      const entityId = decoded.id;
+      const amount = decoded.a;
+
+      const newData: TransactionData = {
+        type,
+        amount: amount || 0,
+        targetId: entityId,
+        metadata: decoded.m || {},
+      };
+
+      // Fetch entity details
+      try {
+        const entityType = getEntityTypeFromTransactionType(type);
+        if (entityType) {
+          const result = await getEntities(entityType as any, {
+            search: entityId,
+            limit: 1,
+            page: 1,
+          });
+          const entity = result.data.find((e: any) => e.id === entityId);
+          if (entity) {
+            newData.entity = entity;
+            if (!newData.amount && entity.priceGtc) {
+              newData.amount = parseFloat(entity.priceGtc);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching scanned entity:", err);
+      }
+
+      setTransactionData(newData);
+
+      const config = TRANSACTION_CONFIGS[type];
+      const initialStep = getInitialStepForType(type, config, !!newData.targetId);
+      setCurrentStep(initialStep);
+
+      if (newData.amount > 0) {
+        calculateFees(type, newData.amount);
+      }
+
+      toast.success("QR Code scanné avec succès");
+    } else {
+      toast.error("QR Code invalide ou format non supporté");
+    }
+  };
+
   const handleEntitySelect = (entity: any) => {
+    const price = entity.priceGtc ? parseFloat(entity.priceGtc) : entity.price || 0;
     setTransactionData((prev) => ({
       ...prev,
       targetId: entity.id,
       entity: entity,
-      amount: entity.price || prev.amount,
+      amount: price || prev.amount,
     }));
 
     // Passer à l'étape suivante
@@ -211,10 +306,10 @@ function CreateTransactionContent({
     if (nextStepIndex < steps.length) {
       setCurrentStep(nextStepIndex);
     }
-    if (transactionData.type && (entity.price || transactionData.amount)) {
+    if (transactionData.type && (price || transactionData.amount)) {
       calculateFees(
         transactionData.type,
-        entity.price || transactionData.amount
+        price || transactionData.amount
       );
     }
   };
@@ -268,6 +363,8 @@ function CreateTransactionContent({
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+    } else {
+      setTransactionData({ type: null as any, amount: 0, metadata: {} });
     }
   };
 
@@ -321,7 +418,6 @@ function CreateTransactionContent({
           paymentMethod: transactionData.metadata?.paymentMethod || "WALLET",
           paymentProvider: transactionData.metadata?.paymentProvider,
           paymentAccountId: transactionData.metadata?.paymentAccountId,
-          //   metadata: transactionData.metadata
         });
 
         if (!request)
@@ -338,18 +434,7 @@ function CreateTransactionContent({
       // Pour les autres transactions, créer directement
       const transaction = await createTransaction({
         walletId: completeData.wallet.id,
-        type: transactionData.type as
-          | "THEME_PURCHASE"
-          | "VIP_SUBSCRIPTION"
-          | "TOURNAMENT_PARTICIPATION"
-          | "GAME_ITEM_PURCHASE"
-          | "DEPOSIT"
-          | "WITHDRAWAL"
-          | "TRANSFER"
-          | "PURCHASE"
-          | "REFUND"
-          | "ORDER_PURCHASE"
-          | "BONUS",
+        type: transactionData.type as any,
         amount: transactionData.amount.toString(),
         description: getTransactionDescription(transactionData),
         metadata: {
@@ -411,19 +496,40 @@ function CreateTransactionContent({
       case "WITHDRAWAL":
         return "Demande de retrait";
       case "TRANSFER":
-        return `Transfert à ${
-          (data.metadata as any).recipientName || "utilisateur"
-        }`;
+        return `Transfert à ${(data.metadata as any).recipientName || "utilisateur"
+          }`;
       default:
         return "Transaction";
     }
   };
 
   if (!completeData?.wallet) {
-    return null;
+    return <TransactionSkeleton />;
   }
 
   const renderStep = () => {
+    if (showScanner) {
+      return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between">
+            <Typography variant="h4" className="font-black italic uppercase tracking-tighter">Scanner QR Code</Typography>
+            <Button variant="ghost" size="icon" onClick={() => setShowScanner(false)} className="rounded-full">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <QrScanner onScan={handleQrScan} />
+          <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10">
+            <Typography variant="body-sm" className="text-center text-muted-foreground leading-relaxed">
+              Placez le QR Code de transaction, d'item ou de profil dans le cadre pour scanner automatiquement.
+            </Typography>
+          </div>
+          <Button variant="outline" onClick={() => setShowScanner(false)} className="w-full h-12 rounded-2xl font-bold">
+            <ArrowLeft className="h-4 w-4 mr-2" /> Retour à la liste
+          </Button>
+        </div>
+      );
+    }
+
     if (!config) {
       return <TransactionTypeSelector onSelect={handleTypeSelect} />;
     }
@@ -490,8 +596,6 @@ function CreateTransactionContent({
               amount: transactionData.amount,
               fees: fees.amount,
               totalAmount: fees.totalAmount,
-              //   entityData: transactionData.entity,
-              //   recipient: transactionData.recipientUser
             }}
           />
         );
@@ -534,21 +638,29 @@ function CreateTransactionContent({
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8">
-          <Typography variant="h1" weight="bold" className="mb-2">
-            {config?.label || "Nouvelle transaction"}
+        <div className="mb-12 text-center md:text-left">
+          <Typography variant="h1" className="mb-3 font-black italic uppercase tracking-tighter text-4xl md:text-5xl">
+            {config?.label || (showScanner ? "SCANNER" : "TRANSAC")}
           </Typography>
-          <Typography variant="body-base" theme="muted">
-            {config
-              ? `Étape ${currentStep + 1} sur ${steps.length}`
-              : "Sélectionnez le type de transaction"}
-          </Typography>
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <Typography variant="body-base" theme="muted" className="font-bold flex-1">
+              {config
+                ? `Étape ${currentStep + 1} sur ${steps.length}`
+                : showScanner ? "Scannez un QR Code pour continuer" : "Sélectionnez le type de transaction"}
+            </Typography>
+            {completeData?.wallet && !showScanner && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-2xl border border-primary/20 self-center md:self-auto">
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Solde:</span>
+                <span className="text-sm font-black text-primary">{completeData.wallet.balance} GTC</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-6">
-          {config && (
+        <div className="space-y-8">
+          {config && !showScanner && (
             <TransactionStepper
               steps={steps}
               currentStep={currentStep}
@@ -556,7 +668,9 @@ function CreateTransactionContent({
             />
           )}
 
-          {renderStep()}
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+            {renderStep()}
+          </div>
         </div>
       </div>
     </div>
@@ -565,9 +679,10 @@ function CreateTransactionContent({
 
 function TransactionSkeleton() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-12 w-64" />
-      <Skeleton className="h-96 w-full" />
+    <div className="container mx-auto px-4 py-12 max-w-4xl space-y-8">
+      <Skeleton className="h-16 w-3/4 rounded-3xl" />
+      <Skeleton className="h-4 w-1/2 rounded-full" />
+      <Skeleton className="h-[500px] w-full rounded-[2.5rem]" />
     </div>
   );
 }

@@ -1,37 +1,38 @@
 import { Metadata } from "next";
 import {
-  getTournamentEditionById,
   getEditionRegistrations,
   getTournamentPhases,
   getMatches,
 } from "@/actions/tournaments";
+import { getTournamentEditionWithRelations } from "@/actions/editions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { Users, Trophy, Activity, Calendar, GitBranch } from "lucide-react";
+import { Users, Trophy, Activity, Calendar, GitBranch, ArrowRight, UserCheck, ShieldAlert } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { notFound } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-interface DashboardPageProps {
-  params: {
+interface PageProps {
+  params: Promise<{
     tournamentId: string;
     editionId: string;
-  };
+  }>;
 }
 
 export const metadata: Metadata = {
   title: "Dashboard Édition - Vue d'ensemble",
 };
 
-export default async function DashboardOverviewPage({
-  params,
-}: DashboardPageProps) {
-  const { editionId } = params;
+export default async function DashboardOverviewPage({ params }: PageProps) {
+  const { tournamentId, editionId } = await params;
 
-  // Parallel fetching
   const [edition, registrationsResponse, phasesResponse, matchesResponse] =
     await Promise.all([
-      getTournamentEditionById(editionId),
+      getTournamentEditionWithRelations(editionId),
       getEditionRegistrations({
         filters: { editionId },
         pagination: { limit: 5, page: 1 },
@@ -53,120 +54,150 @@ export default async function DashboardOverviewPage({
   const stats = [
     {
       label: "Participants",
-      value: `${edition.currentParticipants || 0} / ${edition.maxParticipants}`,
+      value: `${edition.currentParticipants || 0} / ${edition.maxParticipants || "∞"}`,
       icon: Users,
       color: "text-blue-500",
+      bg: "bg-blue-500/10",
       description: "Inscrits confirmés",
     },
     {
       label: "Cashprize",
-      value: `${edition.prizePool || 0} GTC`,
+      value: `${edition.prizePool || 0} ${edition.prizeCurrency || "GTC"}`,
       icon: Trophy,
-      color: "text-yellow-500",
-      description: "Montant total",
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+      description: "Récompense totale",
     },
     {
       label: "Phases",
       value: phasesResponse.data.length,
       icon: GitBranch,
       color: "text-purple-500",
-      description: "Structure du tournoi",
+      bg: "bg-purple-500/10",
+      description: "Structure active",
     },
     {
-      label: "Statut",
-      value: edition.status,
+      label: "Matches",
+      value: matchesResponse.pagination.total,
       icon: Activity,
-      color: "text-green-500",
-      description: "État actuel",
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+      description: "Total des rencontres",
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Typography variant="h3" weight="bold">
-          Vue d'ensemble
-        </Typography>
-        <Typography variant="body-sm" theme="muted">
-          Bienvenue sur le tableau de bord de l'édition.
-        </Typography>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <Typography variant="h3" weight="bold" className="tracking-tight">
+            Vue d'ensemble
+          </Typography>
+          <Typography variant="body-sm" theme="muted" className="flex items-center gap-2 mt-1">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Tableau de bord de l'édition {edition.name || `#${edition.editionNumber}`}
+          </Typography>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="px-3 py-1 font-medium bg-background">
+            {edition.status}
+          </Badge>
+          <Button size="sm" asChild>
+            <Link href={`/tournaments/${tournamentId}/editions/${editionId}`}>
+              Voir la page publique
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <Card key={i}>
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <Typography variant="body-sm" theme="muted" className="mb-1">
+          <Card key={i} className="border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className={cn("p-2 rounded-lg", stat.bg)}>
+                  <stat.icon className={cn("h-5 w-5", stat.color)} />
+                </div>
+                <Typography variant="caption2" theme="muted" className="font-semibold uppercase tracking-wider">
                   {stat.label}
                 </Typography>
-                <Typography variant="h4" weight="bold" className="mb-1">
+              </div>
+              <div>
+                <Typography variant="h4" weight="bold" className="leading-none mb-2">
                   {stat.value}
                 </Typography>
-                <Typography
-                  variant="caption2"
-                  theme="muted"
-                  className="text-xs"
-                >
+                <Typography variant="caption2" theme="muted">
                   {stat.description}
                 </Typography>
-              </div>
-              <div className={`p-3 rounded-full bg-muted/50 ${stat.color}`}>
-                <stat.icon className="h-5 w-5" />
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Registrations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Inscriptions Récentes</CardTitle>
+        <Card className="lg:col-span-2 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between py-4">
+            <div className="space-y-0.5">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-primary" />
+                Inscriptions Récentes
+              </CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" className="text-xs h-8" asChild>
+              <Link href={`/tournaments/${tournamentId}/dashboard/editions/${editionId}/participants`}>
+                Tout voir <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {registrationsResponse.data.length === 0 ? (
-              <div className="text-muted-foreground text-sm text-center py-4">
-                Aucune inscription récente
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Users className="h-10 w-10 text-muted/30 mb-3" />
+                <Typography variant="body-sm" theme="muted">Aucune inscription pour le moment</Typography>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-1">
                 {registrationsResponse.data.map((reg) => (
                   <div
                     key={reg.id}
-                    className="flex items-center justify-between"
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold">
-                        {/* @ts-ignore - quick access to deep prop if exists */}
-                        {reg.member?.displayName
-                          ?.substring(0, 2)
-                          .toUpperCase() || "??"}
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
+                        {reg.member?.avatar ? (
+                          <img src={reg.member.avatar} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          reg.member?.displayName?.substring(0, 2).toUpperCase() || "??"
+                        )}
                       </div>
                       <div>
-                        {/* @ts-ignore */}
-                        <div className="font-medium text-sm">
+                        <div className="font-semibold text-sm group-hover:text-primary transition-colors">
                           {reg.member?.displayName || "Utilisateur"}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(reg.registeredAt), {
+                          Inscrit {formatDistanceToNow(new Date(reg.registeredAt), {
                             addSuffix: true,
                             locale: fr,
                           })}
                         </div>
                       </div>
                     </div>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        reg.feePaid
-                          ? "bg-green-500/10 text-green-500"
-                          : "bg-yellow-500/10 text-yellow-500"
-                      }`}
-                    >
-                      {reg.feePaid ? "Payé" : "En attente"}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        className={cn(
+                          "text-[10px] px-2 py-0.5 font-medium",
+                          reg.feePaid
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-200"
+                            : "bg-amber-500/10 text-amber-600 border-amber-200"
+                        )}
+                        variant="outline"
+                      >
+                        {reg.feePaid ? "Payé" : "Attente Paiement"}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -175,31 +206,52 @@ export default async function DashboardOverviewPage({
         </Card>
 
         {/* Quick Actions / Notices */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Actions Requises</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {phasesResponse.data.length === 0 && (
-                <div className="p-4 border border-yellow-500/20 bg-yellow-500/5 rounded-lg">
-                  <h4 className="font-medium text-yellow-600 mb-1">
-                    Configuration incomplète
-                  </h4>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Vous n'avez pas encore défini les phases du tournoi.
-                  </p>
-                  {/* Link to phases settings would go here */}
+        <div className="space-y-6">
+          <Card className="border-border/50">
+            <CardHeader className="py-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-primary" />
+                Alertes Organisateur
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {phasesResponse.data.length === 0 ? (
+                <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
+                  <div className="flex gap-3">
+                    <Activity className="h-5 w-5 text-amber-500 shrink-0" />
+                    <div>
+                      <Typography variant="body-sm" weight="bold" className="text-amber-700 leading-tight">
+                        Structure manquante
+                      </Typography>
+                      <Typography variant="caption1" className="text-amber-600/80 mt-1">
+                        Définissez les phases (éliminations, poules) pour lancer le tournoi.
+                      </Typography>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full bg-white hover:bg-amber-50 text-amber-600 border-amber-200" asChild>
+                    <Link href={`/tournaments/${tournamentId}/dashboard/editions/${editionId}/phases`}>
+                      Configurer les phases
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
+                  <UserCheck className="h-5 w-5 text-emerald-500" />
+                  <Typography variant="body-sm" className="text-emerald-700">
+                    Structure configurée ({phasesResponse.data.length} phases)
+                  </Typography>
                 </div>
               )}
 
-              {/* Placeholder for other alerts */}
-              <p className="text-sm text-muted-foreground">
-                Aucune autre action urgente requise pour le moment.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-1">
+                <Typography variant="caption1" weight="bold" className="text-primary uppercase tracking-wider">Note Rapide</Typography>
+                <Typography variant="body-sm" theme="muted">
+                  Pensez à vérifier les paiements avant de valider l'arbre final.
+                </Typography>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -655,7 +655,7 @@ export async function getTransactionFees(type: string, amount: number) {
         break;
       case "VIP_SUBSCRIPTION":
         feePercentage = parseFloat(
-          settings?.transactionFeePercentage?.toString() || "0.005"
+          settings?.transactionFeePercentage?.toString() || "0.001"
         );
         break;
       case "TOURNAMENT_PARTICIPATION":

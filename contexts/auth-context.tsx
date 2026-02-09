@@ -26,6 +26,9 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, userData?: any) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
+  verifyResetToken: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,11 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: auth.signOut,
       signIn: auth.signIn,
       signUp: auth.signUp,
+      forgotPassword: auth.forgotPassword,
+      resetPassword: auth.resetPassword,
+      verifyResetToken: auth.verifyResetToken,
     }),
     [auth],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value as unknown as AuthContextType}>{children}</AuthContext.Provider>;
+
 }
 
 export const useAuthContext = () => {

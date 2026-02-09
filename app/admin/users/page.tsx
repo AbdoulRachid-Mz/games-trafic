@@ -67,20 +67,19 @@ export default function UsersPage() {
       limit: 20,
     },
     defaultLimit: 20,
-    fetchMethod: "server-action",
-    fetchFunction: async (params) => {
-      const { page, limit, search, sortBy, sortOrder, ...restFilters } = params;
-      const result = await getUsers({
-        pagination: { page, limit },
-        filters: { ...restFilters, search },
-        options: { sortBy, sortOrder },
-      });
-      return {
-        success: true,
-        data: result.data,
-        pagination: result.pagination,
-      };
-    },
+    // fetchFunction: async (params) => {
+    //   const { page, limit, search, sortBy, sortOrder, ...restFilters } = params;
+    //   const result = await getUsers({
+    //     pagination: { page, limit },
+    //     filters: { ...restFilters, search },
+    //     options: { sortBy, sortOrder },
+    //   });
+    //   return {
+    //     success: true,
+    //     data: result.data,
+    //     pagination: result.pagination,
+    //   };
+    // },
   });
 
   const handleViewUser = (user: User) => {

@@ -37,7 +37,8 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
 } from "lucide-react";
-import { QRCodeDisplay } from "@/components/shared/qr-code";
+// import { QRCodeDisplay } from "@/components/shared/qr-code";
+import { QRCodeDisplay } from "@/components/shared/qr-code-2";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";

@@ -71,6 +71,71 @@ async function getInteractionCounts(entityIds: string[], entityType: string = "G
   return counts;
 }
 
+
+// shareGameClip
+export async function shareGameClip({ id, userId }: { id: string; userId: string }) {
+  // Check user exists
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  // Check clip exists
+  const [clip] = await db
+    .select({ id: gameClips.id })
+    .from(gameClips)
+    .where(eq(gameClips.id, id))
+    .limit(1);
+
+  if (!clip) {
+    throw new Error("Clip not found");
+  }
+
+  // Create share interaction
+  await db.insert(interactions).values({
+    userId,
+    entityId: id,
+    entityType: "GAMECLIP",
+    type: "SHARE",
+  });
+
+  return { success: true };
+}
+
+
+// share counts
+async function getShareCounts(entityIds: string[], entityType: string = "GAMECLIP") {
+  if (entityIds.length === 0) return {};
+
+  const shareCountsData = await db
+    .select({
+      entityId: interactions.entityId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(interactions)
+    .where(
+      and(
+        eq(interactions.entityType, entityType as any),
+        inArray(interactions.entityId, entityIds),
+        eq(interactions.type, "SHARE"),
+      ),
+    )
+    .groupBy(interactions.entityId);
+
+  const counts: Record<string, number> = {};
+  for (const row of shareCountsData) {
+    if (row.entityId) {
+      counts[row.entityId] = row.count;
+    }
+  }
+  return counts;
+}
+
 async function getCommentsCount(entityIds: string[], entityType: string = "GAMECLIP") {
   if (entityIds.length === 0) return {};
   
