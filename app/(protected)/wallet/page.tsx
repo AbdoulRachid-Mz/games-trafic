@@ -156,7 +156,7 @@ export default function WalletPage() {
       >
         <AdvancedUserCard
           wallet={wallet}
-          user={user}
+          user={user!}
           showBalance={showBalance}
           onRefresh={handleRefresh}
         />
