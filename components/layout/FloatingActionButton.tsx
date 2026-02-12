@@ -309,7 +309,7 @@ export const FloatingActionButton = ({
                               "hover:shadow-lg cursor-pointer min-w-[50px]",
                               "relative group",
                               isActiveRoute
-                                ? "bg-gradient-to-br from-primary/20 to-purple-600/20"
+                                ? "bg-primary/10 text-primary"
                                 : "hover:bg-primary/5",
                             )}
                             aria-label={item.label}
@@ -327,7 +327,7 @@ export const FloatingActionButton = ({
                             <div className={cn(
                               "p-2 rounded-lg mb-1 transition-all duration-300",
                               isActiveRoute
-                                ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg"
+                                ? "bg-primary text-white shadow-lg"
                                 : "bg-primary/10 text-primary group-hover:bg-gradient-to-r group-hover:from-primary/20 group-hover:to-purple-600/20"
                             )}>
                               <Icon className="h-5 w-5" />
