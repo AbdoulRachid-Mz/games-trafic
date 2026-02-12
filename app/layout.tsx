@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Roboto } from "next/font/google";
-import { poppins, montserrat } from "./fonts";
+// import { poppins, montserrat } from "./fonts";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import QueryProvider from "@/providers/query-provider";
@@ -47,7 +47,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={roboto.variable} suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} ${poppins.variable} ${montserrat.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} antialiased`}
       >
         <Toaster />
         {/* <TooltipProvider> */}
