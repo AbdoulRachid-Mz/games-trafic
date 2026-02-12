@@ -144,9 +144,9 @@ export function MarketplaceContent() {
             <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
               <SheetContent 
                 side={isSmallScreen ? "bottom" : "left"} 
-                className={isSmallScreen ? "rounded-t-2xl min-h-fit overflow-y-auto" : "w-[400px] overflow-y-auto"}
+                className={isSmallScreen ? "rounded-t-2xl w-[90%] min-h-fit overflow-y-auto" : "w-[400px] overflow-y-auto"}
               >
-                <div className="h-full flex flex-col min-h-fit">
+                <div className="h-full flex flex-col">
                   <div className="flex items-center justify-between pb-4 border-b mb-4">
                     <SheetTitle className="text-xl font-bold flex items-center gap-2">
                       <Typography>

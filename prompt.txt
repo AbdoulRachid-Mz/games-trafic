@@ -1,2 +1,356 @@
-# Cleaned up prompt.txt
-Old errors resolved.
+🔹 CONTEXTE GÉNÉRAL
+
+Tu es un architecte produit et UX spécialisé dans les plateformes de tournois e-sport (type Challengermode, Toornament, Battlefy).
+
+Le système existe déjà pour la gestion des tournois.
+
+Ta mission est de concevoir la gestion cohérente et flexible des ÉDITIONS, incluant :
+
+Phases
+
+Groupes
+
+Brackets (arbre)
+
+Matches
+
+Résultats
+
+Le modèle de données existe déjà (tournamentEditions, tournamentPhases, phaseGroups, bracketNodes, matches, editionResults, etc.).
+
+🔹 OBJECTIFS PRODUIT
+
+Permettre aux organisateurs :
+
+de gérer manuellement ou automatiquement :
+
+phases
+
+groupes
+
+brackets
+
+matches
+
+de sélectionner les participants selon leur statut :
+
+tous
+
+qualifiés
+
+éliminés
+
+non éliminés
+
+seedés
+
+de créer d’abord une structure vide (phase / groupe / bracket),
+puis ajouter les participants plus tard
+
+d’utiliser des librairies internes pour :
+
+générer automatiquement les groupes
+
+générer les brackets
+
+générer les matches (single match, BO3, aller-retour, etc.)
+
+Permettre aux participants / visiteurs :
+
+de consulter facilement :
+
+la phase active
+
+le groupe actif
+
+le bracket actif
+
+les résultats en temps réel
+
+de comprendre rapidement :
+
+qui joue contre qui
+
+qui est qualifié
+
+qui est éliminé
+
+le classement du groupe
+
+l’avancement global de l’édition
+
+🔹 RÈGLES FONCTIONNELLES CLÉS
+1️⃣ Logique d’activation (très importante)
+
+À tout moment :
+
+1 phase active par édition
+
+1 groupe actif par phase
+
+1 bracket actif par phase (si applicable)
+
+Dans la page Edition Detail :
+
+afficher en priorité les entités actives
+
+sinon afficher les dernières entités créées
+
+2️⃣ Cycle de vie d’une édition
+
+Création de l’édition
+
+Inscriptions / check-in
+
+Création des phases
+
+Pour chaque phase :
+
+création des groupes OU brackets
+
+ajout ou génération des participants
+
+génération automatique des matches
+
+Saisie des scores (manuelle ou auto)
+
+Synchronisation :
+
+stats groupes
+
+qualifications
+
+arbre (bracket)
+
+Calcul automatique des résultats finaux
+
+Publication des résultats
+
+🔹 PHASES – CONCEPTION
+
+Chaque phase peut être :
+
+ROUND_ROBIN
+
+ELIMINATION_SIMPLE
+
+DOUBLE_ELIMINATION
+
+SWISS
+
+MIXTE
+
+Chaque phase doit permettre :
+
+configuration du format
+
+configuration du seeding
+
+auto-génération ou gestion manuelle
+
+planification (dates, durée des matchs)
+
+🔹 GROUPES – CONCEPTION
+
+Les groupes servent à :
+
+afficher les tables de classement
+
+calculer automatiquement :
+
+points
+
+positions
+
+qualifications
+
+Fonctionnalités attendues :
+
+création manuelle ou auto
+
+ajout de participants après coup
+
+verrouillage du groupe
+
+recalcul automatique du classement après chaque match
+
+🔹 BRACKETS – CONCEPTION
+
+Les brackets doivent :
+
+être générés automatiquement selon :
+
+nombre de participants
+
+simple / double élimination
+
+BO1 / BO3 / aller-retour
+
+supporter :
+
+BYE
+
+propagation automatique des gagnants/perdants
+
+se mettre à jour dès qu’un match est validé
+
+🔹 MATCHES – CONCEPTION
+
+Les matches sont la source de vérité.
+
+Fonctionnalités :
+
+génération automatique depuis groupes ou brackets
+
+saisie manuelle des scores
+
+validation par :
+
+participants
+
+admin
+
+gestion des litiges
+
+recalcul automatique :
+
+stats du groupe
+
+avancée du bracket
+
+qualification
+
+🔹 RÉSULTATS – CONCEPTION
+
+Les résultats doivent :
+
+être calculés automatiquement
+
+être synchronisés depuis :
+
+les matches
+
+les groupes
+
+les brackets
+
+produire :
+
+classement final
+
+podium
+
+récompenses
+
+statistiques globales
+
+🔹 UX – PAGE "EDITION DETAIL"
+🧩 Structure recommandée
+
+Header
+
+Nom de l’édition
+
+Statut (UPCOMING / LIVE / COMPLETED)
+
+Progression (%)
+
+Navigation interne (tabs ou segments)
+
+Overview
+
+Phases
+
+Groups
+
+Bracket
+
+Matches
+
+Results
+
+🔍 Comportement intelligent
+
+Afficher automatiquement :
+
+phase active
+
+groupe actif
+
+bracket actif
+
+Fallback sur les dernières données créées
+
+🔹 DASHBOARD ORGANISATEUR (édition)
+
+Le dashboard doit permettre :
+
+visualisation globale de l’édition
+
+gestion par étapes (wizard possible)
+
+actions rapides :
+
+générer groupes
+
+générer bracket
+
+générer matches
+
+recalculer résultats
+
+logs et état de synchronisation
+
+🔹 AUTOMATISATION & LIBS INTERNES
+
+Définir des librairies capables de :
+
+distribuer les participants aléatoirement ou par seed
+
+générer automatiquement :
+
+groupes
+
+brackets
+
+matches
+
+recalculer les données sans casser l’existant
+
+🔹 TECHNICAL CONSTRAINTS
+
+The system must be:
+
+modular
+
+idempotent (recalcul possible)
+
+Tolerant of manual updates
+
+No recalculation should break the history
+
+Stats should remain consistent between:
+
+matches
+
+Groups
+
+Final Results
+
+🔹 EXPECTED DELIVERABLE
+
+A clear product vision
+
+Understandable UX logic
+
+A consistent flow for organizers and attendees
+
+A solid foundation for implementing:
+
+pages
+
+Components
+
+services
+
+Auto-Generation Libraries

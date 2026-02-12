@@ -76,7 +76,7 @@ export function EditionStatsGrid({ edition }: EditionStatsGridProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
       {stats
         .filter((s) => !s.hidden)
         .map((stat, i) => (
@@ -84,8 +84,8 @@ export function EditionStatsGrid({ edition }: EditionStatsGridProps) {
             key={i}
             className="overflow-hidden border-none shadow-sm bg-secondary/20"
           >
-            <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-              <div className={`p-2 rounded-full mb-2 ${stat.className}`}>
+            <CardContent className="p-2 flex flex-col items-center justify-center text-center h-full">
+              <div className={`p-1 rounded-full mb-2 ${stat.className}`}>
                 <stat.icon className="h-5 w-5" />
               </div>
               <div className="text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-1">

@@ -57,6 +57,20 @@ export function EditionSettingsForm({
       registrationDeadline: edition.registrationDeadline
         ? new Date(edition.registrationDeadline).toISOString().split("T")[0]
         : "",
+      locationType: edition.locationType || "ONLINE",
+      location: edition.location || "",
+      prizePool: edition.prizePool || 0,
+      prizeCurrency: edition.prizeCurrency || "GTC",
+      notificationsEnabled: edition.notificationsEnabled ?? true,
+      autoAdvance: edition.autoAdvance ?? true,
+      // @ts-ignore
+      config_checkinRequired: edition.editionConfig?.checkinRequired ?? false,
+      // @ts-ignore
+      config_autoStart: edition.editionConfig?.autoStart ?? true,
+      // @ts-ignore
+      config_seedMethod: edition.editionConfig?.seedMethod || "RANDOM",
+      // @ts-ignore
+      config_tiebreakerRules: JSON.stringify(edition.editionConfig?.tiebreakerRules || {}),
     },
   });
 
@@ -70,6 +84,21 @@ export function EditionSettingsForm({
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
         registrationDeadline: new Date(data.registrationDeadline),
+        prizePool: Number(data.prizePool),
+        notificationsEnabled: Boolean(data.notificationsEnabled),
+        autoAdvance: Boolean(data.autoAdvance),
+        editionConfig: {
+          checkinRequired: Boolean(data.config_checkinRequired),
+          autoStart: Boolean(data.config_autoStart),
+          seedMethod: data.config_seedMethod,
+          tiebreakerRules: (() => {
+            try {
+              return JSON.parse(data.config_tiebreakerRules || "{}");
+            } catch {
+              return {};
+            }
+          })(),
+        },
       },
     });
   };
@@ -87,7 +116,6 @@ export function EditionSettingsForm({
       });
     }
   };
-
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -159,6 +187,26 @@ export function EditionSettingsForm({
                   Mettre 0 pour gratuit
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="prizePool">Prix total (pool)</Label>
+                <Input id="prizePool" type="number" step="0.01" {...register("prizePool")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prizeCurrency">Devise des prix</Label>
+                <Input id="prizeCurrency" {...register("prizeCurrency")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="locationType">Type de lieu</Label>
+                <select id="locationType" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" {...register("locationType")}>
+                  <option value="ONLINE">En ligne</option>
+                  <option value="VENUE">Présentiel</option>
+                  <option value="HYBRID">Hybride</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">Lieu</Label>
+                <Input id="location" {...register("location")} placeholder="Adresse ou URL" />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -168,6 +216,45 @@ export function EditionSettingsForm({
                 {...register("description")}
                 rows={4}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3 p-4 border rounded-xl">
+                <div className="font-medium">Notifications & Avancement</div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="notificationsEnabled">Notifications activées</Label>
+                  <Switch id="notificationsEnabled" checked={!!edition.notificationsEnabled} {...register("notificationsEnabled")} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="autoAdvance">Avancement automatique</Label>
+                  <Switch id="autoAdvance" checked={!!edition.autoAdvance} {...register("autoAdvance")} />
+                </div>
+              </div>
+              <div className="space-y-3 p-4 border rounded-xl">
+                <div className="font-medium">Configuration compétition</div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="config_checkinRequired">Check-in requis</Label>
+                  {/* @ts-ignore */}
+                  <Switch id="config_checkinRequired" checked={!!edition.editionConfig?.checkinRequired} {...register("config_checkinRequired")} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="config_autoStart">Démarrage auto</Label>
+                  {/* @ts-ignore */}
+                  <Switch id="config_autoStart" checked={!!edition.editionConfig?.autoStart} {...register("config_autoStart")} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="config_seedMethod">Méthode de seed</Label>
+                  <select id="config_seedMethod" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" {...register("config_seedMethod")}>
+                    <option value="RANDOM">Aléatoire</option>
+                    <option value="RANKING">Classement</option>
+                    <option value="MANUAL">Manuel</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="config_tiebreakerRules">Règles de tiebreaker (JSON)</Label>
+                  <Textarea id="config_tiebreakerRules" rows={3} {...register("config_tiebreakerRules")} />
+                </div>
+              </div>
             </div>
           </CardContent>
           <CardFooter className="border-t px-6 py-4 bg-muted/50 flex justify-end">

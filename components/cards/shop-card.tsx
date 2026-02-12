@@ -247,6 +247,7 @@ export function ShopCard({
                   entityId={shop.id}
                   size="sm"
                   variant="outline"
+                  withCount={false}
                 />
               )}
               {showLikeButton && (

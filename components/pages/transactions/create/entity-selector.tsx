@@ -21,6 +21,8 @@ import {
 import { TransactionType } from "@/types/transaction-types";
 import { cn } from "@/lib/utils";
 import { useEntityList, type EntityType } from "@/hooks/use-entity-list";
+import { useAuthContext } from "@/contexts/auth-context";
+import { getTournamentEditions } from "@/actions/tournaments";
 
 interface TransactionEntity {
   id: string;
@@ -44,12 +46,13 @@ export function TransactionEntitySelector({
   onBack,
 }: TransactionEntitySelectorProps) {
   const [search, setSearch] = useState("");
+  const { user } = useAuthContext();
 
   // Mapper les types de transactions vers les EntityType
   const entityTypeMap: Record<TransactionType, EntityType | null> = {
     THEME_PURCHASE: "themes",
     PRODUCT_PURCHASE: "products",
-    TOURNAMENT_PARTICIPATION: "tournaments",
+    TOURNAMENT_PARTICIPATION: "tournament-editions",
     GAME_ITEM_PURCHASE: "game-items",
     VIP_SUBSCRIPTION: null,
     DEPOSIT: null,
@@ -65,8 +68,8 @@ export function TransactionEntitySelector({
     loading,
     error,
     setSearchTerm,
-  } = useEntityList<TransactionEntity>({
-    entityType: entityType || "products", // Fallback to products
+  } = useEntityList<any>({
+    entityType: (entityType || "products") as any, // Fallback to products
     defaultLimit: 50,
     enabled: !!entityType,
     defaultFilters: {
@@ -74,7 +77,32 @@ export function TransactionEntitySelector({
       // Filtres spécifiques selon le type
       ...(type === "PRODUCT_PURCHASE" && { status: "NON_VENDU" }),
       ...(type === "THEME_PURCHASE" && { isPremium: true }),
+      ...(type === "PRODUCT_PURCHASE" && user?.id ? { excludeUserId: user.id } : {}),
     },
+    fetchFunction:
+      type === "TOURNAMENT_PARTICIPATION"
+        ? async (params) => {
+            const res = await getTournamentEditions({
+              pagination: {
+                page: params.page || 1,
+                limit: params.limit || 50,
+              },
+              filters: {
+                name: params.search || undefined,
+                entryFeeMin: 0.01,
+                onlyAvailable: true,
+                statuses: ["UPCOMING", "LIVE"],
+              } as any,
+              options: {
+                includeDeleted: false,
+                includeInactive: false,
+                sortBy: "startDate",
+                sortOrder: "asc",
+              },
+            });
+            return res as any;
+          }
+        : undefined,
   });
 
   const getEntityIcon = () => {
@@ -108,12 +136,20 @@ export function TransactionEntitySelector({
   };
 
   const filteredEntities = useMemo(() => {
-    return entities.filter(
-      (entity) =>
-        entity.name?.toLowerCase().includes(search.toLowerCase()) ||
-        entity.description?.toLowerCase().includes(search.toLowerCase()) ||
-        entity.id.toLowerCase() === search.toLowerCase()
-    );
+    return (entities || []).filter((entity: any) => {
+      const name = (entity.name || entity.editionSlug || "").toLowerCase();
+      const desc = (entity.description || "").toLowerCase();
+      const idMatch = entity.id?.toLowerCase() === search.toLowerCase();
+      // Exclusions supplémentaires pour produits: ne pas retourner ses propres items
+      const notOwnProduct =
+        type !== "PRODUCT_PURCHASE" || (entity.userId && user?.id ? entity.userId !== user.id : true);
+      return (
+        (name.includes(search.toLowerCase()) ||
+          desc.includes(search.toLowerCase()) ||
+          idMatch) &&
+        notOwnProduct
+      );
+    });
   }, [entities, search]);
 
   const Icon = getEntityIcon();
@@ -208,7 +244,30 @@ export function TransactionEntitySelector({
                     transition={{ delay: index * 0.05 }}
                   >
                     <button
-                      onClick={() => onSelect(entity)}
+                      onClick={() => {
+                        // Adapter l'entité selon le type pour inclure le prix fixe
+                        if (type === "TOURNAMENT_PARTICIPATION") {
+                          const price = parseFloat(entity.entryFee || "0");
+                          const mapped = {
+                            id: entity.id,
+                            name: entity.name || `Édition #${entity.editionNumber}`,
+                            description: entity.description || "",
+                            price: price,
+                            currency: entity.prizeCurrency || "GTC",
+                            image: undefined,
+                            metadata: {
+                              tournamentId: entity.tournamentId,
+                              editionNumber: entity.editionNumber,
+                              startDate: entity.startDate,
+                              currentParticipants: entity.currentParticipants,
+                              maxParticipants: entity.maxParticipants,
+                            },
+                          } as TransactionEntity;
+                          onSelect(mapped);
+                        } else {
+                          onSelect(entity as TransactionEntity);
+                        }
+                      }}
                       disabled={
                         entity.metadata?.status &&
                         entity.metadata.status !== "NON_VENDU"
@@ -259,7 +318,11 @@ export function TransactionEntitySelector({
                                   weight="bold"
                                   className="text-primary truncate"
                                 >
-                                  {entity.price.toFixed(2)}{" "}
+                                  {(
+                                    (type === "TOURNAMENT_PARTICIPATION"
+                                      ? parseFloat(entity.entryFee || "0")
+                                      : entity.price || 0) as number
+                                  ).toFixed(2)}{" "}
                                   <span className="text-xs opacity-70">
                                     GTC
                                   </span>

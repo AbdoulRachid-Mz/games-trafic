@@ -78,6 +78,23 @@ export async function getUserWalletByUserId(
 }
 
 /**
+ * Récupère un wallet par son numéro de carte
+ */
+export async function getUserWalletByCardNumber(
+  cardNumber: string
+): Promise<UserWallet | null> {
+  try {
+    const wallet = await db.query.userWallets.findFirst({
+      where: (wallets, { eq }) => eq(wallets.cardNumberHash, cardNumber.replace(/\s+/g, '')),
+    });
+    return wallet ?? null;
+  } catch (error) {
+    console.error('Error getting wallet by card number:', error);
+    throw new Error('Failed to fetch wallet by number');
+  }
+}
+
+/**
  * Liste les wallets avec pagination
  */
 export async function getUserWallets(

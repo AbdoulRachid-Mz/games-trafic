@@ -251,6 +251,15 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     requiredLevel: 'B',
     isFinancial: true,
   },
+  {
+    id: "requests",
+    label: "Demandes",
+    path: "/admin/requests",
+    icon: AlertCircle,
+    description: "Dépôts, retraits et items",
+    requiredLevel: 'B',
+    isFinancial: true,
+  },
 
   // Portefeuilles
   {

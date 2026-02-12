@@ -1,9 +1,10 @@
 'use server';
 
-import { products, type Product, type NewProduct, shops, orders, interactions, categories, users } from '@/database/schema';
+import { products, type Product, type NewProduct, shops, orders, interactions, categories, users, ProductWithRelations } from '@/database/schema';
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull } from 'drizzle-orm';
 import { type ProductFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { encryptData } from '@/lib/encryption';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -15,7 +16,7 @@ import { db } from '@/lib/db';
 export async function getProductById(
   id: string,
   options?: { populate?: string[] }
-): Promise<Product | null> {
+): Promise<ProductWithRelations | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.products.findFirst({
@@ -27,7 +28,8 @@ export async function getProductById(
           orders: options.populate.includes('orders') ? true : undefined,
         }
       });
-      return (await query) ?? null;
+      const result = await query;
+      return result ? result as ProductWithRelations : null;
     }
 
     const result = await db
@@ -36,7 +38,7 @@ export async function getProductById(
       .where(eq(products.id, id))
       .limit(1);
 
-    return result[0] || null;
+    return result[0] ? result[0] as ProductWithRelations : null;
   } catch (error) {
     console.error('Error getting product by ID:', error);
     throw new Error('Failed to fetch product');
@@ -48,7 +50,7 @@ export async function getProductById(
  */
 export async function getProducts(
   query: ListQuery<ProductFilters> = {}
-): Promise<PaginationResponse<Product>> {
+): Promise<PaginationResponse<ProductWithRelations>> {
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -447,6 +449,33 @@ export async function incrementProductViewCount(id: string): Promise<Product> {
   } catch (error) {
     console.error('Error incrementing product view count:', error);
     throw new Error('Failed to increment product view count');
+  }
+}
+
+export async function setProductCredentials(
+  id: string,
+  login: string,
+  plainPassword: string
+): Promise<Product> {
+  try {
+    const encrypted = encryptData(plainPassword);
+    const result = await db
+      .update(products)
+      .set({
+        accountLogin: login,
+        encryptedPassword: encrypted,
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, id))
+      .returning();
+    if (result.length === 0) {
+      throw new Error('Product not found');
+    }
+    return result[0];
+  } catch (error) {
+    console.error('Error setting product credentials:', error);
+    if (error instanceof Error) throw error;
+    throw new Error('Failed to set product credentials');
   }
 }
 

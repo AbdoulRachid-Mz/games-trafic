@@ -8,6 +8,7 @@ import {
   and,
   or,
   eq,
+  ne,
   gte,
   lte,
   like,
@@ -33,6 +34,15 @@ function buildWhereConditions(table: any, filters: EntityQueryParams) {
   const conditions: any[] = [];
 
   // Filtres de base
+  if (filters.id && table.id) {
+    conditions.push(eq(table.id, filters.id));
+  }
+  if (filters.slug && table.slug) {
+    conditions.push(eq(table.slug, filters.slug));
+  }
+  if (filters.editionSlug && table.editionSlug) {
+    conditions.push(eq(table.editionSlug, filters.editionSlug));
+  }
   if (filters.search && table.name) {
     conditions.push(like(table.name, `%${filters.search}%`));
   }
@@ -304,6 +314,9 @@ export async function getProducts(params: EntityQueryParams = {}) {
 
   if (params.userId) {
     conditions.push(eq(table.userId, params.userId));
+  }
+  if (params.excludeUserId) {
+    conditions.push(ne(table.userId, params.excludeUserId));
   }
 
   if (params.status) {

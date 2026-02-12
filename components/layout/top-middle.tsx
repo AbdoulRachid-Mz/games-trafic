@@ -55,7 +55,7 @@ const TopMiddle = ({
   isSideBarOpen,
   isRightBarOpen,
   hideOnScroll = false,
-  breadcrumbItems = [],
+  breadcrumbItems,
 }: TopMiddleProps) => {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);

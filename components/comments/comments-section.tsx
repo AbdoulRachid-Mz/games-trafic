@@ -21,6 +21,7 @@ interface CommentsSectionProps {
   entityType: EntityType;
   title?: string;
   className?: string;
+  
 }
 
 export function CommentsSection({

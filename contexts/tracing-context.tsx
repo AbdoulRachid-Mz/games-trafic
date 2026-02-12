@@ -24,7 +24,7 @@ export function TracingProvider({ children, options }: TracingProviderProps) {
 
   // Configuration initiale basée sur les options
   useEffect(() => {
-    if (options && tracing.isInitialized) {
+    if (options) {
       const updates: Partial<typeof tracing.config> = {};
 
       if (options.enabled !== undefined) {
@@ -47,7 +47,14 @@ export function TracingProvider({ children, options }: TracingProviderProps) {
         tracing.updateConfig(updates);
       }
     }
-  }, [tracing.isInitialized, options, tracing.updateConfig]);
+  }, [options, tracing.updateConfig]);
+
+  useEffect(() => {
+    const disabled = typeof window !== "undefined" && localStorage.getItem("gt_explanations_disabled") === "true";
+    if (disabled) {
+      tracing.updateConfig({ showExplanations: false });
+    }
+  }, [tracing.updateConfig]);
 
   return (
     <TracingContext.Provider value={tracing}>

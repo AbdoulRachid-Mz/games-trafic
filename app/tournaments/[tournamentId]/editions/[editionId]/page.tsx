@@ -9,6 +9,11 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import { getTournamentEditionWithRelations } from "@/actions/editions";
 import { getTournamentById, getTournamentEditionById, getTournamentMembers, getTournamentPhases } from "@/actions/tournaments";
+import { getPhaseGroups, getPhaseGroupParticipants } from "@/actions/phases";
+import { TransactionQRCode } from "@/components/shared/qr-code";
+import { encodeTransactionQR } from "@/utils/qr-utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { Typography } from "@/components/ui/typography";
 
 interface PageProps {
   params: Promise<{
@@ -42,14 +47,73 @@ export default async function EditionPage({ params }: PageProps) {
     notFound();
   }
 
-  // Déstructurer l'édition avec relations
-  const { registrations, ...edition } = editionWithRelations;
+  const edition = editionWithRelations;
 
   // 1. Phases
   const phasesResponse = await getTournamentPhases({
     filters: { editionId },
     options: { sortBy: "order", sortOrder: "asc" },
   });
+  const phases = phasesResponse.data;
+  const activePhase = phases.find((p) => p.isActive) || phases[0];
+
+  let standings: Array<{
+    groupId: string;
+    groupName: string;
+    rows: Array<{
+      registrationId: string;
+      points: number;
+      matchesPlayed: number;
+      matchesWon: number;
+      matchesDrawn: number;
+      matchesLost: number;
+      scoreFor: number;
+      scoreAgainst: number;
+      scoreDifference: number;
+      position?: number;
+      qualified?: boolean;
+    }>;
+  }> = [];
+
+  if (activePhase) {
+    const groupsRes = await getPhaseGroups({
+      filters: { phaseId: activePhase.id },
+      options: { sortBy: "order", sortOrder: "asc" },
+      pagination: { page: 1, limit: 100 },
+    });
+    const groups = groupsRes.data;
+    for (const g of groups) {
+      const participantsRes = await getPhaseGroupParticipants({
+        filters: { groupId: g.id },
+        options: { sortBy: "points", sortOrder: "desc" },
+        pagination: { page: 1, limit: 500 },
+      });
+      const rows = (participantsRes.data || []).map((p: any) => ({
+        registrationId: p.registrationId,
+        points: p.points ?? 0,
+        matchesPlayed: p.matchesPlayed ?? 0,
+        matchesWon: p.matchesWon ?? 0,
+        matchesDrawn: p.matchesDrawn ?? 0,
+        matchesLost: p.matchesLost ?? 0,
+        scoreFor: p.scoreFor ?? 0,
+        scoreAgainst: p.scoreAgainst ?? 0,
+        scoreDifference: p.scoreDifference ?? 0,
+        position: p.position ?? undefined,
+        qualified: p.qualified ?? false,
+      }));
+      rows.sort((a, b) => {
+        if ((b.points ?? 0) !== (a.points ?? 0)) return (b.points ?? 0) - (a.points ?? 0);
+        if ((b.scoreDifference ?? 0) !== (a.scoreDifference ?? 0)) return (b.scoreDifference ?? 0) - (a.scoreDifference ?? 0);
+        if ((b.matchesWon ?? 0) !== (a.matchesWon ?? 0)) return (b.matchesWon ?? 0) - (a.matchesWon ?? 0);
+        return 0;
+      });
+      standings.push({
+        groupId: g.id,
+        groupName: g.name,
+        rows,
+      });
+    }
+  }
 
   // 2. Vérifier si l'utilisateur est membre du tournoi
   let currentUserMember: TournamentMember | undefined;
@@ -67,7 +131,7 @@ export default async function EditionPage({ params }: PageProps) {
       currentUserMember = member;
 
       // Vérifier si ce membre est déjà inscrit à cette édition
-      const existingRegistration = registrations?.find(
+      const existingRegistration = edition.registrations?.find(
         (reg) => reg.memberId === member.id
       );
       if (existingRegistration) {
@@ -77,12 +141,37 @@ export default async function EditionPage({ params }: PageProps) {
   }
 
   return (
-    <EditionPageContent
-      tournament={tournament}
-      edition={edition}
-      phases={phasesResponse.data}
-      currentUserMember={currentUserMember}
-      currentUserRegistration={currentUserRegistration}
-    />
+    <div className="space-y-8">
+      <EditionPageContent
+        tournament={tournament}
+        edition={edition}
+        phases={phases}
+        standings={standings}
+        currentUserMember={currentUserMember}
+        currentUserRegistration={currentUserRegistration}
+      />
+      {Number(edition.entryFee || "0") > 0 && (
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-6 flex flex-col items-center">
+            <Typography variant="h4" className="font-black italic uppercase tracking-tighter mb-2">
+              Paiement d’inscription
+            </Typography>
+            <Typography variant="caption1" theme="muted" className="mb-4 text-center">
+              Scannez pour régler {edition.entryFee} {edition.prizeCurrency || "GTC"}
+            </Typography>
+            <TransactionQRCode
+              data={encodeTransactionQR({
+                t: "TOURNAMENT_PARTICIPATION",
+                id: edition.id,
+                a: Number(edition.entryFee || 0),
+                m: { tournamentId, editionNumber: edition.editionNumber }
+              })}
+              label={edition.name || `Édition #${edition.editionNumber}`}
+              className="shadow-none border-none p-0 bg-transparent"
+            />
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

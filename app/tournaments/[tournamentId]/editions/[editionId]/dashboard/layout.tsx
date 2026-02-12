@@ -3,12 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getTournamentEditionWithRelations } from "@/actions/editions";
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { AppSidebar, NavItem } from "@/components/dashboard/app-sidebar";
+import { EnhancedDashboard, SidebarItem } from "@/components/dashboard/enhanced-dashboard";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -42,7 +37,7 @@ export default function EditionDashboardLayout({
     getTournamentEditionWithRelations(editionId).then(setEdition);
   }, [editionId]);
 
-  const navData: NavItem[] = [
+  const navData = [
     {
       title: "Vue d'ensemble",
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard`,
@@ -59,6 +54,11 @@ export default function EditionDashboardLayout({
       icon: ListTree,
     },
     {
+      title: "Matchs",
+      url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`,
+      icon: Swords,
+    },
+    {
       title: "Paiements",
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/payments`,
       icon: Wallet,
@@ -70,46 +70,54 @@ export default function EditionDashboardLayout({
     },
   ];
 
+  const sidebarContent = (
+    <div className="flex flex-col gap-2 p-4">
+      {navData.map((item) => (
+        <SidebarItem
+          key={item.title}
+          title={item.title}
+          url={item.url}
+          icon={item.icon}
+          sidebarBgType="default"
+        />
+      ))}
+    </div>
+  );
+
+  const headerContent = (
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+      <div className="flex items-center gap-2">
+        <Separator orientation="vertical" className="mr-2 h-4" />
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbLink
+                href={`/tournaments/${tournamentId}/dashboard/editions`}
+              >
+                Éditions
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="hidden md:block" />
+            <BreadcrumbItem>
+              <BreadcrumbPage>
+                {edition?.name || "Chargement..."}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
+    </header>
+  );
+
   return (
-    <SidebarProvider>
-      <AppSidebar
-        navMain={navData}
-        contextName={
-          edition?.name || `Édition #${edition?.editionNumber || ""}`
-        }
-        contextLogo={Swords}
-        className="mt-28"
-      />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b px-4">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink
-                    href={`/tournaments/${tournamentId}/dashboard/editions`}
-                  >
-                    Éditions
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>
-                    {edition?.name || "Chargement..."}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
-            {children}
-          </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <EnhancedDashboard
+      sidebar={sidebarContent}
+      header={headerContent}
+    // className="mt-28"
+    >
+      <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
+        {children}
+      </div>
+    </EnhancedDashboard>
   );
 }

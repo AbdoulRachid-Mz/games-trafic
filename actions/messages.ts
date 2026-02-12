@@ -58,6 +58,9 @@ export async function getMessageById(
           shop: options.populate.includes("shop") ? true : undefined,
           post: options.populate.includes("post") ? true : undefined,
           product: options.populate.includes("product") ? true : undefined,
+          gameClip: options.populate.includes("gameClip") ? true : undefined,
+          edition: options.populate.includes("edition") ? true : undefined,
+          tournament: options.populate.includes("tournament") ? true : undefined,
           parentMessage: options.populate.includes("parentMessage")
             ? true
             : undefined,

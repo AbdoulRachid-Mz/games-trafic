@@ -13,15 +13,16 @@ import { Shop } from "@/database/schema";
 
 interface ShopCardListProps {
   shop: Shop;
-  onClick: () => void;
+  viewMode: "grid" | "list";
+  onView: () => void;
 }
 
-export function ShopCardList({ shop, onClick }: ShopCardListProps) {
+export function ShopCardList({ shop, viewMode, onView }: ShopCardListProps) {
   return (
     <motion.div
       whileHover={{ x: 4 }}
       className="group cursor-pointer"
-      onClick={onClick}
+      onClick={onView}
     >
       <Card className="border-2 border-transparent hover:border-primary/20 transition-all duration-300">
         <CardContent className="p-4">
@@ -107,7 +108,7 @@ export function ShopCardList({ shop, onClick }: ShopCardListProps) {
                 className="gap-2"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onClick();
+                  onView();
                 }}
               >
                 Visiter

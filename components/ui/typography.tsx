@@ -347,16 +347,16 @@ export function Typography({
         "text-xs sm:text-sm text-muted-foreground leading-relaxed";
       break;
     case "caption1":
-      variantStyles = "text-[10px] sm:text-xs leading-tight";
+      variantStyles = "text-[14px] sm:text-xs leading-tight";
       break;
     case "caption2":
-      variantStyles = "text-[10px] sm:text-xs leading-tight opacity-80";
+      variantStyles = "text-[12px] sm:text-xs leading-tight opacity-80";
       break;
     case "caption3":
-      variantStyles = "text-[8px] sm:text-[10px] leading-tight";
+      variantStyles = "text-[10px] leading-tight";
       break;
     case "caption4":
-      variantStyles = "text-[6px] sm:text-[8px] leading-tight";
+      variantStyles = "text-[8px]  leading-tight";
       break;
   }
 

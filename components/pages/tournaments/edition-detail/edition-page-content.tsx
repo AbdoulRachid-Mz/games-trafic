@@ -30,6 +30,23 @@ interface EditionPageContentProps {
   tournament: Tournament;
   edition: TournamentEditionWithRelations;
   phases: TournamentPhase[];
+  standings?: Array<{
+    groupId: string;
+    groupName: string;
+    rows: Array<{
+      registrationId: string;
+      points: number;
+      matchesPlayed: number;
+      matchesWon: number;
+      matchesDrawn: number;
+      matchesLost: number;
+      scoreFor: number;
+      scoreAgainst: number;
+      scoreDifference: number;
+      position?: number;
+      qualified?: boolean;
+    }>;
+  }>;
   currentUserMember?: TournamentMember & { team?: Team };
   currentUserRegistration?: EditionRegistrationWithRelations;
 }
@@ -38,6 +55,7 @@ export function EditionPageContent({
   tournament,
   edition,
   phases,
+  standings = [],
   currentUserMember,
   currentUserRegistration,
 }: EditionPageContentProps) {
@@ -95,15 +113,21 @@ export function EditionPageContent({
         tournament={tournament}
         edition={edition}
         isOrganizer={false}
+        onJoinClick={handleJoinClick}
+        onPaymentClick={() => setShowPaymentDialog(true)}
+        onCancelJoin={() => setShowJoinDialog(false)}
+        onCancelPayment={() => setShowPaymentDialog(false)}
+        onConfirmPayment={handleConfirmJoin}
+        isRegistered={isRegistered}
       />
 
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          <div className="flex-1 w-full space-y-8">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        <div className="flex flex-col md:flex-row gap-4 items-start">
+          <div className="flex-1 w-full space-y-4">
             <EditionStatsGrid edition={edition} />
 
             {!isRegistered && (
-              <div className="bg-card border rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+              <div className="bg-card border rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
                 <div>
                   <h3 className="text-lg font-bold mb-1">
                     Inscriptions ouvertes !
@@ -129,15 +153,16 @@ export function EditionPageContent({
             )}
 
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 lg:w-[400px]">
+              <TabsList className="grid w-full grid-cols-5 lg:w-[500px]">
                 <TabsTrigger value="overview">Aperçu</TabsTrigger>
                 <TabsTrigger value="participants">Joueurs</TabsTrigger>
                 <TabsTrigger value="phases">Arbre</TabsTrigger>
+                <TabsTrigger value="standings">Classement</TabsTrigger>
                 <TabsTrigger value="comments">Discussion</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4 mt-6">
-                <div className="bg-card border rounded-xl p-6">
+                <div className="bg-card border rounded-xl p-3">
                   <h3 className="text-xl font-bold mb-4">
                     À propos de cette édition
                   </h3>
@@ -160,6 +185,21 @@ export function EditionPageContent({
                     </div>
                   )}
                 </div>
+                <div className="bg-card border rounded-xl p-3">
+                  <h4 className="text-lg font-bold mb-3">Navigation</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="outline" asChild>
+                      <a href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}>
+                        Voir les matchs
+                      </a>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <a href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
+                        Calendrier
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="participants" className="mt-6">
@@ -169,14 +209,75 @@ export function EditionPageContent({
               </TabsContent>
 
               <TabsContent value="phases" className="mt-6">
-                <EditionPhasesView phases={phases} />
+                <EditionPhasesView phases={phases} editionId={edition.id} />
+              </TabsContent>
+
+              <TabsContent value="standings" className="mt-6">
+                <div className="space-y-6">
+                  {standings.length === 0 ? (
+                    <div className="bg-card border rounded-xl p-3 text-sm text-muted-foreground">
+                      Aucun classement disponible pour la phase active.
+                    </div>
+                  ) : (
+                    standings.map((g) => (
+                      <div key={g.groupId} className="bg-card border rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-bold">Groupe {g.groupName}</h4>
+                          <div className="text-xs text-muted-foreground">
+                            {g.rows.length} participants
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-muted-foreground">
+                                <th className="text-left p-2">#</th>
+                                <th className="text-left p-2">Joueur</th>
+                                <th className="text-right p-2">Pts</th>
+                                <th className="text-right p-2">J</th>
+                                <th className="text-right p-2">V</th>
+                                <th className="text-right p-2">N</th>
+                                <th className="text-right p-2">D</th>
+                                <th className="text-right p-2">+/-</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.rows.map((row, idx) => {
+                                const reg = (edition.registrations || []).find(
+                                  (r: any) => r.id === row.registrationId
+                                ) as any;
+                                const name =
+                                  reg?.member?.displayName ||
+                                  reg?.member?.user?.username ||
+                                  reg?.member?.team?.name ||
+                                  "Joueur";
+                                return (
+                                  <tr key={row.registrationId} className="border-t">
+                                    <td className="p-2">{row.position ?? idx + 1}</td>
+                                    <td className="p-2">{name}</td>
+                                    <td className="p-2 text-right font-bold">{row.points}</td>
+                                    <td className="p-2 text-right">{row.matchesPlayed}</td>
+                                    <td className="p-2 text-right">{row.matchesWon}</td>
+                                    <td className="p-2 text-right">{row.matchesDrawn}</td>
+                                    <td className="p-2 text-right">{row.matchesLost}</td>
+                                    <td className="p-2 text-right">{row.scoreDifference}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="comments" className="mt-6">
-                <div className="bg-card border rounded-xl p-6">
+                <div className="bg-card border rounded-xl p-3">
                   <CommentsSection
                     entityId={edition.id}
-                    entityType="TOURNAMENT"
+                    entityType="EDITION"
                     title="Discussion de l'édition"
                   />
                 </div>
@@ -185,7 +286,7 @@ export function EditionPageContent({
           </div>
 
           <div className="hidden lg:block w-80 space-y-6">
-            <div className="bg-card border rounded-xl p-6 sticky top-24">
+            <div className="bg-card border rounded-xl p-3 sticky top-24">
               <h4 className="font-bold mb-4">Informations Tournoi</h4>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">

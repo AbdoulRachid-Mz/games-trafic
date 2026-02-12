@@ -33,6 +33,8 @@ import { decodeTransactionQR, isValidTransactionQR } from "@/utils/qr-utils";
 import { QrScanner } from "@/components/shared/qr-scanner";
 import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getTournamentEditions } from "@/actions/tournaments";
+import { useTransactionFees } from "@/hooks/use-transaction-fees";
 
 export default function CreateTransactionPage() {
   const searchParams = useSearchParams();
@@ -64,16 +66,37 @@ function CreateTransactionContent({
   const [isLoading, setIsLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [transactionData, setTransactionData] = useState<TransactionData>({
-    type: null as any,
+    type: null as unknown as TransactionType,
     amount: 0,
     metadata: {},
   });
-  const [fees, setFees] = useState({
-    percentage: 0,
-    amount: 0,
-    totalAmount: 0,
-  });
   const [transactionId, setTransactionId] = useState<string | null>(null);
+  
+  // Fetch fees via the dedicated hook
+  const { 
+    fees, 
+    total, 
+    isLoading: feesLoading, 
+    isError, 
+    error, 
+    refetch 
+  } = useTransactionFees(
+    transactionData.type,
+    transactionData.amount,
+    { enabled: !!transactionData.type && transactionData.amount > 0 }
+  );
+
+  const feesObj = useMemo(() => {
+    const baseAmount = transactionData.amount || 0;
+    const feeAmount = typeof fees === "number" ? fees : 0;
+    const totalAmount = typeof total === "number" ? total : baseAmount;
+    const percentage = baseAmount > 0 ? feeAmount / baseAmount : 0;
+    return {
+      percentage,
+      amount: feeAmount,
+      totalAmount,
+    };
+  }, [fees, total, transactionData.amount]);
 
   // Récupération des paramètres d'URL et fetch de l'entité
   useEffect(() => {
@@ -93,25 +116,53 @@ function CreateTransactionContent({
           metadata: {},
         };
 
+        if (type === "VIP_SUBSCRIPTION" && !newData.amount) {
+          const monthly = parseFloat(settings?.vipMonthlyPrice || "0");
+          if (monthly > 0) {
+            newData.amount = monthly;
+          }
+        }
         // Fetch entity from database if entityId is provided
         if (actualEntityId && config.needsTargetId) {
           try {
             const entityType = getEntityTypeFromTransactionType(type);
-            if (entityType) {
+            if (entityType === "tournamentEditions") {
+              const res = await getTournamentEditions({
+                pagination: { page: 1, limit: 1 },
+                filters: { id: actualEntityId, entryFeeMin: 0.01 } as any,
+                options: { includeDeleted: false, includeInactive: false },
+              });
+              const entity = res.data?.[0];
+              if (entity) {
+                newData.targetId = actualEntityId;
+                newData.entity = {
+                  id: entity.id,
+                  name: entity.name || `Édition #${entity.editionNumber}`,
+                  description: entity.description,
+                  price: parseFloat(entity.entryFee || "0"),
+                  currency: entity.prizeCurrency || "GTC",
+                  image: undefined,
+                  metadata: {
+                    tournamentId: entity.tournamentId,
+                    editionNumber: entity.editionNumber,
+                  },
+                } as any;
+                if (!newData.amount) {
+                  newData.amount = parseFloat(entity.entryFee || "0");
+                }
+              }
+            } else if (entityType) {
               const result = await getEntities(entityType as any, {
-                search: actualEntityId,
+                id: actualEntityId,
                 limit: 1,
                 page: 1,
               });
-
-              // Find the specific entity by ID
               const entity = result.data.find((e: any) => e.id === actualEntityId);
-
               if (entity) {
                 newData.targetId = actualEntityId;
                 newData.entity = entity;
-                if (!newData.amount && entity.priceGtc) {
-                  newData.amount = parseFloat(entity.priceGtc);
+                if (!newData.amount && (entity.priceGtc || entity.price)) {
+                  newData.amount = parseFloat(entity.priceGtc || entity.price || "0");
                 }
               }
             }
@@ -130,10 +181,6 @@ function CreateTransactionContent({
         );
         setCurrentStep(initialStepIndex);
 
-        // Calculate fees immediately if amount is provided
-        if (newData.amount > 0) {
-          calculateFees(type, newData.amount);
-        }
       }
 
       if (completeData && !completeData?.wallet) {
@@ -174,41 +221,6 @@ function CreateTransactionContent({
     return config.steps.indexOf("TYPE_SELECTION") >= 0 ? 1 : 0;
   };
 
-  const calculateFees = async (type: TransactionType, amount: number) => {
-    try {
-      const response = await fetch("/api/transactions/calculate-fees", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, amount }),
-      });
-      if (!response.ok) {
-        throw new Error("Erreur lors du calcul des frais");
-      }
-      const data = await response.json();
-      const feePercentage = parseFloat(data.feePercentage?.toString() || "0");
-      const feeAmount = parseFloat(data.fees?.toString() || "0");
-      const totalAmount = parseFloat(data.totalAmount?.toString() || "0");
-
-      setFees({
-        percentage: feePercentage,
-        amount: feeAmount,
-        totalAmount,
-      });
-
-      return { feeAmount, totalAmount };
-    } catch (error) {
-      console.error("Error calculating fees:", error);
-      const feeAmount = amount * 0.01;
-      const totalAmount = amount + feeAmount;
-      setFees({
-        percentage: 0.01,
-        amount: feeAmount,
-        totalAmount,
-      });
-      return { feeAmount, totalAmount };
-    }
-  };
-
   const getEntityTypeFromTransactionType = (
     type: TransactionType
   ): string | null => {
@@ -220,7 +232,7 @@ function CreateTransactionContent({
       case "GAME_ITEM_PURCHASE":
         return "gameItems";
       case "TOURNAMENT_PARTICIPATION":
-        return "tournaments";
+        return "tournamentEditions";
       default:
         return null;
     }
@@ -258,17 +270,41 @@ function CreateTransactionContent({
       // Fetch entity details
       try {
         const entityType = getEntityTypeFromTransactionType(type);
-        if (entityType) {
+        if (entityType === "tournamentEditions") {
+          const res = await getTournamentEditions({
+            pagination: { page: 1, limit: 1 },
+            filters: { id: entityId, entryFeeMin: 0.01 } as any,
+            options: { includeDeleted: false, includeInactive: false },
+          });
+          const entity = res.data?.[0];
+          if (entity) {
+            newData.entity = {
+              id: entity.id,
+              name: entity.name || `Édition #${entity.editionNumber}`,
+              description: entity.description,
+              price: parseFloat(entity.entryFee || "0"),
+              currency: entity.prizeCurrency || "GTC",
+              image: undefined,
+              metadata: {
+                tournamentId: entity.tournamentId,
+                editionNumber: entity.editionNumber,
+              },
+            } as any;
+            if (!newData.amount) {
+              newData.amount = parseFloat(entity.entryFee || "0");
+            }
+          }
+        } else if (entityType) {
           const result = await getEntities(entityType as any, {
-            search: entityId,
+            id: entityId,
             limit: 1,
             page: 1,
           });
           const entity = result.data.find((e: any) => e.id === entityId);
           if (entity) {
             newData.entity = entity;
-            if (!newData.amount && entity.priceGtc) {
-              newData.amount = parseFloat(entity.priceGtc);
+            if (!newData.amount && (entity.priceGtc || entity.price)) {
+              newData.amount = parseFloat(entity.priceGtc || entity.price || "0");
             }
           }
         }
@@ -281,10 +317,6 @@ function CreateTransactionContent({
       const config = TRANSACTION_CONFIGS[type];
       const initialStep = getInitialStepForType(type, config, !!newData.targetId);
       setCurrentStep(initialStep);
-
-      if (newData.amount > 0) {
-        calculateFees(type, newData.amount);
-      }
 
       toast.success("QR Code scanné avec succès");
     } else {
@@ -306,19 +338,10 @@ function CreateTransactionContent({
     if (nextStepIndex < steps.length) {
       setCurrentStep(nextStepIndex);
     }
-    if (transactionData.type && (price || transactionData.amount)) {
-      calculateFees(
-        transactionData.type,
-        price || transactionData.amount
-      );
-    }
   };
 
-  const handleAmountChange = async (amount: number) => {
+  const handleAmountChange = (amount: number) => {
     setTransactionData((prev) => ({ ...prev, amount }));
-    if (transactionData.type) {
-      await calculateFees(transactionData.type, amount);
-    }
   };
 
   const handleRecipientSelect = (recipient: any) => {
@@ -442,7 +465,9 @@ function CreateTransactionContent({
           targetId: transactionData.targetId,
           entity: transactionData.entity,
           recipientWalletId: transactionData.recipientWalletId,
-          feePercentage: fees.percentage,
+          feesAmount: feesObj.amount,
+          feesPercentage: feesObj.percentage,
+          totalCalculated: feesObj.totalAmount,
         },
       });
 
@@ -456,12 +481,12 @@ function CreateTransactionContent({
         transactionId: transaction.id,
         amount: transactionData.amount,
         type: transactionData.type,
-        fees: fees.amount,
-        totalAmount: fees.totalAmount,
+        fees: feesObj.amount,
+        totalAmount: feesObj.totalAmount,
         date: new Date(),
         reference: `TX-${transaction.id.slice(-8)}`,
         newBalance:
-          parseFloat(completeData.wallet.balance || "0") - fees.totalAmount,
+          parseFloat(completeData.wallet.balance || "0") - feesObj.totalAmount,
         entityData: transactionData.entity,
       });
 
@@ -553,7 +578,7 @@ function CreateTransactionContent({
             amount={transactionData.amount}
             onChange={handleAmountChange}
             walletBalance={parseFloat(completeData?.wallet?.balance || "0")}
-            fees={fees}
+            fees={feesObj}
             transactionType={transactionData.type}
             entity={transactionData.entity}
             onContinue={handleContinue}
@@ -594,8 +619,8 @@ function CreateTransactionContent({
             transactionDetails={{
               type: transactionData.type,
               amount: transactionData.amount,
-              fees: fees.amount,
-              totalAmount: fees.totalAmount,
+              fees: feesObj.amount,
+              totalAmount: feesObj.totalAmount,
             }}
           />
         );
@@ -605,8 +630,8 @@ function CreateTransactionContent({
           <TransactionConfirmation
             transactionData={{
               ...transactionData,
-              fees: fees.amount,
-              totalAmount: fees.totalAmount,
+              fees: feesObj.amount,
+              totalAmount: feesObj.totalAmount,
             }}
             onConfirm={handleConfirm}
             onCancel={handleBack}
@@ -621,7 +646,7 @@ function CreateTransactionContent({
             transactionData={transactionData}
             newBalance={
               parseFloat(completeData?.wallet?.balance || "0") -
-              fees.totalAmount
+              feesObj.totalAmount
             }
             isRequest={
               transactionData.type === "DEPOSIT" ||

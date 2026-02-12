@@ -40,6 +40,25 @@ export function generateTransactionReceipt(data: ReceiptData) {
     doc.text(`Élément: ${data.entityData.name}`, 20, yPos);
     yPos += 8;
   }
+  // Détails spécifiques par type
+  if (data.type === "TOURNAMENT_PARTICIPATION") {
+    if (data.entityData?.metadata?.editionNumber) {
+      doc.text(
+        `Édition: #${data.entityData.metadata.editionNumber}`,
+        20,
+        yPos
+      );
+      yPos += 8;
+    }
+    if (data.entityData?.metadata?.tournamentId) {
+      doc.text(
+        `Tournoi ID: ${data.entityData.metadata.tournamentId}`,
+        20,
+        yPos
+      );
+      yPos += 8;
+    }
+  }
   
   doc.text("", 20, yPos); // Espace
   

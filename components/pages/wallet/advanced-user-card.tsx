@@ -42,11 +42,13 @@ import { QRCodeDisplay } from "@/components/shared/qr-code-2";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
+import { formatWalletNumber } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { User, UserWallet, UserWithRelations } from "@/database/schema";
 
 interface AdvancedUserCardProps {
-  wallet: any;
-  user: any;
+  wallet: UserWallet;
+  user: UserWithRelations;
   showBalance?: boolean;
   onRefresh?: () => Promise<void>;
   className?: string;
@@ -262,11 +264,7 @@ export function AdvancedUserCard({
               {/* Informations wallet */}
               <div className="space-y-4">
                 <div>
-                  <Typography
-                    variant="caption2"
-                    theme="white"
-                    className="opacity-80"
-                  >
+                  <Typography variant="caption2" theme="white" className="opacity-80">
                     NUMÉRO DE WALLET
                   </Typography>
                   <Typography
@@ -276,9 +274,9 @@ export function AdvancedUserCard({
                     copyable
                     hasTooltip
                     tooltipContent="Cliquez pour copier"
-                    onClick={() => handleCopy(wallet.id, "Numéro de wallet")}
+                    onClick={() => handleCopy(wallet.cardNumberHash || wallet.id, "Numéro de wallet")}
                   >
-                    {wallet.id.slice(0, 8)}...{wallet.id.slice(-4)}
+                    {formatWalletNumber(wallet.cardNumberHash || wallet.id)}
                   </Typography>
                 </div>
 
@@ -467,9 +465,10 @@ export function AdvancedUserCard({
           <div className="p-6 flex flex-col items-center">
             <QRCodeDisplay
               data={{
-                walletId: wallet.id,
-                userId: user?.id,
                 type: "wallet",
+                cardNumber: wallet.cardNumberHash || "",
+                walletId: wallet.id,
+                userId: user?.id || "",
               }}
               size={200}
               title={`Wallet ${user?.fullName || user?.username}`}

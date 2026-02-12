@@ -29,6 +29,7 @@ import { getTournamentMemberById, updateTournamentMember } from "@/actions/membe
 import { useAuthContext } from "@/contexts/auth-context";
 import type { TournamentMember } from "@/database/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+import Image from "next/image";
 
 export default function MemberDetailPage() {
   const params = useParams();
@@ -90,11 +91,14 @@ export default function MemberDetailPage() {
       {/* Banner */}
       <div className="relative h-48 rounded-xl overflow-hidden mb-8">
         {member.banner ? (
-          <img
-            src={member.banner}
-            alt="Bannière"
-            className="w-full h-full object-cover"
-          />
+          <div className="relative h-full w-full">
+            <Image
+              src={member.banner}
+              fill={true}
+              alt="Bannière"
+              className="w-full h-full object-cover"
+            />
+          </div>
         ) : (
           <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-purple-500/20" />
         )}
@@ -111,7 +115,7 @@ export default function MemberDetailPage() {
 
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <Typography variant="h1" weight="bold" className="text-3xl">
+                <Typography variant="h3" weight="bold" >
                   {member.displayName}
                 </Typography>
                 {member.isVerified && (
@@ -128,7 +132,7 @@ export default function MemberDetailPage() {
                 )}
               </div>
 
-              <Typography variant="body-lg" theme="muted">
+              <Typography variant="body-base" theme="muted">
                 {member.gameTag} • {member.clubName || "Sans club"}
               </Typography>
             </div>
@@ -137,12 +141,16 @@ export default function MemberDetailPage() {
               {(isOwner || isOrganizer) && (
                 <Button variant="outline" onClick={() => setIsEditing(true)}>
                   <Edit className="h-4 w-4 mr-2" />
-                  Modifier
+                  <span className="hidden md:inline">
+                    Modifier
+                  </span>
                 </Button>
               )}
               <Button>
                 <MessageCircle className="h-4 w-4 mr-2" />
-                Message
+                <span className="hidden md:inline">
+                  Message
+                </span>
               </Button>
             </div>
           </div>

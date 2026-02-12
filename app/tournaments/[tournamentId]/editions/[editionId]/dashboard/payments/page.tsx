@@ -19,7 +19,8 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getEditionRegistrations } from "@/actions/tournaments";
+import { getEditionRegistrations, updateEditionRegistration, updateRegistrationPayment, getTournamentEditions } from "@/actions/tournaments";
+import { refundTransaction } from "@/actions/transactions";
 import {
   EditionRegistration,
   TournamentMember,
@@ -45,6 +46,14 @@ type RegistrationWithPayment = EditionRegistration & {
 
 export default async function DashboardPaymentsPage({ params }: PageProps) {
   const { editionId } = await params;
+
+  const editionRes = await getTournamentEditions({
+    filters: { id: editionId } as any,
+    pagination: { page: 1, limit: 1 },
+    options: { includeDeleted: false, includeInactive: false },
+  });
+  const edition = editionRes.data?.[0] as any;
+  const isPayingEdition = !!edition && parseFloat(edition.entryFee || "0") > 0;
 
   const registrationsResponse = await getEditionRegistrations({
     filters: { editionId },
@@ -75,6 +84,15 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!isPayingEdition && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Édition non payante</AlertTitle>
+            <AlertDescription>
+              Cette édition ne nécessite aucun paiement. Aucune action d'approbation/rejet n'est requise.
+            </AlertDescription>
+          </Alert>
+        )}
         {payments.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <p>Aucun paiement enregistré pour le moment.</p>
@@ -92,6 +110,7 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
                 <TableHead>Statut</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Transaction ID</TableHead>
+                {isPayingEdition && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -139,6 +158,52 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
                   <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
                     {payment.transactionId?.substring(0, 18)}...
                   </TableCell>
+                  {isPayingEdition && (
+                    <TableCell className="text-right">
+                      {payment.status === "PENDING" ? (
+                        <div className="flex justify-end gap-2">
+                          <form
+                            action={async () => {
+                              "use server";
+                              await updateRegistrationPayment(payment.id, {
+                                status: "COMPLETED",
+                                paidAt: new Date(),
+                              } as any);
+                              await updateEditionRegistration(payment.registration.id, {
+                                feePaid: true,
+                                status: "REGISTERED",
+                              } as any);
+                            }}
+                          >
+                            <button className="px-3 py-2 rounded-md bg-green-600 text-white text-xs">
+                              Approuver
+                            </button>
+                          </form>
+                          <form
+                            action={async () => {
+                              "use server";
+                              if (payment.transactionId) {
+                                await refundTransaction(payment.transactionId, "Inscription rejetée");
+                              }
+                              await updateRegistrationPayment(payment.id, {
+                                status: "REFUNDED",
+                                notes: "Rejet par l'organisateur",
+                              } as any);
+                              await updateEditionRegistration(payment.registration.id, {
+                                status: "CANCELLED",
+                              } as any);
+                            }}
+                          >
+                            <button className="px-3 py-2 rounded-md bg-red-600 text-white text-xs">
+                              Rejeter
+                            </button>
+                          </form>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

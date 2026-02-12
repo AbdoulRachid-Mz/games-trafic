@@ -115,7 +115,7 @@ export function CommentForm({
       createComment(
         {
           content: trimmedContent,
-          senderId: parentId,
+          senderId: user.id,
           entityId,
           entityType,
           parentId,
@@ -236,7 +236,7 @@ export function CommentForm({
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              {isEditMode ? "Modifier" : "Commenter"}
+              {/* {isEditMode ? "Modifier" : "Commenter"} */}
             </Button>
           </div>
         </div>

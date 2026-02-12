@@ -46,7 +46,7 @@ export interface ResolvedRoute {
     hideOnScroll: boolean;
     breadcrumbs: Array<{ name: string; path: string }>;
   };
-  
+  breadcrumbs: boolean;
   leftBar: {
     enabled: boolean;
     requireAuth: boolean;

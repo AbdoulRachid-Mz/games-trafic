@@ -87,7 +87,7 @@ export function MarketplaceHero({ searchQuery, isFilterOpen, toggleFilter, onSea
           </div>
 
           {/* Barre de recherche gaming */}
-          <div className="max-w-2xl mx-auto pt-8">
+          <div className="max-w-2xl mx-auto pt-6">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -101,9 +101,9 @@ export function MarketplaceHero({ searchQuery, isFilterOpen, toggleFilter, onSea
                     placeholder="Rechercher un jeu, un rang, une plateforme..."
                     value={searchQuery}
                     onChange={(e) => onSearch(e.target.value)}
-                    className="flex-1 border-0 bg-transparent placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-0 text-lg h-14"
+                    className="flex-1 border-0 bg-transparent placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-0 text-lg h-12"
                   />
-                  <Button className="h-12 px-6 rounded-xl">
+                  <Button className="h-12 px-2 rounded-xl">
                     Rechercher
                   </Button>
                   <Button

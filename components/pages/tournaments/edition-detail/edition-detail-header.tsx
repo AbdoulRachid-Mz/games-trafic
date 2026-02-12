@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import {
   Calendar,
-  Clock,
-  MapPin,
-  PlayCircle,
-  Share2,
-  Shield,
-  Trophy,
   Users,
+  Trophy,
+  MapPin,
+  Share2,
+  PlayCircle,
+  Clock,
+  Shield,
+  Award,
+  ChevronRight,
   MoreVertical,
   Edit,
   Trash2,
@@ -27,15 +29,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 import {
   Tournament,
-  TournamentEdition,
   TournamentEditionWithRelations,
 } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
+import { cn } from "@/lib/utils";
+import { EditionJoinDialog } from "./edition-join-dialog";
 
 interface EditionDetailHeaderProps {
   tournament: Tournament;
@@ -43,6 +46,12 @@ interface EditionDetailHeaderProps {
   isOrganizer: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onJoinClick?: () => void;
+  onPaymentClick?: () => void;
+  onCancelJoin?: () => void;
+  onCancelPayment?: () => void;
+  onConfirmPayment?: () => void;
+  isRegistered?: boolean;
 }
 
 export function EditionDetailHeader({
@@ -51,44 +60,14 @@ export function EditionDetailHeader({
   isOrganizer,
   onEdit,
   onDelete,
+  onJoinClick,
+  onPaymentClick,
+  onCancelJoin,
+  onCancelPayment,
+  onConfirmPayment,
+  isRegistered,
 }: EditionDetailHeaderProps) {
-  const { isSmallScreen } = useScreenSize();
-
-  const getStatusBadge = () => {
-    switch (edition.status) {
-      case "UPCOMING":
-        return (
-          <Badge className="bg-blue-500 hover:bg-blue-600 gap-1">
-            <Calendar className="h-3 w-3" /> À venir
-          </Badge>
-        );
-      case "LIVE":
-        return (
-          <Badge className="bg-red-500 hover:bg-red-600 gap-1 animate-pulse">
-            <PlayCircle className="h-3 w-3" /> En cours
-          </Badge>
-        );
-      case "COMPLETED":
-        return (
-          <Badge className="bg-green-500 hover:bg-green-600 gap-1">
-            <Trophy className="h-3 w-3" /> Terminé
-          </Badge>
-        );
-      case "CANCELLED":
-        return (
-          <Badge className="bg-red-500 hover:bg-red-600 gap-1">
-            <Trash2 className="h-3 w-3" /> Annulé
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-secondary text-secondary-foreground gap-1">
-            <Trophy className="h-3 w-3" /> Terminé
-          </Badge>
-        );
-    }
-  };
-  
+  const { isMobile } = useScreenSize();
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
 
@@ -97,7 +76,7 @@ export function EditionDetailHeader({
       case "UPCOMING":
         return "bg-blue-500/10 text-blue-500 border-blue-500/20";
       case "LIVE":
-        return "bg-green-500/10 text-green-500 border-green-500/20";
+        return "bg-green-500/10 text-green-500 border-green-500/20 animate-pulse";
       case "COMPLETED":
         return "bg-secondary text-secondary-foreground";
       case "CANCELLED":
@@ -122,6 +101,10 @@ export function EditionDetailHeader({
     }
   };
 
+  const getLocationIcon = (type: string) => {
+    return type === "ONLINE" ? "🌐" : "📍";
+  };
+
   const handleDelete = () => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cette édition ?")) {
       deleteMutation.mutate(edition.id, {
@@ -133,52 +116,92 @@ export function EditionDetailHeader({
   };
 
   return (
-    <div className="relative border-b bg-card">
-      <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-          <Link href="/tournaments" className="hover:text-primary">
-            Tournois
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/tournaments/${tournament.id}`}
-            className="hover:text-primary"
-          >
-            {tournament.name}
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium">
-            {edition.name || `Édition #${edition.editionNumber}`}
-          </span>
+    <div className="relative border-b bg-gradient-to-b from-background via-background to-muted/10">
+      {/* Bannière */}
+      <div className="relative h-48 md:h-64 overflow-hidden">
+        {tournament.coverImage ? (
+          <Image
+            src={tournament.coverImage}
+            alt={tournament.name}
+            fill
+            className="object-cover opacity-20"
+            priority
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-purple-500/20" />
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
+
+        {/* Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+          />
         </div>
+      </div>
 
-        <div className="flex flex-col md:flex-row gap-8 items-start justify-between">
-          <div className="flex-1 space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge className={getStatusColor(edition.status || "UPCOMING")}>
-                {getStatusLabel(edition.status || "UPCOMING")}
-              </Badge>
-              {edition.locationType === "ONLINE" && (
-                <Badge variant="outline" className="gap-1">
-                  <MapPin className="h-3 w-3" /> En ligne
+      {/* Informations */}
+      <div className="container mx-auto px-4 relative -mt-16">
+        <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
+          {/* Logo/Badge */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="relative"
+          >
+            <div className="relative">
+              <div className="w-24 h-24 md:w-28 md:h-28 rounded-xl border-4 border-background bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-2xl">
+                <Trophy className="h-12 w-12 md:h-14 md:w-14 text-primary" />
+              </div>
+
+              {/* Statut */}
+              <div className="absolute -bottom-2 -right-2">
+                <Badge className={getStatusColor(edition.status || "UPCOMING")}>
+                  {getStatusLabel(edition.status || "UPCOMING")}
                 </Badge>
-              )}
+              </div>
             </div>
+          </motion.div>
 
-            <div>
+          {/* Informations */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
               <Typography
                 variant="h1"
-                className="text-3xl md:text-4xl font-bold mb-2"
+                weight="bold"
+                className="text-2xl md:text-4xl"
               >
                 {edition.name || `Édition #${edition.editionNumber}`}
               </Typography>
-              {edition.tagline && (
-                <Typography variant="body-lg" className="text-muted-foreground">
-                  {edition.tagline}
-                </Typography>
-              )}
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="gap-1">
+                  <span className="text-lg">{getLocationIcon(edition.locationType || "ONLINE")}</span>
+                  {edition.locationType === "ONLINE" ? "En ligne" : "Présentiel"}
+                </Badge>
+
+                {edition.entryFee && Number(edition.entryFee) > 0 && (
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 gap-1">
+                    <Trophy className="h-3 w-3" />
+                    {edition.entryFee} {edition.prizeCurrency || "GTC"}
+                  </Badge>
+                )}
+              </div>
             </div>
+
+            {edition.tagline && (
+              <Typography
+                variant="body-lg"
+                className="max-w-3xl mb-4 text-muted-foreground"
+              >
+                {edition.tagline}
+              </Typography>
+            )}
 
             <div className="flex flex-wrap gap-4 md:gap-8 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
@@ -197,46 +220,80 @@ export function EditionDetailHeader({
                 </span>
               </div>
             </div>
-
-            {/* NO PRICE DISPLAY HERE */}
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
-            {isOrganizer ? (
-              <>
-                <Button variant="outline" size="sm" asChild>
-                  <Link
-                    href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}
+            {/* Join button for non-organizers */}
+            {!isOrganizer && !isRegistered && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onJoinClick}
+              >
+                Joindre
+              </Button>
+            )}
+
+            {/* Organizer actions dropdown */}
+            {isOrganizer && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}
+                    >
+                      Tableau de bord
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}
+                    >
+                      Matchs
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}
+                    >
+                      Calendrier
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      // TODO: Open edit dialog or navigate to edit
+                    }}
                   >
-                    Tableau de bord
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    // TODO: Open edit dialog or navigate to edit
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  onClick={handleDelete}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
-            ) : (
+                    <Edit className="h-4 w-4 mr-2" />
+                    Modifier
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Share button for non-organizers */}
+            {!isOrganizer && (
               <Button variant="outline" size="sm" className="gap-2">
                 <Share2 className="h-4 w-4" />
                 Partager
               </Button>
             )}
 
+            {/* Map button */}
             {edition.locationType !== "ONLINE" && edition.location && (
               <Button variant="default" className="gap-2" asChild>
                 <a

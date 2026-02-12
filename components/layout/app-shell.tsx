@@ -11,6 +11,7 @@ import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 import { resolveRoute } from "@/lib/routes/resolver";
 import type { UserRoles } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUserProfile } from "@/hooks/use-profile";
 
 // Loading Screen Premium
 function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
@@ -102,6 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     isVip,
     refreshUser,
   } = useAuthContext();
+  const { data: profile } = useUserProfile({ mode: "partial", relations: ["wallet"] });
 
   const {
     settings,
@@ -124,9 +126,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       isAdmin,
       isVip,
       userId: user?.id,
-      hasWallet: (user as any)?.hasWallet || false,
+      hasWallet: !!profile?.wallet?.id || (user as any)?.hasWallet || false,
     }),
-    [isAuthenticated, isAdmin, isVip, user?.id]
+    [isAuthenticated, isAdmin, isVip, user?.id, profile?.wallet?.id]
   );
 
   // Resolve route
@@ -199,7 +201,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     toggleAnnouncements,
     isAuthenticated,
   ]);
-console.log("resolved:", resolved);
   // Handle maintenance mode
   useEffect(() => {
     if (maintenanceMode && !isAdmin && isInitialized) {

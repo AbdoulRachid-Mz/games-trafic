@@ -33,7 +33,10 @@ export function EditionPaymentDialog({
   memberId,
 }: EditionPaymentDialogProps) {
   const { isAuthenticated } = useAuthContext();
-  const { data: completeData } = useUserProfile(isAuthenticated);
+  const { data: completeData } = useUserProfile({
+    mode: "partial",
+    relations: ["wallet"],
+  });
   const router = useRouter();
   const balance = Number(completeData?.wallet?.balance || 0);
   const entryFee = Number(edition.entryFee) || 0;

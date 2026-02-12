@@ -12,6 +12,7 @@ import {
   tournaments,
   messages,
   themes,
+  PaginationParams,
 } from "@/database/schema";
 import {
   eq,
@@ -283,14 +284,18 @@ export async function getEntityInteractions(
 }
 
 /**
- * Récupère les interactions sur une entité spécifique avec relations
+ * Récupère les interactions sur une entité spécifique avec relations et pagination
  */
 export async function getEntityInteractionsWithRelations(
   entityId: string,
   entityType: string,
   filters?: InteractionFilters,
+  pagination?: { page: number; limit: number },
   options?: QueryOptions
-): Promise<InteractionWithRelations[]> {
+): Promise<{
+  data: InteractionWithRelations[];
+  pagination: PaginationParams;
+}> {
   try {
     const whereConditions = buildInteractionWhereConditions(
       filters || {},
@@ -333,7 +338,18 @@ export async function getEntityInteractionsWithRelations(
         : desc((interactions as any)[options.sortBy])
       : desc(interactions.createdAt);
 
-    const query = db.query.interactions.findMany({
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 50;
+    const offset = (page - 1) * limit;
+
+    // Query for total count
+    const countQuery = db
+      .select({ count: count() })
+      .from(interactions)
+      .where(finalWhere);
+
+    // Query for paginated data
+    const dataQuery = db.query.interactions.findMany({
       where: finalWhere,
       with: {
         user: true,
@@ -347,10 +363,16 @@ export async function getEntityInteractionsWithRelations(
         gameItem: true,
       },
       orderBy: [orderByClause],
+      limit,
+      offset,
     });
 
-    const raw = await query;
-    return raw.map(i => ({
+    const [totalResult, raw] = await Promise.all([countQuery, dataQuery]);
+
+    const total = totalResult[0]?.count ?? 0;
+    const totalPages = Math.ceil(total / limit);
+
+    const data = raw.map(i => ({
       ...i,
       post: i.post ?? undefined,
       product: i.product ?? undefined,
@@ -361,6 +383,18 @@ export async function getEntityInteractionsWithRelations(
       game: i.game ?? undefined,
       gameItem: i.gameItem ?? undefined,
     }));
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: String(total),
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   } catch (error) {
     console.error("Error getting entity interactions with relations:", error);
     throw new Error("Failed to fetch entity interactions");

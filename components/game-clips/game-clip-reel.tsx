@@ -1,4 +1,4 @@
-// @/components/game-clips/game-clip-reel.tsx - version améliorée avec défilement infini et préchargement
+// @/components/game-clips/game-clip-reel.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -15,6 +15,8 @@ interface GameClipReelProps {
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onFetchNextPage?: () => void;
+  onClipChange?: (clipId: string) => void;
+  onCommentsToggle?: () => void;
   className?: string;
 }
 
@@ -25,24 +27,109 @@ export function GameClipReel({
   hasNextPage = false,
   isFetchingNextPage = false,
   onFetchNextPage,
+  onClipChange,
+  onCommentsToggle,
   className,
 }: GameClipReelProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
   const containerRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  const touchStartY = useRef(0);
+  const wheelTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
+  const isInitialized = useRef(false);
 
-  // Initial scroll to starting clip if provided
+  // Initialisation unique sans dépendance circulaire
   useEffect(() => {
-    if (initialClipId && clips.length > 0) {
-      const index = clips.findIndex((c) => c.id === initialClipId);
-      if (index !== -1) {
-        setActiveIndex(index);
+    if (!isInitialized.current && clips.length > 0) {
+      if (initialClipId) {
+        const index = clips.findIndex((c) => c.id === initialClipId);
+        if (index !== -1) {
+          setActiveIndex(index);
+          onClipChange?.(clips[index].id);
+        }
+      }
+      isInitialized.current = true;
+    }
+  }, [clips, initialClipId, onClipChange]);
+
+  // Notifier du changement de clip sans créer de boucle
+  const handleClipChange = useCallback((index: number) => {
+    if (clips[index]) {
+      onClipChange?.(clips[index].id);
+    }
+  }, [clips, onClipChange]);
+
+  const goToNext = useCallback(() => {
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    setTimeout(() => setIsTransitioning(false), 500);
+
+    if (activeIndex < clips.length - 1) {
+      const newIndex = activeIndex + 1;
+      setActiveIndex(newIndex);
+      handleClipChange(newIndex);
+    } else if (hasNextPage && onFetchNextPage && !isFetchingNextPage) {
+      onFetchNextPage();
+    }
+  }, [activeIndex, clips.length, hasNextPage, onFetchNextPage, isFetchingNextPage, isTransitioning, handleClipChange]);
+
+  const goToPrev = useCallback(() => {
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    setTimeout(() => setIsTransitioning(false), 500);
+
+    if (activeIndex > 0) {
+      const newIndex = activeIndex - 1;
+      setActiveIndex(newIndex);
+      handleClipChange(newIndex);
+    }
+  }, [activeIndex, isTransitioning, handleClipChange]);
+
+  // Wheel navigation with throttling
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    
+    if (isTransitioning) return;
+
+    clearTimeout(wheelTimeout.current);
+    wheelTimeout.current = setTimeout(() => {
+      if (Math.abs(e.deltaY) < 10) return;
+
+      if (e.deltaY > 0) {
+        goToNext();
+      } else {
+        goToPrev();
+      }
+    }, 100);
+  }, [goToNext, goToPrev, isTransitioning]);
+
+  // Touch navigation
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.targetTouches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaY = touchStartY.current - touchEndY;
+
+    if (Math.abs(deltaY) > 50 && !isTransitioning) {
+      if (deltaY > 0) {
+        goToNext();
+      } else {
+        goToPrev();
       }
     }
-  }, [initialClipId, clips.length]);
+  }, [goToNext, goToPrev, isTransitioning]);
 
-  // Handle keyboard navigation
+  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown") {
@@ -59,138 +146,76 @@ export function GameClipReel({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, clips.length, isMuted]);
-
-  const goToNext = useCallback(() => {
-    if (activeIndex < clips.length - 1) {
-      setActiveIndex((prev) => prev + 1);
-    } else if (hasNextPage && onFetchNextPage && !isFetchingNextPage) {
-      onFetchNextPage();
-    }
-  }, [activeIndex, clips.length, hasNextPage, onFetchNextPage, isFetchingNextPage]);
-
-  const goToPrev = useCallback(() => {
-    if (activeIndex > 0) {
-      setActiveIndex((prev) => prev - 1);
-    }
-  }, [activeIndex]);
-
-  // Handle wheel scroll with throttling
-  const lastScrollTime = useRef(0);
-  const handleScroll = useCallback((e: React.WheelEvent) => {
-    const now = Date.now();
-    if (now - lastScrollTime.current < 800) return; // Throttle 800ms
-
-    if (Math.abs(e.deltaY) < 10) return; // Ignore small movements
-
-    if (e.deltaY > 0) {
-      goToNext();
-    } else {
-      goToPrev();
-    }
-    lastScrollTime.current = now;
   }, [goToNext, goToPrev]);
-
-  // Handle touch swipe
-  const touchStartY = useRef(0);
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.targetTouches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaY = touchStartY.current - touchEndY;
-
-    if (Math.abs(deltaY) > 50) {
-      if (deltaY > 0) {
-        goToNext();
-      } else {
-        goToPrev();
-      }
-    }
-  };
 
   return (
     <div
       ref={containerRef}
       className={cn(
-        "relative h-screen w-screen md:w-full overflow-hidden bg-black selection:bg-transparent",
+        "relative h-screen w-full overflow-hidden bg-black touch-pan-y",
         className
       )}
-      onWheel={handleScroll}
+      onWheel={handleWheel}
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Mute Toggle Button */}
+      {/* Global Mute Toggle */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           setIsMuted(!isMuted);
         }}
-        className="absolute top-6 right-6 z-50 bg-black/40 backdrop-blur-md rounded-full p-3 text-white hover:bg-black/60 transition-all border border-white/10"
+        className="absolute top-6 right-6 z-50 bg-black/40 backdrop-blur-md rounded-full p-3 text-white hover:bg-black/60 transition-all border border-white/10 md:top-20"
       >
-        {isMuted ? (
-          <VolumeX className="h-5 w-5" />
-        ) : (
-          <Volume2 className="h-5 w-5" />
-        )}
+        {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
-      {/* Progress Multi-Lines (Instagram style) */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex gap-1.5 w-full max-w-lg px-6">
-        {clips.map((_, index) => (
-          <div
-            key={index}
-            className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden"
-          >
-            <div
-              className={cn(
-                "h-full bg-white transition-all duration-300",
-                index === activeIndex ? "w-full" : index < activeIndex ? "w-full opacity-100" : "w-0"
-              )}
+      {/* Clips Container */}
+      <div
+        className="h-full w-full transition-transform duration-500 ease-out will-change-transform"
+        style={{ transform: `translateY(-${activeIndex * 100}%)` }}
+      >
+        {clips.map((clip, index) => (
+          <div key={clip.id} className="h-full w-full shrink-0 snap-start snap-always">
+            <GameClipPlayer
+              clip={clip}
+              isActive={index === activeIndex}
+              isMuted={isMuted}
+              onMuteToggle={() => setIsMuted(!isMuted)}
+              onAutoNext={goToNext}
+              onAutoPrev={goToPrev}
+              onCommentsToggle={onCommentsToggle}
+              hasMore={hasNextPage}
             />
           </div>
         ))}
+
+        {/* Loading State */}
+        {hasNextPage && (
+          <div className="h-full w-full shrink-0 flex items-center justify-center bg-black">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <Typography variant="body-sm" className="text-white/50 font-medium">
+                Chargement du clip suivant...
+              </Typography>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Clip Content Layer */}
-      {clips.length > 0 ? (
-        <div
-          className="h-full w-full transition-transform duration-500 ease-out flex flex-col"
-          style={{ transform: `translateY(-${activeIndex * 100}%)` }}
-        >
-          {clips.map((clip, index) => (
-            <div key={clip.id} className="h-full w-full shrink-0">
-              <GameClipPlayer
-                clip={clip}
-                isActive={index === activeIndex}
-                isMuted={isMuted}
-                onAutoNext={goToNext}
-                hasMore={hasNextPage}
-              />
-            </div>
-          ))}
-
-          {/* Loading slot at the end */}
-          {hasNextPage && (
-            <div className="h-full w-full shrink-0 flex items-center justify-center bg-black">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <Typography variant="body-sm" className="text-white/50 font-medium">Chargement du clip suivant...</Typography>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : !loading && (
-        /* Empty State */
+      {/* Empty State */}
+      {!loading && clips.length === 0 && (
         <div className="h-full w-full flex flex-col items-center justify-center text-white p-6 text-center bg-[#0a0a0b]">
           <div className="mb-6 p-8 rounded-3xl bg-white/5 border border-white/10">
-            <Loader2 className="h-12 w-12 text-primary/40" />
+            <div className="text-6xl mb-4">🎮</div>
           </div>
-          <h3 className="text-2xl font-bold mb-3 tracking-tight">Aucun clip à l'horizon</h3>
-          <p className="text-white/50 max-w-sm mb-8 leading-relaxed">
-            Exploration terminée ! Revenez plus tard ou partagez votre propre talent pour animer cet espace.
-          </p>
+          <Typography variant="h3" className="text-2xl font-bold mb-3 tracking-tight">
+            Aucun clip à l'horizon
+          </Typography>
+          <Typography variant="body-base" className="text-white/50 max-w-sm mb-8">
+            Sois le premier à partager ton meilleur moment de jeu !
+          </Typography>
           <button
             onClick={() => window.location.href = '/game-clips?create=true'}
             className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/20"
@@ -200,22 +225,12 @@ export function GameClipReel({
         </div>
       )}
 
-      {/* Global Loader Overlay */}
+      {/* Loading Overlay */}
       {loading && clips.length === 0 && (
         <div className="absolute inset-0 z-[60] bg-black flex items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       )}
-
-      {/* Navigation Tips Desktop */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 text-white/40 pointer-events-none bg-black/20 backdrop-blur-sm px-4 py-2 rounded-full border border-white/5">
-        <kbd className="px-2 py-1 bg-white/10 rounded-md text-[10px] uppercase font-bold text-white/60">Flèches</kbd>
-        <div className="h-3 w-px bg-white/10" />
-        <span className="text-xs font-medium uppercase tracking-widest">Naviguer</span>
-        <div className="h-3 w-px bg-white/10" />
-        <kbd className="px-2 py-1 bg-white/10 rounded-md text-[10px] uppercase font-bold text-white/60">M</kbd>
-        <span className="text-xs font-medium uppercase tracking-widest">Muet</span>
-      </div>
     </div>
   );
 }

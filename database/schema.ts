@@ -28,7 +28,7 @@ export const entityTypeEnum = pgEnum('entity_type', [
   'PRODUCT', 'POST', 'SHOP', 'TOURNAMENT', 'USER', 'BLOG', 
   'MESSAGE', 'TEAM', 'THEME', 'NEWS', 'GROUP', 'ANNOUNCEMENT', 
   'SERVICE', 'GUIDE', 'COMMENT', 'MATCH', 'GAME', 'GAME_ITEM', 'GAMECLIP', 
-  'PARTNER'
+  'PARTNER', "EDITION"
 ]);
 export const productStatusEnum = pgEnum('product_status', ['NON_VENDU', 'RESERVE', 'EN_ECHANGE', 'LIVRE', 'VENDU', 'ANNULER']);
 export const interactionTypeEnum = pgEnum('interaction_type', ['LIKE', 'FOLLOW', 'BOOKMARK', 'VIEW', 'SHARE']);
@@ -1465,7 +1465,8 @@ export const gameItems = pgTable('game_items', {
 ]);
 
 export const requestTypeEnum = pgEnum('request_type', ['DEPOSIT', 'WITHDRAWAL', 'GAME_ITEMS', 'OTHER']);
-
+// enum items types
+// export const itemTypeEnum = pgEnum('item_type', ['COINS', 'SKIN', 'EQUIPMENT', 'CURRENCY', 'OTHER'])
 export const requests = pgTable('requests', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -1592,6 +1593,8 @@ export const messages = pgTable('messages', {
   shopId: text('shop_id').references(() => shops.id), // Ajouté pour la cohérence des relations
   postId: text('post_id').references(() => posts.id), // Ajouté pour la cohérence des relations
   gameClipId: text('game_clip_id').references(() => gameClips.id), // Ajouté pour la cohérence des relations
+  editionId: text('edition_id').references(() => tournamentEditions.id), // Ajouté pour la cohérence des relations
+  tournamentId: text('tournament_id').references(() => tournaments.id), // Ajouté pour la cohérence des relations
   productId: text('product_id').references(() => products.id), // Ajouté pour la cohérence des relations
   userId: text('user_id').references(() => users.id), // Ajouté pour la cohérence des relations
 
@@ -2353,6 +2356,9 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
   post: one(posts, { fields: [messages.postId], references: [posts.id] }), // Relation ajoutée
   product: one(products, { fields: [messages.productId], references: [products.id] }), // Relation ajoutée
   // Note: interactions relation retirée car elle est gérée dans interactionsRelations
+  gameClip: one(gameClips, { fields: [messages.gameClipId], references: [gameClips.id] }), // Relation ajoutée
+  edition: one(tournamentEditions, { fields: [messages.editionId], references: [tournamentEditions.id] }), // Relation ajoutée
+  tournament: one(tournaments, { fields: [messages.tournamentId], references: [tournaments.id] }), // Relation ajoutée
 }));
 
 export const interactionsRelations = relations(interactions, ({ one }) => ({
@@ -2854,7 +2860,10 @@ export type MessageWithRelations = Message & {
   post?: Post;
   product?: Product;
   interactions?: Interaction[];
+  edition?: TournamentEdition;
+  gameClip?: GameClip;
 };
+
 
 export type InteractionWithRelations = Interaction & {
   user?: User;
@@ -3034,6 +3043,7 @@ export interface TransferMetadata {
 }
 
 export type EntityType = typeof interactions.$inferSelect.entityType
+export type InteractionType = typeof interactions.$inferSelect.type
 
 export interface DepositMetadata {
   paymentMethod: string;
@@ -3094,6 +3104,7 @@ export type PartnerWithRelations = Partner & {
 export type PartnershipWithRelations = Partnership & {
   partner?: Partner;
 }
+
 
 
 // Union type pour tous les métadonnées de transaction

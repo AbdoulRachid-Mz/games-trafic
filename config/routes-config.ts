@@ -117,6 +117,11 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     name: "Onboarding",
     excludeLayout: true,
     styleGroup: "onboarding",
+    footer: false,
+    topMiddle: false,
+    leftBar: false,
+    rightBar: false,
+    breadcrumbs: false,
   },
   {
     path: "/maintenance",
@@ -174,19 +179,25 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     styleGroup: "dashboard",
   },
   {
-    path: ["/tournaments/[tournamentId]/editions/[editionId]/dashboard", "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**"],
+    path: [
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard", 
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**", 
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/**", 
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/groupes/**"
+    ],
     name: "Dashboard Édition",
     excludeLayout: false,
-    leftBar: true,
+    leftBar: false,
     rightBar: false,
     topMiddle: true,
     breadcrumbs: false,
     footer: false,
     requireAuth: true,
     navigationLinks: false,
-    floatingActions: true,
+    dockLinks: [],
+    floatingActions: false,
     showAIAssistant: false,
-    styleGroup: "dashboard",
+    // styleGroup: "dashboard",
   },
   {
     path: ["/tournaments/[tournamentId]/dashboard", "/tournaments/[tournamentId]/dashboard/**"],
@@ -309,6 +320,15 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
     ],
     floatingActions: true,
+    fabActions: [
+      {
+        id: "qr-scanner",
+        label: "Scanner QR",
+        type: "link",
+        url: "/wallet/transactions/qr",
+        requireWallet: true,
+      },
+    ],
     requireAuth: true,
     styleGroup: "wallet",
   },
@@ -413,6 +433,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         url: "/marketplace",
       },
       {
+        id: "qr-scanner",
+        label: "Scanner QR",
+        type: "link",
+        url: "/wallet/transactions/qr",
+        requireWallet: true,
+      },
+      {
         id: "create-shop",
         label: "Créer une boutique",
         type: "link",
@@ -471,6 +498,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         url: "/marketplace",
       },
       {
+        id: "qr-scanner",
+        label: "Scanner QR",
+        type: "link",
+        url: "/wallet/transactions/qr",
+        requireWallet: true,
+      },
+      {
         id: "create-shop",
         label: "Créer une boutique",
         type: "link",
@@ -519,6 +553,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         url: "/marketplace",
       },
       {
+        id: "qr-scanner",
+        label: "Scanner QR",
+        type: "link",
+        url: "/wallet/transactions/qr",
+        requireWallet: true,
+      },
+      {
         id: "create-shop",
         label: "Créer une boutique",
         type: "link",
@@ -555,9 +596,9 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: "/shops/[shopId]",
     name: "Détail Boutique",
-    breadcrumbs: true,
     footer: true,
     topMiddle: true,
+    breadcrumbs: false,
     leftBar: true,
     rightBar: false,
     navigationLinks: true,
@@ -602,13 +643,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: "/tournaments/[tournamentId]",
     name: "Détail Tournoi",
-    breadcrumbs: true,
     footer: true,
     topMiddle: true,
     leftBar: true,
     rightBar: true,
     navigationLinks: true,
     hideFloatingActions: true,
+    breadcrumbs: false,
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
@@ -622,14 +663,14 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   // PRODUITS
   // =============================================
   {
-    path: "/marketplace/productId",
+    path: "/marketplace/[productId]",
     name: "Detail Produit",
     breadcrumbs: false,
     footer: false,
     topMiddle: true,
     leftBar: true,
     rightBar: false,
-    navigationLinks: true,
+    navigationLinks: false,
     menu: true,
     menuOrder: 5,
     dockLinks: [
@@ -670,7 +711,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: "/shops/create",
     name: "Créer Boutique",
-    breadcrumbs: true,
+    breadcrumbs: false,
     footer: false,
     topMiddle: true,
     leftBar: false,
@@ -682,7 +723,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: "/tournaments/create",
     name: "Créer Tournoi",
-    breadcrumbs: true,
+    breadcrumbs: false,
     footer: false,
     topMiddle: true,
     leftBar: false,

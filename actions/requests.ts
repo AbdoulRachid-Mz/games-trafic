@@ -192,6 +192,59 @@ export async function getRequestStats(filters?: RequestFilters) {
   }
 }
 
+/**
+ * Liste les requêtes (admin)
+ */
+export async function getRequests(
+  query: ListQuery<RequestFilters> = {}
+): Promise<PaginationResponse<Request>> {
+  try {
+    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const offset = (pagination.page - 1) * pagination.limit;
+
+    const whereConditions = buildRequestWhereConditions(filters, options);
+
+    const dataQuery = db
+      .select()
+      .from(requests)
+      .where(whereConditions)
+      .limit(pagination.limit)
+      .offset(offset);
+
+    if (options.sortBy) {
+      const sortField = options.sortBy as keyof Request;
+      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+      dataQuery.orderBy(sortOrder(requests[sortField]));
+    } else {
+      dataQuery.orderBy(desc(requests.createdAt));
+    }
+
+    const countQuery = db
+      .select({ count: count() })
+      .from(requests)
+      .where(whereConditions);
+
+    const [data, totalResult] = await Promise.all([dataQuery, countQuery]);
+    const total = totalResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / pagination.limit);
+
+    return {
+      data,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages,
+        hasNext: pagination.page < totalPages,
+        hasPrev: pagination.page > 1,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting requests:', error);
+    throw new Error('Failed to fetch requests');
+  }
+}
+
 // ============================================================================
 // MUTATIONS - Écriture des données
 // ============================================================================

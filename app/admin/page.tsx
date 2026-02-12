@@ -20,6 +20,9 @@ import {
 } from "@/components/admin/admin-charts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGlobalStats } from "@/actions/stats";
+import { getOrderStats } from "@/actions/orders";
+import { getProductStats } from "@/actions/products";
+import { getRequestStats } from "@/actions/requests";
 import {
   Users,
   ShoppingBag,
@@ -63,6 +66,9 @@ export default function AdminOverviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("general");
   const { screenSize } = useScreenSize();
+  const [orderStats, setOrderStats] = useState<any>(null);
+  const [productStats, setProductStats] = useState<any>(null);
+  const [requestStats, setRequestStats] = useState<any>(null);
 
   useEffect(() => {
     loadStats();
@@ -70,8 +76,16 @@ export default function AdminOverviewPage() {
 
   const loadStats = async () => {
     try {
-      const data = await getGlobalStats();
-      setStats(data);
+      const [global, orders, products, requests] = await Promise.all([
+        getGlobalStats(),
+        getOrderStats(),
+        getProductStats(),
+        getRequestStats(),
+      ]);
+      setStats(global);
+      setOrderStats(orders);
+      setProductStats(products);
+      setRequestStats(requests);
     } catch (error) {
       console.error("Error loading stats:", error);
     } finally {
@@ -178,6 +192,116 @@ export default function AdminOverviewPage() {
           )}
         </div>
 
+        {/* Tab: Général */}
+        <TabsContent value="general" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard
+              title="Utilisateurs"
+              value={stats?.total_users || 0}
+              icon={Users}
+              description={`${stats?.active_users || 0} actifs • ${stats?.vip_users || 0} VIP`}
+            />
+            <StatCard
+              title="Boutiques"
+              value={stats?.total_shops || 0}
+              icon={ShoppingBag}
+              description={`${stats?.active_shops || 0} actives`}
+            />
+            <StatCard
+              title="Produits"
+              value={stats?.total_products || 0}
+              icon={Package}
+              description={`${stats?.active_products || 0} actifs • ${stats?.sold_products || 0} vendus`}
+            />
+            <StatCard
+              title="Commandes"
+              value={stats?.total_orders || 0}
+              icon={ShoppingCart}
+              description={`${orderStats?.accepted || 0} acceptées • ${orderStats?.pending || 0} en attente`}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Nouveaux utilisateurs (Aujourd'hui)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <NewUsersChart
+                  data={[
+                    { name: "Aujourd'hui", "Nouveaux": stats?.new_users_today || 0 },
+                    { name: "Commandes", "Nouveaux": stats?.new_orders_today || 0 },
+                    { name: "Produits", "Nouveaux": stats?.new_products_today || 0 },
+                    { name: "Posts", "Nouveaux": stats?.new_posts_today || 0 },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Activité Globale</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EntityGrowthChart
+                  data={[
+                    { name: "Users", count: stats?.total_users || 0 },
+                    { name: "Shops", count: stats?.total_shops || 0 },
+                    { name: "Products", count: stats?.total_products || 0 },
+                    { name: "Orders", count: stats?.total_orders || 0 },
+                  ]}
+                  dataKey="count"
+                  label="Totaux"
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Tab: Finances */}
+        <TabsContent value="finances" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard
+              title="Demandes"
+              value={requestStats?.total || 0}
+              icon={Wallet}
+              description={`${requestStats?.pending || 0} en attente • ${requestStats?.approved || 0} approuvées`}
+            />
+            <StatCard
+              title="Montant complété"
+              value={requestStats?.totalAmount || 0}
+              icon={CreditCard}
+              description="Somme des demandes terminées (GTC)"
+            />
+            <StatCard
+              title="Commandes acceptées"
+              value={orderStats?.accepted || 0}
+              icon={TrendingUp}
+              description={`${orderStats?.rejected || 0} rejetées`}
+            />
+            <StatCard
+              title="Produits vendus"
+              value={productStats?.sold || stats?.sold_products || 0}
+              icon={Package}
+              description={`${productStats?.reserved || 0} réservés`}
+            />
+          </div>
+
+          <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+            <CardHeader>
+              <CardTitle>Évolution financière</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FinanceEvolutionChart
+                data={[
+                  { name: "Demandes", value: requestStats?.total || 0 },
+                  { name: "Montant", value: requestStats?.totalAmount || 0 },
+                  { name: "Cmd acceptées", value: orderStats?.accepted || 0 },
+                ]}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
         {/* Tab: Partenaires */}
         <TabsContent value="partners" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

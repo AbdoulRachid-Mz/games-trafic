@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Typography } from "@/components/ui/typography";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { QrScanner } from "@/components/shared/qr-scanner";
+import { getUserWalletById, getUserWalletByUserId, getUserWalletByCardNumber } from "@/actions/wallets";
+import { getUserById } from "@/actions/users";
+import { formatWalletNumber } from "@/lib/utils";
+import { useEntityList } from "@/hooks/use-entity-list";
 
 interface Recipient {
   id: string;
@@ -49,64 +55,181 @@ export function TransactionRecipientSelector({
 }: TransactionRecipientSelectorProps) {
   const [search, setSearch] = useState("");
   const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(
     null
   );
   const [searchType, setSearchType] = useState<"USER" | "WALLET" | "PHONE">(
     "USER"
   );
+  const [showScanner, setShowScanner] = useState(false);
 
-  useEffect(() => {
-    // Charger les contacts récents
-    loadRecentRecipients();
-  }, []);
-
-  const loadRecentRecipients = async () => {
-    try {
-      const response = await fetch("/api/wallet/contacts/recent");
-      const data = await response.json();
-      setRecipients(data.data || []);
-    } catch (error) {
-      console.error("Error loading recipients:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: foundUsers,
+    onRefresh: refreshUsers,
+    setSearchTerm: setUserSearch,
+    setFilters: setUserFilters,
+  } = useEntityList<any>({
+    entityType: "users",
+    defaultLimit: 20,
+    enabled: false,
+  });
 
   const searchRecipient = async () => {
     if (!search.trim()) return;
 
     setLoading(true);
     try {
-      let endpoint = "";
-      const params = new URLSearchParams();
-
-      if (searchType === "WALLET") {
-        endpoint = "/api/wallet/search/by-number";
-        params.append("walletNumber", search);
+      if (searchType === "USER") {
+        setUserSearch(search);
+        setUserFilters({ includeInactive: false });
+        await refreshUsers();
+        const users = foundUsers || [];
+        const result: Recipient[] = [];
+        for (const u of users) {
+          const wallet = await getUserWalletByUserId(u.id);
+          if (wallet) {
+            result.push({
+              id: u.id,
+              walletId: wallet.id,
+              user: {
+                id: u.id,
+                name: (u as any).fullName || (u as any).username || "Utilisateur",
+                email: (u as any).email,
+                avatar: (u as any).avatarUrl,
+                walletNumber: formatWalletNumber(wallet.cardNumberHash || wallet.id),
+              },
+              wallet: {
+                isActive: !!wallet.isActive,
+                isLocked: !!wallet.isLocked,
+                balance: wallet.balance?.toString(),
+              },
+            });
+          }
+        }
+        setRecipients(result);
+        if (!result.length) {
+          toast.error("Aucun destinataire trouvé");
+        }
       } else if (searchType === "PHONE") {
-        endpoint = "/api/wallet/search/by-phone"; // Supposons que cette route existe
-        params.append("phoneNumber", search);
-      } else {
-        endpoint = "/api/wallet/search/by-user";
-        params.append("query", search);
-      }
-
-      const response = await fetch(`${endpoint}?${params.toString()}`);
-      const data = await response.json();
-
-      if (data.data) {
-        setRecipients(Array.isArray(data.data) ? data.data : [data.data]);
-      } else {
-        setRecipients([]);
-        toast.error("Aucun destinataire trouvé");
+        const normalized = search.replace(/[^\d]/g, "").replace(/^00/, "");
+        setUserSearch("");
+        setUserFilters({ phoneNumber: normalized, includeInactive: false });
+        await refreshUsers();
+        const users = foundUsers || [];
+        const result: Recipient[] = [];
+        for (const u of users) {
+          const wallet = await getUserWalletByUserId(u.id);
+          if (wallet) {
+            result.push({
+              id: u.id,
+              walletId: wallet.id,
+              user: {
+                id: u.id,
+                name: (u as any).fullName || (u as any).username || "Utilisateur",
+                email: (u as any).email,
+                avatar: (u as any).avatarUrl,
+                walletNumber: formatWalletNumber(wallet.cardNumberHash || wallet.id),
+              },
+              wallet: {
+                isActive: !!wallet.isActive,
+                isLocked: !!wallet.isLocked,
+                balance: wallet.balance?.toString(),
+              },
+            });
+          }
+        }
+        setRecipients(result);
+        if (!result.length) {
+          toast.error("Aucun destinataire trouvé");
+        }
+      } else if (searchType === "WALLET") {
+        const wallet = await getUserWalletByCardNumber(search);
+        if (wallet) {
+          const user = await getUserById(wallet.userId, { populate: ["wallet"] });
+          if (user) {
+            const recipient: Recipient = {
+              id: user.id,
+              walletId: wallet.id,
+              user: {
+                id: user.id,
+                name: (user as any).fullName || (user as any).username || "Utilisateur",
+                email: (user as any).email,
+                avatar: (user as any).avatarUrl,
+                walletNumber: formatWalletNumber(wallet.cardNumberHash || wallet.id),
+              },
+              wallet: {
+                isActive: !!wallet.isActive,
+                isLocked: !!wallet.isLocked,
+                balance: wallet.balance?.toString(),
+              },
+            };
+            setRecipients([recipient]);
+          } else {
+            setRecipients([]);
+          }
+        } else {
+          setRecipients([]);
+        }
+        if (!wallet) {
+          toast.error("Aucun destinataire trouvé");
+        }
       }
     } catch (error) {
       console.error("Error searching recipient:", error);
       toast.error("Erreur lors de la recherche");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleScan = async (data: string) => {
+    try {
+      const isPlain = typeof data === "string";
+      let wallet = null as any;
+      if (isPlain && (data.startsWith("WLT-") || /^\d{16}$/.test(data.replace(/\s+/g, "")))) {
+        wallet = await getUserWalletByCardNumber(data);
+      } else {
+        const parsed = JSON.parse(data);
+        if (parsed && parsed.type === "wallet") {
+          if (parsed.cardNumber) {
+            wallet = await getUserWalletByCardNumber(parsed.cardNumber);
+          } else if (parsed.walletId) {
+            wallet = await getUserWalletById(parsed.walletId);
+          }
+        }
+      }
+      if (wallet) {
+        const user = await getUserById(wallet.userId, { populate: ["wallet"] });
+        if (!user) {
+          toast.error("Utilisateur introuvable");
+          return;
+        }
+        const recipient: Recipient = {
+          id: user.id,
+          walletId: wallet.id,
+          user: {
+            id: user.id,
+            name: (user as any).fullName || (user as any).username || "Utilisateur",
+            email: (user as any).email,
+            avatar: (user as any).avatarUrl,
+            walletNumber: formatWalletNumber(wallet.cardNumberHash || wallet.id),
+          },
+          wallet: {
+            isActive: !!wallet.isActive,
+            isLocked: !!wallet.isLocked,
+            balance: wallet.balance?.toString(),
+          },
+        };
+        setRecipients([recipient]);
+        setSelectedRecipient(recipient);
+        setShowScanner(false);
+        toast.success("Wallet scanné");
+        return;
+      }
+      toast.error("QR non pris en charge");
+    } catch {
+      toast.error("QR invalide");
     }
   };
 
@@ -161,7 +284,6 @@ export function TransactionRecipientSelector({
                     setSearch("");
                     setRecipients([]);
                     setSelectedRecipient(null);
-                    if (type === "USER") loadRecentRecipients(); // Recharge récents pour utilisateur
                   }}
                   className={cn(
                     "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
@@ -205,11 +327,29 @@ export function TransactionRecipientSelector({
               <Button
                 onClick={searchRecipient}
                 className="h-12 w-12 p-0 rounded-xl"
-                disabled={!search && searchType !== "USER"}
+                 disabled={!search}
               >
                 <Search className="w-5 h-5" />
               </Button>
+              <Button
+                onClick={() => setShowScanner(true)}
+                variant="outline"
+                className="h-12 w-12 p-0 rounded-xl"
+              >
+                <ScanLine className="w-5 h-5" />
+              </Button>
             </div>
+
+            {showScanner && (
+              <div className="rounded-2xl overflow-hidden border border-border/50 bg-background/30 p-4">
+                <QrScanner onScan={handleScan} />
+                <div className="flex justify-end mt-4">
+                  <Button variant="secondary" onClick={() => setShowScanner(false)}>
+                    Fermer
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Selected Recipient Preview */}
             <AnimatePresence mode="wait">

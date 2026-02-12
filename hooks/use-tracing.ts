@@ -564,7 +564,18 @@ export function useTracing(): TracingContextValue {
     (page: string) => {
       if (!config.showExplanations) return;
 
-      const explanation = PAGE_EXPLANATIONS.find((e) => e.page === page);
+      const explanation = PAGE_EXPLANATIONS.find((e) => {
+        if (e.page === page) return true;
+        if (e.page.includes("[") || e.page.includes("*")) {
+          const pattern = e.page
+            .replace(/\[[^\]]+\]/g, "[^/]+")
+            .replace(/\*\*/g, ".*")
+            .replace(/\*/g, "[^/]*");
+          const regex = new RegExp(`^${pattern}$`);
+          return regex.test(page);
+        }
+        return false;
+      });
       if (!explanation) return;
 
       // Mettre à jour l'état
@@ -622,7 +633,21 @@ export function useTracing(): TracingContextValue {
       if (config.explanationFrequency === "NEVER") return false;
 
       const existingState = explanationStatesRef.current[page];
-      const explanationExists = PAGE_EXPLANATIONS.some((e) => e.page === page);
+      const globalDisabled = typeof window !== "undefined" && localStorage.getItem("gt_explanations_disabled") === "true";
+      const pageDisabled = typeof window !== "undefined" && localStorage.getItem(`gt_explanation_${page}_disabled`) === "true";
+      if (globalDisabled || pageDisabled) return false;
+      const explanationExists = PAGE_EXPLANATIONS.some((e) => {
+        if (e.page === page) return true;
+        if (e.page.includes("[") || e.page.includes("*")) {
+          const pattern = e.page
+            .replace(/\[[^\]]+\]/g, "[^/]+")
+            .replace(/\*\*/g, ".*")
+            .replace(/\*/g, "[^/]*");
+          const regex = new RegExp(`^${pattern}$`);
+          return regex.test(page);
+        }
+        return false;
+      });
 
       if (!explanationExists) return false;
 
@@ -778,10 +803,10 @@ export function useTracing(): TracingContextValue {
       config.checkRedirectConditions
     ) {
       localStorage.setItem(key, "true");
-      router.push(config.redirectPath);
+      router.replace(config.redirectPath);
     } else if (hasVisitedWelcome && isWelcomePage) {
       // Empêcher le retour si déjà visité
-      router.push("/");
+      router.replace("/");
     }
   }, [config, pathname, router]);
 
@@ -799,10 +824,8 @@ export function useTracing(): TracingContextValue {
 
   // Initialisation
   useEffect(() => {
-    if (!authLoading) {
-      initialize();
-    }
-  }, [authLoading, initialize]);
+    initialize();
+  }, [initialize]);
 
   // Tracking automatique des changements de page
   useEffect(() => {

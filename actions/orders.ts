@@ -1,9 +1,11 @@
 'use server';
 
-import { orders, type Order, type Neworder, products, shops, users } from '@/database/schema';
+import { orders, type Order, type Neworder, products, shops, users, walletTransactions, userWallets } from '@/database/schema';
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull } from 'drizzle-orm';
 import { type OrderFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { createNotification } from '@/actions/notifications';
+import { refundTransaction } from '@/actions/transactions';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -423,6 +425,208 @@ export async function rejectOrder(id: string, rejectionReason: string): Promise<
  */
 export async function cancelOrder(id: string): Promise<Order> {
   return updateOrderStatus(id, 'CANCELLED');
+}
+
+/**
+ * Approbation ADMIN d'une commande (paiement vendeur + transfert de propriété)
+ */
+export async function adminApproveOrder(
+  id: string,
+  adminUserId?: string
+): Promise<Order> {
+  // Récupération avec relations
+  const order = await getOrderById(id, { populate: ['product', 'buyer', 'shop'] });
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  if (order.status !== 'ACCEPTED') {
+    throw new Error('Order must be accepted by shop before admin approval');
+  }
+
+  // Produit et boutique
+  const product = await db.query.products.findFirst({
+    where: (p, { eq }) => eq(p.id, order.productId),
+  });
+  if (!product) throw new Error('Product not found');
+
+  const shop = await db.query.shops.findFirst({
+    where: (s, { eq }) => eq(s.id, order.shopId),
+  });
+  if (!shop) throw new Error('Shop not found');
+
+  // Transaction d'achat originale (pour netAmount)
+  const originalTx = await db
+    .select()
+    .from(walletTransactions)
+    .where(
+      and(
+        eq(walletTransactions.type as any, 'PRODUCT_PURCHASE' as any),
+        eq(walletTransactions.status, 'COMPLETED'),
+        eq(walletTransactions.fromUserId, order.buyerId),
+        sql`(${walletTransactions.metadata} ->> 'targetId') = ${order.productId}`
+      )
+    )
+    .orderBy(desc(walletTransactions.createdAt))
+    .limit(1);
+
+  const purchaseTx = originalTx[0];
+  const netAmount =
+    purchaseTx?.netAmount !== undefined
+      ? parseFloat(String(purchaseTx.netAmount))
+      : parseFloat(String(order.price));
+
+  // Wallet du vendeur (propriétaire de la boutique)
+  const sellerWallet = await db
+    .select()
+    .from(userWallets)
+    .where(eq(userWallets.userId, shop.ownerId))
+    .limit(1);
+  const wallet = sellerWallet[0];
+  if (!wallet) {
+    throw new Error('Seller wallet not found');
+  }
+
+  const currentBalance = parseFloat(String(wallet.balance ?? '0'));
+  const newBalance = (currentBalance + netAmount).toFixed(2);
+
+  // Créditer le vendeur (type BONUS pour éviter effets secondaires)
+  const payoutTx = await db
+    .insert(walletTransactions)
+    .values({
+      walletId: wallet.id,
+      fromUserId: order.buyerId,
+      toUserId: shop.ownerId,
+      amount: netAmount.toFixed(2),
+      fees: '0',
+      netAmount: netAmount.toFixed(2),
+      balanceAfter: newBalance,
+      type: 'BONUS',
+      status: 'COMPLETED',
+      description: `Payout commande ${order.id}`,
+      metadata: {
+        orderId: order.id,
+        productId: order.productId,
+        originalTransactionId: purchaseTx?.id,
+        processedBy: adminUserId,
+      },
+    })
+    .returning();
+
+  // Mettre à jour le solde du wallet vendeur
+  await db
+    .update(userWallets)
+    .set({ balance: newBalance, updatedAt: new Date() })
+    .where(eq(userWallets.id, wallet.id));
+
+  // Transfert de propriété produit + livraison
+  await db
+    .update(products)
+    .set({
+      userId: order.buyerId,
+      status: 'VENDU',
+      deliveredToUserId: order.buyerId,
+      deliveredAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(products.id, order.productId));
+
+  // Notifications
+  await Promise.all([
+    createNotification({
+      userId: order.buyerId,
+      title: 'Commande approuvée',
+      message: 'Votre commande a été approuvée par l’admin. Le produit a été livré.',
+      type: 'ORDER_APPROVED',
+      linkUrl: '/app/(protected)/dashboard/my-purchases',
+      shopId: order.shopId,
+    }),
+    createNotification({
+      userId: shop.ownerId,
+      title: 'Paiement reçu',
+      message: `Paiement reçu pour la commande ${order.id}.`,
+      type: 'ORDER_PAID',
+      linkUrl: `/shops/${order.shopId}/dashboard/orders`,
+      shopId: order.shopId,
+    }),
+  ]);
+
+  // Marquer la commande comme ACCEPTED (finalisé)
+  const updated = await updateOrderStatus(id, 'ACCEPTED');
+  return updated;
+}
+
+/**
+ * Rejet ADMIN d'une commande (remboursement + libération produit)
+ */
+export async function adminRejectOrder(
+  id: string,
+  adminUserId: string,
+  reason: string
+): Promise<Order> {
+  const order = await getOrderById(id);
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  // Trouver la transaction d'achat pour remboursement
+  const originalTx = await db
+    .select()
+    .from(walletTransactions)
+    .where(
+      and(
+        eq(walletTransactions.type as any, 'PRODUCT_PURCHASE' as any),
+        eq(walletTransactions.status, 'COMPLETED'),
+        eq(walletTransactions.fromUserId, order.buyerId),
+        sql`(${walletTransactions.metadata} ->> 'targetId') = ${order.productId}`
+      )
+    )
+    .orderBy(desc(walletTransactions.createdAt))
+    .limit(1);
+
+  const purchaseTx = originalTx[0];
+  if (purchaseTx) {
+    await refundTransaction(purchaseTx.id, reason || 'Order rejected by admin');
+  }
+
+  // Libérer le produit
+  await db
+    .update(products)
+    .set({
+      status: 'NON_VENDU',
+      deliveredToUserId: null as any,
+      deliveredAt: null as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(products.id, order.productId));
+
+  // Notifications
+  const shop = await db.query.shops.findFirst({
+    where: (s, { eq }) => eq(s.id, order.shopId),
+  });
+  if (shop?.ownerId) {
+    await Promise.all([
+      createNotification({
+        userId: order.buyerId,
+        title: 'Commande rejetée',
+        message: 'Votre commande a été rejetée par l’admin. Remboursement effectué.',
+        type: 'ORDER_REJECTED',
+        linkUrl: '/app/(protected)/wallet/transactions',
+        shopId: order.shopId,
+      }),
+      createNotification({
+        userId: shop.ownerId,
+        title: 'Commande rejetée',
+        message: `La commande ${order.id} a été rejetée par l’admin.`,
+        type: 'ORDER_REJECTED',
+        linkUrl: `/shops/${order.shopId}/dashboard/orders`,
+        shopId: order.shopId,
+      }),
+    ]);
+  }
+
+  const updated = await updateOrderStatus(id, 'REJECTED', reason);
+  return updated;
 }
 
 // ============================================================================

@@ -13,13 +13,14 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { MoreVertical, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getEditionRegistrations } from "@/actions/tournaments";
+import { getEditionRegistrations, updateEditionRegistration } from "@/actions/tournaments";
 import {
   EditionRegistration,
   TournamentMember,
   User as UserType,
   Team,
 } from "@/database/schema";
+import { revalidatePath } from "next/cache";
 
 interface PageProps {
   params: Promise<{
@@ -36,7 +37,7 @@ type RegistrationWithMember = EditionRegistration & {
 };
 
 export default async function DashboardParticipantsPage({ params }: PageProps) {
-  const { editionId } = await params;
+  const { tournamentId, editionId } = await params;
 
   const registrationsResponse = await getEditionRegistrations({
     filters: { editionId },
@@ -49,6 +50,30 @@ export default async function DashboardParticipantsPage({ params }: PageProps) {
   });
 
   const participants = registrationsResponse.data as RegistrationWithMember[];
+
+  async function setStatusAction(formData: FormData) {
+    "use server";
+    const id = (formData.get("id") as string) || "";
+    const status = (formData.get("status") as string) || "REGISTERED";
+    await updateEditionRegistration(id, { status } as any);
+    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants`);
+  }
+
+  async function toggleCheckinAction(formData: FormData) {
+    "use server";
+    const id = (formData.get("id") as string) || "";
+    const checkedIn = (formData.get("checkedIn") as string) === "true";
+    await updateEditionRegistration(id, { checkedIn } as any);
+    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants`);
+  }
+
+  async function toggleFeePaidAction(formData: FormData) {
+    "use server";
+    const id = (formData.get("id") as string) || "";
+    const feePaid = (formData.get("feePaid") as string) === "true";
+    await updateEditionRegistration(id, { feePaid } as any);
+    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants`);
+  }
 
   return (
     <Card>
@@ -109,7 +134,7 @@ export default async function DashboardParticipantsPage({ params }: PageProps) {
                           ? "default"
                           : reg.status === "PARTICIPATED"
                             ? "secondary"
-                            : "outline"
+                            : "outline" 
                       }
                       className="font-normal"
                     >
@@ -142,13 +167,36 @@ export default async function DashboardParticipantsPage({ params }: PageProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <form action={toggleCheckinAction}>
+                        <input type="hidden" name="id" value={reg.id} />
+                        <input type="hidden" name="checkedIn" value={(!reg.checkedIn).toString()} />
+                        <Button variant="outline" size="sm">
+                          {reg.checkedIn ? "Annuler check-in" : "Check-in"}
+                        </Button>
+                      </form>
+                      <form action={toggleFeePaidAction}>
+                        <input type="hidden" name="id" value={reg.id} />
+                        <input type="hidden" name="feePaid" value={(!reg.feePaid).toString()} />
+                        <Button variant="outline" size="sm">
+                          {reg.feePaid ? "Marquer impayé" : "Marquer payé"}
+                        </Button>
+                      </form>
+                      <form action={setStatusAction}>
+                        <input type="hidden" name="id" value={reg.id} />
+                        <input type="hidden" name="status" value="PARTICIPATED" />
+                        <Button variant="ghost" size="sm">
+                          Confirmer
+                        </Button>
+                      </form>
+                      <form action={setStatusAction}>
+                        <input type="hidden" name="id" value={reg.id} />
+                        <input type="hidden" name="status" value="CANCELLED" />
+                        <Button variant="destructive" size="sm">
+                          Annuler
+                        </Button>
+                      </form>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

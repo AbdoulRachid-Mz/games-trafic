@@ -10,16 +10,23 @@ import { Button } from "@/components/ui/button";
 export function QrScanner({
   onScan,
   className,
+  active = true,
 }: {
   onScan: (data: string) => void;
   className?: string;
+  active?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  const scanCallbackRef = useRef<(data: string) => void>(() => {});
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+
+  useEffect(() => {
+    scanCallbackRef.current = onScan;
+  }, [onScan]);
 
   useEffect(() => {
     const reader = new BrowserQRCodeReader();
@@ -45,7 +52,7 @@ export function QrScanner({
           videoRef.current!,
           (result) => {
             if (result) {
-              onScan(result.getText());
+              scanCallbackRef.current?.(result.getText());
 
               // ✅ arrêt propre du scanner
               controlsRef.current?.stop();
@@ -66,13 +73,21 @@ export function QrScanner({
       }
     };
 
-    startScanner();
+    if (active) {
+      startScanner();
+    } else {
+      if (isScanning) {
+        controlsRef.current?.stop();
+        controlsRef.current = null;
+        setIsScanning(false);
+      }
+    }
 
     return () => {
       controlsRef.current?.stop();
       controlsRef.current = null;
     };
-  }, [onScan]);
+  }, [active]);
 
     return (
         <div className={cn("relative aspect-square overflow-hidden rounded-3xl border-2 border-primary/20 bg-black shadow-2xl", className)}>

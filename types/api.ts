@@ -99,6 +99,7 @@ export interface UserFilters extends BaseFilters {
   emailVerified?: boolean;
   username?: string;
   fullName?: string;
+  phoneNumber?: string;
   country?: string;
   countryCode?: string;
   isPublicProfile?: boolean;
@@ -481,11 +482,14 @@ export interface TournamentEditionFilters extends BaseFilters {
   editionNumber?: number;
   editionNumberMin?: number;
   editionNumberMax?: number;
+  onlyAvailable?: boolean;
   name?: string;
   tagline?: string;
   editionSlug?: string;
   statuses?: ("UPCOMING" | "LIVE" | "COMPLETED" | "CANCELLED")[];
   locationType?: ("ONLINE" | "VENUE" | "HYBRID")[];
+  entryFeeMin?: number;
+  entryFeeMax?: number;
   startDateFrom?: Date | string;
   startDateTo?: Date | string;
   endDateFrom?: Date | string;

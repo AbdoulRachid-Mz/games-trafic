@@ -376,6 +376,121 @@ export async function getTournamentStats(filters?: TournamentFilters) {
 }
 
 // ============================================================================
+// EDITION DETAIL TREE
+// ============================================================================
+export async function getEditionDetailTree(
+  editionId: string,
+  filters: {
+    phases?: TournamentPhaseFilters;
+    groups?: PhaseGroupFilters;
+    bracketNodes?: BracketNodeFilters;
+    matches?: MatchFilters;
+  } = {},
+  options: QueryOptions = {}
+): Promise<any | null> {
+  try {
+    const edition = await db.query.tournamentEditions.findFirst({
+      where: eq(tournamentEditions.id, editionId),
+      with: {
+        tournament: true,
+        phases: {
+          orderBy: (phases, { asc }) => [asc(phases.order)],
+          with: {
+            groups: {
+              orderBy: (groups, { asc }) => [asc(groups.order)],
+              with: {
+                bracketNodes: true,
+                participants: true,
+              },
+            },
+            bracketNodes: true,
+            matches: true,
+          },
+        },
+        matches: true,
+        registrations: true,
+      },
+    });
+
+    if (!edition) return null;
+
+    const filterPhase = (p: any) => {
+      const f = filters.phases || {};
+      if (options.includeDeleted !== true && p.isDeleted) return false;
+      if (options.includeInactive !== true && p.isActive === false) return false;
+      if (f.phaseType && Array.isArray(f.phaseType) && !f.phaseType.includes(p.phaseType)) return false;
+      if (f.isCompleted !== undefined && p.isCompleted !== f.isCompleted) return false;
+      if (f.isHidden !== undefined && p.isHidden !== f.isHidden) return false;
+      if (f.orderMin !== undefined && p.order < f.orderMin) return false;
+      if (f.orderMax !== undefined && p.order > f.orderMax) return false;
+      return true;
+    };
+
+    const filterGroup = (g: any) => {
+      const f = filters.groups || {};
+      if (options.includeDeleted !== true && g.isDeleted) return false;
+      if (f.groupType && Array.isArray(f.groupType) && !f.groupType.includes(g.groupType)) return false;
+      if (f.isCompleted !== undefined && g.isCompleted !== f.isCompleted) return false;
+      if (f.isLocked !== undefined && g.isLocked !== f.isLocked) return false;
+      if (f.orderMin !== undefined && g.order < f.orderMin) return false;
+      if (f.orderMax !== undefined && g.order > f.orderMax) return false;
+      return true;
+    };
+
+    const filterNode = (n: any) => {
+      const f = filters.bracketNodes || {};
+      if (options.includeDeleted !== true && n.isDeleted) return false;
+      if (f.bracketType && Array.isArray(f.bracketType) && !f.bracketType.includes(n.bracketType)) return false;
+      if (f.roundMin !== undefined && (n.round ?? 0) < f.roundMin) return false;
+      if (f.roundMax !== undefined && (n.round ?? 0) > f.roundMax) return false;
+      if (f.matchNumberMin !== undefined && (n.matchNumber ?? 0) < f.matchNumberMin) return false;
+      if (f.matchNumberMax !== undefined && (n.matchNumber ?? 0) > f.matchNumberMax) return false;
+      if (f.depthMin !== undefined && (n.depth ?? 0) < f.depthMin) return false;
+      if (f.depthMax !== undefined && (n.depth ?? 0) > f.depthMax) return false;
+      return true;
+    };
+
+    const filterMatch = (m: any) => {
+      const f = filters.matches || {};
+      if (options.includeDeleted !== true && m.isDeleted) return false;
+      if (f.statuses && Array.isArray(f.statuses) && !f.statuses.includes(m.status)) return false;
+      if (f.matchType) {
+        if (Array.isArray(f.matchType)) {
+          if (!f.matchType.includes(m.matchType)) return false;
+        } else if (m.matchType !== f.matchType) return false;
+      }
+      if (f.roundMin !== undefined && (m.round ?? 0) < f.roundMin) return false;
+      if (f.roundMax !== undefined && (m.round ?? 0) > f.roundMax) return false;
+      if (f.groupId && m.groupId !== f.groupId) return false;
+      if (f.bracketNodeId && m.bracketNodeId !== f.bracketNodeId) return false;
+      return true;
+    };
+
+    const phases = (edition.phases || []).filter(filterPhase).map((p: any) => {
+      const groups = (p.groups || []).filter(filterGroup).map((g: any) => {
+        const nodes = (g.bracketNodes || []).filter(filterNode);
+        const participants = g.participants || [];
+        return { ...g, bracketNodes: nodes, participants };
+      });
+
+      const phaseNodes = (p.bracketNodes || []).filter(filterNode);
+      const phaseMatches = (p.matches || []).filter(filterMatch);
+      return { ...p, groups, bracketNodes: phaseNodes, matches: phaseMatches };
+    });
+
+    const editionMatches = (edition.matches || []).filter(filterMatch);
+
+    return {
+      ...edition,
+      phases,
+      matches: editionMatches,
+    };
+  } catch (error) {
+    console.error("Error building edition detail tree:", error);
+    throw new Error("Failed to build edition detail tree");
+  }
+}
+// ============================================================================
 // MUTATIONS - Écriture des données
 // ============================================================================
 
@@ -1707,6 +1822,7 @@ export async function createRegistrationPayment(
   }
 }
 
+
 /**
  * Met à jour un paiement d'inscription
  */
@@ -2143,6 +2259,16 @@ function buildTournamentEditionWhereConditions(
   if (filters.statuses && filters.statuses.length > 0) {
     conditions.push(inArray(tournamentEditions.status, filters.statuses));
   }
+  if (filters.entryFeeMin !== undefined) {
+    conditions.push(
+      gte(tournamentEditions.entryFee, String(filters.entryFeeMin))
+    );
+  }
+  if (filters.entryFeeMax !== undefined) {
+    conditions.push(
+      lte(tournamentEditions.entryFee, String(filters.entryFeeMax))
+    );
+  }
   if (filters.locationType) {
     if (Array.isArray(filters.locationType)) {
       conditions.push(
@@ -2179,6 +2305,11 @@ function buildTournamentEditionWhereConditions(
         tournamentEditions.currentParticipants,
         filters.currentParticipantsMax
       )
+    );
+  }
+  if (filters.onlyAvailable === true) {
+    conditions.push(
+      sql`${tournamentEditions.currentParticipants} < ${tournamentEditions.maxParticipants}`
     );
   }
   if (filters.prizePoolMin !== undefined) {
@@ -2381,6 +2512,13 @@ function buildTournamentPhaseWhereConditions(
 ) {
   const conditions = [];
 
+  if (!options.includeDeleted) {
+    conditions.push(eq(tournamentPhases.isDeleted, false));
+  }
+  if (!options.includeInactive) {
+    conditions.push(eq(tournamentPhases.isActive, true));
+  }
+
   if (filters.id) conditions.push(eq(tournamentPhases.id, filters.id));
   if (filters.editionId)
     conditions.push(eq(tournamentPhases.editionId, filters.editionId));
@@ -2443,6 +2581,10 @@ function buildPhaseGroupWhereConditions(
   options: QueryOptions = {}
 ) {
   const conditions = [];
+
+  if (!options.includeDeleted) {
+    conditions.push(eq(phaseGroups.isDeleted, false));
+  }
 
   if (filters.id) conditions.push(eq(phaseGroups.id, filters.id));
   if (filters.phaseId)
@@ -2557,6 +2699,10 @@ function buildBracketNodeWhereConditions(
 ) {
   const conditions = [];
 
+  if (!options.includeDeleted) {
+    conditions.push(eq(bracketNodes.isDeleted, false));
+  }
+
   if (filters.id) conditions.push(eq(bracketNodes.id, filters.id));
   if (filters.phaseId)
     conditions.push(eq(bracketNodes.phaseId, filters.phaseId));
@@ -2620,6 +2766,10 @@ function buildMatchWhereConditions(
   options: QueryOptions = {}
 ) {
   const conditions = [];
+
+  if (!options.includeDeleted) {
+    conditions.push(eq(matches.isDeleted, false));
+  }
 
   if (filters.id) conditions.push(eq(matches.id, filters.id));
   if (filters.editionId)

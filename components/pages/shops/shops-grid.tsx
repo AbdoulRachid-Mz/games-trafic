@@ -6,9 +6,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Store, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
-import { ShopCard } from "@/components/pages/shops/shop-card";
 import { ShopCardList } from "@/components/pages/shops/shop-card-list";
 import { Shop } from "@/database/schema";
+import { ShopCard } from "@/components/cards/shop-card";
 
 interface ShopsGridProps {
   shops: Shop[];
@@ -95,7 +95,11 @@ export function ShopsGrid({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <ShopCard shop={shop} onView={() => onShopClick(shop.id)} />
+                  <ShopCard
+                    shop={shop}
+                    viewMode="grid"
+                    onView={() => onShopClick(shop.id)}
+                  />
                 </motion.div>
               ))}
             </div>
@@ -108,9 +112,13 @@ export function ShopsGrid({
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <ShopCardList
+                  <ShopCard
                     shop={shop}
-                    onClick={() => onShopClick(shop.id)}
+                    viewMode="compact"
+                    showDetails={false}
+                    showStats={false}
+                    showLikeButton={false}
+                    onView={() => onShopClick(shop.id)}
                   />
                 </motion.div>
               ))}

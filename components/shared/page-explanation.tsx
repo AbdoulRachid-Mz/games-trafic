@@ -29,7 +29,18 @@ export function PageExplanation() {
   const [currentStep, setCurrentStep] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
-  const explanation = PAGE_EXPLANATIONS.find((e) => e.page === pathname);
+  const explanation = PAGE_EXPLANATIONS.find((e) => {
+    if (e.page === pathname) return true;
+    if (e.page.includes("[") || e.page.includes("*")) {
+      const pattern = e.page
+        .replace(/\[[^\]]+\]/g, "[^/]+")
+        .replace(/\*\*/g, ".*")
+        .replace(/\*/g, "[^/]*");
+      const regex = new RegExp(`^${pattern}$`);
+      return regex.test(pathname);
+    }
+    return false;
+  });
   const steps = explanation?.steps || [];
 
   useEffect(() => {
@@ -37,7 +48,7 @@ export function PageExplanation() {
       // Délai avant d'afficher l'explication
       const timer = setTimeout(() => {
         setIsOpen(true);
-      }, 1000);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
@@ -51,6 +62,20 @@ export function PageExplanation() {
       localStorage.setItem(`gt_explanation_${pathname}_shown`, "true");
     }
 
+    skipExplanation(pathname);
+  };
+
+  const handleDisablePage = () => {
+    localStorage.setItem(`gt_explanation_${pathname}_disabled`, "true");
+    setIsOpen(false);
+    setCurrentStep(0);
+    skipExplanation(pathname);
+  };
+
+  const handleDisableAll = () => {
+    localStorage.setItem("gt_explanations_disabled", "true");
+    setIsOpen(false);
+    setCurrentStep(0);
     skipExplanation(pathname);
   };
 
@@ -176,15 +201,21 @@ export function PageExplanation() {
               htmlFor="dont-show"
               className="text-sm text-muted-foreground cursor-pointer"
             >
-              Don't show this again
+              Ne plus afficher une seule fois
             </Label>
           </div>
 
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleDisablePage}>
+              Ne plus afficher cette page
+            </Button>
+            <Button variant="outline" onClick={handleDisableAll}>
+              Ne plus afficher les explications
+            </Button>
             {currentStep > 0 && (
               <Button variant="outline" onClick={handlePrevious}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
+                Précédent
               </Button>
             )}
 
@@ -193,10 +224,10 @@ export function PageExplanation() {
               onClick={isLastStep ? handleComplete : handleNext}
             >
               {isLastStep ? (
-                "Got it!"
+                "Compris"
               ) : (
                 <>
-                  Next
+                  Suivant
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </>
               )}

@@ -35,6 +35,7 @@ export function MemberCard({
   const role = member.role || "PARTICIPANT";
   const isActive = member.isActive ?? true;
   const isBanned = member.isBanned ?? false;
+  const isMe = member.userId === user?.id;
 
   // Helper to determine role color/icon
   const getRoleBadge = (role: string) => {
@@ -142,7 +143,7 @@ export function MemberCard({
   // Grid View
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative">
+      <CardContent className="p-3 flex flex-col items-center text-center gap-3 relative">
         {userDisplay !== "member" && (
           <div className="absolute top-2 right-2">
             <DropdownMenu>
@@ -190,7 +191,7 @@ export function MemberCard({
             className="font-bold truncate"
             title={member.displayName || user?.username || "Inconnu"}
           >
-            {member.displayName || user?.username || "Inconnu"}
+            {member.displayName || user?.username || "Inconnu"} {isMe && <Badge variant="default">Moi</Badge>}
           </h3>
           <p className="text-xs text-muted-foreground truncate">
             {member.contactEmail || "Pas d'email"}
@@ -213,10 +214,20 @@ export function MemberCard({
         </div>
 
         {member.joinedAt && (
-          <div className="text-xs text-muted-foreground pt-2 border-t w-full mt-2">
+          <div className="text-xs text-muted-foreground pt-1 border-t w-full mt-1">
             Membre depuis le: {new Date(member.joinedAt).toLocaleDateString()}
           </div>
         )}
+        {/* voir profil */}
+
+          <Button
+            variant="link"
+            size="default"
+            className="text-sm text-muted-foreground"
+            onClick={() => actions?.onViewProfile?.(member.id)}
+          >
+            Voir le profil
+          </Button>
       </CardContent>
     </Card>
   );

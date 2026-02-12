@@ -14,6 +14,8 @@ import {
   createPhaseGroup,
   updatePhaseGroupParticipant,
   updateMatchResult,
+  getBracketNodes,
+  getMatches,
 } from "@/actions/tournaments";
 import {
   getTournamentEditionWithRelations,
@@ -39,6 +41,8 @@ import {
   type TournamentEditionFilters,
   type EditionRegistrationFilters,
   type TournamentPhaseFilters,
+  type BracketNodeFilters,
+  type MatchFilters,
 } from "@/types/api";
 
 import { toast } from "sonner";
@@ -246,6 +250,40 @@ export function useCreatePhase() {
     onError: (error: Error) => {
       toast.error(`Erreur: ${error.message}`);
     },
+  });
+}
+
+// Bracket Nodes
+export function usePhaseBracketNodes(
+  phaseId: string,
+  query: ListQuery<BracketNodeFilters> = {}
+) {
+  return useQuery({
+    queryKey: ["bracket-nodes", phaseId, query],
+    queryFn: () =>
+      getBracketNodes({
+        ...query,
+        filters: { ...query.filters, phaseId },
+        options: { sortBy: "order", sortOrder: "asc", ...(query.options || {}) },
+      }),
+    enabled: !!phaseId,
+  });
+}
+
+// Matches
+export function usePhaseMatches(
+  phaseId: string,
+  query: ListQuery<MatchFilters> = {}
+) {
+  return useQuery({
+    queryKey: ["matches", phaseId, query],
+    queryFn: () =>
+      getMatches({
+        ...query,
+        filters: { ...query.filters, phaseId },
+        options: { sortBy: "round", sortOrder: "asc", ...(query.options || {}) },
+      }),
+    enabled: !!phaseId,
   });
 }
 

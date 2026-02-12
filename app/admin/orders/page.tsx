@@ -49,68 +49,39 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { getOrders, getOrderStats, adminApproveOrder, adminRejectOrder } from "@/actions/orders";
+import { getProductById } from "@/actions/products";
+import { useAuthContext } from "@/contexts/auth-context";
 
-// Mock data - À remplacer par de vraies actions
-const mockOrders = [
-  {
-    id: "order-1",
-    productId: "prod-1",
-    productName: "Compte Fortnite Level 250",
-    productImage: "https://via.placeholder.com/150",
-    game: "Fortnite",
-    platform: "PC",
-    buyerId: "user-1",
-    buyerName: "John Doe",
-    buyerEmail: "john@example.com",
-    shopId: "shop-1",
-    shopName: "GameZone Pro",
-    shopOwner: "Seller One",
-    amount: 150,
-    status: "PENDING",
-    createdAt: new Date(),
-    // Informations sensibles du compte
-    accountLogin: "fortnite_account@email.com",
-    accountPassword: "SecurePass123!",
-    accountDetails: {
-      level: 250,
-      rank: "Diamond",
-      vbucks: 5000,
-      skins: 120,
-      twoFactorAuth: "Enabled",
-      recoveryEmail: "recovery@email.com",
-    },
-  },
-  {
-    id: "order-2",
-    productId: "prod-2",
-    productName: "Compte Valorant Immortal",
-    productImage: "https://via.placeholder.com/150",
-    game: "Valorant",
-    platform: "PC",
-    buyerId: "user-2",
-    buyerName: "Jane Smith",
-    buyerEmail: "jane@example.com",
-    shopId: "shop-2",
-    shopName: "Elite Gaming",
-    shopOwner: "Seller Two",
-    amount: 200,
-    status: "PENDING",
-    createdAt: new Date(),
-    accountLogin: "valorant_pro@email.com",
-    accountPassword: "ValoPass456!",
-    accountDetails: {
-      level: 180,
-      rank: "Immortal 2",
-      agents: 18,
-      skins: 45,
-      twoFactorAuth: "Disabled",
-      recoveryEmail: "val_recovery@email.com",
-    },
-  },
-];
+type UiOrder = {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage?: string;
+  game?: string | null;
+  platform?: string | null;
+  buyerId: string;
+  buyerName?: string;
+  buyerEmail?: string;
+  shopId: string;
+  shopName?: string;
+  shopOwner?: string;
+  amount: number;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  createdAt: Date;
+  accountLogin?: string | null;
+  accountPasswordMasked?: string | null;
+  accountDetails?: {
+    level?: string | null;
+    rank?: string | null;
+    twoFactorAuth?: string | null;
+    recoveryEmail?: string | null;
+  };
+};
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState(mockOrders);
+  const { user: auth } = useAuthContext();
+  const [orders, setOrders] = useState<UiOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -125,6 +96,66 @@ export default function AdminOrdersPage() {
   const [verificationNotes, setVerificationNotes] = useState("");
   const [actionReason, setActionReason] = useState("");
 
+  const loadData = async () => {
+    try {
+      const result = await getOrders({
+        pagination: { page: 1, limit: 50 },
+        filters: { statuses: ["PENDING", "ACCEPTED"] },
+        options: { sortBy: "createdAt", sortOrder: "desc" },
+      });
+
+      const enriched: UiOrder[] = [];
+      for (const o of result.data) {
+        let productName = o.productId;
+        let productImage: string | undefined;
+        let game: string | null | undefined;
+        let platform: string | null | undefined;
+        let accountLogin: string | null | undefined;
+        let accountDetails: UiOrder["accountDetails"] = {};
+
+        try {
+          const p = await getProductById(o.productId);
+          if (p) {
+            productName = p.name;
+            productImage = (p as any).featuredImage || undefined;
+            game = p.game;
+            platform = p.platform;
+            accountLogin = p.accountLogin || null;
+            accountDetails = {
+              level: p.accountLevel || null,
+              rank: p.accountRank || null,
+            };
+          }
+        } catch {}
+
+        enriched.push({
+          id: o.id,
+          productId: o.productId,
+          productName,
+          productImage,
+          game,
+          platform,
+          buyerId: o.buyerId,
+          shopId: o.shopId,
+          amount: Number(o.price || 0),
+          status: o.status as UiOrder["status"],
+          createdAt: o.createdAt as Date,
+          accountLogin,
+          accountPasswordMasked: accountLogin ? "••••••••••••" : null,
+          accountDetails,
+        });
+      }
+
+      setOrders(enriched);
+    } catch (e) {
+      toast.error("Erreur chargement des commandes");
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const handleApprove = async (orderId: string) => {
     const allChecked = Object.values(verificationChecks).every((v) => v);
     if (!allChecked) {
@@ -133,8 +164,9 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      // TODO: Implémenter l'approbation
+      await adminApproveOrder(orderId, auth?.id);
       toast.success("Commande approuvée - Transfert effectué");
+      await loadData();
       setSelectedOrder(null);
       resetVerification();
     } catch (error) {
@@ -149,8 +181,9 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      // TODO: Implémenter le rejet
+      await adminRejectOrder(orderId, auth?.id || "", actionReason);
       toast.success("Commande rejetée - Remboursement effectué");
+      await loadData();
       setSelectedOrder(null);
       resetVerification();
     } catch (error) {
@@ -180,7 +213,7 @@ export default function AdminOrdersPage() {
     const matchesSearch =
       order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.buyerName.toLowerCase().includes(searchQuery.toLowerCase());
+      (order.buyerName && order.buyerName.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus =
       statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -455,63 +488,30 @@ export default function AdminOrdersPage() {
                       </Typography>
                     </div>
                     <div className="space-y-3">
-                      <div>
-                        <Typography variant="caption1" theme="muted">
-                          Login / Email
-                        </Typography>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="flex-1 px-3 py-2 bg-background rounded-lg font-mono text-sm">
-                            {selectedOrder.accountLogin}
-                          </code>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              copyToClipboard(
-                                selectedOrder.accountLogin,
-                                "Login"
-                              )
-                            }
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
+                      {selectedOrder.accountLogin && (
+                        <div>
+                          <Typography variant="caption1" theme="muted">
+                            Login / Email
+                          </Typography>
+                          <div className="flex items-center gap-2 mt-1">
+                            <code className="flex-1 px-3 py-2 bg-background rounded-lg font-mono text-sm">
+                              {selectedOrder.accountLogin}
+                            </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                copyToClipboard(
+                                  selectedOrder.accountLogin,
+                                  "Login"
+                                )
+                              }
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <Typography variant="caption1" theme="muted">
-                          Password
-                        </Typography>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="flex-1 px-3 py-2 bg-background rounded-lg font-mono text-sm">
-                            {showPassword
-                              ? selectedOrder.accountPassword
-                              : "••••••••••••"}
-                          </code>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowPassword(!showPassword)}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              copyToClipboard(
-                                selectedOrder.accountPassword,
-                                "Password"
-                              )
-                            }
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                      )}
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
                           <Typography variant="caption2" theme="muted">

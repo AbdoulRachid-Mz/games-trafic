@@ -81,7 +81,11 @@ export function EditionParticipantsList({
           }
         >
           {filtered.map((reg) => (
-            <MemberCard key={reg.id} member={reg.member} viewMode={viewMode} />
+            <MemberCard
+              key={reg.id}
+              member={reg.member}
+              viewMode={viewMode}
+            />
           ))}
         </div>
       )}

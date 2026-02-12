@@ -29,12 +29,14 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Typography } from "@/components/ui/typography";
 import { useAuthContext } from "@/contexts/auth-context";
+import { useUserProfile } from "@/hooks/use-profile";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import type { FABAction as FABActionType } from "@/config/routes-config";
 import type { NavItem } from "@/types/routes";
 import { Badge } from "../ui/badge";
+import { resolveRoute } from "@/lib/routes/resolver";
 
 interface FloatingActionButtonProps {
   hidden?: boolean;
@@ -67,7 +69,20 @@ export const FloatingActionButton = ({
 
   const router = useRouter();
   const { isAuthenticated, isAdmin } = useAuthContext();
-  const { isActive } = useActiveRoute();
+  const { data: profile } = useUserProfile({ mode: "partial", relations: ["wallet"] });
+  const { pathname } = useActiveRoute();
+  const resolved = useMemo(() => {
+    try {
+      return resolveRoute(pathname || "/", {
+        isAuthenticated: !!isAuthenticated,
+        isAdmin: !!isAdmin,
+        isVip: false,
+        hasWallet: !!profile?.wallet?.id,
+      } as any);
+    } catch {
+      return { pathname: pathname || "/" } as any;
+    }
+  }, [pathname, isAuthenticated, isAdmin, profile?.wallet?.id]);
 
   // Default nav items if none provided
   const defaultNavItems: NavItem[] = [
@@ -271,72 +286,80 @@ export const FloatingActionButton = ({
             className="fixed bottom-10 max-md:bottom-4 left-1/2 -translate-x-1/2 z-40"
           >
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-background/30 backdrop-blur-lg border border-border/50 shadow-2xl">
-              {filteredNavItems.map((item, idx) => {
-                const isActiveRoute = isActive(item.href, false);
-                const Icon = item.icon as React.ElementType;
-
-                return (
-                  <Tooltip key={idx}>
-                    <TooltipTrigger asChild>
-                      <Link href={item.href}>
-                        <motion.div
-                          whileHover={{ scale: 1.15, y: -5 }}
-                          whileTap={{ scale: 0.9 }}
-                          className={cn(
-                            "flex flex-col items-center justify-center p-1 rounded-xl transition-all duration-300",
-                            "hover:shadow-lg cursor-pointer min-w-[50px]",
-                            "relative group",
-                            isActiveRoute
-                              ? "bg-gradient-to-br from-primary/20 to-purple-600/20"
-                              : "hover:bg-primary/5",
-                          )}
-                          aria-label={item.label}
-                        >
-                          {/* Indicateur actif */}
-                          {isActiveRoute && (
-                            <motion.div
-                              className="absolute -top-1 h-1 w-6 rounded-full bg-gradient-to-r from-primary to-purple-600"
-                              initial={{ scaleX: 0 }}
-                              animate={{ scaleX: 1 }}
-                              transition={{ duration: 0.3 }}
-                            />
-                          )}
-                          
-                          <div className={cn(
-                            "p-2 rounded-lg mb-1 transition-all duration-300",
-                            isActiveRoute
-                              ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg"
-                              : "bg-primary/10 text-primary group-hover:bg-gradient-to-r group-hover:from-primary/20 group-hover:to-purple-600/20"
-                          )}>
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          
-                          <Typography
-                            variant="caption2"
-                            weight="medium"
-                            className={cn(
-                              "text-xs transition-colors duration-300",
-                              isActiveRoute
-                                ? "text-primary font-bold"
-                                : "text-muted-foreground group-hover:text-foreground"
-                            )}
-                          >
-                            {item.label}
-                          </Typography>
-                          
-                          {/* Effet de halo sur l'élément actif */}
-                          {isActiveRoute && (
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-purple-600/5 -z-10" />
-                          )}
-                        </motion.div>
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <Typography variant="caption1">{item.label}</Typography>
-                    </TooltipContent>
-                  </Tooltip>
+              {(() => {
+                const normalizeHref = (href: string) =>
+                  href.endsWith("/") && href !== "/" ? href.slice(0, -1) : href;
+                const activeItem = filteredNavItems.find(
+                  (i) => resolved.pathname === normalizeHref(i.href),
                 );
-              })}
+                const activeHref = activeItem ? normalizeHref(activeItem.href) : "";
+                return filteredNavItems.map((item, idx) => {
+                  const isActiveRoute = activeHref !== "" && normalizeHref(item.href) === activeHref;
+                  const Icon = item.icon as React.ElementType;
+
+                  return (
+                    <Tooltip key={idx}>
+                      <TooltipTrigger asChild>
+                        <Link href={item.href}>
+                          <motion.div
+                            whileHover={{ scale: 1.15, y: -5 }}
+                            whileTap={{ scale: 0.9 }}
+                            className={cn(
+                              "flex flex-col items-center justify-center p-1 rounded-xl transition-all duration-300",
+                              "hover:shadow-lg cursor-pointer min-w-[50px]",
+                              "relative group",
+                              isActiveRoute
+                                ? "bg-gradient-to-br from-primary/20 to-purple-600/20"
+                                : "hover:bg-primary/5",
+                            )}
+                            aria-label={item.label}
+                          >
+                            {/* Indicateur actif */}
+                            {isActiveRoute && (
+                              <motion.div
+                                className="absolute -top-1 h-1 w-6 rounded-full bg-gradient-to-r from-primary to-purple-600"
+                                initial={{ scaleX: 0 }}
+                                animate={{ scaleX: 1 }}
+                                transition={{ duration: 0.3 }}
+                              />
+                            )}
+                            
+                            <div className={cn(
+                              "p-2 rounded-lg mb-1 transition-all duration-300",
+                              isActiveRoute
+                                ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg"
+                                : "bg-primary/10 text-primary group-hover:bg-gradient-to-r group-hover:from-primary/20 group-hover:to-purple-600/20"
+                            )}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            
+                            <Typography
+                              variant="caption2"
+                              weight="medium"
+                              className={cn(
+                                "text-xs transition-colors duration-300",
+                                isActiveRoute
+                                  ? "text-primary font-bold"
+                                  : "text-muted-foreground group-hover:text-foreground"
+                              )}
+                            >
+                              {item.label}
+                            </Typography>
+                            
+                            {/* Effet de halo sur l'élément actif */}
+                            {isActiveRoute && (
+                              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-purple-600/5 -z-10" />
+                            )}
+                          </motion.div>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <Typography variant="caption1">{item.label}</Typography>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                });
+              })()}
             </div>
           </motion.div>
         )}

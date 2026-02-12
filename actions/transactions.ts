@@ -11,6 +11,12 @@ import {
   users,
   themePurchases,
   products,
+  shops,
+  tournamentEditions,
+  tournamentMembers,
+  editionRegistrations,
+  registrationPayments,
+  requests,
 } from "@/database/schema";
 import {
   eq,
@@ -40,6 +46,8 @@ import { getAppSettings } from "./app-settings";
 import { getUserWalletById, updateWalletBalance } from "./wallets";
 import { createUserTrace } from "./user-traces";
 import { getCurrentUser } from "@/lib/auth/session";
+import { createOrder } from "./orders";
+import { createNotification } from "./notifications";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -422,7 +430,20 @@ export async function createTransaction(data: {
     const netAmount = amount - fees;
     const currentBalance = parseFloat(wallet.balance || "0");
     const totalDebit = amount + fees;
-    const newBalance = currentBalance - totalDebit;
+    let newBalance = currentBalance;
+    if (
+      [
+        "PURCHASE",
+        "TRANSFER",
+        "VIP_SUBSCRIPTION",
+        "THEME_PURCHASE",
+        "PRODUCT_PURCHASE",
+        "GAME_ITEM_PURCHASE",
+        "TOURNAMENT_PARTICIPATION",
+      ].includes(data.type)
+    ) {
+      newBalance = currentBalance - totalDebit;
+    }
 
     // Vérifier le solde pour les transactions débiteuses
     const debitTypes = [
@@ -441,6 +462,7 @@ export async function createTransaction(data: {
     }
 
     if (data.type === "ORDER_PURCHASE") {
+
       const targetId = data.metadata?.targetId as string | undefined;
       if (!targetId) {
         throw new Error("ID du produit requis");
@@ -451,8 +473,27 @@ export async function createTransaction(data: {
       if (!product) {
         throw new Error("Produit non trouvé");
       }
-      if (["VENDU", "RESERVE", "ANNULER", "EN_ECHANGE", "LIVRE"].includes(product.status as string)) {
+      if (
+        product.isDeleted ||
+        !product.isActive ||
+        ["VENDU", "RESERVE", "ANNULER", "EN_ECHANGE", "LIVRE"].includes(
+          product.status as string
+        )
+      ) {
         throw new Error("Produit indisponible");
+      }
+      const [{ count: pendingCount }] = await db
+        .select({ count: count() })
+        .from(walletTransactions)
+        .where(
+          and(
+            eq(walletTransactions.type as any, "PRODUCT_PURCHASE" as any),
+            inArray(walletTransactions.status as any, ["PENDING", "PROCESSING"] as any),
+            sql`(${walletTransactions.metadata} ->> 'targetId') = ${targetId}`
+          )
+        );
+      if (Number(pendingCount) > 0) {
+        throw new Error("Produit en cours d'achat");
       }
     }
 
@@ -465,6 +506,31 @@ export async function createTransaction(data: {
       });
       if (existingVip) {
         throw new Error("Abonnement VIP déjà actif");
+      }
+    }
+
+    if (data.type === "TOURNAMENT_PARTICIPATION") {
+      const editionId = data.metadata?.targetId as string | undefined;
+      if (!editionId) {
+        throw new Error("ID de l'édition requis pour la participation");
+      }
+      const edition = await db.query.tournamentEditions.findFirst({
+        where: eq(tournamentEditions.id, editionId),
+      });
+      if (!edition) {
+        throw new Error("Édition introuvable");
+      }
+      if (edition.isDeleted || !edition.isActive) {
+        throw new Error("Édition indisponible");
+      }
+      const entryFee = parseFloat((edition.entryFee as any) || "0");
+      if (entryFee <= 0) {
+        throw new Error("Cette édition n'est pas payante");
+      }
+      const current = edition.currentParticipants || 0;
+      const max = edition.maxParticipants || 0;
+      if (max && current >= max) {
+        throw new Error("Nombre de places déjà atteint pour cette édition");
       }
     }
 
@@ -493,15 +559,17 @@ export async function createTransaction(data: {
         netAmount: netAmount.toFixed(2),
         balanceAfter: newBalance.toFixed(2),
         type: data.type,
-        status: "COMPLETED",
+        status: ["DEPOSIT", "WITHDRAWAL"].includes(data.type) ? "PENDING" : "COMPLETED",
         description: data.description,
         metadata: data.metadata || {},
         createdAt: new Date(),
       })
       .returning();
 
-    // Mettre à jour le solde du wallet
-    await updateWalletBalance(data.walletId, newBalance.toFixed(2));
+    // Mettre à jour le solde du wallet si finalisé
+    if (!["DEPOSIT", "WITHDRAWAL"].includes(data.type)) {
+      await updateWalletBalance(data.walletId, newBalance.toFixed(2));
+    }
 
     // Actions spécifiques selon le type
     await handleTransactionType(
@@ -552,15 +620,43 @@ async function handleTransactionType(
 
     case "PRODUCT_PURCHASE":
       if (metadata?.targetId) {
-        await db
-          .update(products)
-          .set({
-            status: "VENDU",
-            deliveredToUserId: userId,
-            deliveredAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(products.id, metadata.targetId));
+        const product = await db.query.products.findFirst({
+          where: eq(products.id, metadata.targetId),
+        });
+        if (product) {
+          await db
+            .update(products)
+            .set({
+              status: "RESERVE",
+              updatedAt: new Date(),
+            })
+            .where(eq(products.id, metadata.targetId));
+
+          const order = await createOrder({
+            productId: metadata.targetId,
+            buyerId: userId,
+            shopId: product.shopId as string,
+            price: product.price as any,
+            orderType: "PURCHASE",
+            status: "PENDING",
+            message: "",
+          } as any);
+
+          const shop = await db.query.shops.findFirst({
+            where: eq(shops.id, product.shopId as string),
+          });
+          if (shop?.ownerId) {
+            await createNotification({
+              userId: shop.ownerId,
+              title: "Nouvelle commande",
+              message:
+                "Un produit a été demandé et une commande a été créée dans votre boutique",
+              type: "ORDER_REQUEST",
+              linkUrl: `/shops/${product.shopId}/dashboard/orders`,
+              shopId: product.shopId as string,
+            });
+          }
+        }
       }
       break;
 
@@ -637,6 +733,142 @@ async function handleTransactionType(
         }
       }
       break;
+
+    case "DEPOSIT":
+      {
+        await db.insert(requests).values({
+          userId,
+          type: "DEPOSIT",
+          amount: (metadata?.amount as any) ?? "0",
+          currency: "GTC",
+          status: "PENDING",
+          paymentMethod: (metadata?.paymentMethod as any) ?? null,
+          paymentProvider: (metadata?.paymentProvider as any) ?? null,
+          paymentAccountId: (metadata?.paymentAccountId as any) ?? null,
+          paymentReference: (metadata?.paymentReference as any) ?? null,
+          paymentImage: (metadata?.paymentImage as any) ?? null,
+          paymentMetadata: (metadata?.paymentMetadata as any) ?? {},
+          userNotes: (metadata?.notes as any) ?? null,
+          transactionId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+      break;
+
+    case "WITHDRAWAL":
+      {
+        await db.insert(requests).values({
+          userId,
+          type: "WITHDRAWAL",
+          amount: (metadata?.amount as any) ?? "0",
+          currency: "GTC",
+          status: "PENDING",
+          paymentMethod: (metadata?.paymentMethod as any) ?? null,
+          paymentProvider: (metadata?.paymentProvider as any) ?? null,
+          paymentAccountId: (metadata?.paymentAccountId as any) ?? null,
+          paymentReference: (metadata?.paymentReference as any) ?? null,
+          paymentMetadata: (metadata?.paymentMetadata as any) ?? {},
+          userNotes: (metadata?.notes as any) ?? null,
+          transactionId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+      break;
+
+    case "GAME_ITEM_PURCHASE":
+      {
+        await db.insert(requests).values({
+          userId,
+          type: "GAME_ITEMS",
+          amount: (metadata?.amount as any) ?? "0",
+          currency: "GTC",
+          status: "PENDING",
+          gameItemId: (metadata?.targetId as any) ?? null,
+          quantity: (metadata?.quantity as any) ?? null,
+          totalGtc: (metadata?.totalGtc as any) ?? (metadata?.amount as any) ?? "0",
+          commission: "0",
+          gameAccount: (metadata?.gameAccount as any) ?? null,
+          encryptedPassword: (metadata?.encryptedPassword as any) ?? null,
+          gameId: (metadata?.gameId as any) ?? null,
+          additionalInfo: (metadata?.additionalInfo as any) ?? {},
+          userNotes: (metadata?.notes as any) ?? null,
+          transactionId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+      break;
+
+    case "TOURNAMENT_PARTICIPATION":
+      {
+        const editionId = metadata?.targetId as string | undefined;
+        if (!editionId) {
+          return;
+        }
+        const edition = await db.query.tournamentEditions.findFirst({
+          where: eq(tournamentEditions.id, editionId),
+        });
+        if (!edition) {
+          return;
+        }
+
+        let member = await db.query.tournamentMembers.findFirst({
+          where: and(
+            eq(tournamentMembers.userId, userId),
+            eq(tournamentMembers.tournamentId, edition.tournamentId)
+          ),
+        });
+        if (!member) {
+          const [createdMember] = await db
+            .insert(tournamentMembers)
+            .values({
+              userId,
+              tournamentId: edition.tournamentId,
+              role: "PLAYER",
+              isCoOrganizer: false,
+              isVerified: true,
+              isDeleted: false,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning();
+          member = createdMember;
+        }
+
+        const [registration] = await db
+          .insert(editionRegistrations)
+          .values({
+            editionId,
+            memberId: member.id,
+            registrationType: "PLAYER",
+            feePaid: false,
+            checkedIn: false,
+            status: "REGISTERED",
+            registeredAt: new Date(),
+            isDeleted: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await db.insert(registrationPayments).values({
+          registrationId: registration.id,
+          transactionId,
+          amount: (metadata?.amount || metadata?.netAmount || "0") as string,
+          currency: "GTC",
+          status: "PENDING",
+          paymentMethod: "WALLET",
+          paidAt: new Date(),
+          metadata: {
+            fromTransaction: transactionId,
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+      break;
   }
 }
 
@@ -680,6 +912,19 @@ export async function getTransactionFees(type: string, amount: number) {
         break;
       default:
         feePercentage = 0.01;
+    }
+
+    const sessionUser = await getCurrentUser();
+    if (sessionUser) {
+      const found = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, sessionUser.id))
+        .limit(1);
+      const isVip = !!found[0]?.isVip;
+      if (isVip) {
+        feePercentage = Math.max(0, feePercentage * 0.5);
+      }
     }
 
     const fees = amount * feePercentage;

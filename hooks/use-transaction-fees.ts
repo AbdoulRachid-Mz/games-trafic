@@ -3,6 +3,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { calculateTransactionFees } from "@/actions/entities";
+import { TransactionType } from "@/types/transaction-types";
 
 export interface UseTransactionFeesOptions {
     enabled?: boolean;
@@ -16,7 +17,7 @@ export interface UseTransactionFeesOptions {
  * @param options Options du hook
  */
 export function useTransactionFees(
-    type: string,
+    type: TransactionType,
     amount: number,
     options: UseTransactionFeesOptions = {},
 ) {

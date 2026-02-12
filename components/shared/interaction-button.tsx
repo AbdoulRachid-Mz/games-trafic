@@ -12,12 +12,13 @@ import {
 } from "@/hooks/use-interactions";
 import { cn } from "@/lib/utils";
 import { fireConfettiPreset } from "@/utils/confetti";
+import { EntityType } from "@/database/schema";
 
 type InteractionType = "like" | "bookmark" | "follow" | "share";
 
 export interface InteractionButtonProps {
   type: InteractionType;
-  entityType: string;
+  entityType: EntityType;
   entityId: string;
   iconOnly?: boolean;
   count?: number;
@@ -27,6 +28,7 @@ export interface InteractionButtonProps {
   variant?: "default" | "ghost" | "outline" | "secondary";
   size?: "sm" | "md" | "lg";
   withConfetti?: boolean; // trigger confetti animation on activate
+  withCount?: boolean; // display count next to icon
 }
 
 const iconMap: Record<InteractionType, React.ElementType> = {
@@ -55,6 +57,7 @@ export function InteractionButton({
   variant = "default",
   size = "md",
   withConfetti = true,
+  withCount = true,
 }: InteractionButtonProps) {
   const { user, isAuthenticated } = useAuthContext();
   const { mutate: toggle } = useToggleInteraction();
@@ -109,23 +112,7 @@ export function InteractionButton({
     toggle({
       userId: user.id,
       entityId,
-      entityType: entityType as
-        | "PRODUCT"
-        | "POST"
-        | "SHOP"
-        | "TOURNAMENT"
-        | "USER"
-        | "BLOG"
-        | "MESSAGE"
-        | "TEAM"
-        | "THEME"
-        | "NEWS"
-        | "GROUP"
-        | "ANNOUNCEMENT"
-        | "SERVICE"
-        | "GUIDE"
-        | "COMMENT"
-        | "MATCH",
+      entityType,
       type: type.toUpperCase() as any,
     });
   };
@@ -183,7 +170,7 @@ export function InteractionButton({
               )}
             </>
           )}
-          {iconOnly && localCount > 0 && (
+          {iconOnly && withCount && localCount > 0 && (
             <span className="tabular-nums text-xs">{localCount}</span>
           )}
         </motion.div>

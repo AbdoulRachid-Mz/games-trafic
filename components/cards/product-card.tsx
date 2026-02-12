@@ -1,6 +1,7 @@
 // @/components/cards/product-card.tsx
 "use client";
 
+import { useRouter } from "next/router";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";

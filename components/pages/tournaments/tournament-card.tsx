@@ -25,9 +25,10 @@ import {
 } from "@/components/ui/dialog";
 import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
+import { TournamentWithRelations } from "@/database/schema";
 
 interface TournamentCardProps {
-  tournament: any; // On typerait mieux avec le schéma drizzle si dispo dans le front
+  tournament: TournamentWithRelations; // On typerait mieux avec le schéma drizzle si dispo dans le front
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
@@ -124,7 +125,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
                     data={encodeTransactionQR({
                       t: "TOURNAMENT_PARTICIPATION",
                       id: tournament.id,
-                      a: parseFloat(tournament.entryFee || "0"),
+                      // a: parseFloat(tournament.entryFee || "0"),
                       m: { name: tournament.name }
                     })}
                     label={tournament.name}

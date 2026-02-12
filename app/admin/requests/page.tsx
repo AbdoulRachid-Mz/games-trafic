@@ -33,16 +33,24 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ResultDialog } from "@/components/shared/result-dialog";
 import {
-  getUserRequests,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  getRequests,
   getRequestStats,
   approveRequest,
   rejectRequest,
 } from "@/actions/requests";
-import { useAuth } from "@/hooks/use-auth";
+import { createNotification } from "@/actions/notifications";
+import { refundTransaction } from "@/actions/transactions";
+import { useAuthContext } from "@/contexts/auth-context";
 import { Label } from "@/components/ui/label";
 
 export default function AdminRequestsPage() {
-  const { user } = useAuth();
+  const { user: auth } = useAuthContext();
   const [activeTab, setActiveTab] = useState("deposits");
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [actionReason, setActionReason] = useState("");
@@ -51,6 +59,7 @@ export default function AdminRequestsPage() {
   const [isRejecting, setIsRejecting] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   // Data states
   const [deposits, setDeposits] = useState<any[]>([]);
@@ -58,24 +67,51 @@ export default function AdminRequestsPage() {
   const [gameItems, setGameItems] = useState<any[]>([]);
   const [claims, setClaims] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("PENDING");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [statusFilter, searchQuery]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load stats
       const statsData = await getRequestStats();
       setStats(statsData);
 
-      // Load requests by type (you'd need to implement getUserRequests with filters)
-      // For now, we'll use a placeholder
-      // In a real scenario, you'd call getUserRequests with different filters
-      setDeposits([]);
-      setWithdrawals([]);
-      setGameItems([]);
+      const baseFilters = {
+        statuses: statusFilter === "all" ? [] : [statusFilter as any],
+      } as any;
+
+      const [dep, wit, items] = await Promise.all([
+        getRequests({
+          pagination: { page: 1, limit: 50 },
+          filters: { ...baseFilters, types: ["DEPOSIT"] },
+          options: { sortBy: "createdAt", sortOrder: "desc" },
+        }),
+        getRequests({
+          pagination: { page: 1, limit: 50 },
+          filters: { ...baseFilters, types: ["WITHDRAWAL"] },
+          options: { sortBy: "createdAt", sortOrder: "desc" },
+        }),
+        getRequests({
+          pagination: { page: 1, limit: 50 },
+          filters: { ...baseFilters, types: ["GAME_ITEMS"] },
+          options: { sortBy: "createdAt", sortOrder: "desc" },
+        }),
+      ]);
+
+      const q = searchQuery.toLowerCase();
+      const filterSearch = (r: any) =>
+        !q ||
+        r.id.toLowerCase().includes(q) ||
+        (r.paymentMethod?.toLowerCase().includes(q)) ||
+        (r.paymentProvider?.toLowerCase().includes(q));
+
+      setDeposits(dep.data.filter(filterSearch));
+      setWithdrawals(wit.data.filter(filterSearch));
+      setGameItems(items.data.filter(filterSearch));
       setClaims([]);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -86,12 +122,28 @@ export default function AdminRequestsPage() {
   };
 
   const handleApprove = async () => {
-    if (!selectedRequest || !user?.id) return;
+    if (!selectedRequest || !auth?.id) return;
 
     setIsApproving(true);
     try {
-      await approveRequest(selectedRequest.id, user.id, {
-        createTransaction: true,
+      const shouldCreateTx =
+        selectedRequest.type === "DEPOSIT" ||
+        selectedRequest.type === "WITHDRAWAL";
+      await approveRequest(selectedRequest.id, auth?.id, {
+        createTransaction: shouldCreateTx,
+      });
+
+      await createNotification({
+        userId: selectedRequest.userId,
+        title: "Demande approuvée",
+        message:
+          selectedRequest.type === "DEPOSIT"
+            ? "Votre dépôt a été approuvé et crédité."
+            : selectedRequest.type === "WITHDRAWAL"
+            ? "Votre retrait a été approuvé."
+            : "Votre demande d’items a été approuvée.",
+        type: "REQUEST_APPROVED",
+        linkUrl: "/app/(protected)/wallet/transactions",
       });
 
       toast.success("Demande approuvée avec succès");
@@ -107,7 +159,7 @@ export default function AdminRequestsPage() {
   };
 
   const handleReject = async () => {
-    if (!selectedRequest || !user?.id) return;
+    if (!selectedRequest || !auth?.id) return;
     if (!actionReason.trim()) {
       toast.error("Veuillez fournir une raison");
       return;
@@ -115,7 +167,21 @@ export default function AdminRequestsPage() {
 
     setIsRejecting(true);
     try {
-      await rejectRequest(selectedRequest.id, user.id, actionReason);
+      await rejectRequest(selectedRequest.id, auth?.id, actionReason);
+
+      if (selectedRequest.transactionId) {
+        try {
+          await refundTransaction(selectedRequest.transactionId, actionReason);
+        } catch {}
+      }
+
+      await createNotification({
+        userId: selectedRequest.userId,
+        title: "Demande rejetée",
+        message: "Votre demande a été rejetée. Détails dans l’historique.",
+        type: "REQUEST_REJECTED",
+        linkUrl: "/app/(protected)/wallet/transactions",
+      });
 
       toast.success("Demande rejetée");
       setShowRejectDialog(false);
@@ -140,6 +206,11 @@ export default function AdminRequestsPage() {
     setShowRejectDialog(true);
   };
 
+  const openDetailsDialog = (request: any) => {
+    setSelectedRequest(request);
+    setShowDetailsDialog(true);
+  };
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -152,6 +223,35 @@ export default function AdminRequestsPage() {
         </Typography>
       </div>
 
+      <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+        <CardContent className="p-4">
+          <FilterBar
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Rechercher par ID, méthode ou fournisseur..."
+            hasActiveFilters={statusFilter !== "PENDING"}
+            onClearFilters={() => {
+              setStatusFilter("PENDING");
+              setSearchQuery("");
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Label>Statut</Label>
+              <select
+                className="border rounded-md px-2 py-1 text-sm bg-background"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="PENDING">En attente</option>
+                <option value="APPROVED">Approuvées</option>
+                <option value="REJECTED">Rejetées</option>
+                <option value="COMPLETED">Terminées</option>
+                <option value="all">Tous</option>
+              </select>
+            </div>
+          </FilterBar>
+        </CardContent>
+      </Card>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard
@@ -269,6 +369,13 @@ export default function AdminRequestsPage() {
                             >
                               <XCircle className="h-4 w-4 mr-1" />
                               Rejeter
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDetailsDialog(request)}
+                            >
+                              Détails
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -411,6 +518,98 @@ export default function AdminRequestsPage() {
         ]}
         showCloseButton={false}
       />
+
+      {/* Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Détails de la demande</DialogTitle>
+          </DialogHeader>
+          {selectedRequest && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Typography variant="caption1" theme="muted">Type</Typography>
+                  <div className="font-medium">{selectedRequest.type}</div>
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Statut</Typography>
+                  <StatusBadge status={selectedRequest.status} />
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Montant</Typography>
+                  <div className="font-semibold">{selectedRequest.amount} {selectedRequest.currency || 'GTC'}</div>
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Méthode</Typography>
+                  <div>{selectedRequest.paymentMethod || '-'}</div>
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Fournisseur</Typography>
+                  <div>{selectedRequest.paymentProvider || '-'}</div>
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Référence</Typography>
+                  <div className="font-mono text-xs">{selectedRequest.paymentReference || '-'}</div>
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Compte paiement</Typography>
+                  <div className="font-mono text-xs">{selectedRequest.paymentAccountId || '-'}</div>
+                </div>
+                <div>
+                  <Typography variant="caption1" theme="muted">Code confirmation</Typography>
+                  <div className="font-mono text-xs">{selectedRequest.paymentConfirmationCode || '-'}</div>
+                </div>
+              </div>
+
+              {selectedRequest.paymentImage && (
+                <div>
+                  <Typography variant="caption1" theme="muted">Preuve de paiement</Typography>
+                  <img
+                    src={selectedRequest.paymentImage}
+                    alt="Preuve"
+                    className="mt-2 w-full max-h-64 object-cover rounded-lg border"
+                  />
+                </div>
+              )}
+
+              {/* GAME ITEMS details */}
+              {selectedRequest.type === 'GAME_ITEMS' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Typography variant="caption1" theme="muted">Item ID</Typography>
+                    <div className="font-mono text-xs">{selectedRequest.gameItemId || '-'}</div>
+                  </div>
+                  <div>
+                    <Typography variant="caption1" theme="muted">Quantité</Typography>
+                    <div>{selectedRequest.quantity || '-'}</div>
+                  </div>
+                  <div>
+                    <Typography variant="caption1" theme="muted">Total GTC</Typography>
+                    <div>{selectedRequest.totalGtc || '-'}</div>
+                  </div>
+                  <div>
+                    <Typography variant="caption1" theme="muted">Commission</Typography>
+                    <div>{selectedRequest.commission || '0'}</div>
+                  </div>
+                  <div>
+                    <Typography variant="caption1" theme="muted">Compte jeu</Typography>
+                    <div className="font-mono text-xs">{selectedRequest.gameAccount || '-'}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata JSON */}
+              <div>
+                <Typography variant="caption1" theme="muted">Métadonnées</Typography>
+                <pre className="mt-2 bg-muted p-3 rounded-lg text-xs overflow-auto max-h-48">
+                  {JSON.stringify(selectedRequest.paymentMetadata || {}, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

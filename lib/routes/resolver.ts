@@ -288,8 +288,9 @@ export function resolveRoute(
     topMiddle: {
       enabled: routeConfig.topMiddle !== false,
       hideOnScroll: routeConfig.hideTopMiddleOnScroll || false,
-      breadcrumbs,
+      breadcrumbs: routeConfig.breadcrumbs !== false ? breadcrumbs : [],
     },
+    breadcrumbs: routeConfig.breadcrumbs !== false,
     leftBar: {
       enabled: routeConfig.leftBar !== false && layout === "public",
       requireAuth: routeConfig.requireAuth || false,

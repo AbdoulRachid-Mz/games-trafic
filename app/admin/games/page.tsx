@@ -369,6 +369,10 @@ export default function AdminGamesPage() {
 
       {/* Details Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        {/* title */}
+        <DialogTitle className="text-2xl font-bold hidden">
+          Détails de {selectedGame?.name}
+        </DialogTitle>
         <DialogContent className="max-w-7xl p-0 overflow-hidden bg-background border-primary/20">
           {selectedGame && (
             <>

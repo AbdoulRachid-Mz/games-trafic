@@ -1166,6 +1166,10 @@ function buildUserWhereConditions(
     conditions.push(ilike(users.fullName, `%${filters.fullName}%`));
   }
 
+  if (filters.phoneNumber) {
+    conditions.push(ilike(users.phoneNumber, `%${filters.phoneNumber}%`));
+  }
+
   if (filters.country) {
     conditions.push(ilike(users.country, `%${filters.country}%`));
   }

@@ -40,15 +40,24 @@ export function TransactionAmountInput({
   const isWithdrawal = transactionType === "WITHDRAWAL";
   const isTransfer = transactionType === "TRANSFER";
   const isGameItem = transactionType === "GAME_ITEM_PURCHASE";
+  const isVip = transactionType === "VIP_SUBSCRIPTION";
+  const isTournamentParticipation = transactionType === "TOURNAMENT_PARTICIPATION";
 
   // Selon l'utilisateur: seulement requests (deposit/withdrawal), game-items et transfert 
   // ont besoin de champ pour le montant/quantité.
+  const isFixedPrice =
+    isVip ||
+    (!!entity?.price && (isTournamentParticipation || !isGameItem));
+  const itemType =
+    (entity as any)?.metadata?.type?.toString()?.toUpperCase() ||
+    (entity as any)?.type?.toString()?.toUpperCase() ||
+    "";
   const requiresAmountInput =
     isDeposit ||
     isWithdrawal ||
     isTransfer ||
-    isGameItem ||
-    !entity?.price;
+    (isGameItem && (itemType === "COIN" || itemType === "CURRENCY")) ||
+    !isFixedPrice;
 
   const hasSufficientBalance =
     isDeposit ||

@@ -11,6 +11,8 @@ import { FloatingActionButton } from "./FloatingActionButton";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { AIAssistant } from "../shared/chatbot-assistant";
 import type { NavItem, FabAction } from "@/types/routes";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { QrTransaction } from "@/components/transactions/qr-transaction";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -37,6 +39,7 @@ export function MainLayout({
   topMiddle = true,
   leftBar = true,
   rightBar = false,
+  breadcrumbs = true,
   floatingActions = [],
   floatingActiveActionId,
   maintenanceMode = false,
@@ -48,7 +51,13 @@ export function MainLayout({
 }: MainLayoutProps) {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
-  // console.log("shouldExcludeContainer:", shouldExcludeContainer);
+  const [qrOpen, setQrOpen] = useState(false);
+  // console.log("shouldExcludeContainer:", breadcrumbs);
+
+  const topPadding =
+  topMiddle && !shouldExcludeContainer && breadcrumbs
+    ? "pt-20"
+    : "pt-10";
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);
   const closeRight = useCallback(() => setRightOpen(false), []);
@@ -65,7 +74,7 @@ export function MainLayout({
           isSideBarOpen={leftOpen}
           isRightBarOpen={rightOpen}
           hideOnScroll={hideTopMiddleOnScroll}
-          breadcrumbItems={breadcrumbItems}
+          breadcrumbItems={breadcrumbs ? breadcrumbItems : undefined}
         />
       )}
 
@@ -97,48 +106,62 @@ export function MainLayout({
       )}
 
       {/* MAIN CONTENT */}
-      <main className={cn("min-h-screen", topMiddle && !shouldExcludeContainer && "pt-16")}>
-        <Suspense
-          fallback={
-            <div className="flex min-h-[60vh] items-center justify-center">
-              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
-            </div>
-          }
-        >
-          <div
-            className={cn(
-              shouldExcludeContainer ? "mx-auto px-4 lg:px-6 py-6" : 'container mx-auto px-4 lg:px-6 py-6',
-              topMiddle && !shouldExcludeContainer && "pt-16"
-            )}
-          >
-            {maintenanceMode ? (
-              <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-                <h2 className="mb-2 text-2xl font-bold">Mode maintenance</h2>
-                <p className="text-muted-foreground">
-                  Veuillez réessayer plus tard.
-                </p>
-              </div>
-            ) : (
-              children
-            )}
-          </div>
-        </Suspense>
 
-        {footer && !shouldExcludeContainer && <Footer />}
-      </main>
+<main className={cn("min-h-screen", topPadding)}>
+  <Suspense
+    fallback={
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+      </div>
+    }
+  >
+    <div
+      className={cn(
+        "mx-auto px-3 lg:px-4",
+        shouldExcludeContainer ? "py-4" : "py-2"
+      )}
+    >
+      {maintenanceMode ? (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+          <h2 className="mb-2 text-2xl font-bold">Mode maintenance</h2>
+          <p className="text-muted-foreground">
+            Veuillez réessayer plus tard.
+          </p>
+        </div>
+      ) : (
+        children
+      )}
+    </div>
+  </Suspense>
+
+  {footer && !shouldExcludeContainer && <Footer />}
+</main>
+
 
       {/* Floating Action Button avec dock */}
-      {!shouldExcludeContainer && (
+      {!shouldExcludeContainer && (floatingActions.length > 0 || floatingDockLinks.length > 0) && (
         <FloatingActionButton
-          actions={floatingActions}
+          actions={floatingActions.map((a) =>
+            a.id === "qr-scanner"
+              ? { ...a, action: () => setQrOpen(true) }
+              : a
+          )}
           activeActionId={floatingActiveActionId}
           isFixed={true}
           navItems={floatingDockLinks}
         />
       )}
 
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="sm:max-w-2xl bg-background/95 backdrop-blur-2xl border-border/50 rounded-[2rem] p-0 overflow-hidden">
+          <div className="p-6">
+            <QrTransaction />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* AI assistant */}
-      {!shouldExcludeContainer && showAIAssistant && <AIAssistant />}
+      {/* {!shouldExcludeContainer && showAIAssistant && <AIAssistant />} */}
     </div>
   );
 }

@@ -68,9 +68,22 @@ export async function getTournamentEditionWithRelations(
         phases: {
           orderBy: (phases, { asc }) => [asc(phases.order)],
           with: {
-            groups: true,
-          }
-        }
+            groups: {
+              orderBy: (groups, { asc }) => [asc(groups.order)],
+              with: {
+                bracketNodes: true,
+                participants: {
+                  with: {
+                    registration: true,
+                  },
+                },
+              },
+            },
+            bracketNodes: true,
+            matches: true,
+          },
+        },
+        matches: true,
       },
     });
 
