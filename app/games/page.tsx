@@ -59,12 +59,12 @@ function GamesContent() {
       {/* Hero Section */}
       <GamesHero searchQuery={searchQuery} onSearch={setSearchQuery} />
 
-      <div className="container mx-auto px-4 py-8 md:py-12">
+      <div className="container mx-auto px-3 py-4 md:py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar - Desktop only */}
           {!isSmallScreen && (
             <div className="lg:col-span-1">
-              <div className="sticky top-24">
+              <div className="sticky top-20">
                 <GamesFilterSidebar
                   filters={filters}
                   updateFilter={updateFilter}
@@ -76,7 +76,7 @@ function GamesContent() {
           )}
 
           {/* Main Content Area */}
-          <div className="lg:col-span-3 space-y-6 md:space-y-8">
+          <div className="lg:col-span-3 space-y-4 md:space-y-6">
             {/* Control Bar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card border border-border p-4 rounded-2xl shadow-sm">
               <div className="flex items-center gap-3">
