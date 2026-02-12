@@ -20,6 +20,7 @@ export function FollowersList({ userId, currentUserId }: FollowersListProps) {
     userId,
     "USER",
     { types: ["FOLLOW"] },
+    { page: 1, limit: 20 },
     { populate: ["user"] }
   );
 

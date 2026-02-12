@@ -86,11 +86,15 @@ export function useEntityInteractionsWithRelations(
   entityId: string,
   entityType: string,
   filters?: InteractionFilters,
+  pagination?: { page: number; limit: number },
   options?: QueryOptions
 ) {
   return useQuery<InteractionWithRelations[]>({
-    queryKey: QUERY_KEYS.entityInteractions(entityId, entityType, filters),
-    queryFn: () => getEntityInteractionsWithRelations(entityId, entityType, filters, options),
+    queryKey: [...QUERY_KEYS.entityInteractions(entityId, entityType, filters), pagination, options],
+    queryFn: async () => {
+      const res = await getEntityInteractionsWithRelations(entityId, entityType, filters, pagination, options);
+      return res.data;
+    },
     enabled: !!entityId && !!entityType,
   });
 }
