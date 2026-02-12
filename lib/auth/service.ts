@@ -6,6 +6,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { AuthErrorHandler } from './errors';
 import { getProfile, getMyProfile } from '@/actions/users';
+import { getAppUrlEnv } from '@/utils/app-url';
 
 // Définition des types basés sur le schéma
 export interface AuthResponse {
@@ -173,7 +174,7 @@ export class AuthService {
       const result = await auth.api.requestPasswordReset({
         body: {
           email,
-          redirectTo: `${process.env.NEXTAUTH_URL}/reset-password`,
+          redirectTo: `${getAppUrlEnv()}/reset-password`,
         },
       });
 
@@ -238,7 +239,7 @@ export class AuthService {
       const result = await auth.api.signInSocial({
         body: {
           provider,
-          callbackURL: `${process.env.NEXTAUTH_URL}/api/auth/callback/${provider}`,
+          callbackURL: `${getAppUrlEnv()}/api/auth/callback/${provider}`,
         },
       });
 
@@ -346,7 +347,7 @@ export class AuthService {
       const result = await auth.api.sendVerificationEmail({
         body: {
           email,
-          callbackURL: `${process.env.NEXTAUTH_URL}/verify-email`,
+          callbackURL: `${getAppUrlEnv()}/verify-email`,
         },
       });
 

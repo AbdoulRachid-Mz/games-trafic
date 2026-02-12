@@ -260,7 +260,7 @@ export function LoginForm({
 
               <FieldDescription className="text-center">
                 Vous n'avez pas de compte ?{" "}
-                <Link href="/signup" className="underline">
+                <Link href="/sign-up" className="underline">
                   S'inscrire
                 </Link>
               </FieldDescription>

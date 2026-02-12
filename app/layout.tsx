@@ -12,6 +12,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { DisableSWInDev } from "@/components/pwa/disable-sw-in-dev";
 // import { TooltipProvider } from "@/providers/tooltip-provider";
 import { Toaster } from "sonner";
+import { getAppUrlEnv } from "@/utils/app-url";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
   description:
     "Games Trafics is a platform that helps you track your games trafic",
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    getAppUrlEnv(),
   ),
 };
 

@@ -1,10 +1,8 @@
 // lib/api.ts
+import { getAppUrlEnv } from "@/utils/app-url";
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3000" ||
-  "http://localhost:3001";
+export const API_BASE_URL = getAppUrlEnv();
 
 class ApiService {
   private static instance: ApiService;
