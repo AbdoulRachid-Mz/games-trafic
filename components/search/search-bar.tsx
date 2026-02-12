@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge"
 import { debounce } from "lodash"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import Image from "next/image"
 
 type SearchType = "products" | "shops" | "tournaments" | "all"
 
@@ -235,10 +236,11 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
                                   className="flex items-center gap-2"
                                 >
                                   {result.image ? (
-                                    <div className="h-8 w-8 rounded overflow-hidden bg-muted">
-                                      <img
+                                    <div className="h-8 w-8 relative rounded overflow-hidden bg-muted">
+                                      <Image
                                         src={result.image || "/placeholder.svg"}
                                         alt={result.title}
+                                        fill={true}
                                         className="h-full w-full object-cover"
                                       />
                                     </div>
@@ -290,10 +292,11 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
                                   className="flex items-center gap-2"
                                 >
                                   {result.image ? (
-                                    <div className="h-8 w-8 rounded overflow-hidden bg-muted">
-                                      <img
+                                    <div className="h-8 w-8 relative rounded overflow-hidden bg-muted">
+                                      <Image
                                         src={result.image || "/placeholder.svg"}
                                         alt={result.title}
+                                        fill={true}
                                         className="h-full w-full object-cover"
                                       />
                                     </div>
@@ -323,10 +326,11 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
                               className="flex items-center gap-2"
                             >
                               {result.image ? (
-                                <div className="h-8 w-8 rounded overflow-hidden bg-muted">
-                                  <img
+                                <div className="h-8 w-8 relative rounded overflow-hidden bg-muted">
+                                  <Image
                                     src={result.image || "/placeholder.svg"}
                                     alt={result.title}
+                                    fill={true}
                                     className="h-full w-full object-cover"
                                   />
                                 </div>

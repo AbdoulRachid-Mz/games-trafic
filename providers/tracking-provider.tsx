@@ -1,6 +1,6 @@
 import { AutoTracker } from "@/components/tracking/auto-tracker";
 import { TracingProvider } from "@/contexts/tracing-context";
-import React from "react";
+import React, { Suspense } from "react";
 
 interface Props {
   children: React.ReactNode;
@@ -16,11 +16,13 @@ const TrackingProviders = ({ children }: Props) => {
         redirectFirstTimeUsers: true,
       }}
     >
-      <AutoTracker
-        trackQueryParams={true}
-        trackScrollDepth={false}
-        trackClicks={false}
-      />
+      <Suspense fallback={null}>
+        <AutoTracker
+          trackQueryParams={true}
+          trackScrollDepth={false}
+          trackClicks={false}
+        />
+      </Suspense>
       {children}
     </TracingProvider>
   );
