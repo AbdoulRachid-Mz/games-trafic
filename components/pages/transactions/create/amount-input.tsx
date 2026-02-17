@@ -22,6 +22,7 @@ interface TransactionAmountInputProps {
   };
   transactionType: TransactionType;
   entity?: TransactionEntity;
+  alreadyVip?: boolean;
   onContinue: () => void;
   onBack: () => void;
 }
@@ -33,9 +34,11 @@ export function TransactionAmountInput({
   fees,
   transactionType,
   entity,
+  alreadyVip,
   onContinue,
   onBack,
 }: TransactionAmountInputProps) {
+  const [qty, setQty] = React.useState<number>(1);
   const isDeposit = transactionType === "DEPOSIT";
   const isWithdrawal = transactionType === "WITHDRAWAL";
   const isTransfer = transactionType === "TRANSFER";
@@ -43,8 +46,6 @@ export function TransactionAmountInput({
   const isVip = transactionType === "VIP_SUBSCRIPTION";
   const isTournamentParticipation = transactionType === "TOURNAMENT_PARTICIPATION";
 
-  // Selon l'utilisateur: seulement requests (deposit/withdrawal), game-items et transfert 
-  // ont besoin de champ pour le montant/quantité.
   const isFixedPrice =
     isVip ||
     (!!entity?.price && (isTournamentParticipation || !isGameItem));
@@ -58,6 +59,9 @@ export function TransactionAmountInput({
     isTransfer ||
     (isGameItem && (itemType === "COIN" || itemType === "CURRENCY")) ||
     !isFixedPrice;
+  const requiresQuantity =
+    isGameItem && !(itemType === "COIN" || itemType === "CURRENCY");
+  const unitPrice = entity?.price || 0;
 
   const hasSufficientBalance =
     isDeposit ||
@@ -67,23 +71,35 @@ export function TransactionAmountInput({
     ? [500, 1000, 5000, 10000]
     : transactionType === "TRANSFER"
       ? [100, 500, 1000, 2000]
-      : [];
+      : requiresQuantity
+        ? [1, 5, 10]
+        : [];
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-8">
       <div className="text-center">
         <Typography variant="h3" weight="bold">
-          {requiresAmountInput ? "Quel montant ?" : "Confirmer l'achat"}
+          {requiresQuantity ? "Quelle quantité ?" : requiresAmountInput ? "Quel montant ?" : "Confirmer l'achat"}
         </Typography>
         <Typography variant="body-base" theme="muted">
           {isDeposit
             ? "Saisissez le montant à recharger"
-            : "Saisissez le montant de la transaction"}
+            : requiresQuantity
+              ? "Saisissez la quantité à acheter"
+              : "Saisissez le montant de la transaction"}
         </Typography>
       </div>
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden">
         <CardContent className="p-8">
+          {isVip && alreadyVip && (
+            <div className="mb-6 p-4 rounded-xl border border-amber-300/40 bg-amber-200/15">
+              <Typography variant="body-base" className="font-bold text-amber-700">
+                Vous êtes déjà VIP. Veuillez attendre l’expiration pour renouveler.
+              </Typography>
+            </div>
+          )}
+
           {entity && (
             <div className="mb-8 p-4 bg-primary/5 rounded-xl border border-primary/10 flex items-center justify-between">
               <div>
@@ -114,24 +130,39 @@ export function TransactionAmountInput({
             </div>
           )}
 
-          {requiresAmountInput && (
+          {(requiresAmountInput || requiresQuantity) && (
             <div className="space-y-8">
               <div className="relative flex justify-center py-4">
                 <div className="relative">
                   <Input
                     id="amount"
                     type="number"
-                    placeholder="0.00"
-                    value={amount || ""}
-                    onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                    placeholder={requiresQuantity ? "0" : "0.00"}
+                    value={
+                      requiresQuantity && unitPrice > 0
+                        ? Math.max(0, Math.round((amount || 0) / unitPrice))
+                        : amount || ""
+                    }
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0;
+                      if (requiresQuantity) {
+                        const total = Math.max(0, v) * unitPrice;
+                        setQty(Math.max(0, v));
+                        onChange(total);
+                      } else {
+                        onChange(v);
+                      }
+                    }}
                     className="text-6xl font-black h-24 text-center border-none bg-transparent focus-visible:ring-0 shadow-none p-0 w-full min-w-[200px] max-w-[400px]"
                     min="0"
-                    step="0.01"
+                    step={requiresQuantity ? "1" : "0.01"}
                     autoFocus
                   />
-                  <span className="absolute top-1/2 -right-12 -translate-y-1/2 text-2xl font-bold text-muted-foreground">
-                    GTC
-                  </span>
+                  {!requiresQuantity && (
+                    <span className="absolute top-1/2 -right-12 -translate-y-1/2 text-2xl font-bold text-muted-foreground">
+                      GTC
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -140,15 +171,25 @@ export function TransactionAmountInput({
                   {quickAmounts.map((quickAmount) => (
                     <button
                       key={quickAmount}
-                      onClick={() => onChange(quickAmount)}
+                      onClick={() => {
+                        if (requiresQuantity) {
+                          const total = quickAmount * unitPrice;
+                          setQty(quickAmount);
+                          onChange(total);
+                        } else {
+                          onChange(quickAmount);
+                        }
+                      }}
                       className={cn(
                         "px-4 py-2 rounded-full text-sm font-bold transition-all border",
-                        amount === quickAmount
+                        (requiresQuantity
+                          ? Math.max(0, Math.round((amount || 0) / unitPrice))
+                          : amount) === quickAmount
                           ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25"
                           : "bg-card/50 border-border hover:border-primary/50 hover:bg-card/80"
                       )}
                     >
-                      {quickAmount} GTC
+                      {requiresQuantity ? quickAmount : `${quickAmount} GTC`}
                     </button>
                   ))}
                 </div>
@@ -163,7 +204,7 @@ export function TransactionAmountInput({
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Montant</span>
               <span className="font-bold">
-                {(entity?.price || amount || 0).toFixed(2)} GTC
+                {(amount || 0).toFixed(2)} GTC
               </span>
             </div>
             {fees.percentage > 0 && (
@@ -234,7 +275,8 @@ export function TransactionAmountInput({
           disabled={
             (!amount && !entity?.price) ||
             (amount <= 0 && !entity?.price) ||
-            !hasSufficientBalance
+            !hasSufficientBalance ||
+            (isVip && !!alreadyVip)
           }
           className="flex-1 h-12 gap-2 text-base font-bold rounded-xl shadow-lg shadow-primary/20"
         >

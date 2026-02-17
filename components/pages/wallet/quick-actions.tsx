@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import React from "react";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
@@ -15,18 +16,29 @@ import {
   Settings,
   Shield,
   Zap,
+  ShoppingBag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface QuickActionsProps {
   walletId: string;
 }
+interface QuickAction {
+  id: string;
+  icon: React.ComponentType<{ className?: string }>; label: string;
+  path?: string;
+  description: string;
+  color: string;
+  iconColor: string;
+  variant: "default" | "outline";
+}
 
-const actions = [
+const actions: QuickAction[] = [
   {
     id: "deposit",
     icon: ArrowDownLeft,
     label: "Dépôt",
+    path: "/transactions/create?type=DEPOSIT",
     description: "Recharger",
     color: "from-green-500 to-emerald-700",
     iconColor: "text-green-400",
@@ -36,6 +48,7 @@ const actions = [
     id: "withdraw",
     icon: ArrowUpRight,
     label: "Retrait",
+    path: "/transactions/create?type=WITHDRAWAL",
     description: "Vers compte",
     color: "from-red-500 to-rose-700",
     iconColor: "text-red-400",
@@ -45,24 +58,27 @@ const actions = [
     id: "transfer",
     icon: Send,
     label: "Envoi",
+    path: "/transactions/create?type=TRANSFER",
     description: "P2P Rapide",
     color: "from-blue-500 to-indigo-700",
     iconColor: "text-blue-400",
     variant: "outline" as const,
   },
   {
-    id: "pay",
-    icon: CreditCard,
-    label: "Payer",
-    description: "Services",
+    id: "Achat comptes",
+    icon: ShoppingBag,
+    label: "Achat de comptes",
+    path: "/transactions/create?type=PRODUCT_PURCHASE",
+    description: "Achat de comptes ",
     color: "from-purple-500 to-violet-700",
     iconColor: "text-purple-400",
     variant: "outline" as const,
   },
   {
-    id: "receive",
+    id: "scan",
     icon: QrCode,
-    label: "Reçevoir",
+    label: "Scanner",
+    path: "/transactions/create?type=QR_SCAN",
     description: "Via QR Code",
     color: "from-amber-500 to-orange-700",
     iconColor: "text-amber-400",
@@ -80,6 +96,8 @@ const actions = [
 ];
 
 export function QuickActions({ walletId }: QuickActionsProps) {
+  const router = useRouter();
+
   return (
     <div className="relative">
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-purple-500/5 rounded-3xl blur-3xl" />
@@ -114,6 +132,7 @@ export function QuickActions({ walletId }: QuickActionsProps) {
                 transition={{ delay: index * 0.05 }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => action.path && router.push(action.path)}
                 className="group relative flex flex-col items-center justify-center p-4 h-32 rounded-2xl bg-gradient-to-b from-white/5 to-white/0 border border-white/5 hover:border-white/10 transition-all duration-300 overflow-hidden"
               >
                 {/* Hover Gradient Background */}
@@ -130,8 +149,12 @@ export function QuickActions({ walletId }: QuickActionsProps) {
                     "border border-white/5 group-hover:border-white/20"
                   )}
                 >
-                  <action.icon className={cn("w-6 h-6", action.iconColor)} />
+                  {(() => {
+                    const Icon = action.icon;
+                    return <Icon className={cn("w-6 h-6", action.iconColor)} />;
+                  })()}
                 </div>
+
 
                 <div className="relative text-center z-10">
                   <span className="block text-sm font-bold text-foreground/90 group-hover:text-foreground transition-colors">

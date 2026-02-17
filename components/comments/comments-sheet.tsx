@@ -22,8 +22,8 @@ export function CommentsSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
-        side="bottom" 
-        className="h-[85vh] rounded-t-3xl border-t border-white/10 bg-[#0a0a0b]"
+        side="right" 
+        className="h-[85vh] w-[85%] md:w-[300px] rounded-t-3xl border-t border-white/10 bg-[#0a0a0b]"
       >
         <SheetHeader className="pb-4 border-b border-white/5">
           <SheetTitle className="text-white flex items-center gap-2">

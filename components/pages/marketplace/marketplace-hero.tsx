@@ -96,22 +96,23 @@ export function MarketplaceHero({ searchQuery, isFilterOpen, toggleFilter, onSea
             >
               <div className="relative bg-card border rounded-2xl p-2">
                 <div className="flex items-center gap-2">
-                  <Search className="ml-4 h-5 w-5 text-muted-foreground" />
                   <Input
                     placeholder="Rechercher un jeu, un rang, une plateforme..."
                     value={searchQuery}
                     onChange={(e) => onSearch(e.target.value)}
-                    className="flex-1 border-0 bg-transparent placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-0 text-lg h-12"
-                  />
-                  <Button className="h-12 px-2 rounded-xl">
-                    Rechercher
+                    className="flex-1 border-0 bg-transparent placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-0 text-lg h-10 md:h-12"
+                    />
+                  <Button className="h-10 md:h-12 px-2 rounded-xl gap-3 flex items-center justify-center">
+                    <span className="hidden md:inline-block">Rechercher</span>
+                    <Search className="h-10 w-10 md:h-12 md:w-12 text-white" />
                   </Button>
                   <Button
                     onClick={toggleFilter}
                     variant="outline"
                     className="h-12 p-3 flex justify-center items-center rounded-xl sm:hidden"
                   >
-                    <Filter className="h-5 w-5 mr-2" />
+                    <Filter className="h-5 w-5" />
+                    <span className="hidden md:inline-block">Filtrer</span>
                     {/* Filtrer */}
                   </Button>
                 </div>

@@ -224,6 +224,7 @@ export interface RecentActivity {
   color: string;
 }
 
+
 // ============================================================================
 // FONCTIONS D'AIDE
 // ============================================================================
@@ -438,12 +439,16 @@ export async function getGlobalStats(
       // Wallet
       db
         .select({
-          total_balance: sum(userWallets.balance),
+          total_balance: sql<number>`(
+            SELECT coalesce(sum(le.credit) - sum(le.debit), 0) 
+            FROM ledger_entries le 
+            JOIN financial_accounts fa ON le.account_id = fa.id 
+            WHERE fa.type = 'USER_WALLET'
+          )`,
           total_transactions: count(),
           total_volume: sum(walletTransactions.amount),
         })
         .from(walletTransactions)
-        .leftJoin(userWallets, eq(walletTransactions.walletId, userWallets.id))
         .where(buildWhereConditions(filters, walletTransactions)),
 
       // VIP Subscriptions

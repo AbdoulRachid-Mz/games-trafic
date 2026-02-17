@@ -7,6 +7,7 @@ import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
+  Sidebar,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Typography } from "@/components/ui/typography";
@@ -26,6 +27,7 @@ import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "../layout/ThemeToggle";
 import { useScreenSize } from "@/hooks/use-screen";
+ 
 
 interface EnhancedDashboardProps {
   children: React.ReactNode;
@@ -55,7 +57,9 @@ export function EnhancedDashboard({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <div className={cn("flex min-h-screen w-full", className)}>
-        {sidebar}
+        <Sidebar collapsible="icon" variant="sidebar" className="md:block">
+          {sidebar}
+        </Sidebar>
         <SidebarInset className="flex-1">
           {header}
           <main className="flex-1 p-4 max-md:p-3 max-md:space-y-4 space-y-3">
@@ -597,6 +601,9 @@ interface DashboardHeaderProps {
   actions?: React.ReactNode;
   showSidebarTrigger?: boolean;
   className?: string;
+  onNotificationButtonClick?: () => void;
+  notificationCount?: number;
+  children?: React.ReactNode;
 }
 
 export function DashboardHeader({
@@ -605,6 +612,9 @@ export function DashboardHeader({
   actions,
   showSidebarTrigger = true,
   className,
+  onNotificationButtonClick,
+  notificationCount,
+  children,
 }: DashboardHeaderProps) {
   return (
     <header
@@ -628,10 +638,17 @@ export function DashboardHeader({
       </div>
 
       <div className="flex items-center gap-4">
-        {actions || (
-          <Button variant="outline" size="sm">
+        {children}
+        {actions}
+        {onNotificationButtonClick && (
+          <Button variant="outline" size="sm" onClick={onNotificationButtonClick} className="relative">
             <Bell className="h-4 w-4 mr-2" />
             Notifications
+            {typeof notificationCount === "number" && notificationCount > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] h-4 min-w-4 px-1">
+                {notificationCount}
+              </span>
+            )}
           </Button>
         )}
         <ThemeToggle />
@@ -673,7 +690,7 @@ export function SidebarContainer({
 
   return (
     <div
-      className={cn("flex flex-col h-full", getBackgroundStyles(), className)}
+      className={cn("flex flex-col h-full overflow-y-auto", getBackgroundStyles(), className)}
     >
       {children}
     </div>

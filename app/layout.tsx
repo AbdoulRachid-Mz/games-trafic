@@ -13,6 +13,7 @@ import { DisableSWInDev } from "@/components/pwa/disable-sw-in-dev";
 // import { TooltipProvider } from "@/providers/tooltip-provider";
 import { Toaster } from "sonner";
 import { getAppUrlEnv } from "@/utils/app-url";
+import { ExplanationManager } from "@/components/onboarding/explanation-manager";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -29,7 +30,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Games Trafics",
   description:
-    "Games Trafics is a platform that helps you track your games trafic",
+    "Games Trafics est une plateforme qui vous aide à suivre le trafic de vos jeux",
   metadataBase: new URL(
     getAppUrlEnv(),
   ),
@@ -63,6 +64,7 @@ export default function RootLayout({
             <AuthProvider>
               <PWAProvider>
                 <TrackingProviders>
+                  <ExplanationManager />
                   <AppProvider>
                     <AppShell>{children}</AppShell>
                   </AppProvider>

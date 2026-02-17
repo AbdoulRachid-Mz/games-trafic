@@ -1,356 +1,170 @@
-🔹 CONTEXTE GÉNÉRAL
+Nous devons refactorer complètement l’architecture financière de l’application pour adopter un modèle comptable basé sur un ledger (double entrée).
 
-Tu es un architecte produit et UX spécialisé dans les plateformes de tournois e-sport (type Challengermode, Toornament, Battlefy).
+Objectif :
 
-Le système existe déjà pour la gestion des tournois.
+financial_accounts devient le wallet universel
 
-Ta mission est de concevoir la gestion cohérente et flexible des ÉDITIONS, incluant :
+ledger_entries devient la source de vérité des soldes
 
-Phases
+user_wallets devient uniquement une couche de sécurité / KYC
 
-Groupes
+wallet_transactions reste l’historique visible utilisateur
 
-Brackets (arbre)
+Supprimer toute dépendance au champ balance comme source de vérité
 
-Matches
+🧱 ÉTAPE 1 — Corriger la structure des relations
 
-Résultats
+financial_accounts devient l’unique entité représentant un wallet.
 
-Le modèle de données existe déjà (tournamentEditions, tournamentPhases, phaseGroups, bracketNodes, matches, editionResults, etc.).
+Un wallet peut appartenir à :
 
-🔹 OBJECTIFS PRODUIT
+un user (ownerUserId)
 
-Permettre aux organisateurs :
+une shop (ownerShopId)
 
-de gérer manuellement ou automatiquement :
+un tournoi (via metadata si nécessaire)
 
-phases
+la plateforme
 
-groupes
+Le champ type détermine la nature du wallet :
+USER_WALLET
+SHOP_WALLET
+TOURNAMENT_POOL
+PLATFORM_ESCROW
+PLATFORM_FEES
+SYSTEM_ADJUSTMENT
 
-brackets
+ledger_entries
 
-matches
+Chaque mouvement financier doit créer AU MOINS deux entrées :
 
-de sélectionner les participants selon leur statut :
+un débit
 
-tous
+un crédit
 
-qualifiés
+Le solde réel d’un wallet = SUM(credit - debit)
 
-éliminés
+user_wallets
 
-non éliminés
+Devient une extension de sécurité liée à un wallet financier
 
-seedés
+Ajouter financialAccountId
 
-de créer d’abord une structure vide (phase / groupe / bracket),
-puis ajouter les participants plus tard
+Supprimer balance ou le garder uniquement comme cache
 
-d’utiliser des librairies internes pour :
+Contient uniquement :
 
-générer automatiquement les groupes
+pinHash
 
-générer les brackets
+KYC
 
-générer les matches (single match, BO3, aller-retour, etc.)
+failedAttempts
 
-Permettre aux participants / visiteurs :
+verrouillage
 
-de consulter facilement :
+wallet_transactions
 
-la phase active
+Doit référencer financialAccountId
 
-le groupe actif
+Ne doit pas être utilisé pour calculer les soldes
 
-le bracket actif
+Sert uniquement d’historique utilisateur
 
-les résultats en temps réel
+Supprimer toute logique métier qui modifie directement un champ balance.
 
-de comprendre rapidement :
+🧮 ÉTAPE 2 — Corriger les filtres et requêtes
 
-qui joue contre qui
+Toute récupération de solde doit utiliser :
 
-qui est qualifié
+SUM(credit - debit)
+FROM ledger_entries
+WHERE account_id = ?
 
-qui est éliminé
+Les requêtes de transactions utilisateur doivent :
 
-le classement du groupe
+passer par son financial account
 
-l’avancement global de l’édition
+filtrer proprement par ownerUserId
 
-🔹 RÈGLES FONCTIONNELLES CLÉS
-1️⃣ Logique d’activation (très importante)
+Vérifier toutes les jointures :
 
-À tout moment :
+éviter les dépendances directes sur user_wallets.balance
 
-1 phase active par édition
+utiliser financial_accounts comme pivot principal
 
-1 groupe actif par phase
+⚙️ ÉTAPE 3 — Corriger les Server Actions & API
 
-1 bracket actif par phase (si applicable)
+Créer une fonction transaction atomique :
 
-Dans la page Edition Detail :
+executeTransaction({
+fromAccountId,
+toAccountId,
+amount,
+type,
+metadata
+})
 
-afficher en priorité les entités actives
+Cette fonction doit :
 
-sinon afficher les dernières entités créées
+Ouvrir une transaction DB
 
-2️⃣ Cycle de vie d’une édition
+Vérifier que le solde est suffisant (via ledger sum)
 
-Création de l’édition
+Créer :
 
-Inscriptions / check-in
+une ledger entry débit
 
-Création des phases
+une ledger entry crédit
 
-Pour chaque phase :
+Créer un wallet_transaction pour affichage
 
-création des groupes OU brackets
+Commit
 
-ajout ou génération des participants
+Rollback si erreur
 
-génération automatique des matches
+Aucune autre action serveur ne doit modifier les soldes directement.
 
-Saisie des scores (manuelle ou auto)
+🖥️ ÉTAPE 4 — Corriger composants & pages
 
-Synchronisation :
+Toutes les pages affichant un solde doivent :
 
-stats groupes
+appeler une fonction getWalletBalance(accountId)
 
-qualifications
+ne jamais lire un champ balance directement
 
-arbre (bracket)
+Les dashboards shop/tournoi doivent :
 
-Calcul automatique des résultats finaux
+récupérer leur financial_account
 
-Publication des résultats
+calculer les soldes via ledger
 
-🔹 PHASES – CONCEPTION
+Supprimer toute logique front qui dépend d’un champ balance stocké.
 
-Chaque phase peut être :
+🛡️ RÈGLES IMPORTANTES
 
-ROUND_ROBIN
+Le ledger est la seule source de vérité.
 
-ELIMINATION_SIMPLE
+Aucun update direct de balance.
 
-DOUBLE_ELIMINATION
+Toute opération financière passe par une transaction atomique.
 
-SWISS
+Les comptes financiers sont indépendants des users.
 
-MIXTE
+Les shops et tournois ont leurs propres wallets.
 
-Chaque phase doit permettre :
+Objectif final :
+Obtenir une architecture financière scalable, cohérente et prête pour des paiements réels.
 
-configuration du format
+🔥 Pourquoi ce prompt est bon
 
-configuration du seeding
+Il :
 
-auto-génération ou gestion manuelle
+définit la vision
 
-planification (dates, durée des matchs)
+sépare les étapes
 
-🔹 GROUPES – CONCEPTION
+empêche les erreurs
 
-Les groupes servent à :
+structure la migration
 
-afficher les tables de classement
-
-calculer automatiquement :
-
-points
-
-positions
-
-qualifications
-
-Fonctionnalités attendues :
-
-création manuelle ou auto
-
-ajout de participants après coup
-
-verrouillage du groupe
-
-recalcul automatique du classement après chaque match
-
-🔹 BRACKETS – CONCEPTION
-
-Les brackets doivent :
-
-être générés automatiquement selon :
-
-nombre de participants
-
-simple / double élimination
-
-BO1 / BO3 / aller-retour
-
-supporter :
-
-BYE
-
-propagation automatique des gagnants/perdants
-
-se mettre à jour dès qu’un match est validé
-
-🔹 MATCHES – CONCEPTION
-
-Les matches sont la source de vérité.
-
-Fonctionnalités :
-
-génération automatique depuis groupes ou brackets
-
-saisie manuelle des scores
-
-validation par :
-
-participants
-
-admin
-
-gestion des litiges
-
-recalcul automatique :
-
-stats du groupe
-
-avancée du bracket
-
-qualification
-
-🔹 RÉSULTATS – CONCEPTION
-
-Les résultats doivent :
-
-être calculés automatiquement
-
-être synchronisés depuis :
-
-les matches
-
-les groupes
-
-les brackets
-
-produire :
-
-classement final
-
-podium
-
-récompenses
-
-statistiques globales
-
-🔹 UX – PAGE "EDITION DETAIL"
-🧩 Structure recommandée
-
-Header
-
-Nom de l’édition
-
-Statut (UPCOMING / LIVE / COMPLETED)
-
-Progression (%)
-
-Navigation interne (tabs ou segments)
-
-Overview
-
-Phases
-
-Groups
-
-Bracket
-
-Matches
-
-Results
-
-🔍 Comportement intelligent
-
-Afficher automatiquement :
-
-phase active
-
-groupe actif
-
-bracket actif
-
-Fallback sur les dernières données créées
-
-🔹 DASHBOARD ORGANISATEUR (édition)
-
-Le dashboard doit permettre :
-
-visualisation globale de l’édition
-
-gestion par étapes (wizard possible)
-
-actions rapides :
-
-générer groupes
-
-générer bracket
-
-générer matches
-
-recalculer résultats
-
-logs et état de synchronisation
-
-🔹 AUTOMATISATION & LIBS INTERNES
-
-Définir des librairies capables de :
-
-distribuer les participants aléatoirement ou par seed
-
-générer automatiquement :
-
-groupes
-
-brackets
-
-matches
-
-recalculer les données sans casser l’existant
-
-🔹 TECHNICAL CONSTRAINTS
-
-The system must be:
-
-modular
-
-idempotent (recalcul possible)
-
-Tolerant of manual updates
-
-No recalculation should break the history
-
-Stats should remain consistent between:
-
-matches
-
-Groups
-
-Final Results
-
-🔹 EXPECTED DELIVERABLE
-
-A clear product vision
-
-Understandable UX logic
-
-A consistent flow for organizers and attendees
-
-A solid foundation for implementing:
-
-pages
-
-Components
-
-services
-
-Auto-Generation Libraries
+évite de casser le front trop tôt

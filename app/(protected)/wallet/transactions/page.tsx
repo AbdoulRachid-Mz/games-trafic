@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/auth-context";
 import { Typography } from "@/components/ui/typography";
@@ -12,11 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 // import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  Filter, 
-  Search, 
+import {
+  ArrowUpRight,
+  ArrowDownLeft,
+  Filter,
+  Search,
   Download,
   Plus,
   RefreshCw,
@@ -34,12 +34,15 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useUserProfile } from "@/hooks/use-profile";
+import { getWalletLedgerStats } from "@/actions/wallets";
+import { getWalletTransactions as getWalletTransactionsAction } from "@/actions/transactions";
+import type { WalletTransaction } from "@/database/schema";
 
 export default function TransactionsPage() {
   const router = useRouter();
   const { user } = useAuthContext();
   const { data: completeData } = useUserProfile(!!user?.id);
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     total: 0,
@@ -74,21 +77,30 @@ export default function TransactionsPage() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const queryParams = new URLSearchParams();
-      if (!wallet?.id) {
-        console.warn("Wallet is undefined; skipping walletId query param.");
-        return;
+      if (!wallet?.id) return;
+      const types = filters.type !== "all" ? [filters.type] : undefined;
+      const statuses = filters.status !== "all" ? [filters.status] : undefined;
+      const startDate = filters.dateRange.from ? (filters.dateRange.from as Date).toISOString() : undefined;
+      const endDate = filters.dateRange.to ? (filters.dateRange.to as Date).toISOString() : undefined;
+      const data = await getWalletTransactionsAction(wallet.id, {
+        filters: {
+          types: types as ("PURCHASE" | "VIP_SUBSCRIPTION" | "GAME_ITEM_PURCHASE" | "THEME_PURCHASE" | "DEPOSIT" | "WITHDRAWAL" | "REFUND" | "TRANSFER" | "ORDER_PURCHASE" | "TOURNAMENT_PARTICIPATION")[] | undefined,
+          statuses: statuses as ("PENDING" | "COMPLETED" | "PROCESSING" | "FAILED" | "REFUNDED")[] | undefined,
+          startDate,
+          endDate
+        },
+        pagination: { page: 1, limit: 50 },
+        options: { sortBy: "createdAt", sortOrder: "desc" }
+      });
+      let list: WalletTransaction[] = data.data || [];
+      if (filters.search) {
+        const s = filters.search.toLowerCase();
+        list = list.filter((t: any) =>
+          (t.description || "").toLowerCase().includes(s) ||
+          (t.id || "").toLowerCase().includes(s)
+        );
       }
-      queryParams.append("walletId", wallet.id);
-      if (filters.search) queryParams.append("search", filters.search);
-      if (filters.type !== "all") queryParams.append("type", filters.type);
-      if (filters.status !== "all") queryParams.append("status", filters.status);
-      if (filters.dateRange.from) queryParams.append("from", (filters.dateRange.from as Date).toISOString());
-      if (filters.dateRange.to) queryParams.append("to", (filters.dateRange.to as Date).toISOString());
-
-      const response = await fetch(`/api/transactions?${queryParams.toString()}`);
-      const data = await response.json();
-      setTransactions(data.data || []);
+      setTransactions(list);
     } catch (error) {
       console.error("Error loading transactions:", error);
       toast.error("Erreur lors du chargement des transactions");
@@ -100,9 +112,15 @@ export default function TransactionsPage() {
   const loadStats = async () => {
     try {
       if (!wallet?.id) return;
-      const response = await fetch(`/api/wallet/stats?walletId=${wallet.id}`);
-      const data = await response.json();
-      setStats(data);
+      const startDate = filters.dateRange.from ? (filters.dateRange.from as Date).toISOString() : undefined;
+      const endDate = filters.dateRange.to ? (filters.dateRange.to as Date).toISOString() : undefined;
+      const s = await getWalletLedgerStats({ walletId: wallet.id, startDate, endDate });
+      setStats({
+        total: s.total,
+        income: s.income,
+        expense: s.expense,
+        pending: s.pending
+      });
     } catch (error) {
       console.error("Error loading stats:", error);
     }
@@ -187,7 +205,7 @@ export default function TransactionsPage() {
       {/* En-tête */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div>
-          <Typography variant="h2" weight="bold">
+          <Typography variant="h3" weight="bold">
             Mes Transactions
           </Typography>
           <Typography variant="body-base" theme="muted" className="mt-1">
@@ -199,26 +217,30 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={handleExport}
-            className="gap-2"
+            className="gap-2 items-center flex justify-center"
           >
             <Download className="h-4 w-4" />
-            Exporter
+            <span className="hidden md:inline-block">
+              Exporter
+            </span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={loadTransactions}
-            className="gap-2"
+            className="gap-2 items-center flex justify-center"
           >
             <RefreshCw className="h-4 w-4" />
-            Actualiser
+            <span className="hidden md:inline-block">
+              Actualiser
+            </span>
           </Button>
           <Button
-            onClick={() => router.push("/transactions/create")}
-            className="gap-2"
+            onClick={() => router.push("/wallet/transactions/create")}
+            className="gap-2 items-center flex justify-center"
           >
             <Plus className="h-4 w-4" />
-            Nouvelle transaction
+            <span className="">Nouvelle transaction</span>
           </Button>
         </div>
       </div>
@@ -388,19 +410,19 @@ export default function TransactionsPage() {
                   <Typography variant="body-sm" theme="muted" className="mt-2">
                     Commencez par effectuer votre première transaction
                   </Typography>
-                  <Button 
-                    onClick={() => router.push("/transactions/create")}
+                  <Button
+                    onClick={() => router.push("/wallet/transactions/create")}
                     className="mt-4"
                   >
                     Créer une transaction
                   </Button>
                 </div>
               ) : (
-                transactions.map((transaction: any, index) => {
+                transactions.map((transaction, index) => {
                   const Icon = getTypeIcon(transaction.type);
-                  const isIncome = transaction.type === "DEPOSIT" || 
-                                  (transaction.type === "TRANSFER" && transaction.toUserId === user?.id);
-                  
+                  const isIncome = transaction.type === "DEPOSIT" ||
+                    (transaction.type === "TRANSFER" && transaction.toUserId === user?.id);
+
                   return (
                     <motion.div
                       key={transaction.id}
@@ -420,10 +442,10 @@ export default function TransactionsPage() {
                                   <Typography variant="body-sm" weight="semibold">
                                     {getTypeLabel(transaction.type)}
                                   </Typography>
-                                  {getStatusBadge(transaction.status)}
+                                  {getStatusBadge(transaction.status || "")}
                                 </div>
                                 <Typography variant="caption2" theme="muted">
-                                  {format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
+                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
                                 </Typography>
                                 {transaction.description && (
                                   <Typography variant="caption2" theme="muted" className="mt-1">

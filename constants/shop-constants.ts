@@ -109,6 +109,12 @@ export const shopPaymentItems = [
     icon: Wallet,
     description: "Gérer les paiements",
   },
+  {
+    title: "Portefeuille",
+    url: "/shops/[shopId]/dashboard/wallet",
+    icon: CreditCard,
+    description: "Gérer vos revenus et retraits",
+  },
 ];
 
 export const shopSettingsItems = [

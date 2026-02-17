@@ -15,6 +15,7 @@ import {
   Activity,
   ArrowUpRight,
 } from "lucide-react";
+import { getWalletLedgerDailyFlow } from "@/actions/wallets";
 
 interface StatsOverviewProps {
   stats: {
@@ -31,14 +32,25 @@ export function StatsOverview({ stats, walletId }: StatsOverviewProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simuler le chargement des données hebdomadaires
-    setTimeout(() => {
-      setWeeklyData([120, 190, 300, 500, 200, 300, 450]);
-      setIsLoading(false);
-    }, 1000);
+    let mounted = true;
+    async function load() {
+      try {
+        const data = await getWalletLedgerDailyFlow(walletId, 7);
+        if (mounted) {
+          setWeeklyData(data);
+        }
+      } catch (e) {
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const maxValue = Math.max(...weeklyData);
+  const maxValue = Math.max(...weeklyData, 1);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

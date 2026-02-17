@@ -5,20 +5,25 @@ import {
   userWallets,
   walletTransactions,
   users,
+  financialAccounts,
+  ledgerEntries,
   type UserWallet,
   type NewUserWallet,
   type WalletTransaction,
   type NewWalletTransaction,
   type User,
+  type FinancialAccount,
+  type LedgerEntry,
   VerificationEnum,
+  shops,
 } from '@/database/schema';
 import {
   eq,
   and,
   or,
+  sql,
   desc,
   asc,
-  sql,
   count,
   gte,
   lte,
@@ -38,6 +43,12 @@ import { WalletUtils } from '@/lib/wallet/wallet-utils';
 import { getAppSettings } from '@/actions/app-settings';
 import { createUserTrace } from '@/actions/user-traces';
 import { getCurrentUser } from '@/lib/auth/session';
+import {
+  executeTransaction,
+  getOrCreatePlatformAccount,
+  getAccountBalance
+} from '@/lib/ledger/ledger-utils';
+import { createTransaction as createWalletTransaction } from '@/actions/transactions';
 
 // ============================================================================
 // USER WALLETS - Queries
@@ -90,7 +101,22 @@ export async function getUserWalletByCardNumber(
     return wallet ?? null;
   } catch (error) {
     console.error('Error getting wallet by card number:', error);
-    throw new Error('Failed to fetch wallet by number');
+    throw new Error('Failed to fetch wallet');
+  }
+}
+
+/**
+ * Récupère le solde réel d'un wallet via le ledger
+ */
+export async function getWalletBalance(walletId: string): Promise<number> {
+  try {
+    const wallet = await getUserWalletById(walletId);
+    if (!wallet?.financialAccountId) return 0;
+
+    return await getAccountBalance(wallet.financialAccountId);
+  } catch (error) {
+    console.error('Error getting wallet balance:', error);
+    return 0;
   }
 }
 
@@ -149,8 +175,13 @@ export async function getUserWallets(
 /**
  * Crée un nouveau wallet utilisateur
  */
+/**
+ * Crée un nouveau wallet utilisateur
+ * ⚠️ REFACTORÉ: Crée d'abord le financial_account, puis utilise executeTransaction pour le bonus
+ */
 export async function createUserWallet(
-  walletData: NewUserWallet
+  walletData: NewUserWallet,
+  options?: { currency?: string }
 ): Promise<UserWallet> {
   try {
     // Validation
@@ -166,59 +197,108 @@ export async function createUserWallet(
 
     // Récupérer les paramètres de l'app
     const appSettings = await getAppSettings();
-    const defaultBalance = appSettings?.defaultUserBalance?.toString() || '250';
+    const defaultBalance = parseFloat(appSettings?.defaultUserBalance?.toString() || '250');
 
     // Générer un numéro de carte sécurisé
     const cardNumber = WalletUtils.generateSecureCardNumber();
 
-    // Créer le wallet
-    const [newWallet] = await db
-      .insert(userWallets)
-      .values({
-        userId: walletData.userId,
-        pinHash: walletData.pinHash,
-        cardNumberHash: cardNumber,
-        balance: defaultBalance,
-        isActive: true,
-        isLocked: false,
-        failedAttempts: 0,
-        verificationStatus: 'PENDING',
+    return await db.transaction(async (tx) => {
+      // 1️⃣ Créer d'abord le financial_account
+      const [account] = await tx
+        .insert(financialAccounts)
+        .values({
+          ownerUserId: walletData.userId,
+          type: 'USER_WALLET',
+          currency: options?.currency || 'GTC',
+          isActive: true,
+          isLocked: false,
+          metadata: { initialBonus: defaultBalance },
+          createdAt: new Date(),
+        })
+        .returning();
+
+      // 2️⃣ Créer le wallet lié au financial_account
+      const [newWallet] = await tx
+        .insert(userWallets)
+        .values({
+          userId: walletData.userId,
+          pinHash: walletData.pinHash,
+          cardNumberHash: cardNumber,
+          financialAccountId: account.id,
+          isActive: true,
+          isLocked: false,
+          failedAttempts: 0,
+          verificationStatus: 'PENDING',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      // 3️⃣ Créer le bonus de bienvenue via executeTransaction
+      // Le bonus vient du compte SYSTEM_ADJUSTMENT vers le compte user
+      const systemAccount = await getOrCreatePlatformAccount(tx, 'SYSTEM_ADJUSTMENT');
+
+      // Créer les ledger entries pour le bonus
+      const transactionId = crypto.randomUUID();
+
+      // Transaction wallet pour l'historique
+      const [welcomeTransaction] = await tx
+        .insert(walletTransactions)
+        .values({
+          id: transactionId,
+          walletId: newWallet.id,
+          financialAccountId: account.id,
+          amount: defaultBalance.toFixed(2),
+          fees: '0',
+          netAmount: defaultBalance.toFixed(2),
+          balanceAfter: defaultBalance.toFixed(2),
+          type: 'BONUS',
+          status: 'COMPLETED',
+          description: 'Bonus de bienvenue - Création de wallet',
+          metadata: {
+            type: 'WELCOME_BONUS',
+            walletCreation: true,
+          },
+          createdAt: new Date(),
+        })
+        .returning();
+
+      // Ledger entries (double-entry)
+      // Débit du compte système
+      await tx.insert(ledgerEntries).values({
+        transactionId,
+        accountId: systemAccount.id,
+        debit: defaultBalance.toFixed(2),
+        credit: '0',
+        currency: 'GTC',
         createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+      });
 
-    // Créer une transaction de bienvenue
-    const welcomeTransaction: NewWalletTransaction = {
-      walletId: newWallet.id,
-      amount: defaultBalance,
-      netAmount: defaultBalance,
-      balanceAfter: defaultBalance,
-      type: 'BONUS',
-      status: 'COMPLETED',
-      description: 'Bonus de bienvenue - Création de wallet',
-      metadata: {
-        type: 'WELCOME_BONUS',
-        walletCreation: true,
-      },
-    };
+      // Crédit du compte user
+      await tx.insert(ledgerEntries).values({
+        transactionId,
+        accountId: account.id,
+        debit: '0',
+        credit: defaultBalance.toFixed(2),
+        currency: 'GTC',
+        createdAt: new Date(),
+      });
 
-    await createTransaction(welcomeTransaction);
+      // Journalisation
+      await createUserTrace({
+        userId: walletData.userId,
+        type: 'ACTION',
+        entityId: newWallet.id,
+        payload: {
+          action: 'WALLET_CREATED',
+          walletId: newWallet.id,
+          bonusAmount: defaultBalance,
+          cardNumber,
+        },
+      });
 
-    // Journalisation
-    await createUserTrace({
-      userId: walletData.userId,
-      type: 'ACTION',
-      entityId: newWallet.id,
-      payload: {
-        action: 'WALLET_CREATED',
-        walletId: newWallet.id,
-        bonusAmount: parseInt(defaultBalance),
-        cardNumber,
-      },
+      return newWallet;
     });
-
-    return newWallet;
   } catch (error) {
     console.error('Error creating wallet:', error);
     if (error instanceof Error) {
@@ -257,7 +337,6 @@ export async function createWalletServer(
     const wallet = await createUserWallet({
       userId,
       pinHash,
-      balance: '0', // Le bonus sera ajouté dans createUserWallet
     });
 
     return {
@@ -266,7 +345,7 @@ export async function createWalletServer(
     };
   } catch (error: any) {
     console.error('Error creating wallet:', error);
-    
+
     // Messages d'erreur conviviaux
     let userMessage = 'Erreur lors de la création du wallet';
     if (error.message.includes('déjà un wallet')) {
@@ -321,7 +400,6 @@ export async function updateWalletBalance(
     const [updatedWallet] = await db
       .update(userWallets)
       .set({
-        balance: newBalance,
         updatedAt: new Date(),
       })
       .where(eq(userWallets.id, walletId))
@@ -402,7 +480,7 @@ export async function verifyWalletPin(
         .where(eq(userWallets.id, walletId));
 
       const attemptsRemaining = 5 - newAttempts;
-      
+
       return {
         success: false,
         error: `PIN incorrect${isNowLocked ? ' - Wallet verrouillé' : ''}`,
@@ -513,40 +591,75 @@ export async function createTransaction(
     const netAmount = transactionData.netAmount || transactionData.amount;
     let balanceAfter = transactionData.balanceAfter || transactionData.amount;
 
-    // Si c'est un retrait ou achat, vérifier le solde
-    const spendTypes = ['PURCHASE', 'WITHDRAWAL', 'TRANSFER', 'VIP_SUBSCRIPTION', 'GAME_ITEM_PURCHASE'];
-    if (spendTypes.includes(transactionData.type)) {
-      const wallet = await getUserWalletById(transactionData.walletId);
-      if (!wallet) {
-        throw new Error('Wallet not found');
-      }
-
-      const currentBalance = parseFloat(wallet.balance || '0');
-      const amount = parseFloat(transactionData.amount);
-
-      if (currentBalance < amount) {
-        throw new Error('Solde insuffisant');
-      }
-
-      // Calculer le nouveau solde
-      const newBalance = currentBalance - amount;
-      balanceAfter = newBalance.toString();
-
-      // Mettre à jour le solde du wallet
-      await updateWalletBalance(transactionData.walletId, newBalance.toString());
+    const wallet = await getUserWalletById(transactionData.walletId);
+    if (!wallet) {
+      throw new Error('Wallet not found');
     }
+    const accountId = wallet.financialAccountId || null;
+    let currentBalance = 0;
+    if (accountId) {
+      const balRes = await db
+        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.accountId, accountId));
+      currentBalance = parseFloat(balRes[0]?.balance || '0');
+    }
+    const amountNum = parseFloat(transactionData.amount);
+    const spendTypes = ['PURCHASE', 'WITHDRAWAL', 'TRANSFER', 'VIP_SUBSCRIPTION', 'GAME_ITEM_PURCHASE'];
+    if (spendTypes.includes(transactionData.type) && currentBalance < amountNum) {
+      throw new Error('Solde insuffisant');
+    }
+    balanceAfter = spendTypes.includes(transactionData.type)
+      ? (currentBalance - amountNum).toFixed(2)
+      : (currentBalance + parseFloat(netAmount)).toFixed(2);
 
     // Créer la transaction
     const [newTransaction] = await db
       .insert(walletTransactions)
       .values({
         ...transactionData,
+        financialAccountId: accountId,
         fees,
         netAmount,
         balanceAfter,
         createdAt: new Date(),
       })
       .returning();
+
+    if (accountId) {
+      const debit = spendTypes.includes(transactionData.type) ? transactionData.amount : '0';
+      const credit = spendTypes.includes(transactionData.type) ? '0' : netAmount;
+      await db.insert(ledgerEntries).values({
+        transactionId: newTransaction.id,
+        accountId,
+        debit,
+        credit,
+        currency: 'GTC',
+        createdAt: new Date(),
+      });
+      // Contrepartie plateforme/système
+      const [platformAccount] = await db
+        .select()
+        .from(financialAccounts)
+        .where(eq(financialAccounts.type, spendTypes.includes(transactionData.type) ? 'PLATFORM_ESCROW' : 'SYSTEM_ADJUSTMENT'))
+        .limit(1);
+      const platformId = platformAccount?.id || (await db.insert(financialAccounts).values({
+        type: spendTypes.includes(transactionData.type) ? 'PLATFORM_ESCROW' : 'SYSTEM_ADJUSTMENT',
+        currency: 'GTC',
+        isActive: true,
+        isLocked: false,
+        metadata: { autoCreated: true },
+        createdAt: new Date(),
+      }).returning())[0].id;
+      await db.insert(ledgerEntries).values({
+        transactionId: newTransaction.id,
+        accountId: platformId,
+        debit: spendTypes.includes(transactionData.type) ? '0' : netAmount,
+        credit: spendTypes.includes(transactionData.type) ? transactionData.amount : '0',
+        currency: 'GTC',
+        createdAt: new Date(),
+      });
+    }
 
     return newTransaction;
   } catch (error) {
@@ -617,24 +730,20 @@ export async function transferMoney(
       return { success: false, error: 'Un des wallets est verrouillé' };
     }
 
-    // Vérifier le solde
-    const fromBalance = parseFloat(fromWallet.balance || '0');
-    if (fromBalance < amount) {
-      return { success: false, error: 'Solde insuffisant' };
+    // Vérifier le solde via ledger
+    let fromBalance = 0;
+    if (fromWallet.financialAccountId) {
+      const [bal] = await db
+        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.accountId, fromWallet.financialAccountId));
+      fromBalance = parseFloat(bal?.balance || '0');
     }
+    if (fromBalance < amount) return { success: false, error: 'Solde insuffisant' };
 
     // Calculer les frais
     const fees = WalletUtils.calculateFees(amount, 'TRANSFER', false);
     const netAmount = amount - fees.amount;
-
-    // Débiter l'expéditeur
-    const newFromBalance = fromBalance - amount;
-    await updateWalletBalance(fromWallet.id, newFromBalance.toString());
-
-    // Créditer le destinataire
-    const toBalance = parseFloat(toWallet.balance || '0');
-    const newToBalance = toBalance + netAmount;
-    await updateWalletBalance(toWallet.id, newToBalance.toString());
 
     // Créer la transaction de transfert
     const transaction = await createTransaction({
@@ -644,7 +753,7 @@ export async function transferMoney(
       amount: amount.toString(),
       fees: fees.amount.toString(),
       netAmount: netAmount.toString(),
-      balanceAfter: newFromBalance.toString(),
+      balanceAfter: (fromBalance - amount).toFixed(2),
       type: 'TRANSFER',
       status: 'COMPLETED',
       description: description || `Transfert vers ${toUserId}`,
@@ -656,6 +765,14 @@ export async function transferMoney(
     });
 
     // Créer une transaction de réception pour le destinataire
+    let toBalance = 0;
+    if (toWallet.financialAccountId) {
+      const [bal] = await db
+        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.accountId, toWallet.financialAccountId));
+      toBalance = parseFloat(bal?.balance || '0');
+    }
     await createTransaction({
       walletId: toWallet.id,
       fromUserId,
@@ -663,7 +780,7 @@ export async function transferMoney(
       amount: netAmount.toString(),
       fees: '0',
       netAmount: netAmount.toString(),
-      balanceAfter: newToBalance.toString(),
+      balanceAfter: (toBalance + netAmount).toFixed(2),
       type: 'TRANSFER',
       status: 'COMPLETED',
       description: `Transfert reçu de ${fromUserId}`,
@@ -695,6 +812,65 @@ export async function transferMoney(
 }
 
 /**
+ * Transfert entre identités appartenant au même utilisateur (ex: Retrait Shop -> Wallet)
+ */
+export async function transferBetweenIdentities(params: {
+  fromIdentityId: string;
+  fromType: 'USER' | 'SHOP' | 'TOURNAMENT';
+  toIdentityId: string;
+  toType: 'USER' | 'SHOP' | 'TOURNAMENT';
+  amount: number;
+  description?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) throw new Error("Non authentifié");
+
+    return await db.transaction(async (tx) => {
+      // 1. Resolve source account
+      let fromAccount: FinancialAccount | undefined;
+      if (params.fromType === 'USER') {
+        const wallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, params.fromIdentityId) });
+        if (wallet?.userId !== user.id) throw new Error("Accès refusé");
+        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, wallet.financialAccountId!) });
+      } else if (params.fromType === 'SHOP') {
+        const shop = await tx.query.shops.findFirst({ where: eq(shops.id, params.fromIdentityId) });
+        if (shop?.ownerId !== user.id) throw new Error("Accès refusé (Non propriétaire)");
+        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop.financialAccountId!) });
+      }
+
+      // 2. Resolve destination account
+      let toAccount: FinancialAccount | undefined;
+      if (params.toType === 'USER') {
+        const wallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, params.toIdentityId) });
+        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, wallet!.financialAccountId!) });
+      } else if (params.toType === 'SHOP') {
+        const shop = await tx.query.shops.findFirst({ where: eq(shops.id, params.toIdentityId) });
+        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop!.financialAccountId!) });
+      }
+
+      if (!fromAccount || !toAccount) throw new Error("Comptes introuvables");
+
+      // 3. Execute Transaction
+      await executeTransaction({
+        fromAccountId: fromAccount.id,
+        toAccountId: toAccount.id,
+        amount: params.amount,
+        type: 'TRANSFER',
+        description: params.description || `Transfert interne entre ${params.fromType} et ${params.toType}`,
+        userId: user.id,
+        metadata: { transferType: 'internal_identity_transfer' }
+      });
+
+      return { success: true };
+    });
+  } catch (error: any) {
+    console.error("Error in transferBetweenIdentities:", error);
+    return { success: false, error: error.message || "Erreur lors du transfert" };
+  }
+}
+
+/**
  * Déposer de l'argent sur un wallet
  */
 export async function depositToWallet(
@@ -712,12 +888,16 @@ export async function depositToWallet(
       return { success: false, error: 'Wallet non trouvé' };
     }
 
-    // Calculer le nouveau solde
-    const currentBalance = parseFloat(wallet.balance || '0');
+    // Calculer le nouveau solde via ledger
+    let currentBalance = 0;
+    if (wallet.financialAccountId) {
+      const [bal] = await db
+        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.accountId, wallet.financialAccountId));
+      currentBalance = parseFloat(bal?.balance || '0');
+    }
     const newBalance = currentBalance + amount;
-
-    // Mettre à jour le solde
-    await updateWalletBalance(walletId, newBalance.toString());
 
     // Créer la transaction
     const transaction = await createTransaction({
@@ -757,8 +937,8 @@ export async function getWalletStats(filters?: UserWalletFilters) {
         total: count(),
         active: sql`count(case when ${userWallets.isActive} = true then 1 end)`.mapWith(Number),
         locked: sql`count(case when ${userWallets.isLocked} = true then 1 end)`.mapWith(Number),
-        totalBalance: sql`sum(${userWallets.balance}::numeric)`,
-        averageBalance: sql`avg(${userWallets.balance}::numeric)`,
+        totalBalance: sql<number>`sum((SELECT coalesce(sum(le.credit) - sum(le.debit), 0) FROM ledger_entries le WHERE le.account_id = ${userWallets.financialAccountId}))`,
+        averageBalance: sql<number>`avg((SELECT coalesce(sum(le.credit) - sum(le.debit), 0) FROM ledger_entries le WHERE le.account_id = ${userWallets.financialAccountId}))`,
       })
       .from(userWallets)
       .where(conditions);
@@ -807,6 +987,105 @@ export async function getTransactionStats(filters?: WalletTransactionFilters) {
   }
 }
 
+export async function getWalletLedgerStats(params: {
+  walletId: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  try {
+    const { walletId, startDate, endDate } = params;
+    const wallet = await getUserWalletById(walletId);
+    if (!wallet?.financialAccountId) {
+      return { total: 0, pending: 0, income: 0, expense: 0 };
+    }
+
+    const ledgerWhere: any[] = [eq(ledgerEntries.accountId, wallet.financialAccountId)];
+    if (startDate) {
+      ledgerWhere.push(gte(ledgerEntries.createdAt, new Date(startDate)));
+    }
+    if (endDate) {
+      ledgerWhere.push(lte(ledgerEntries.createdAt, new Date(endDate)));
+    }
+
+    const [ledgerAgg] = await db
+      .select({
+        income: sql<string>`COALESCE(SUM(${ledgerEntries.credit}), '0')`,
+        expense: sql<string>`COALESCE(SUM(${ledgerEntries.debit}), '0')`,
+      })
+      .from(ledgerEntries)
+      .where(and(...ledgerWhere));
+
+    const [txAgg, pendingAgg] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.walletId, walletId)),
+      db
+        .select({ count: count() })
+        .from(walletTransactions)
+        .where(and(eq(walletTransactions.walletId, walletId), eq(walletTransactions.status, 'PENDING'))),
+    ]);
+
+    return {
+      total: txAgg[0]?.count || 0,
+      pending: pendingAgg[0]?.count || 0,
+      income: parseFloat(ledgerAgg?.income || '0'),
+      expense: parseFloat(ledgerAgg?.expense || '0'),
+    };
+  } catch (error) {
+    console.error('Error getting wallet ledger stats:', error);
+    return { total: 0, pending: 0, income: 0, expense: 0 };
+  }
+}
+
+export async function getWalletLedgerDailyFlow(walletId: string, days: number = 7): Promise<number[]> {
+  try {
+    const wallet = await getUserWalletById(walletId);
+    if (!wallet?.financialAccountId) {
+      return Array.from({ length: days }, () => 0);
+    }
+
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const start = new Date();
+    start.setDate(end.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+
+    const rows = await db
+      .select({
+        day: sql<string>`to_char(${ledgerEntries.createdAt}, 'YYYY-MM-DD')`,
+        income: sql<string>`COALESCE(SUM(${ledgerEntries.credit}), '0')`,
+        expense: sql<string>`COALESCE(SUM(${ledgerEntries.debit}), '0')`,
+      })
+      .from(ledgerEntries)
+      .where(and(
+        eq(ledgerEntries.accountId, wallet.financialAccountId),
+        gte(ledgerEntries.createdAt, start),
+        lte(ledgerEntries.createdAt, end),
+      ))
+      .groupBy(sql`to_char(${ledgerEntries.createdAt}, 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${ledgerEntries.createdAt}, 'YYYY-MM-DD')`);
+
+    const map: Record<string, number> = {};
+    for (const r of rows as any[]) {
+      const net = parseFloat(r.income || '0') - parseFloat(r.expense || '0');
+      map[r.day] = net;
+    }
+
+    const result: number[] = [];
+    const cursor = new Date(start);
+    for (let i = 0; i < days; i++) {
+      const key = cursor.toISOString().slice(0, 10);
+      result.push(map[key] ?? 0);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return result;
+  } catch (error) {
+    console.error('Error getting wallet ledger daily flow:', error);
+    return Array.from({ length: days }, () => 0);
+  }
+}
+
 // ============================================================================
 // UTILITAIRES INTERNES
 // ============================================================================
@@ -826,6 +1105,9 @@ function buildWalletConditions(filters: UserWalletFilters, options: QueryOptions
   if (filters.userId) {
     conditions.push(eq(userWallets.userId, filters.userId));
   }
+  if (filters.financialAccountId) {
+    conditions.push(eq(userWallets.financialAccountId, filters.financialAccountId));
+  }
 
   if (filters.isActive !== undefined) {
     conditions.push(eq(userWallets.isActive, filters.isActive));
@@ -834,7 +1116,7 @@ function buildWalletConditions(filters: UserWalletFilters, options: QueryOptions
   if (filters.isLocked !== undefined) {
     conditions.push(eq(userWallets.isLocked, filters.isLocked));
   }
-  
+
   if (filters.verificationStatus) {
     if (Array.isArray(filters.verificationStatus)) {
       conditions.push(inArray(userWallets.verificationStatus, filters.verificationStatus as any));
@@ -843,14 +1125,7 @@ function buildWalletConditions(filters: UserWalletFilters, options: QueryOptions
     }
   }
 
-  // Filtres de solde
-  if (filters.balanceMin !== undefined) {
-    conditions.push(gte(sql`${userWallets.balance}::numeric`, filters.balanceMin));
-  }
-
-  if (filters.balanceMax !== undefined) {
-    conditions.push(lte(sql`${userWallets.balance}::numeric`, filters.balanceMax));
-  }
+  // Les filtres de solde basés sur user_wallets.balance sont retirés
 
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
@@ -869,6 +1144,16 @@ function buildTransactionConditions(filters: WalletTransactionFilters, options: 
   // Filtres spécifiques
   if (filters.walletId) {
     conditions.push(eq(walletTransactions.walletId, filters.walletId));
+  }
+  if (filters.financialAccountId) {
+    conditions.push(eq(walletTransactions.financialAccountId, filters.financialAccountId));
+  }
+  if (filters.shopId) {
+    const shopAccountSubquery = db
+      .select({ id: financialAccounts.id })
+      .from(financialAccounts)
+      .where(eq(financialAccounts.ownerShopId, filters.shopId));
+    conditions.push(inArray(walletTransactions.financialAccountId, shopAccountSubquery));
   }
 
   if (filters.fromUserId) {
@@ -945,10 +1230,9 @@ export async function getCurrentUserWallet(): Promise<UserWallet | null> {
 export async function getCurrentUserBalance(): Promise<number> {
   try {
     const wallet = await getCurrentUserWallet();
-    if (!wallet || !wallet.balance) {
-      return 0;
-    }
-    return parseFloat(wallet.balance);
+    if (!wallet || !wallet.financialAccountId) return 0;
+    const balance = await getAccountBalance(wallet.financialAccountId);
+    return balance;
   } catch (error) {
     console.error('Error getting current user balance:', error);
     return 0;

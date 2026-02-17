@@ -66,10 +66,10 @@ export async function getTournamentEditionWithRelations(
           },
         },
         phases: {
-          orderBy: (phases, { asc }) => [asc(phases.order)],
+          orderBy: (phases: any, { asc }: any) => [asc(phases.order)],
           with: {
             groups: {
-              orderBy: (groups, { asc }) => [asc(groups.order)],
+              orderBy: (groups: any, { asc }: any) => [asc(groups.order)],
               with: {
                 bracketNodes: true,
                 participants: {

@@ -28,10 +28,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { getOrdersByShopId, acceptOrder, rejectOrder } from "@/actions/orders";
-import { setProductCredentials, getProductById } from "@/actions/products";
-import { createNotification } from "@/actions/notifications";
+import { getOrdersByShopId, approveOrderShop, rejectOrder } from "@/actions/orders";
+import { getProductById } from "@/actions/products";
 import { useAuthContext } from "@/contexts/auth-context";
+import { useOrdersByShopId } from "@/hooks/use-orders";
 
 type UiOrder = {
   id: string;
@@ -48,7 +48,6 @@ export default function ShopOrdersPage() {
   const params = useParams();
   const shopId = String(params.shopId);
   const { user: auth } = useAuthContext();
-  const [orders, setOrders] = useState<UiOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<UiOrder | null>(null);
@@ -56,16 +55,17 @@ export default function ShopOrdersPage() {
   const [password, setPassword] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
+  const [orders, setOrders] = useState<UiOrder[]>([]);
+  const { data: ordersData, isLoading, error } = useOrdersByShopId(shopId, {
+    status: ["COMPLETED", "CANCELLED", "REJECTED_BY_SHOP", "REJECTED_BY_ADMIN"],
+    limit: 50,
+    page: 1,
+  });
+
   const loadData = async () => {
     try {
-      const result = await getOrdersByShopId(shopId, {
-        pagination: { page: 1, limit: 50 },
-        filters: { statuses: ["PENDING", "ACCEPTED"] },
-        options: { sortBy: "createdAt", sortOrder: "desc" },
-      });
-
       const enriched: UiOrder[] = [];
-      for (const o of result.data) {
+      for (const o of ordersData?.data || []) {
         let name = o.productId;
         let image: string | undefined;
         try {
@@ -74,7 +74,7 @@ export default function ShopOrdersPage() {
             name = p.name;
             image = (p as any).featuredImage || undefined;
           }
-        } catch {}
+        } catch { }
         enriched.push({
           id: o.id,
           productId: o.productId,
@@ -93,8 +93,10 @@ export default function ShopOrdersPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, [shopId]);
+    if (ordersData?.data) {
+      loadData();
+    }
+  }, [ordersData]);
 
   const handleApprove = async () => {
     if (!selectedOrder) return;
@@ -103,16 +105,11 @@ export default function ShopOrdersPage() {
       return;
     }
     try {
-      await setProductCredentials(selectedOrder.productId, login.trim(), password.trim());
-      await acceptOrder(selectedOrder.id);
-      await createNotification({
-        userId: selectedOrder.buyerId,
-        title: "Commande acceptée",
-        message: "La boutique a accepté votre commande et fourni les identifiants.",
-        type: "ORDER_ACCEPTED",
-        linkUrl: "/app/(protected)/dashboard/my-purchases",
-        shopId,
+      await approveOrderShop(selectedOrder.id, {
+        login: login.trim(),
+        pass: password.trim()
       });
+      // Optionally notify using custom system if needed, but the action handles status update
       toast.success("Commande approuvée par la boutique");
       setSelectedOrder(null);
       setLogin("");

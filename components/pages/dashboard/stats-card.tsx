@@ -41,9 +41,9 @@ export function StatsCard({
       whileHover={{ scale: 1.02 }}
       className={cn("h-full", className)}
     >
-      <Card className="h-full border-2 hover:shadow-lg hover:shadow-primary/25 transition-all duration-300">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between mb-4">
+      <Card className="h-full border-2 p-3 hover:shadow-lg hover:shadow-primary/25 transition-all duration-300">
+        <CardContent className="p-2">
+          <div className="flex items-start justify-between mb-2">
             <div className="p-3 rounded-lg bg-primary/10">
               <Icon className="h-6 w-6 text-primary" />
             </div>
@@ -63,7 +63,7 @@ export function StatsCard({
             >
               {title}
             </Typography>
-            <Typography variant="h3" weight="bold" gradient>
+            <Typography variant="h4" weight="bold" gradient>
               {value}
             </Typography>
             {changeLabel && (

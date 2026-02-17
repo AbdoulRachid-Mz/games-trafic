@@ -7,6 +7,7 @@ import { headers } from 'next/headers';
 import { AuthErrorHandler } from './errors';
 import { getProfile, getMyProfile } from '@/actions/users';
 import { getAppUrlEnv } from '@/utils/app-url';
+import { createUserWallet } from '@/actions/wallets';
 
 // Définition des types basés sur le schéma
 export interface AuthResponse {
@@ -51,8 +52,8 @@ export class AuthService {
    * Inscription avec email/mot de passe
    */
   static async signUp(
-    email: string, 
-    password: string, 
+    email: string,
+    password: string,
     userData?: {
       username?: string;
       fullName?: string;
@@ -88,12 +89,17 @@ export class AuthService {
       // Vérifier si l'utilisateur est présent dans le résultat
       if ('user' in result && result.user?.id) {
         // Créer le wallet par défaut
-        await this.createUserWallet(result.user.id);
+        await createUserWallet({
+          userId: result.user.id,
+          pinHash: 'default', // to be hashed in production
+          isActive: false,
+          isLocked: false,
+          verificationStatus: 'PENDING',
+        });
 
         return {
           success: true,
-// lib/auth/service.ts
-          user: (await this.getCompleteUserData(result.user.id)) as UserWithRelations | undefined,
+          user: (await getProfile(result.user.id, { includeFullData: true })) as UserWithRelations | undefined,
           session: result
         };
       }
@@ -116,7 +122,7 @@ export class AuthService {
   /**
    * Connexion avec email/mot de passe
    */
- // Mettre à jour signIn et signUp pour utiliser getMyProfile
+  // Mettre à jour signIn et signUp pour utiliser getMyProfile
   static async signIn(email: string, password: string): Promise<AuthResponse> {
     try {
       const result = await auth.api.signInEmail({
@@ -313,7 +319,7 @@ export class AuthService {
    * Changement de mot de passe
    */
   static async changePassword(
-    currentPassword: string, 
+    currentPassword: string,
     newPassword: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
@@ -385,10 +391,10 @@ export class AuthService {
     }
   }
 
- /**
-   * Récupération des données utilisateur complètes
-   */
-static async getCompleteUserData(userId: string) {
+  /**
+    * Récupération des données utilisateur complètes
+    */
+  static async getCompleteUserData(userId: string) {
     try {
       return await getProfile(userId, { includeFullData: true });
     } catch (error) {
@@ -404,7 +410,7 @@ static async getCompleteUserData(userId: string) {
     try {
       const session = await this.getSession();
       if (!session?.user?.id) return null;
-      
+
       return await getMyProfile();
     } catch (error) {
       console.error('Error getting my profile:', error);
@@ -469,10 +475,9 @@ static async getCompleteUserData(userId: string) {
    */
   private static async createUserWallet(userId: string): Promise<void> {
     try {
-      await db.insert(userWallets).values({
+      await createUserWallet({
         userId,
-        pinHash: 'default', // À hasher en production
-        balance: '0',
+        pinHash: 'default', // to be hashed in production
         isActive: false,
         isLocked: false,
         verificationStatus: 'PENDING',
@@ -488,7 +493,7 @@ static async getCompleteUserData(userId: string) {
   private static async updateLastLogin(userId: string): Promise<void> {
     try {
       await db.update(users)
-        .set({ 
+        .set({
           lastLogin: new Date(),
           updatedAt: new Date()
         })

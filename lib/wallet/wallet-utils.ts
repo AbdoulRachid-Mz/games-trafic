@@ -62,31 +62,31 @@ export class WalletUtils {
     strength: 'weak' | 'medium' | 'strong';
   } {
     const errors: string[] = [];
-    
+
     if (!pin) {
       errors.push('PIN requis');
     }
-    
-    if (pin.length !== 4) {
-      errors.push('Le PIN doit contenir exactement 4 chiffres');
+
+    if (pin.length < 4) {
+      errors.push('Le PIN doit contenir au moins 4 chiffres');
     }
-    
+
     if (!/^\d+$/.test(pin)) {
       errors.push('Le PIN ne doit contenir que des chiffres');
     }
-    
+
     // Éviter les séquences simples
     const sequences = [
-      '1234', '4321', '0000', '1111', '2222', '3333', 
+      '1234', '4321', '0000', '1111', '2222', '3333',
       '4444', '5555', '6666', '7777', '8888', '9999',
       '0123', '1230', '2345', '3456', '4567', '5678', '6789',
       '9876', '8765', '7654', '6543', '5432', '4321', '3210'
     ];
-    
+
     if (sequences.includes(pin)) {
       errors.push('Veuillez éviter les séquences trop simples');
     }
-    
+
     // Éviter les dates de naissance courantes (1900-2024)
     if (/^(19|20)\d{2}$/.test(pin)) {
       const year = parseInt(pin);
@@ -94,20 +94,22 @@ export class WalletUtils {
         errors.push('Évitez d\'utiliser une année de naissance');
       }
     }
-    
+
     const isValid = errors.length === 0;
     const strength = errors.length === 0 ? 'strong' : errors.length <= 2 ? 'medium' : 'weak';
-    
+
     return { isValid, errors, strength };
   }
 
   /**
    * Formatte le solde pour l'affichage
+   * ⚠️ NOTE: Le solde doit être calculé via getAccountBalance() de ledger-utils
+   * Ne jamais utiliser le champ `balance` de userWallets directement
    */
   static formatBalance(balance: string | number, currency: string = 'GTC'): string {
     try {
       const numBalance = typeof balance === 'string' ? parseFloat(balance) : balance;
-      
+
       if (currency === 'GTC') {
         // Format personnalisé pour GTC
         return new Intl.NumberFormat('fr-FR', {
@@ -115,7 +117,7 @@ export class WalletUtils {
           maximumFractionDigits: 2,
         }).format(numBalance) + ' GTC';
       }
-      
+
       // Pour les vraies devises
       return new Intl.NumberFormat('fr-FR', {
         style: 'currency',
@@ -147,17 +149,17 @@ export class WalletUtils {
     if (!user) {
       return { canCreate: false, reason: 'Utilisateur non trouvé' };
     }
-    
+
     if (user.isDeleted) {
       return { canCreate: false, reason: 'Compte désactivé' };
     }
-    
+
     if (user.banned) {
       return { canCreate: false, reason: 'Compte banni' };
     }
-    
+
     // Note: On vérifie l'existence du wallet dans l'action serveur
-    
+
     return { canCreate: true };
   }
 
@@ -168,11 +170,11 @@ export class WalletUtils {
     const algorithm = 'aes-256-gcm';
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(algorithm, Buffer.from(key.padEnd(32).slice(0, 32)), iv);
-    
+
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const authTag = cipher.getAuthTag();
-    
+
     return JSON.stringify({
       encrypted,
       iv: iv.toString('hex'),
@@ -191,12 +193,12 @@ export class WalletUtils {
       Buffer.from(key.padEnd(32).slice(0, 32)),
       Buffer.from(data.iv, 'hex')
     );
-    
+
     decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
-    
+
     let decrypted = decipher.update(data.encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -238,13 +240,13 @@ export class WalletUtils {
     if (typeof window === 'undefined') {
       return;
     }
-    
+
     try {
       // Importer dynamiquement confetti pour éviter l'erreur côté serveur
       const { fireConfetti, fireConfettiPreset } = await import('@/utils/confetti');
-      
+
       await fireConfettiPreset('success');
-      
+
       setTimeout(async () => {
         await fireConfetti({
           intensity: 'medium',
@@ -273,7 +275,7 @@ export class WalletUtils {
   ): { amount: number; percentage: number; netAmount: number } {
     // Pourcentage de base selon le type
     let feePercentage = 0.01; // 1% par défaut
-    
+
     switch (transactionType) {
       case 'PURCHASE':
         feePercentage = 0.01; // 1%
@@ -300,15 +302,15 @@ export class WalletUtils {
         feePercentage = 0; // 0%
         break;
     }
-    
+
     // Réduction pour les VIP
     if (isVip) {
       feePercentage *= 0.5; // 50% de réduction
     }
-    
+
     const feeAmount = amount * feePercentage;
     const netAmount = amount - feeAmount;
-    
+
     return {
       amount: feeAmount,
       percentage: feePercentage * 100,

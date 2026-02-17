@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import Image from "next/image";
 
 // Schéma Zod pour la validation
 const signupSchema = z
@@ -73,7 +74,7 @@ export function SignupForm({
         email: formData.email,
         password: formData.password,
         name: formData.name,
-        callbackURL: "/dashboard",
+        callbackURL: "/callback",
       },
       {
         onRequest: () => {
@@ -97,7 +98,7 @@ export function SignupForm({
     setError("");
     await authClient.signIn.social({
       provider,
-      callbackURL: "/dashboard",
+      callbackURL: "/callback",
       errorCallbackURL: "/error",
       newUserCallbackURL: "/welcome",
     });
@@ -272,9 +273,10 @@ export function SignupForm({
               </FieldGroup>
             </form>
 
-            <div className="bg-muted relative hidden md:block">
-              <img
-                src="/placeholder.svg"
+            <div className="bg-muted relative relative hidden md:block">
+              <Image
+                src="/images/icons/pages/auth/sign-up.jpg"
+                fill
                 alt="Rejoignez Games-Trafics"
                 className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
               />

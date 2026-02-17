@@ -29,7 +29,7 @@ import { AdvancedUserCard } from "@/components/pages/wallet/advanced-user-card";
 import { TransactionList } from "@/components/pages/wallet/transaction-list";
 import { QuickActions } from "@/components/pages/wallet/quick-actions";
 import { StatsOverview } from "@/components/pages/wallet/stats-overview";
-import { getWalletTransactions, getTransactionStats } from "@/actions/wallets";
+import { getWalletTransactions, getWalletLedgerStats } from "@/actions/wallets";
 import { type WalletTransaction } from "@/database/schema";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -72,13 +72,13 @@ export default function WalletPage() {
 
       setTransactions(transactionsData.data || []);
 
-      // Charger les statistiques via actions
-      const statsData = await getTransactionStats({ walletId: wallet.id });
+      // Charger les statistiques via ledger
+      const statsData = await getWalletLedgerStats({ walletId: wallet.id });
       setStats({
-        totalTransactions: statsData.total || 0,
-        totalAmount: parseFloat(statsData.totalAmount?.toString() || "0"),
-        monthlyChange: 0, // TODO: Calculate monthly change
-        pendingTransactions: statsData.pending || 0,
+        totalTransactions: statsData.total,
+        totalAmount: statsData.income,
+        monthlyChange: 0,
+        pendingTransactions: statsData.pending,
       });
     } catch (error) {
       console.error("Error loading wallet data:", error);
@@ -180,44 +180,28 @@ export default function WalletPage() {
         <StatsOverview stats={stats} walletId={wallet.id} />
       </motion.div>
 
-      {/* Onglets principaux */}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-6"
-      >
-        <TabsList className="grid grid-cols-4 gap-2">
-          <TabsTrigger value="overview" className="gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Aperçu
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="gap-2">
-            <History className="h-4 w-4" />
-            Transactions
-          </TabsTrigger>
-          <TabsTrigger value="cards" className="gap-2">
-            <CreditCard className="h-4 w-4" />
-            Cartes
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Shield className="h-4 w-4" />
-            Sécurité
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
+      {/* Onglets principaux - Simplifié pour ne garder que l'aperçu global */}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="bg-card/40 backdrop-blur-xl border-border/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <Typography variant="h4" weight="semibold">
-                  Activité Récente
-                </Typography>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <History className="h-5 w-5 text-primary" />
+                  </div>
+                  <Typography variant="h4" weight="semibold">
+                    Activité Récente
+                  </Typography>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveTab("transactions")}
+                  onClick={() => router.push("/wallet/transactions")}
+                  className="gap-2"
                 >
                   Voir tout
+                  <ArrowUpRight className="h-4 w-4" />
                 </Button>
               </div>
               <TransactionList
@@ -228,145 +212,75 @@ export default function WalletPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
+          <div className="space-y-6">
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
               <CardContent className="p-6">
-                <Typography variant="h4" weight="semibold" className="mb-4">
-                  Revenus Mensuels
-                </Typography>
-                <div className="space-y-2">
-                  <Typography variant="h3" weight="bold" gradient>
-                    +{stats.totalAmount.toLocaleString()} GTC
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 rounded-lg bg-green-500/10">
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                  </div>
+                  <Typography variant="h4" weight="semibold">
+                    Analyse des Flux
                   </Typography>
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-green-500" />
-                    <Typography variant="body-sm" theme="success">
-                      {stats.monthlyChange > 0 ? "+" : ""}
-                      {stats.monthlyChange}% ce mois-ci
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
+                    <Typography variant="body-sm" theme="muted">Revenus ce mois</Typography>
+                    <Typography variant="body-base" weight="bold" className="text-green-500">
+                      +{stats.totalAmount.toLocaleString()} GTC
                     </Typography>
                   </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
+                    <Typography variant="body-sm" theme="muted">Transactions en attente</Typography>
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20">
+                      {stats.pendingTransactions}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 mt-2"
+                    onClick={() => router.push("/wallet/transactions/history")}
+                  >
+                    <History className="h-4 w-4" />
+                    Historique complet
+                  </Button>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
               <CardContent className="p-6">
-                <Typography variant="h4" weight="semibold" className="mb-4">
-                  En Attente
-                </Typography>
-                <div className="space-y-2">
-                  <Typography variant="h3" weight="bold">
-                    {stats.pendingTransactions}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <Shield className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <Typography variant="h4" weight="semibold">
+                    Sécurité & Accès
                   </Typography>
-                  <Typography variant="body-sm" theme="muted">
-                    Transactions en attente de traitement
-                  </Typography>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="secondary"
+                    className="justify-start gap-3"
+                    onClick={() => router.push("/wallet/settings")}
+                  >
+                    <Lock className="h-4 w-4" />
+                    Paramètres de sécurité
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="justify-start gap-3"
+                    onClick={() => router.push("/wallet/claims")}
+                  >
+                    <Bell className="h-4 w-4" />
+                    Réclamations (Claims)
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="transactions">
-          <TransactionList
-            transactions={transactions}
-            walletId={wallet.id}
-            showFilters
-          />
-        </TabsContent>
-
-        <TabsContent value="cards">
-          <Card>
-            <CardContent className="p-6">
-              <Typography variant="h4" weight="semibold" className="mb-6">
-                Cartes Associées
-              </Typography>
-              <div className="text-center py-12">
-                <CreditCard className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                <Typography variant="body-lg" theme="muted" className="mb-4">
-                  Aucune carte associée
-                </Typography>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Ajouter une Carte
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security">
-          <Card>
-            <CardContent className="p-6 space-y-6">
-              <Typography variant="h4" weight="semibold">
-                Paramètres de Sécurité
-              </Typography>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Shield className="h-5 w-5 text-green-500" />
-                    <div>
-                      <Typography variant="body-sm" weight="medium">
-                        Authentification à 2 facteurs
-                      </Typography>
-                      <Typography variant="caption2" theme="muted">
-                        Protection supplémentaire pour votre compte
-                      </Typography>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Activer
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Bell className="h-5 w-5 text-blue-500" />
-                    <div>
-                      <Typography variant="body-sm" weight="medium">
-                        Notifications de sécurité
-                      </Typography>
-                      <Typography variant="caption2" theme="muted">
-                        Soyez alerté des activités suspectes
-                      </Typography>
-                    </div>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="bg-green-50 text-green-700"
-                  >
-                    Activé
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Lock className="h-5 w-5 text-orange-500" />
-                    <div>
-                      <Typography variant="body-sm" weight="medium">
-                        Verrouillage automatique
-                      </Typography>
-                      <Typography variant="caption2" theme="muted">
-                        Verrouille après 15 minutes d'inactivité
-                      </Typography>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Configurer
-                  </Button>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <Button variant="destructive" size="sm">
-                  Déconnecter tous les appareils
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }

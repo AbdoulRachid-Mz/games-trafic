@@ -3,6 +3,9 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { createTransaction as createWalletTransaction } from "@/actions/transactions";
+import { verifyWalletPin } from "@/actions/wallets";
+import { getTransactionFees } from "@/actions/transactions";
 
 interface UseTransactionProps {
   walletId: string;
@@ -10,49 +13,56 @@ interface UseTransactionProps {
 }
 
 interface TransactionData {
-  type: string;
+  type: "PURCHASE" | "VIP_SUBSCRIPTION" | "GAME_ITEM_PURCHASE" | "THEME_PURCHASE" | "DEPOSIT" | "WITHDRAWAL" | "REFUND" | "TRANSFER" | "ORDER_PURCHASE" | "TOURNAMENT_PARTICIPATION" | "BONUS";
   amount: number;
   targetId?: string;
+  description?: string;
   metadata?: any;
   fees?: number;
   totalAmount?: number;
 }
 
+/**
+ * Hook pour gérer les transactions wallet
+ * ✅ REFACTORÉ: Utilise maintenant les server actions au lieu de l'API
+ */
 export function useTransaction({ walletId, userId }: UseTransactionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const calculateFees = useCallback((type: string, amount: number): number => {
-    const feeRates: Record<string, number> = {
-      THEME_PURCHASE: 0.01, // 1%
-      VIP_SUBSCRIPTION: 0.005, // 0.5%
-      PRODUCT_PURCHASE: 0.02, // 2%
-      TOURNAMENT_PARTICIPATION: 0.015, // 1.5%
-      GAME_ITEM_PURCHASE: 0.03, // 3%
-      DEPOSIT: 0.001, // 0.1%
-      TRANSFER: 0.005, // 0.5%
-    };
-
-    return amount * (feeRates[type] || 0.01);
+  const calculateFees = useCallback(async (type: string, amount: number): Promise<number> => {
+    try {
+      const feeCalc = await getTransactionFees(type, amount);
+      return feeCalc.fees;
+    } catch (error) {
+      console.error("Error calculating fees:", error);
+      // Fallback aux taux par défaut
+      const feeRates: Record<string, number> = {
+        THEME_PURCHASE: 0.01,
+        VIP_SUBSCRIPTION: 0.005,
+        PRODUCT_PURCHASE: 0.02,
+        TOURNAMENT_PARTICIPATION: 0.015,
+        GAME_ITEM_PURCHASE: 0.03,
+        DEPOSIT: 0.001,
+        TRANSFER: 0.005,
+      };
+      return amount * (feeRates[type] || 0.01);
+    }
   }, []);
 
   const verifyPin = useCallback(async (pin: string): Promise<boolean> => {
     try {
-      const response = await fetch("/api/wallet/verify-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletId, pin }),
-      });
+      const result = await verifyWalletPin(walletId, pin);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "PIN incorrect");
+      if (!result.success) {
+        toast.error(result.error || "PIN incorrect");
+        return false;
       }
 
       return true;
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || "Erreur lors de la vérification du PIN");
       return false;
     }
   }, [walletId]);
@@ -65,10 +75,6 @@ export function useTransaction({ walletId, userId }: UseTransactionProps) {
     setError(null);
 
     try {
-      // Calculer les frais si non fournis
-      const fees = data.fees || calculateFees(data.type, data.amount);
-      const totalAmount = data.totalAmount || data.amount + fees;
-
       // Vérifier le PIN si fourni
       if (pin) {
         const isPinValid = await verifyPin(pin);
@@ -77,35 +83,35 @@ export function useTransaction({ walletId, userId }: UseTransactionProps) {
         }
       }
 
-      // Créer la transaction
-      const response = await fetch("/api/transactions/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          walletId,
+      // Calculer les frais si non fournis
+      const fees = data.fees || await calculateFees(data.type, data.amount);
+
+      // Créer la transaction via server action
+      const transaction = await createWalletTransaction({
+        walletId,
+        type: data.type,
+        amount: data.amount.toFixed(2),
+        description: data.description,
+        metadata: {
+          ...data.metadata,
+          targetId: data.targetId,
           userId,
-          fees,
-          totalAmount,
-        }),
+        },
+        fees: fees.toFixed(2),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erreur lors de la transaction");
-      }
-
       toast.success("Transaction effectuée avec succès !");
-      return result.data;
+      router.refresh(); // Rafraîchir les données
+      return transaction;
     } catch (error: any) {
-      setError(error.message);
-      toast.error(error.message);
+      const errorMessage = error.message || "Erreur lors de la transaction";
+      setError(errorMessage);
+      toast.error(errorMessage);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [walletId, userId, calculateFees, verifyPin]);
+  }, [walletId, userId, calculateFees, verifyPin, router]);
 
   const validateTransaction = useCallback(async (
     amount: number,

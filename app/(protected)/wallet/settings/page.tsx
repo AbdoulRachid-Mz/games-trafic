@@ -183,7 +183,7 @@ const WalletSettingsPage = () => {
           GTC
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{wallet.balance} GTC</div>
+          {/* <div className="text-2xl font-bold">{wallet.} GTC</div> */}
           <p className="text-xs text-muted-foreground">
             Card #: ****{wallet.cardNumberHash?.slice(-4)}
           </p>

@@ -35,6 +35,7 @@ import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getTournamentEditions } from "@/actions/tournaments";
 import { useTransactionFees } from "@/hooks/use-transaction-fees";
+import { getTournamentMembers } from "@/actions/members";
 
 export default function CreateTransactionPage() {
   const searchParams = useSearchParams();
@@ -57,8 +58,7 @@ function CreateTransactionContent({
   const { user } = useAuthContext();
   const { data: completeData } = useUserProfile({
     enabled: true,
-    mode: "partial",
-    relations: ["wallet"],
+    mode: "minimal",
   });
   const { settings } = useApp();
 
@@ -71,15 +71,15 @@ function CreateTransactionContent({
     metadata: {},
   });
   const [transactionId, setTransactionId] = useState<string | null>(null);
-  
+
   // Fetch fees via the dedicated hook
-  const { 
-    fees, 
-    total, 
-    isLoading: feesLoading, 
-    isError, 
-    error, 
-    refetch 
+  const {
+    fees,
+    total,
+    isLoading: feesLoading,
+    isError,
+    error,
+    refetch
   } = useTransactionFees(
     transactionData.type,
     transactionData.amount,
@@ -205,19 +205,16 @@ function CreateTransactionContent({
     config: (typeof TRANSACTION_CONFIGS)[TransactionType],
     hasTargetId: boolean
   ): number => {
-    // If entity is required but not provided, start at entity selection
-    if (config.requiresEntity && !hasTargetId) {
+    if (config.requiresEntity) {
       const entityStepIndex = config.steps.indexOf("ENTITY_SELECTION");
-      return entityStepIndex >= 0 ? entityStepIndex : 0;
+      if (entityStepIndex >= 0) return entityStepIndex;
     }
 
-    // If amount input is needed and no amount provided, start there
     if (config.steps.includes("AMOUNT_INPUT")) {
       const amountStepIndex = config.steps.indexOf("AMOUNT_INPUT");
       return amountStepIndex >= 0 ? amountStepIndex : 0;
     }
 
-    // Otherwise start at first step after type selection
     return config.steps.indexOf("TYPE_SELECTION") >= 0 ? 1 : 0;
   };
 
@@ -324,7 +321,35 @@ function CreateTransactionContent({
     }
   };
 
-  const handleEntitySelect = (entity: any) => {
+  const handleEntitySelect = async (entity: any) => {
+    if (transactionData.type === "THEME_PURCHASE" || transactionData.type === "PRODUCT_PURCHASE") {
+      const creatorId = entity.creatorId || entity.userId || entity.ownerId;
+      if (creatorId && user?.id && creatorId === user.id) {
+        toast.error("Action non autorisée: vous êtes l'auteur de cet élément");
+        return;
+      }
+    }
+
+    if (transactionData.type === "TOURNAMENT_PARTICIPATION" && user?.id) {
+      const tId =
+        entity?.metadata?.tournamentId ||
+        entity?.tournamentId ||
+        entity?.tournament?.id;
+      if (tId) {
+        try {
+          const res = await getTournamentMembers({
+            pagination: { page: 1, limit: 1 },
+            filters: { tournamentId: tId, userId: user.id } as any,
+          });
+          if (res?.data && res.data.length > 0) {
+            toast.error("Vous êtes déjà membre ou organisateur de ce tournoi");
+            return;
+          }
+        } catch (e) {
+        }
+      }
+    }
+
     const price = entity.priceGtc ? parseFloat(entity.priceGtc) : entity.price || 0;
     setTransactionData((prev) => ({
       ...prev,
@@ -333,7 +358,6 @@ function CreateTransactionContent({
       amount: price || prev.amount,
     }));
 
-    // Passer à l'étape suivante
     const nextStepIndex = steps.indexOf(currentStepType) + 1;
     if (nextStepIndex < steps.length) {
       setCurrentStep(nextStepIndex);
@@ -468,6 +492,14 @@ function CreateTransactionContent({
           feesAmount: feesObj.amount,
           feesPercentage: feesObj.percentage,
           totalCalculated: feesObj.totalAmount,
+          ...(transactionData.type === "GAME_ITEM_PURCHASE" && transactionData.entity?.price
+            ? {
+              quantity: Math.max(
+                1,
+                Math.round(transactionData.amount / (transactionData.entity?.price || 1))
+              ),
+            }
+            : {}),
         },
       });
 
@@ -486,7 +518,7 @@ function CreateTransactionContent({
         date: new Date(),
         reference: `TX-${transaction.id.slice(-8)}`,
         newBalance:
-          parseFloat(completeData.wallet.balance || "0") - feesObj.totalAmount,
+          parseFloat(completeData.ledgerBalance || "0") - feesObj.totalAmount,
         entityData: transactionData.entity,
       });
 
@@ -577,10 +609,15 @@ function CreateTransactionContent({
           <TransactionAmountInput
             amount={transactionData.amount}
             onChange={handleAmountChange}
-            walletBalance={parseFloat(completeData?.wallet?.balance || "0")}
+            walletBalance={parseFloat(completeData?.ledgerBalance || "0")}
             fees={feesObj}
             transactionType={transactionData.type}
             entity={transactionData.entity}
+            alreadyVip={
+              transactionData.type === "VIP_SUBSCRIPTION"
+                ? !!completeData?.hasActiveSubscription
+                : false
+            }
             onContinue={handleContinue}
             onBack={handleBack}
           />
@@ -645,7 +682,7 @@ function CreateTransactionContent({
             transactionId={transactionId}
             transactionData={transactionData}
             newBalance={
-              parseFloat(completeData?.wallet?.balance || "0") -
+              parseFloat(completeData?.ledgerBalance || "0") -
               feesObj.totalAmount
             }
             isRequest={
@@ -678,7 +715,7 @@ function CreateTransactionContent({
             {completeData?.wallet && !showScanner && (
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-2xl border border-primary/20 self-center md:self-auto">
                 <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Solde:</span>
-                <span className="text-sm font-black text-primary">{completeData.wallet.balance} GTC</span>
+                <span className="text-sm font-black text-primary">{completeData.ledgerBalance || "0"} GTC</span>
               </div>
             )}
           </div>

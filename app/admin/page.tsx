@@ -215,9 +215,9 @@ export default function AdminOverviewPage() {
             />
             <StatCard
               title="Commandes"
-              value={stats?.total_orders || 0}
+              value={stats?.orders || 0}
               icon={ShoppingCart}
-              description={`${orderStats?.accepted || 0} acceptées • ${orderStats?.pending || 0} en attente`}
+              description={`${orderStats?.completed || 0} complétées • ${orderStats?.cancelled || 0} annulées`}
             />
           </div>
 

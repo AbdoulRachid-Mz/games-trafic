@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getShopStats, getShopStatsById } from "@/actions/shops";
-import { getOrderStats } from "@/actions/orders";
+import { getOrderStats, getShopOrderStats } from "@/actions/orders";
 import { getProductStats } from "@/actions/products";
 import { AdvancedChart } from "@/components/ui/advanced-chart";
 
@@ -95,7 +95,7 @@ export default function ShopOverviewPage() {
       // Ici, vous intégrerez les vraies données
       const [shopStats, orderStats, productStats] = await Promise.all([
         getShopStatsById(params.id as string),
-        getOrderStats({ shopId: params.id as string }),
+        getShopOrderStats(params.id as string),
         getProductStats({ shopId: params.id as string }),
       ]);
 

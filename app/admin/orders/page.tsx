@@ -49,7 +49,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { getOrders, getOrderStats, adminApproveOrder, adminRejectOrder } from "@/actions/orders";
+import { getOrders, completeOrderAdmin, rejectOrder } from "@/actions/orders";
 import { getProductById } from "@/actions/products";
 import { useAuthContext } from "@/contexts/auth-context";
 
@@ -67,7 +67,7 @@ type UiOrder = {
   shopName?: string;
   shopOwner?: string;
   amount: number;
-  status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  status: "PENDING" | "ACCEPTED_BY_SHOP" | "REJECTED_BY_SHOP" | "REJECTED_BY_ADMIN" | "COMPLETED" | "CANCELLED";
   createdAt: Date;
   accountLogin?: string | null;
   accountPasswordMasked?: string | null;
@@ -99,9 +99,8 @@ export default function AdminOrdersPage() {
   const loadData = async () => {
     try {
       const result = await getOrders({
-        pagination: { page: 1, limit: 50 },
-        filters: { statuses: ["PENDING", "ACCEPTED"] },
-        options: { sortBy: "createdAt", sortOrder: "desc" },
+        statuses: ["PENDING", "ACCEPTED_BY_SHOP", "COMPLETED", "REJECTED_BY_SHOP", "REJECTED_BY_ADMIN"],
+        limit: 50
       });
 
       const enriched: UiOrder[] = [];
@@ -126,7 +125,7 @@ export default function AdminOrdersPage() {
               rank: p.accountRank || null,
             };
           }
-        } catch {}
+        } catch { }
 
         enriched.push({
           id: o.id,
@@ -143,6 +142,10 @@ export default function AdminOrdersPage() {
           accountLogin,
           accountPasswordMasked: accountLogin ? "••••••••••••" : null,
           accountDetails,
+          shopName: o.shop?.name || undefined,
+          shopOwner: o.shop?.ownerId || undefined,
+          buyerName: o.buyer?.username || undefined,
+          buyerEmail: o.buyer?.email || undefined,
         });
       }
 
@@ -164,7 +167,7 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      await adminApproveOrder(orderId, auth?.id);
+      await completeOrderAdmin(orderId);
       toast.success("Commande approuvée - Transfert effectué");
       await loadData();
       setSelectedOrder(null);
@@ -181,7 +184,7 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      await adminRejectOrder(orderId, auth?.id || "", actionReason);
+      await rejectOrder(orderId, actionReason);
       toast.success("Commande rejetée - Remboursement effectué");
       await loadData();
       setSelectedOrder(null);
@@ -222,8 +225,9 @@ export default function AdminOrdersPage() {
   const stats = {
     total: orders.length,
     pending: orders.filter((o) => o.status === "PENDING").length,
-    accepted: orders.filter((o) => o.status === "ACCEPTED").length,
-    rejected: orders.filter((o) => o.status === "REJECTED").length,
+    accepted: orders.filter((o) => o.status === "ACCEPTED_BY_SHOP").length,
+    rejected: orders.filter((o) => o.status.includes("REJECTED")).length,
+    completed: orders.filter((o) => o.status === "COMPLETED").length,
   };
 
   return (
@@ -253,16 +257,16 @@ export default function AdminOrdersPage() {
           description="À traiter"
         />
         <StatCard
-          title="Approuvées"
+          title="Validées Boutique"
           value={stats.accepted}
           icon={CheckCircle}
-          description="Finalisées"
+          description="En attente Admin"
         />
         <StatCard
-          title="Rejetées"
-          value={stats.rejected}
-          icon={XCircle}
-          description="Annulées"
+          title="Finalisées"
+          value={stats.completed}
+          icon={CheckCircle}
+          description="Terminées"
         />
       </div>
 
@@ -286,12 +290,15 @@ export default function AdminOrdersPage() {
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
                 <SelectItem value="PENDING">En attente</SelectItem>
-                <SelectItem value="ACCEPTED">Approuvé</SelectItem>
-                <SelectItem value="REJECTED">Rejeté</SelectItem>
+                <SelectItem value="ACCEPTED_BY_SHOP">Validé par Boutique</SelectItem>
+                <SelectItem value="COMPLETED">Terminé</SelectItem>
+                <SelectItem value="REJECTED_BY_ADMIN">Rejeté Admin</SelectItem>
+                <SelectItem value="REJECTED_BY_SHOP">Rejeté Boutique</SelectItem>
                 <SelectItem value="CANCELLED">Annulé</SelectItem>
               </SelectContent>
             </Select>
           </FilterBar>
+
         </CardContent>
       </Card>
 
@@ -555,7 +562,7 @@ export default function AdminOrdersPage() {
                       <Checkbox
                         checked={
                           verificationChecks[
-                            key as keyof typeof verificationChecks
+                          key as keyof typeof verificationChecks
                           ]
                         }
                         onCheckedChange={(checked) =>

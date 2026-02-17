@@ -44,6 +44,7 @@ export function GamesFilterSidebar({
     { value: "COIN", label: "Monnaies / Cash", icon: Coins },
     { value: "ITEM", label: "Items de jeu", icon: Package },
     { value: "SKIN", label: "Skins / Apparences", icon: Shield },
+    { value: "EQUIPMENT", label: "Équipements", icon: Gamepad2 },
   ];
 
   return (
@@ -151,7 +152,7 @@ export function GamesFilterSidebar({
       </Card>
 
       {/* Promo Card in Sidebar */}
-      <Card className="bg-[#0a0a0b] border-2 border-primary/20 text-white overflow-hidden relative group rounded-2xl">
+      <Card className="bg-background border-2 border-primary/20 text-foreground overflow-hidden relative group rounded-2xl">
         <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:scale-150 transition-transform duration-1000">
           <Sparkles className="h-32 w-32 text-primary" />
         </div>
@@ -162,7 +163,7 @@ export function GamesFilterSidebar({
           <h4 className="font-black text-lg leading-tight text-start tracking-tighter uppercase italic">
             GTC Bonus <span className="text-primary">+5%</span>
           </h4>
-          <p className="text-[11px] text-white/50 text-start leading-relaxed font-medium">
+          <p className="text-[11px] text-muted-foreground text-start leading-relaxed font-medium">
             Rechargez +50€ et recevez un bonus immédiat pour vos prochains achats.
           </p>
           <Button

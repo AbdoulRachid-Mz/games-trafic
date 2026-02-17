@@ -79,16 +79,16 @@ export function generateTransactionReceipt(data: ReceiptData) {
   doc.text(`Total: ${data.totalAmount.toFixed(2)} GTC`, 30, yPos);
   
   yPos += 12;
-  doc.text(`Nouveau solde: ${data.newBalance.toFixed(2)} GTC`, 30, yPos);
+  // Retiré: affichage du nouveau solde sur le reçu
   
   // Pied de page
   doc.setLineWidth(0.5);
   doc.line(20, 250, 190, 250);
   
   doc.setFontSize(9);
-  doc.text("Merci pour votre confiance !", 105, 260, { align: "center" });
-  doc.text("www.gamestrafics.com", 105, 265, { align: "center" });
-  doc.text("support@gamestrafics.com", 105, 270, { align: "center" });
+  doc.text("Merci pour votre confiance !", 105, 258, { align: "center" });
+  doc.text("support@gamestrafics.com", 105, 263, { align: "center" });
+  doc.text("Tahoua - Niger", 105, 268, { align: "center" });
   
   // Enregistrer le PDF
   doc.save(`receipt-${data.reference}.pdf`);

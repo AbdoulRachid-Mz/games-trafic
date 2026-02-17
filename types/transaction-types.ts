@@ -1,4 +1,4 @@
-export type TransactionType = 
+export type TransactionType =
   | 'THEME_PURCHASE'
   | 'VIP_SUBSCRIPTION'
   | 'PRODUCT_PURCHASE'
@@ -8,7 +8,7 @@ export type TransactionType =
   | 'WITHDRAWAL'
   | 'TRANSFER';
 
-  
+
 
 export interface TransactionEntity {
   id: string;
@@ -31,7 +31,7 @@ export interface TransactionConfig {
   steps: TransactionStep[];
 }
 
-export type TransactionStep = 
+export type TransactionStep =
   | 'TYPE_SELECTION'
   | 'ENTITY_SELECTION'
   | 'AMOUNT_INPUT'
@@ -118,14 +118,25 @@ export const TRANSACTION_CONFIGS: Record<TransactionType, TransactionConfig> = {
 export interface TransactionData {
   type: TransactionType;
   amount: number;
+
+  // ⚠️ IMPORTANT: Use accountId for ledger-based operations
+  fromAccountId?: string;
+  toAccountId?: string;
+
+  // Legacy: kept for backward compatibility with wallet-based operations
+  fromWalletId?: string;
+  toWalletId?: string;
+
   targetId?: string;
   entity?: TransactionEntity;
   recipientWalletId?: string;
+  recipientAccountId?: string;
   recipientUser?: {
     id: string;
     name: string;
     walletNumber: string;
   };
+
   metadata: {
     paymentMethod?: string;
     paymentProvider?: string;
@@ -140,4 +151,36 @@ export interface TransactionFee {
   percentage: number;
   amount: number;
   totalAmount: number;
+}
+
+// ============================================================================
+// LEDGER-BASED TRANSACTION TYPES
+// ============================================================================
+
+/**
+ * Data structure for executing a ledger-based transaction
+ * This enforces double-entry accounting principles
+ */
+export interface LedgerTransactionData {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  type: TransactionType;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Result of a ledger transaction execution
+ */
+export interface LedgerTransactionResult {
+  transactionId: string;
+  ledgerEntries: Array<{
+    id: string;
+    accountId: string;
+    debit: string;
+    credit: string;
+  }>;
+  fromAccountBalance: number;
+  toAccountBalance: number;
 }

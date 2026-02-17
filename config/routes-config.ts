@@ -17,6 +17,7 @@ export interface RouteConfig {
   floatingActions?: boolean;
   showAIAssistant?: boolean;
   requireAuth?: boolean;
+  guestOnly?: boolean;
   requireAdmin?: boolean;
   excludeLayout?: boolean;
   fabActions?: FABAction[];
@@ -111,6 +112,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     excludeLayout: true,
     requireAuth: false,
     styleGroup: "auth",
+    guestOnly: true,
   },
   {
     path: ["/welcome", "/onboarding", "/test"],
@@ -122,6 +124,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     leftBar: false,
     rightBar: false,
     breadcrumbs: false,
+    guestOnly: true,
   },
   {
     path: "/maintenance",
@@ -333,24 +336,32 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     styleGroup: "wallet",
   },
   {
-    path: "/wallet/transactions",
+    path: ["/wallet/transactions", "/wallet/transactions/**"],
     name: "Transactions",
-    dockLinks: [
-      {
-        href: "/wallet/transactions",
-        label: "Transactions",
-        icon: "transactions",
-        requireAuth: true,
-      },
-      {
-        href: "/wallet/transactions/history",
-        label: "Historique",
-        icon: "history",
-        requireAuth: true,
-      },
-    ],
     // excludeLayout: true,
     styleGroup: "wallet",
+    footer: false
+  },
+  {
+    path: "/wallet/transactions/create",
+    name: "Create Transaction",
+    // excludeLayout: true,
+    styleGroup: "wallet",
+    footer: false
+  },
+  {
+    path: "/wallet/transactions/claims",
+    name: "Reclamations",
+    // excludeLayout: true,
+    styleGroup: "wallet",
+    footer: false
+  },
+  {
+    path: "/wallet/transactions/history",
+    name: "Transaction Historiques",
+    // excludeLayout: true,
+    styleGroup: "wallet",
+    footer: false
   },
   {
     path: ["/chats", "/chats/**"],
@@ -939,7 +950,7 @@ export const findRouteConfig = (pathname: string): RouteConfig => {
 export const canAccessRoute = (
   pathname: string,
   user: UserRoles,
-): { hasAccess: boolean; redirectTo?: string } => {
+): { hasAccess: boolean; redirectTo?: string; reason?: string } => {
   const config = findRouteConfig(pathname);
 
   // Admin check
@@ -947,11 +958,21 @@ export const canAccessRoute = (
     return { hasAccess: false, redirectTo: "/" };
   }
 
-  // Auth check
+  // 1️⃣ Page protégée
   if (config.requireAuth && !user.isAuthenticated) {
     return {
       hasAccess: false,
-      redirectTo: `/sign-in?redirect=${encodeURIComponent(pathname)}`,
+      redirectTo: "/sign-in",
+      reason: "AUTH_REQUIRED",
+    };
+  }
+
+  // 2️⃣ Page guest-only
+  if (config.guestOnly && user.isAuthenticated) {
+    return {
+      hasAccess: false,
+      redirectTo: "/dashboard",
+      reason: "ALREADY_AUTHENTICATED",
     };
   }
 

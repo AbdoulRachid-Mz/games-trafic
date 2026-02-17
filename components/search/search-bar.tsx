@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
-import { debounce } from "lodash"
+import { useLocalSearch } from "@/hooks/use-local-search"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
 
@@ -37,7 +37,6 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [selectedFilters, setSelectedFilters] = useState<string[]>([])
   const searchRef = useRef<HTMLDivElement>(null)
 
@@ -46,89 +45,41 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
     const searchQuery = searchParams.get("q") || ""
     if (searchQuery) {
       setQuery(searchQuery)
-      performSearch(searchQuery)
     }
   }, [searchParams])
 
-  // Gestion de l'historique de session
-  const SESSION_KEY = "sessionSearchQueries"
-  const pushSessionQuery = (q: string) => {
-    const term = q.trim()
-    if (term.length < 2) return
-    try {
-      const raw = sessionStorage.getItem(SESSION_KEY)
-      const arr: string[] = raw ? JSON.parse(raw) : []
-      if (!arr.includes(term)) {
-        arr.push(term)
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify(arr))
-      }
-    } catch {}
-  }
-  const flushSessionQueries = async () => {
-    try {
-      const raw = sessionStorage.getItem(SESSION_KEY)
-      if (!raw) return
-      const arr: string[] = JSON.parse(raw)
-      const unique = Array.from(new Set(arr.filter((v) => v && v.trim().length >= 2)))
-      if (unique.length === 0) return
-      for (const q of unique) {
-        const payload = JSON.stringify({ query: q })
-        if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
-          const blob = new Blob([payload], { type: "application/json" })
-          navigator.sendBeacon("/api/search/history", blob)
-        } else {
-          fetch("/api/search/history", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true })
-        }
-      }
-      sessionStorage.removeItem(SESSION_KEY)
-    } catch {}
-  }
+  const searchTypes = (() => {
+    if (type === "all") return ["shop","product","tournament"] as const
+    if (type === "products") return ["product"] as const
+    if (type === "shops") return ["shop"] as const
+    if (type === "tournaments") return ["tournament"] as const
+    return ["product"] as const
+  })()
+
+  const { results: searchData, isLoading, addToHistory } = useLocalSearch(searchTypes as any, query, { limitPerType: 8, debounceMs: 400 })
+
   useEffect(() => {
-    const handler = () => { void flushSessionQueries() }
-    window.addEventListener("beforeunload", handler)
-    return () => window.removeEventListener("beforeunload", handler)
-  }, [])
-
-  // Fonction de recherche avec debounce (envoi uniquement après pause de saisie)
-  const performSearch = useCallback(
-    debounce(async (searchQuery: string) => {
-      const trimmed = searchQuery.trim()
-      if (!trimmed) {
-        setResults([])
-        return
-      }
-      // Stocker la requête (pause de saisie considérée)
-      pushSessionQuery(trimmed)
-
-      setIsLoading(true)
-      try {
-        const searchType = type === "all" ? "" : `&type=${type}`
-        const filters = selectedFilters.length > 0 ? `&filters=${selectedFilters.join(",")}` : ""
-        const response = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}${searchType}${filters}`)
-        const data = await response.json()
-        if (data.success) {
-          setResults(data.results)
-        } else {
-          setResults([])
-        }
-      } catch (error) {
-        console.error("Erreur lors de la recherche:", error)
-        setResults([])
-      } finally {
-        setIsLoading(false)
-      }
-    }, 500),
-    [type, selectedFilters],
-  )
-
-  // Mettre à jour la recherche uniquement après une pause de saisie
-  useEffect(() => {
-    if (query.trim()) {
-      performSearch(query)
-    } else {
+    if (!query.trim()) {
       setResults([])
+    } else {
+      const mapped = searchData.map((r: any) => {
+        const url =
+          r.type === "product" ? `/produits/${r.id}` :
+          r.type === "shop" ? `/boutiques/${r.id}` :
+          r.type === "tournament" ? `/tournois/${r.id}` :
+          "#"
+        return {
+          id: r.id,
+          title: r.title,
+          type: r.type,
+          image: r.image,
+          subtitle: r.description,
+          url
+        } as SearchResult
+      })
+      setResults(mapped as any)
     }
-  }, [query, performSearch])
+  }, [searchData, query])
 
 
   // Gérer la soumission du formulaire
@@ -136,9 +87,9 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
     e.preventDefault()
     const trimmed = query.trim()
     if (trimmed) {
+      addToHistory(trimmed)
       const searchType = type === "all" ? "" : `&type=${type}`
       const filters = selectedFilters.length > 0 ? `&filters=${selectedFilters.join(",")}` : ""
-      pushSessionQuery(trimmed)
       router.push(`/search?q=${encodeURIComponent(trimmed)}${searchType}${filters}`)
       setOpen(false)
     }
@@ -146,6 +97,7 @@ export function SearchBar({ type = "all", placeholder = "Rechercher...", classNa
 
   // Gérer le clic sur un résultat
   const handleResultClick = (result: SearchResult) => {
+    addToHistory(result.title)
     router.push(result.url)
     setOpen(false)
   }

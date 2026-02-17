@@ -9,9 +9,10 @@ import { useState } from "react"
 interface SearchHistoryItemProps {
   term: string
   onClick: (term: string) => void
+  onDelete?: () => void
 }
 
-export function SearchHistoryItem({ term, onClick }: SearchHistoryItemProps) {
+export function SearchHistoryItem({ term, onClick, onDelete }: SearchHistoryItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -19,14 +20,7 @@ export function SearchHistoryItem({ term, onClick }: SearchHistoryItemProps) {
     setIsDeleting(true)
 
     try {
-      // Implement delete single history item
-      await fetch(`/api/search/history/item`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: term }),
-      })
-    } catch (error) {
-      console.error("Error deleting search history item:", error)
+      if (onDelete) onDelete()
     } finally {
       setIsDeleting(false)
     }

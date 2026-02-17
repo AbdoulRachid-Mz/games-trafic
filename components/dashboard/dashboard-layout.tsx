@@ -29,6 +29,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { PageSkeleton } from "../ui/page-skeleton";
+import { Sheet } from "@/components/ui/sheet";
+import { SheetContent } from "@/components/ui/sheet";
 
 interface DashboardTab {
   id: string;
@@ -270,42 +272,22 @@ export function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Mobile menu button */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={cn(
-          "fixed z-30 top-4 right-4 md:hidden",
-          isSidebarOpen && "hidden"
-        )}
-      >
-        <Menu size={24} />
-      </Button>
-
-      {/* Sidebar */}
-      <AnimatePresence>
-        {(!isMobile || isSidebarOpen) && (
+      {/* Sidebar (Desktop) */}
+      {!isMobile && (
+        <AnimatePresence>
           <motion.div
-            initial={{
-              width: isSidebarOpen ? 280 : 80,
-              opacity: isMobile && !isSidebarOpen ? 0 : 1,
-            }}
-            animate={{
-              width: isSidebarOpen ? 280 : 80,
-              opacity: 1,
-            }}
+            key="desktop-sidebar"
+            initial={{ width: isSidebarOpen ? 280 : 80, opacity: 1 }}
+            animate={{ width: isSidebarOpen ? 280 : 80, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className={cn(
-              "fixed md:relative z-20 h-full shadow-lg",
+              "relative z-20 h-full shadow-lg",
               getSidebarStyles(),
               isSidebarOpen ? "w-72" : "w-20"
             )}
           >
             <div className="h-full flex flex-col">
-              {/* Sidebar header */}
               <div className="flex items-center justify-between p-6 border-b border-white/20">
                 <div className="flex items-center gap-3">
                   <div
@@ -319,37 +301,20 @@ export function DashboardLayout({
                     <Sparkles
                       className={cn(
                         "h-6 w-6",
-                        sidebarBgType === "gradient" ||
-                          sidebarBgType === "glass"
+                        sidebarBgType === "gradient" || sidebarBgType === "glass"
                           ? "text-yellow-400"
                           : "text-primary"
                       )}
                     />
                   </div>
                   {isSidebarOpen && (
-                    <Typography
-                      variant="h4"
-                      weight="bold"
-                      className={getTextColor()}
-                    >
+                    <Typography variant="h4" weight="bold" className={getTextColor()}>
                       {title}
                     </Typography>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Close button */}
-                  <button
-                    onClick={() => setIsSidebarOpen(false)}
-                    className={cn(
-                      "p-1 rounded-full hover:bg-white/10 transition-colors",
-                      getTextColor()
-                    )}
-                  >
-                    <X size={18} />
-                  </button>
-
-                  {/* If togglePosition is 'top', show toggle here */}
-                  {togglePosition === "top" && !isMobile && (
+                  {togglePosition === "top" && (
                     <button
                       onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                       className={cn(
@@ -364,8 +329,6 @@ export function DashboardLayout({
                   )}
                 </div>
               </div>
-
-              {/* Toggle button - desktop (edge) */}
               {!isMobile && togglePosition === "edge" && (
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -376,15 +339,9 @@ export function DashboardLayout({
                       : "bg-primary text-primary-foreground hover:bg-primary/90"
                   )}
                 >
-                  {isSidebarOpen ? (
-                    <ChevronLeft size={16} />
-                  ) : (
-                    <ChevronRight size={16} />
-                  )}
+                  {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                 </button>
               )}
-
-              {/* Navigation items */}
               {tabs && (
                 <ScrollArea className="flex-1 p-4">
                   <TooltipProvider delayDuration={100}>
@@ -403,24 +360,19 @@ export function DashboardLayout({
                                 } else {
                                   setActiveTab(tab.id);
                                 }
-                                if (isMobile) setIsSidebarOpen(false);
                               }}
                             >
                               <div className="flex items-center gap-3 w-full">
                                 <div className={getIconStyles(isActive)}>
                                   <tab.icon size={20} />
                                 </div>
-
                                 {isSidebarOpen && (
                                   <>
                                     <div className="flex-1 min-w-0">
                                       <Typography
                                         variant="body-sm"
                                         weight="medium"
-                                        className={cn(
-                                          "truncate",
-                                          getTextColor()
-                                        )}
+                                        className={cn("truncate", getTextColor())}
                                       >
                                         {tab.label}
                                       </Typography>
@@ -429,8 +381,7 @@ export function DashboardLayout({
                                           variant="caption2"
                                           className={cn(
                                             "text-xs",
-                                            sidebarBgType === "gradient" ||
-                                              sidebarBgType === "glass"
+                                            sidebarBgType === "gradient" || sidebarBgType === "glass"
                                               ? "text-white/60"
                                               : "text-muted-foreground"
                                           )}
@@ -439,14 +390,12 @@ export function DashboardLayout({
                                         </Typography>
                                       )}
                                     </div>
-
                                     {tab.badge && (
                                       <Badge
                                         variant="secondary"
                                         className={cn(
                                           "text-xs px-1.5 py-0.5",
-                                          sidebarBgType === "gradient" ||
-                                            sidebarBgType === "glass"
+                                          sidebarBgType === "gradient" || sidebarBgType === "glass"
                                             ? "bg-yellow-400/20 text-yellow-300 border-yellow-400/30"
                                             : ""
                                         )}
@@ -464,9 +413,7 @@ export function DashboardLayout({
                               <div className="text-center">
                                 <p className="font-medium">{tab.label}</p>
                                 {tab.description && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {tab.description}
-                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">{tab.description}</p>
                                 )}
                               </div>
                             </TooltipContent>
@@ -477,15 +424,11 @@ export function DashboardLayout({
                   </TooltipProvider>
                 </ScrollArea>
               )}
-
-              {/* User footer */}
               {user && (
                 <div
                   className={cn(
                     "p-4 border-t",
-                    sidebarBgType === "gradient" || sidebarBgType === "glass"
-                      ? "border-white/20"
-                      : "border-border"
+                    sidebarBgType === "gradient" || sidebarBgType === "glass" ? "border-white/20" : "border-border"
                   )}
                 >
                   <div
@@ -501,31 +444,22 @@ export function DashboardLayout({
                       <AvatarFallback
                         className={cn(
                           "text-xs",
-                          sidebarBgType === "gradient" ||
-                            sidebarBgType === "glass"
-                            ? "bg-white/20 text-white"
-                            : ""
+                          sidebarBgType === "gradient" || sidebarBgType === "glass" ? "bg-white/20 text-white" : ""
                         )}
                       >
                         {user.username?.charAt(0)?.toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
-
                     {isSidebarOpen && (
                       <div className="flex-1 min-w-0">
-                        <Typography
-                          variant="body-sm"
-                          weight="medium"
-                          className={cn("truncate", getTextColor())}
-                        >
+                        <Typography variant="body-sm" weight="medium" className={cn("truncate", getTextColor())}>
                           {user.username || "Utilisateur"}
                         </Typography>
                         {user.level && (
                           <Typography
                             variant="caption2"
                             className={cn(
-                              sidebarBgType === "gradient" ||
-                                sidebarBgType === "glass"
+                              sidebarBgType === "gradient" || sidebarBgType === "glass"
                                 ? "text-white/60"
                                 : "text-muted-foreground"
                             )}
@@ -540,8 +474,90 @@ export function DashboardLayout({
               )}
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      )}
+
+      {/* Sidebar (Mobile Sheet) */}
+      {isMobile && (
+        <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+          <SheetContent side="left" className="p-0" showCloseButton>
+            <div className={cn("h-full", getSidebarStyles())}>
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between p-6 border-b border-white/20">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "p-2 rounded-xl transition-all duration-300",
+                        sidebarBgType === "gradient" || sidebarBgType === "glass"
+                          ? "bg-white/20 backdrop-blur-sm"
+                          : "bg-primary/10"
+                      )}
+                    >
+                      <Sparkles
+                        className={cn(
+                          "h-6 w-6",
+                          sidebarBgType === "gradient" || sidebarBgType === "glass"
+                            ? "text-yellow-400"
+                            : "text-primary"
+                        )}
+                      />
+                    </div>
+                    <Typography variant="h4" weight="bold" className={getTextColor()}>
+                      {title}
+                    </Typography>
+                  </div>
+                </div>
+                {tabs && (
+                  <ScrollArea className="flex-1 p-4">
+                    {tabs.map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <div
+                          key={tab.id}
+                          className={getItemStyles(isActive)}
+                          onClick={() => {
+                            if (tab.path) {
+                              window.location.href = tab.path;
+                            } else {
+                              setActiveTab(tab.id);
+                            }
+                            setIsSidebarOpen(false);
+                          }}
+                        >
+                          <div className="flex items-center gap-3 w-full">
+                            <div className={getIconStyles(isActive)}>
+                              <tab.icon size={20} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <Typography variant="body-sm" weight="medium" className={cn("truncate", getTextColor())}>
+                                {tab.label}
+                              </Typography>
+                              {tab.description && (
+                                <Typography
+                                  variant="caption2"
+                                  className={cn(
+                                    "text-xs",
+                                    sidebarBgType === "gradient" || sidebarBgType === "glass"
+                                      ? "text-white/60"
+                                      : "text-muted-foreground"
+                                  )}
+                                >
+                                  {tab.description}
+                                </Typography>
+                              )}
+                            </div>
+                            {tab.badge && <Badge variant="secondary">{tab.badge}</Badge>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </ScrollArea>
+                )}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -549,12 +565,11 @@ export function DashboardLayout({
         <header className="border-b p-4 sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              {!isMobile && (
+              {isMobile && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="md:hidden"
                 >
                   <Menu size={20} />
                 </Button>

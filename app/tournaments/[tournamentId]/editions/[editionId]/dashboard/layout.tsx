@@ -3,7 +3,15 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getTournamentEditionWithRelations } from "@/actions/editions";
-import { EnhancedDashboard, SidebarItem } from "@/components/dashboard/enhanced-dashboard";
+import {
+  EnhancedDashboard,
+  SidebarHeader,
+  SidebarGroup,
+  SidebarItem,
+  SidebarFooter,
+  DashboardHeader,
+  SidebarContainer,
+} from "@/components/dashboard/enhanced-dashboard";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -22,6 +30,7 @@ import {
   Wallet,
   ListTree,
 } from "lucide-react";
+import { useActiveRoute } from "@/hooks/use-active-route";
 
 export default function EditionDashboardLayout({
   children,
@@ -32,6 +41,7 @@ export default function EditionDashboardLayout({
   const tournamentId = params.tournamentId as string;
   const editionId = params.editionId as string;
   const [edition, setEdition] = useState<any>(null);
+  const { isActive } = useActiveRoute();
 
   useEffect(() => {
     getTournamentEditionWithRelations(editionId).then(setEdition);
@@ -70,51 +80,74 @@ export default function EditionDashboardLayout({
     },
   ];
 
-  const sidebarContent = (
-    <div className="flex flex-col gap-2 p-4">
-      {navData.map((item) => (
-        <SidebarItem
-          key={item.title}
-          title={item.title}
-          url={item.url}
-          icon={item.icon}
-          sidebarBgType="default"
-        />
-      ))}
-    </div>
+  const editionOverview = navData.filter(i =>
+    i.url.endsWith(`/tournaments/${tournamentId}/editions/${editionId}/dashboard`) ||
+    i.url.endsWith(`/phases`) ||
+    i.url.endsWith(`/matches`)
+  );
+  const editionManage = navData.filter(i =>
+    i.url.endsWith(`/participants`) ||
+    i.url.endsWith(`/payments`) ||
+    i.url.endsWith(`/settings`)
   );
 
-  const headerContent = (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-      <div className="flex items-center gap-2">
-        <Separator orientation="vertical" className="mr-2 h-4" />
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem className="hidden md:block">
-              <BreadcrumbLink
-                href={`/tournaments/${tournamentId}/dashboard/editions`}
-              >
-                Éditions
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden md:block" />
-            <BreadcrumbItem>
-              <BreadcrumbPage>
-                {edition?.name || "Chargement..."}
-              </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+  const EditionSidebar = (
+    <SidebarContainer sidebarBgType="gradient">
+      <SidebarHeader
+        title={edition?.name || "Édition"}
+        subtitle="Tableau de bord"
+        user={{
+          username: "Organisateur",
+          level: "Edition",
+        }}
+        sidebarBgType="gradient"
+      />
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <SidebarGroup label="Vue d'ensemble" sidebarBgType="gradient">
+          {editionOverview.map((item) => (
+            <SidebarItem
+              key={item.title}
+              {...item}
+              isActive={isActive(item.url, item.url.endsWith(`/dashboard`))}
+              sidebarBgType="gradient"
+            />
+          ))}
+        </SidebarGroup>
+
+        <SidebarGroup label="Organisation" sidebarBgType="gradient">
+          {editionManage.map((item) => (
+            <SidebarItem
+              key={item.title}
+              {...item}
+              isActive={isActive(item.url, false)}
+              sidebarBgType="gradient"
+            />
+          ))}
+        </SidebarGroup>
       </div>
-    </header>
+
+      <SidebarFooter
+        user={{
+          username: "Organisateur",
+          profileImage: undefined,
+          status: "online",
+        }}
+        sidebarBgType="gradient"
+      />
+    </SidebarContainer>
+  );
+
+  const Header = (
+    <DashboardHeader
+      title={edition?.name || "Édition"}
+      description="Gestion de l'édition"
+      showSidebarTrigger={true}
+    />
   );
 
   return (
-    <EnhancedDashboard
-      sidebar={sidebarContent}
-      header={headerContent}
-    // className="mt-28"
-    >
+    <EnhancedDashboard sidebar={EditionSidebar} header={Header}>
       <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
         {children}
       </div>

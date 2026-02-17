@@ -70,7 +70,7 @@ export default async function ProductPage({ params }: PageProps) {
   return (
     <div className="space-y-8">
       <ProductDetail productId={productId} initialProduct={product} initialRelated={relatedProducts} />
-      <Card className="max-w-md mx-auto">
+      {/* <Card className="max-w-md mx-auto">
         <CardContent className="p-6 flex flex-col items-center">
           <Typography variant="h4" className="font-black italic uppercase tracking-tighter mb-2">
             Achat Rapide
@@ -89,7 +89,7 @@ export default async function ProductPage({ params }: PageProps) {
             className="shadow-none border-none p-0 bg-transparent"
           />
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }

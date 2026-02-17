@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
       message: "Wallet créé avec succès",
       data: {
         walletId: result.wallet!.id,
-        balance: result.wallet!.balance,
         isActive: result.wallet!.isActive,
       },
     });

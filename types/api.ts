@@ -126,8 +126,7 @@ export interface UserFilters extends BaseFilters {
 export interface UserWalletFilters extends BaseFilters {
   id?: string;
   userId?: string;
-  balanceMin?: number;
-  balanceMax?: number;
+  financialAccountId?: string;
   isActive?: boolean;
   isLocked?: boolean;
   verificationStatus?: string[];
@@ -141,6 +140,8 @@ export interface UserWalletFilters extends BaseFilters {
 export interface WalletTransactionFilters extends BaseFilters {
   id?: string;
   walletId?: string;
+  financialAccountId?: string;
+  shopId?: string; // Ajouté pour filtrer par boutique
   fromUserId?: string;
   toUserId?: string;
   types?: (
@@ -259,6 +260,44 @@ export interface RequestFilters extends BaseFilters {
   rejectedFrom?: Date | string;
   rejectedTo?: Date | string;
   isDeleted?: boolean; // Ajouté pour cohérence avec le schéma
+}
+
+// ============================================================================
+// LEDGER-BASED FILTERS
+// ============================================================================
+
+// Financial Accounts - Basé sur la table `financial_accounts`
+export interface FinancialAccountFilters extends BaseFilters {
+  id?: string;
+  ownerUserId?: string;
+  ownerShopId?: string;
+  types?: (
+    | "USER_WALLET"
+    | "SHOP_WALLET"
+    | "PLATFORM_ESCROW"
+    | "PLATFORM_FEES"
+    | "TOURNAMENT_POOL"
+    | "SYSTEM_ADJUSTMENT"
+  )[];
+  currency?: string;
+  isActive?: boolean;
+  isLocked?: boolean;
+  createdFrom?: Date | string;
+  createdTo?: Date | string;
+}
+
+// Ledger Entries - Basé sur la table `ledger_entries`
+export interface LedgerEntryFilters extends BaseFilters {
+  id?: string;
+  transactionId?: string;
+  accountId?: string;
+  debitMin?: number;
+  debitMax?: number;
+  creditMin?: number;
+  creditMax?: number;
+  currency?: string;
+  createdFrom?: Date | string;
+  createdTo?: Date | string;
 }
 
 // VIP Subscriptions - Basé sur la table `vipSubscriptions`
@@ -382,7 +421,28 @@ export interface OrderFilters extends BaseFilters {
   productId?: string;
   buyerId?: string;
   shopId?: string;
-  statuses?: ("PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED")[];
+  statuses?: (
+    | "PENDING"
+    | "ACCEPTED"
+    | "ACCEPTED_BY_SHOP"
+    | "REJECTED"
+    | "REJECTED_BY_SHOP"
+    | "REJECTED_BY_ADMIN"
+    | "COMPLETED"
+    | "CANCELLED"
+  )[];
+  status?: (
+    | "PENDING"
+    | "ACCEPTED"
+    | "ACCEPTED_BY_SHOP"
+    | "REJECTED"
+    | "REJECTED_BY_SHOP"
+    | "REJECTED_BY_ADMIN"
+    | "COMPLETED"
+    | "CANCELLED"
+  );
+  limit?: number;
+  page?: number;
   priceMin?: number;
   priceMax?: number;
   orderType?: string;
@@ -391,6 +451,15 @@ export interface OrderFilters extends BaseFilters {
   expiresTo?: Date | string;
   createdFrom?: Date | string;
   createdTo?: Date | string;
+}
+export type OrderStatus = 'COMPLETED' | 'CANCELLED' | 'REJECTED_BY_SHOP' | 'REJECTED_BY_ADMIN';
+
+export interface OrderStats {
+  total: number;
+  completed: number;
+  cancelled: number;
+  rejectedByShop: number;
+  rejectedByAdmin: number;
 }
 
 // Teams - Basé sur la table `teams`
@@ -856,10 +925,10 @@ export interface MatchResultSubmission {
 export interface BracketGenerationParams {
   phaseId: string;
   bracketType:
-    | "SINGLE_ELIMINATION"
-    | "DOUBLE_ELIMINATION"
-    | "ROUND_ROBIN"
-    | "SWISS";
+  | "SINGLE_ELIMINATION"
+  | "DOUBLE_ELIMINATION"
+  | "ROUND_ROBIN"
+  | "SWISS";
   participants: string[]; // registrationIds
   options?: {
     seedMethod?: "RANDOM" | "RANKING" | "MANUAL";

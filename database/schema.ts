@@ -22,12 +22,20 @@ export const transactionTypeEnum = pgEnum('transaction_type', [
   'PURCHASE', 'VIP_SUBSCRIPTION', 'GAME_ITEM_PURCHASE', 'THEME_PURCHASE',
   'DEPOSIT', 'WITHDRAWAL', 'REFUND', 'TRANSFER', 'ORDER_PURCHASE', 'TOURNAMENT_PARTICIPATION', 'BONUS'
 ]);
-export const orderStatusEnum = pgEnum('order_status', ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED']);
+export const orderStatusEnum = pgEnum('order_status', [
+  'PENDING',
+  'ACCEPTED_BY_SHOP',
+  'PROCESSING_BY_ADMIN',
+  'COMPLETED',
+  'REJECTED_BY_SHOP',
+  'REJECTED_BY_ADMIN',
+  'CANCELLED'
+]);
 export const participationStatusEnum = pgEnum('participation_status', ['REGISTERED', 'PARTICIPATED', 'DISQUALIFIED', 'WINNER', 'ELIMINATED']);
 export const entityTypeEnum = pgEnum('entity_type', [
-  'PRODUCT', 'POST', 'SHOP', 'TOURNAMENT', 'USER', 'BLOG', 
-  'MESSAGE', 'TEAM', 'THEME', 'NEWS', 'GROUP', 'ANNOUNCEMENT', 
-  'SERVICE', 'GUIDE', 'COMMENT', 'MATCH', 'GAME', 'GAME_ITEM', 'GAMECLIP', 
+  'PRODUCT', 'POST', 'SHOP', 'TOURNAMENT', 'USER', 'BLOG',
+  'MESSAGE', 'TEAM', 'THEME', 'NEWS', 'GROUP', 'ANNOUNCEMENT',
+  'SERVICE', 'GUIDE', 'COMMENT', 'MATCH', 'GAME', 'GAME_ITEM', 'GAMECLIP',
   'PARTNER', "EDITION"
 ]);
 export const productStatusEnum = pgEnum('product_status', ['NON_VENDU', 'RESERVE', 'EN_ECHANGE', 'LIVRE', 'VENDU', 'ANNULER']);
@@ -45,7 +53,7 @@ export const traceTypeEnum = pgEnum('trace_type', [
   'CLAIM', 'ERROR', 'EXPLANATION_SHOWN', 'EXPLANATION_COMPLETED',
   'EXPLANATION_SKIPPED', 'UPDATE_SETTINGS', 'OTHER', 'ACTION',
   'REFRESH_DATA', 'MARK_ANNOUNCEMENT_READ', 'MARK_ALL_ANNOUNCEMENTS_READ',
-  'MAINTENANCE_MODE_DISABLED', 'MAINTENANCE_MODE_ENABLED', 'UPDATE_EXCHANGE_RATES'
+  'MAINTENANCE_MODE_DISABLED', 'MAINTENANCE_MODE_ENABLED', 'UPDATE_EXCHANGE_RATES', 'EXPLANATION_OPENED'
 ]);
 
 export const mediaTypeEnum = pgEnum('media_type', ['image', 'video', 'document', 'audio', 'other']);
@@ -120,10 +128,10 @@ export const users = pgTable('users', {
 
   // Timestamps
   createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
   lastLogin: timestamp('last_login'),
 }, (table) => [
   index('users_email_idx').on(table.email),
@@ -132,44 +140,44 @@ export const users = pgTable('users', {
 ]);
 
 export const session = pgTable("session", {
-	id: text("id").primaryKey(),
-	expiresAt: timestamp("expires_at").notNull(),
-	token: text("token").notNull().unique(),
-	createdAt: timestamp("created_at").notNull(),
-	updatedAt: timestamp("updated_at").notNull(),
-	ipAddress: text("ip_address"),
+  id: text("id").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+  token: text("token").notNull().unique(),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+  ipAddress: text("ip_address"),
   impersonatedBy: text("impersonated_by"),
-	userAgent: text("user_agent"),
+  userAgent: text("user_agent"),
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
 });
 
 export const account = pgTable("account", {
-	id: text("id").primaryKey(),
-	accountId: text("account_id").notNull(),
-	providerId: text("provider_id").notNull(),
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
   userId: text("user_id")
     .notNull()
     .references(() => users.id),
-	accessToken: text("access_token"),
-	refreshToken: text("refresh_token"),
-	idToken: text("id_token"),
-	accessTokenExpiresAt: timestamp("access_token_expires_at"),
-	refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-	scope: text("scope"),
-	password: text("password"),
-	createdAt: timestamp("created_at").notNull(),
-	updatedAt: timestamp("updated_at").notNull(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  scope: text("scope"),
+  password: text("password"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
 });
 
 export const verification = pgTable("verification", {
-	id: text("id").primaryKey(),
-	identifier: text("identifier").notNull(),
-	value: text("value").notNull(),
-	expiresAt: timestamp("expires_at").notNull(),
-	createdAt: timestamp("created_at"),
-	updatedAt: timestamp("updated_at"),
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
 });
 
 export const passkey = pgTable("passkey", {
@@ -201,9 +209,12 @@ export const passkey = pgTable("passkey", {
 export const userWallets = pgTable('user_wallets', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+
+  financialAccountId: text('financial_account_id').references(() => financialAccounts.id),
+
   cardNumberHash: text('card_number_hash').unique(),
   pinHash: text('pin_hash').notNull(),
-  balance: numeric('balance', { precision: 15, scale: 2 }).default('0'),
+
   isActive: boolean('is_active').default(false),
   isLocked: boolean('is_locked').default(false),
   isDeleted: boolean('is_deleted').default(false),
@@ -220,12 +231,16 @@ export const userWallets = pgTable('user_wallets', {
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => [
   uniqueIndex('wallet_user_unique').on(table.userId),
-  index('wallet_user_id_idx').on(table.userId)
+  index('wallet_user_id_idx').on(table.userId),
+  index('wallet_financial_account_idx').on(table.financialAccountId)
 ]);
 
 export const walletTransactions = pgTable('wallet_transactions', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   walletId: text('wallet_id').notNull().references(() => userWallets.id),
+
+  financialAccountId: text('financial_account_id').references(() => financialAccounts.id),
+
   fromUserId: text('from_user_id').references(() => users.id),
   toUserId: text('to_user_id').references(() => users.id),
 
@@ -233,6 +248,7 @@ export const walletTransactions = pgTable('wallet_transactions', {
   amount: numeric('amount', { precision: 15, scale: 2 }).notNull(),
   fees: numeric('fees', { precision: 15, scale: 2 }).default('0'),
   netAmount: numeric('net_amount', { precision: 15, scale: 2 }).notNull(),
+
   balanceAfter: numeric('balance_after', { precision: 15, scale: 2 }).notNull(),
   currency: text('currency').default('GTC'),
 
@@ -250,11 +266,94 @@ export const walletTransactions = pgTable('wallet_transactions', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => [
   index('transactions_wallet_id_idx').on(table.walletId),
+  index('transactions_financial_account_idx').on(table.financialAccountId),
   index('transactions_type_status_idx').on(table.type, table.status),
   index('transactions_created_at_idx').on(table.createdAt),
   index('transactions_from_user_idx').on(table.fromUserId),
   index('transactions_to_user_idx').on(table.toUserId)
 ]);
+
+export const financialAccountTypeEnum = pgEnum("financial_account_type", [
+  "USER_WALLET",        // Wallet d'un utilisateur individuel
+  "SHOP_WALLET",        // Wallet d'une boutique
+  "PLATFORM_ESCROW",    // Compte escrow de la plateforme (pour les transactions en cours)
+  "PLATFORM_FEES",      // Compte des frais de la plateforme
+  "TOURNAMENT_POOL",    // Pool de prix d'un tournoi
+  "SYSTEM_ADJUSTMENT"   // Ajustements système (bonus, corrections, etc.)
+]);
+
+// ============================================================================
+// FINANCIAL ACCOUNTS - Source de vérité pour tous les wallets
+// ============================================================================
+// Cette table représente TOUS les comptes financiers du système.
+// Chaque wallet (user, shop, tournament) a un financial_account associé.
+// Le solde réel est TOUJOURS calculé via: SUM(credit) - SUM(debit) from ledger_entries
+export const financialAccounts = pgTable("financial_accounts", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // Ownership: un account peut appartenir à un user, une shop, ou être un compte système
+  ownerUserId: text("owner_user_id").references(() => users.id),
+  ownerShopId: text("owner_shop_id"), // .references(() => shops.id), // Circular dependency fix
+  ownerEditionId: text("owner_edition_id"), // .references(() => tournamentEditions.id),
+
+  type: financialAccountTypeEnum("type").notNull().default("USER_WALLET"),
+  currency: text("currency").default("GTC"),
+
+  isActive: boolean("is_active").default(true),
+  isLocked: boolean("is_locked").default(false),
+
+  metadata: jsonb("metadata").default({}),
+
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("financial_accounts_owner_user_idx").on(t.ownerUserId),
+  index("financial_accounts_owner_shop_idx").on(t.ownerShopId),
+  index("financial_accounts_owner_edition_idx").on(t.ownerEditionId),
+  index("financial_accounts_type_idx").on(t.type),
+]);
+
+
+// ============================================================================
+// LEDGER ENTRIES - Comptabilité en partie double (Double-Entry Accounting)
+// ============================================================================
+// Chaque transaction financière crée AU MOINS 2 entrées dans cette table:
+// - Une entrée DEBIT (argent qui sort d'un compte)
+// - Une entrée CREDIT (argent qui entre dans un compte)
+//
+// Règle d'or: SUM(debit) = SUM(credit) pour chaque transactionId
+//
+// Exemple de transfert de 100 GTC de User A vers User B:
+// 1. Debit 100 sur account_A  (argent sort)
+// 2. Credit 100 sur escrow    (argent entre dans escrow)
+// 3. Debit 100 sur escrow     (argent sort de escrow)
+// 4. Credit 100 sur account_B (argent entre)
+export const ledgerEntries = pgTable("ledger_entries", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // Référence à la transaction wallet (pour traçabilité)
+  transactionId: text("transaction_id").notNull(),
+
+  // Compte concerné par cette entrée
+  accountId: text("account_id")
+    .notNull()
+    .references(() => financialAccounts.id),
+
+  // Montants: SOIT debit SOIT credit (jamais les deux en même temps)
+  debit: numeric("debit", { precision: 15, scale: 2 }).default("0"),
+  credit: numeric("credit", { precision: 15, scale: 2 }).default("0"),
+
+  currency: text("currency").default("GTC"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("ledger_account_idx").on(t.accountId),
+  index("ledger_transaction_idx").on(t.transactionId),
+  index("ledger_created_at_idx").on(t.createdAt),
+]);
+
+
+
+
 
 export const receipts = pgTable('receipts', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -326,55 +425,55 @@ export const vipSubscriptions = pgTable('vip_subscriptions', {
 
 export const partners = pgTable('partners', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
-  
+
   // Informations de base
   name: text('name').notNull(),
   legalName: text('legal_name'),
   slug: text('slug').unique(),
   description: text('description'),
   shortDescription: text('short_description'),
-  
+
   // Type et catégorie
   type: partnerTypeEnum('type').notNull(),
   categories: text('categories').array().default([]),
   tags: text('tags').array().default([]),
-  
+
   // Branding
   logo: text('logo'),
   coverImage: text('cover_image'),
   brandColors: text('brand_colors').array().default([]),
   website: text('website'),
-  
+
   // Contact
   contactEmail: text('contact_email'),
   contactPhone: text('contact_phone'),
   contactPerson: text('contact_person'),
   contactTitle: text('contact_title'),
-  
+
   // Adresse
   country: text('country'),
   city: text('city'),
   address: jsonb('address'),
-  
+
   // Social media
   socialMedia: jsonb('social_media').default([]),
-  
+
   // Statut et visibilité
   status: partnershipStatusEnum('status').default('PENDING'),
   isActive: boolean('is_active').default(true),
   isVisible: boolean('is_visible').default(true),
   isDeleted: boolean('is_deleted').default(false),
   verified: boolean('verified').default(false),
-  
+
   // Statistiques
   totalPartnerships: integer('total_partnerships').default(0),
   totalInvestment: numeric('total_investment', { precision: 15, scale: 2 }).default('0'),
   viewCount: integer('view_count').default(0),
-  
+
   // Métadonnées
   metadata: jsonb('metadata').default({}),
   internalNotes: text('internal_notes'),
-  
+
   // Timestamps
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -389,76 +488,76 @@ export const partners = pgTable('partners', {
 export const partnerships = pgTable('partnerships', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   partnerId: text('partner_id').notNull().references(() => partners.id, { onDelete: 'cascade' }),
-  
+
   // Informations du partenariat
   title: text('title').notNull(),
   description: text('description'),
   type: text('type').notNull(), // "SPONSORSHIP", "MEDIA_PARTNERSHIP", "TECH_PARTNERSHIP", etc.
-  
+
   // Tier et niveau
   tier: partnershipTierEnum('tier').default('BRONZE'),
   priority: integer('priority').default(0),
-  
+
   // Dates
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date'),
   renewalDate: timestamp('renewal_date'),
-  
+
   // Valeur et investissement
   totalValue: numeric('total_value', { precision: 15, scale: 2 }).default('0'),
   currency: text('currency').default('GTC'),
   paymentTerms: text('payment_terms'),
   paymentSchedule: jsonb('payment_schedule').default([]),
-  
+
   // Deliverables et obligations
   partnerDeliverables: jsonb('partner_deliverables').default([]),
   ourDeliverables: jsonb('our_deliverables').default([]),
   kpis: jsonb('kpis').default({}),
   milestones: jsonb('milestones').default([]),
-  
+
   // Assets et ressources
   assetsProvided: jsonb('assets_provided').default([]),
   resourceAllocation: jsonb('resource_allocation').default({}),
-  
+
   // Exclusivité
   isExclusive: boolean('is_exclusive').default(false),
   exclusivityScope: text('exclusivity_scope'),
   exclusivityDuration: text('exclusivity_duration'),
-  
+
   // Statut et gestion
   status: partnershipStatusEnum('status').default('PENDING'),
   progress: integer('progress').default(0),
-  
+
   // Performance et métriques
   performanceScore: numeric('performance_score', { precision: 5, scale: 2 }).default('0'),
   roi: numeric('roi', { precision: 5, scale: 2 }).default('0'),
   metrics: jsonb('metrics').default({}),
-  
+
   // Relations avec d'autres entités
   relatedEntityType: entityTypeEnum('related_entity_type'),
   relatedEntityId: text('related_entity_id'),
-  
+
   // Documents et contrats
   contractUrl: text('contract_url'),
   contractStatus: text('contract_status').default('DRAFT'),
   signedAt: timestamp('signed_at'),
-  
+
   // Contact pour ce partenariat
   partnerContact: text('partner_contact'),
   partnerContactEmail: text('partner_contact_email'),
-  
+
   // Notes et communication
   notes: text('notes'),
   communicationLog: jsonb('communication_log').default([]),
-  
+
   // Flags
   isActive: boolean('is_active').default(true),
   isDeleted: boolean('is_deleted').default(false),
   autoRenew: boolean('auto_renew').default(false),
-  
+
   // Métadonnées
   metadata: jsonb('metadata').default({}),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => [
@@ -517,6 +616,8 @@ export const shops = pgTable('shops', {
   description: text('description'),
   profileImage: text('profile_image'),
   coverImage: text('cover_image'),
+
+  financialAccountId: text('financial_account_id').references(() => financialAccounts.id),
 
   // Contact
   phoneNumber: text('phone_number'),
@@ -604,9 +705,9 @@ export const entityCategories = pgTable('entity_categories', {
   entityId: text('entity_id').notNull(),
   entityType: entityTypeEnum('entity_type').notNull(),
   categoryId: text('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
-  
+
 }, (table) => [
   uniqueIndex('entity_category_unique').on(table.entityId, table.entityType, table.categoryId),
   index('entity_categories_entity_idx').on(table.entityId, table.entityType),
@@ -681,6 +782,12 @@ export const orders = pgTable('orders', {
   // Échange produit contre produit
   orderType: text('order_type').default('PURCHASE'),
   orderedProductId: text('ordered_product_id').references(() => products.id),
+
+  // Workflow tracking
+  walletTransactionId: text('wallet_transaction_id').references(() => walletTransactions.id),
+  sellerCredentials: jsonb('seller_credentials'), // For account login/pass
+  buyerInstructions: text('buyer_instructions'),
+  adminNotes: text('admin_notes'),
 
   expiresAt: timestamp('expires_at'),
   rejectionReason: text('rejection_reason'),
@@ -796,7 +903,7 @@ export const tournaments = pgTable('tournaments', {
   status: tournamentStatusEnum('status').default('UPCOMING'),
   featured: boolean('featured').default(false),
   verified: boolean('verified').default(false),
-  
+
   isActive: boolean('is_active').default(true),
   isDeleted: boolean('is_deleted').default(false),
 
@@ -824,6 +931,9 @@ export const tournaments = pgTable('tournaments', {
 export const tournamentEditions = pgTable('tournament_editions', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   tournamentId: text('tournament_id').notNull().references(() => tournaments.id, { onDelete: 'cascade' }),
+
+  // ⚠️ IMPORTANT: financialAccountId is the PRIMARY reference for edition prize pool/pool
+  financialAccountId: text('financial_account_id').references(() => financialAccounts.id),
 
   // Identification de l'édition
   editionNumber: integer('edition_number').notNull(),
@@ -907,7 +1017,7 @@ export const tournamentMembers = pgTable('tournament_members', {
   teamId: text('team_id').references(() => teams.id),
 
   // Rôle principal
-  role: text('role').notNull().default('PARTICIPANT'), 
+  role: text('role').notNull().default('PARTICIPANT'),
   // Roles disponibles: ORGANIZER, CO_ORGANIZER, REFEREE, PARTICIPANT, SPECTATOR, COMMENTATOR
 
   // Permissions spécifiques
@@ -924,7 +1034,7 @@ export const tournamentMembers = pgTable('tournament_members', {
   contactPhone: text('contact_phone'),
   contactEmail: text('contact_email'),
   discordId: text('discord_id'),
-  
+
   clubName: text('club_name'),
   biography: text('biography'),
   achievements: text('achievements').array().default([]),
@@ -966,7 +1076,7 @@ export const tournamentMembers = pgTable('tournament_members', {
     .where(sql`${t.userId} IS NOT NULL`),
   uniqueIndex('tournament_member_team_unique').on(t.tournamentId, t.teamId)
     .where(sql`${t.teamId} IS NOT NULL`),
-  
+
   // Index de recherche
   index('tournament_members_tournament_idx').on(t.tournamentId),
   index('tournament_members_user_idx').on(t.userId),
@@ -986,12 +1096,12 @@ export const editionRegistrations = pgTable('edition_registrations', {
   memberId: text('member_id').notNull().references(() => tournamentMembers.id, { onDelete: 'cascade' }),
 
   // Type d'inscription
-  registrationType: text('registration_type').default('REGULAR'), 
+  registrationType: text('registration_type').default('REGULAR'),
   // Types: REGULAR, INVITED, QUALIFIED, WILDCARD, STAFF, BYE
 
   // Statut de participation
   status: participationStatusEnum('status').default('REGISTERED'),
-  
+
   // Informations de jeu spécifiques
   gameLevel: text('game_level'),
   gameRank: text('game_rank'),
@@ -1034,7 +1144,7 @@ export const editionRegistrations = pgTable('edition_registrations', {
 }, (t) => [
   // Unicité
   uniqueIndex('edition_registration_unique').on(t.editionId, t.memberId),
-  
+
   // Index de recherche
   index('edition_registrations_edition_idx').on(t.editionId),
   index('edition_registrations_member_idx').on(t.memberId),
@@ -1066,7 +1176,7 @@ export const registrationPayments = pgTable('registration_payments', {
 
   // Métadonnées
   metadata: jsonb('metadata').default({}),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1083,12 +1193,12 @@ export const registrationPayments = pgTable('registration_payments', {
 export const tournamentPhases = pgTable('tournament_phases', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   editionId: text('edition_id').notNull().references(() => tournamentEditions.id, { onDelete: 'cascade' }),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   phaseType: tournamentFormatEnum('type').default('ELIMINATION'), // Renommé pour clarté
   order: integer('order').notNull(),
-  
+
   // Configuration
   config: jsonb('config').default({
     qualifiedCount: null,
@@ -1098,13 +1208,13 @@ export const tournamentPhases = pgTable('tournament_phases', {
     seedingMethod: 'RANDOM',
     tiebreaker: 'HEAD_TO_HEAD'
   }),
-  
+
   // État
   isActive: boolean('is_active').default(false),
   isCompleted: boolean('is_completed').default(false),
   isDoubleElimination: boolean('is_double_elimination').default(false),
   isHidden: boolean('is_hidden').default(false), // Phase préparatoire cachée
-  
+
   // Planning
   scheduledStart: timestamp('scheduled_start'),
   scheduledEnd: timestamp('scheduled_end'),
@@ -1112,13 +1222,13 @@ export const tournamentPhases = pgTable('tournament_phases', {
   actualEnd: timestamp('actual_end'),
   matchDuration: integer('match_duration'), // minutes
   breakDuration: integer('break_duration'), // minutes
-  
+
   // Statistiques
   totalMatches: integer('total_matches').default(0),
   completedMatches: integer('completed_matches').default(0),
-  
+
   isDeleted: boolean('is_deleted').default(false),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1135,12 +1245,12 @@ export const tournamentPhases = pgTable('tournament_phases', {
 export const phaseGroups = pgTable('phase_groups', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   phaseId: text('phase_id').notNull().references(() => tournamentPhases.id, { onDelete: 'cascade' }),
-  
+
   name: text('name').notNull(),
   description: text('description'),
   order: integer('order').notNull(),
   groupType: text('group_type').default('ROUND_ROBIN'),
-  
+
   // Configuration spécifique
   config: jsonb('config').default({
     matchesPerParticipant: 1,
@@ -1150,17 +1260,17 @@ export const phaseGroups = pgTable('phase_groups', {
     pointsPerDraw: 1,
     pointsPerLoss: 0
   }),
-  
+
   // État
   isCompleted: boolean('is_completed').default(false),
   isLocked: boolean('is_locked').default(false), // Empêche les modifications
-  
+
   // Statistiques
   participantCount: integer('participant_count').default(0),
   matchCount: integer('match_count').default(0),
-  
+
   isDeleted: boolean('is_deleted').default(false),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1177,33 +1287,33 @@ export const phaseGroupParticipants = pgTable('phase_group_participants', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   groupId: text('group_id').notNull().references(() => phaseGroups.id, { onDelete: 'cascade' }),
   registrationId: text('registration_id').notNull().references(() => editionRegistrations.id, { onDelete: 'cascade' }),
-  
+
   // Statistiques dans le groupe
   matchesPlayed: integer('matches_played').default(0),
   matchesWon: integer('matches_won').default(0),
   matchesDrawn: integer('matches_drawn').default(0),
   matchesLost: integer('matches_lost').default(0),
-  
+
   points: integer('points').default(0),
   scoreFor: integer('score_for').default(0), // Buts/points marqués
   scoreAgainst: integer('score_against').default(0), // Buts/points encaissés
   scoreDifference: integer('score_difference').generatedAlwaysAs(sql`score_for - score_against`),
-  
+
   // Position et classement
   position: integer('position'),
   isSeeded: boolean('is_seeded').default(false),
   seedOrder: integer('seed_order'),
-  
+
   // Qualification
   qualified: boolean('qualified').default(false),
   qualificationPosition: integer('qualification_position'),
-  
+
   // Métadonnées
   stats: jsonb('stats').default({}), // Stats supplémentaires
   metadata: jsonb('metadata').default({}),
-  
+
   isDeleted: boolean('is_deleted').default(false),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1222,30 +1332,30 @@ export const bracketNodes = pgTable('bracket_nodes', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   phaseId: text('phase_id').notNull().references(() => tournamentPhases.id, { onDelete: 'cascade' }),
   groupId: text('group_id').references(() => phaseGroups.id, { onDelete: 'cascade' }),
-  
+
   // Identification
   nodeType: text('node_type').default('MATCH'), // MATCH, BYE, TBD (à déterminer)
   nodeCode: text('node_code'), // Ex: "U1-1", "L2-3"
-  
+
   // Structure d'arbre
   parentNodeId: text('parent_node_id').references((): any => bracketNodes.id, { onDelete: 'cascade' }),
   childPosition: text('child_position'), // 'WINNER', 'LOSER', 'UPPER', 'LOWER'
   depth: integer('depth').default(0), // Profondeur dans l'arbre
   order: integer('order'), // Ordre d'affichage
-  
+
   // Position dans le bracket
   bracketType: text('bracket_type'), // 'UPPER', 'LOWER', 'FINAL', 'CONSOLATION'
   round: integer('round'), // Numéro du round (1, 2, 3...)
   matchNumber: integer('match_number'), // Numéro du match dans le round
-  
+
   // Métadonnées
   metadata: jsonb('metadata').default({
     isBye: false,
     requiresMatch: true
   }),
-  
+
   isDeleted: boolean('is_deleted').default(false),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1263,70 +1373,70 @@ export const bracketNodes = pgTable('bracket_nodes', {
 // ============================================================================
 export const matches = pgTable('matches', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
-  
+
   // Références
   editionId: text('edition_id').notNull().references(() => tournamentEditions.id, { onDelete: 'cascade' }),
   phaseId: text('phase_id').notNull().references(() => tournamentPhases.id, { onDelete: 'cascade' }),
   groupId: text('group_id').references(() => phaseGroups.id, { onDelete: 'cascade' }),
   bracketNodeId: text('bracket_node_id').references(() => bracketNodes.id, { onDelete: 'cascade' }),
-  
+
   // Identification
   matchCode: text('match_code'),
   matchType: text('match_type').default('REGULAR'), // REGULAR, QUALIFIER, FINAL, THIRD_PLACE
   round: integer('round').notNull().default(1),
   matchNumber: integer('match_number').notNull().default(1),
-  
+
   // Horaires
   scheduledTime: timestamp('scheduled_time'),
   estimatedDuration: integer('estimated_duration'), // minutes
   actualStartTime: timestamp('actual_start_time'),
   actualEndTime: timestamp('actual_end_time'),
   duration: integer('duration'), // minutes réelles
-  
+
   // Participants
   participant1RegistrationId: text('participant1_registration_id').references(() => editionRegistrations.id),
   participant2RegistrationId: text('participant2_registration_id').references(() => editionRegistrations.id),
-  
+
   // Résultats
   score1: integer('score1'),
   score2: integer('score2'),
   winnerRegistrationId: text('winner_registration_id').references(() => editionRegistrations.id),
   loserRegistrationId: text('loser_registration_id').references(() => editionRegistrations.id),
-  
+
   // Détails du match
   gameData: jsonb('game_data').default({}), // Données spécifiques au jeu
   replayId: text('replay_id'),
   streamLink: text('stream_link'),
-  
+
   // Preuves et validation
   screenshot: text('screenshot'),
   proofLinks: text('proof_links').array().default([]),
   notes: text('notes'),
   submittedByUserId: text('submitted_by_user_id').references(() => users.id),
-  
+
   // Confirmation
   confirmedByParticipant1: boolean('confirmed_by_participant1').default(false),
   confirmedByParticipant2: boolean('confirmed_by_participant2').default(false),
   confirmedByAdmin: boolean('confirmed_by_admin').default(false),
   confirmedAt: timestamp('confirmed_at'),
-  
+
   // Disputes
   disputed: boolean('disputed').default(false),
   disputeReason: text('dispute_reason'),
   resolvedBy: text('resolved_by').references(() => users.id),
   resolution: text('resolution'),
-  
+
   // Statut
   status: matchStatusEnum('status').default('PENDING'),
-  
+
   // Métadonnées
   metadata: jsonb('metadata').default({
     format: 'BEST_OF_1',
     rules: 'STANDARD'
   }),
-  
+
   isDeleted: boolean('is_deleted').default(false),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1335,22 +1445,22 @@ export const matches = pgTable('matches', {
   index('matches_phase_idx').on(t.phaseId),
   index('matches_group_idx').on(t.groupId),
   index('matches_bracket_node_idx').on(t.bracketNodeId),
-  
+
   // Index temporels
   index('matches_scheduled_idx').on(t.scheduledTime),
   index('matches_created_at_idx').on(t.createdAt),
-  
+
   // Index de recherche
   index('matches_code_idx').on(t.matchCode),
   index('matches_status_idx').on(t.status),
   index('matches_round_idx').on(t.round, t.matchNumber),
   index('matches_type_idx').on(t.matchType),
-  
+
   // Index participants
   index('matches_participant1_idx').on(t.participant1RegistrationId),
   index('matches_participant2_idx').on(t.participant2RegistrationId),
   index('matches_winner_idx').on(t.winnerRegistrationId),
-  
+
   // Index performance
   index('matches_composite_idx').on(t.editionId, t.status, t.scheduledTime),
   index('matches_group_status_idx').on(t.groupId, t.status),
@@ -1363,16 +1473,16 @@ export const editionResults = pgTable('edition_results', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
   editionId: text('edition_id').notNull().references(() => tournamentEditions.id, { onDelete: 'cascade' }),
   registrationId: text('registration_id').notNull().references(() => editionRegistrations.id),
-  
+
   // Position finale
   position: integer('position').notNull(),
   tier: text('tier'), // "GOLD", "SILVER", "BRONZE"
-  
+
   // Récompenses
   prizeAmount: numeric('prize_amount', { precision: 15, scale: 2 }),
   prizeCurrency: text('prize_currency').default('GTC'),
   prizeDescription: text('prize_description'),
-  
+
   // Statistiques finales
   matchesPlayed: integer('matches_played').default(0),
   matchesWon: integer('matches_won').default(0),
@@ -1380,22 +1490,22 @@ export const editionResults = pgTable('edition_results', {
   matchesDrawn: integer('matches_drawn').default(0),
   totalScore: integer('total_score').default(0),
   averageScore: numeric('average_score', { precision: 5, scale: 2 }),
-  
+
   // Récompenses supplémentaires
   awards: text('awards').array().default([]),
   specialMentions: text('special_mentions').array().default([]),
-  
+
   // Paiement
   prizePaid: boolean('prize_paid').default(false),
   paymentTransactionId: text('payment_transaction_id').references(() => walletTransactions.id),
   paidAt: timestamp('paid_at'),
-  
+
   // Métadonnées
   statistics: jsonb('statistics').default({}),
   metadata: jsonb('metadata').default({}),
-  
+
   isDeleted: boolean('is_deleted').default(false),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => [
@@ -1547,7 +1657,7 @@ export const gameClips = pgTable('game_clips', {
 
   // Story/Status behavior
   expiresAt: timestamp('expires_at'),
-  
+
   isActive: boolean('is_active').default(true),
   isDeleted: boolean('is_deleted').default(false),
 
@@ -1666,7 +1776,7 @@ export const interactions = pgTable('interactions', {
   gameItemId: text('game_item_id').references(() => gameItems.id),
   gameClipId: text('game_clip_id').references(() => gameClips.id),
 
-  
+
 
   isDeleted: boolean('is_deleted').default(false),
 
@@ -1704,7 +1814,7 @@ export const medias = pgTable('medias', {
   entityId: text('entity_id'), // ID de l'entité concernée
 
   metadata: jsonb('metadata').default({}), // dimensions, duration, etc.
-  
+
   isDeleted: boolean('is_deleted').default(false),
 
   createdAt: timestamp('created_at').defaultNow(),
@@ -2048,6 +2158,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(account),
   verifications: many(verification),
   passkeys: many(passkey),
+
   // twoFactors: many(twoFactors),
 }));
 
@@ -2069,11 +2180,13 @@ export const accountRelations = relations(account, ({ one }) => ({
 
 export const userWalletsRelations = relations(userWallets, ({ one, many }) => ({
   user: one(users, { fields: [userWallets.userId], references: [users.id] }),
+  financialAccount: one(financialAccounts, { fields: [userWallets.financialAccountId], references: [financialAccounts.id] }),
   transactions: many(walletTransactions),
 }));
 
 export const walletTransactionsRelations = relations(walletTransactions, ({ one, many }) => ({
   wallet: one(userWallets, { fields: [walletTransactions.walletId], references: [userWallets.id] }),
+  financialAccount: one(financialAccounts, { fields: [walletTransactions.financialAccountId], references: [financialAccounts.id] }),
   fromUser: one(users, {
     fields: [walletTransactions.fromUserId],
     references: [users.id],
@@ -2538,6 +2651,12 @@ export type NewUserWallet = typeof userWallets.$inferInsert;
 export type WalletTransaction = typeof walletTransactions.$inferSelect;
 export type NewWalletTransaction = typeof walletTransactions.$inferInsert;
 
+export type FinancialAccount = typeof financialAccounts.$inferSelect;
+export type NewFinancialAccount = typeof financialAccounts.$inferInsert;
+
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
+
 export type Receipt = typeof receipts.$inferSelect;
 export type NewReceipt = typeof receipts.$inferInsert;
 
@@ -2689,42 +2808,7 @@ export type NewPartnership = typeof partnerships.$inferInsert;
 // TYPES UTILITAIRES
 // ============================================================================
 
-// Types pour les relations chargées
-export type UserWithRelations = User & {
-  wallet?: UserWallet;
-  vipSubscription?: VipSubscription;
-  shops?: Shop[];
-  products?: Product[];
-  tournaments?: Tournament[];
-  gameClips?: GameClip[];
-  posts?: Post[];
-  announcements?: Announcement[];
-  transactions?: WalletTransaction[];
-  notifications?: Notification[];
-  interactions?: Interaction[];
-  searches?: SearchHistory[];
-  sessions?: Session[];
-  accounts?: Account[];
-  viewers?: Viewer[];
-  traces?: UserTrace[];
-  requests?: Request[];
 
-  stats?: {
-      shopsCount: number;
-      tournamentsCount: number;
-      productsCount: number;
-      followersCount: number;
-      followingCount: number;
-  };
-  // twoFactors?: TwoFactor[];
-};
-
-export type ShopWithRelations = Shop & {
-  owner?: User;
-  products?: Product[];
-  orders?: Order[];
-  categories?: EntityCategory[]; // Utilise EntityCategory pour la jointure
-};
 
 export type TournamentWithRelations = Tournament & {
   organizer?: User;
@@ -2738,6 +2822,13 @@ export type TournamentEditionWithRelations = TournamentEdition & {
   registrations?: EditionRegistration[];
   phases?: TournamentPhase[];
   results?: EditionResult[];
+  financialAccount?: FinancialAccount;
+};
+
+export type EditionRegistrationWithRelations = EditionRegistration & {
+  edition?: TournamentEdition;
+  user?: User;
+  team?: Team;
 };
 
 export type TournamentMemberWithRelations = TournamentMember & {
@@ -2746,11 +2837,6 @@ export type TournamentMemberWithRelations = TournamentMember & {
   team?: Team;
 };
 
-export type EditionRegistrationWithRelations = EditionRegistration & {
-  edition?: TournamentEdition;
-  member?: TournamentMember;
-  payment?: RegistrationPayment;
-};
 
 export type TournamentPhaseWithRelations = TournamentPhase & {
   edition?: TournamentEdition;
@@ -2847,7 +2933,7 @@ export type GameClipWithRelations = GameClip & {
   author?: User;
   shop?: Shop;
   game?: Game;
-  
+
 };
 
 export type MessageWithRelations = Message & {
@@ -3072,7 +3158,74 @@ export type NewGuideStep = typeof guideSteps.$inferInsert;
 export type BlogWithRelations = Blog & {
   author?: User;
   medias?: Media;
-  interactions?: Interaction;
+};
+
+// ============================================================================
+// TYPES POUR LES RELATIONS CHARGÉES
+// ============================================================================
+
+export type UserWithRelations = User & {
+  wallet?: UserWallet;
+  vipSubscription?: VipSubscription;
+  shops?: Shop[];
+  products?: Product[];
+  tournaments?: Tournament[];
+  gameClips?: GameClip[];
+  posts?: Post[];
+  announcements?: Announcement[];
+  transactions?: WalletTransaction[];
+  notifications?: Notification[];
+  interactions?: Interaction[];
+  searches?: SearchHistory[];
+  sessions?: Session[];
+  accounts?: Account[];
+  viewers?: Viewer[];
+  traces?: UserTrace[];
+  requests?: Request[];
+
+  stats?: {
+    shopsCount: number;
+    tournamentsCount: number;
+    productsCount: number;
+    followersCount: number;
+    followingCount: number;
+  };
+};
+
+export type ShopWithRelations = Shop & {
+  owner?: User;
+  products?: Product[];
+  orders?: Order[];
+  categories?: EntityCategory[];
+  financialAccount?: FinancialAccount;
+};
+
+
+
+export type UserWalletWithRelations = UserWallet & {
+  user?: User;
+  financialAccount?: FinancialAccount;
+  transactions?: WalletTransaction[];
+};
+
+export type WalletTransactionWithRelations = WalletTransaction & {
+  wallet?: UserWallet;
+  financialAccount?: FinancialAccount;
+  fromUser?: User;
+  toUser?: User;
+  ledgerEntries?: LedgerEntry[];
+};
+
+export type FinancialAccountWithRelations = FinancialAccount & {
+  ownerUser?: User;
+  ownerShop?: Shop;
+  ledgerEntries?: LedgerEntry[];
+  transactions?: WalletTransaction[];
+};
+
+export type LedgerEntryWithRelations = LedgerEntry & {
+  account?: FinancialAccount;
+  transaction?: WalletTransaction;
 };
 // Types pour les relations chargées
 export type PostWithRelations = Post & {

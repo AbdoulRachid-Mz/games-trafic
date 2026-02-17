@@ -20,12 +20,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { QrScanner } from "@/components/shared/qr-scanner";
 import { getUserWalletById, getUserWalletByUserId, getUserWalletByCardNumber } from "@/actions/wallets";
-import { getUserById } from "@/actions/users";
+import { getUserById, getUsers as searchUsersAdvanced } from "@/actions/users";
+import { getUsers as searchUsersGeneric } from "@/actions/entities";
 import { formatWalletNumber } from "@/lib/utils";
-import { useEntityList } from "@/hooks/use-entity-list";
+import { useWalletBalance } from "@/hooks/use-wallets";
 
 interface Recipient {
   id: string;
@@ -63,17 +63,8 @@ export function TransactionRecipientSelector({
     "USER"
   );
   const [showScanner, setShowScanner] = useState(false);
-
-  const {
-    data: foundUsers,
-    onRefresh: refreshUsers,
-    setSearchTerm: setUserSearch,
-    setFilters: setUserFilters,
-  } = useEntityList<any>({
-    entityType: "users",
-    defaultLimit: 20,
-    enabled: false,
-  });
+  const walletBalance = useWalletBalance(selectedRecipient?.walletId || "");
+  
 
   const searchRecipient = async () => {
     if (!search.trim()) return;
@@ -81,15 +72,21 @@ export function TransactionRecipientSelector({
     setLoading(true);
     try {
       if (searchType === "USER") {
-        setUserSearch(search);
-        setUserFilters({ includeInactive: false });
-        await refreshUsers();
-        const users = foundUsers || [];
-        const result: Recipient[] = [];
-        for (const u of users) {
-          const wallet = await getUserWalletByUserId(u.id);
-          if (wallet) {
-            result.push({
+        const response = await searchUsersGeneric({
+          search: search.trim(),
+          isActive: true,
+          page: 1,
+          limit: 20,
+        });
+        const users = response?.data || [];
+        const wallets = await Promise.all(
+          users.map((u: any) => getUserWalletByUserId(u.id))
+        );
+        const result: Recipient[] = users
+          .map((u: any, idx: number) => {
+            const wallet = wallets[idx];
+            if (!wallet) return null;
+            return {
               id: u.id,
               walletId: wallet.id,
               user: {
@@ -102,26 +99,31 @@ export function TransactionRecipientSelector({
               wallet: {
                 isActive: !!wallet.isActive,
                 isLocked: !!wallet.isLocked,
-                balance: wallet.balance?.toString(),
+                balance: walletBalance.data?.toString() || "0",
               },
-            });
-          }
-        }
+            } as Recipient;
+          })
+          .filter(Boolean) as Recipient[];
         setRecipients(result);
         if (!result.length) {
           toast.error("Aucun destinataire trouvé");
         }
       } else if (searchType === "PHONE") {
         const normalized = search.replace(/[^\d]/g, "").replace(/^00/, "");
-        setUserSearch("");
-        setUserFilters({ phoneNumber: normalized, includeInactive: false });
-        await refreshUsers();
-        const users = foundUsers || [];
-        const result: Recipient[] = [];
-        for (const u of users) {
-          const wallet = await getUserWalletByUserId(u.id);
-          if (wallet) {
-            result.push({
+        const response = await searchUsersAdvanced({
+          pagination: { page: 1, limit: 20 },
+          filters: { phoneNumber: normalized },
+          options: { includeInactive: false },
+        });
+        const users = response?.data || [];
+        const wallets = await Promise.all(
+          users.map((u: any) => getUserWalletByUserId(u.id))
+        );
+        const result: Recipient[] = users
+          .map((u: any, idx: number) => {
+            const wallet = wallets[idx];
+            if (!wallet) return null;
+            return {
               id: u.id,
               walletId: wallet.id,
               user: {
@@ -134,11 +136,11 @@ export function TransactionRecipientSelector({
               wallet: {
                 isActive: !!wallet.isActive,
                 isLocked: !!wallet.isLocked,
-                balance: wallet.balance?.toString(),
+                balance: walletBalance.data?.toString() || "0",
               },
-            });
-          }
-        }
+            } as Recipient;
+          })
+          .filter(Boolean) as Recipient[];
         setRecipients(result);
         if (!result.length) {
           toast.error("Aucun destinataire trouvé");
@@ -161,7 +163,7 @@ export function TransactionRecipientSelector({
               wallet: {
                 isActive: !!wallet.isActive,
                 isLocked: !!wallet.isLocked,
-                balance: wallet.balance?.toString(),
+                balance: walletBalance.data?.toString() || "0",
               },
             };
             setRecipients([recipient]);
@@ -218,7 +220,7 @@ export function TransactionRecipientSelector({
           wallet: {
             isActive: !!wallet.isActive,
             isLocked: !!wallet.isLocked,
-            balance: wallet.balance?.toString(),
+            balance: walletBalance.data?.toString() || "0",
           },
         };
         setRecipients([recipient]);

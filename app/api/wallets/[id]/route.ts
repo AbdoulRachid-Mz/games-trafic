@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserWalletById, updateUserWallet, updateWalletBalance, toggleWalletLock } from '@/actions/wallets';
+import { getUserWalletById, updateUserWallet, toggleWalletLock } from '@/actions/wallets';
 import { z } from 'zod';
 
 // Validation schemas
@@ -87,34 +87,13 @@ export async function PATCH(
   request: NextRequest,
   { params }: Props
 ) {
-  try {
-    const body = await request.json();
-
-    // Validate input
-    const { balance } = updateBalanceSchema.parse(body);
-    const { id } = await params;
-
-    const updatedWallet = await updateWalletBalance(id, balance);
-
-    return NextResponse.json(updatedWallet);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Validation error', details: error.message },
-        { status: 400 }
-      );
-    }
-
-    if (error instanceof Error && error.message === 'Wallet not found') {
-      return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
-    }
-
-    console.error('Error updating wallet balance:', error);
-    return NextResponse.json(
-      { error: 'Failed to update wallet balance' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error: 'Direct balance modification is disabled',
+      details: 'Please use the transaction API to create a DEPOSIT or WITHDRAWAL transaction.'
+    },
+    { status: 400 } // Bad Request
+  );
 }
 
 // POST /api/wallets/[id]/toggle-lock - Toggle wallet lock status

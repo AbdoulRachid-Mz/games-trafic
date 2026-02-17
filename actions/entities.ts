@@ -168,6 +168,9 @@ export async function getUsers(params: EntityQueryParams = {}) {
   if (params.username) {
     conditions.push(like(table.username, `%${params.username}%`));
   }
+  if ((params as any).phoneNumber && (table as any).phoneNumber) {
+    conditions.push(like((table as any).phoneNumber, `%${(params as any).phoneNumber}%`));
+  }
 
   if (params.isVip !== undefined) {
     conditions.push(eq(table.isVip, params.isVip));
@@ -192,6 +195,7 @@ export async function getUsers(params: EntityQueryParams = {}) {
         like(table.fullName, `%${params.search}%`),
         like(table.username, `%${params.search}%`),
         like(table.email, `%${params.search}%`),
+        ((table as any).phoneNumber ? like((table as any).phoneNumber, `%${params.search}%`) : undefined)
       )!,
     );
   }

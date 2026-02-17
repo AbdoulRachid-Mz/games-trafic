@@ -96,8 +96,8 @@ export function validatePin(pin: string): {
 } {
   const errors: string[] = [];
 
-  if (pin.length !== 4) {
-    errors.push("Le PIN doit contenir exactement 4 chiffres");
+  if (pin.length < 4) {
+    errors.push("Le PIN doit contenir au moins 4 chiffres");
   }
 
   if (!/^\d+$/.test(pin)) {

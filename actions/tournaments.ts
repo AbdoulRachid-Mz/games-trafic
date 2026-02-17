@@ -20,6 +20,7 @@ import {
   notifications,
   walletTransactions,
   userWallets,
+  financialAccounts,
   type Tournament,
   type NewTournament,
   type TournamentEdition,
@@ -553,16 +554,38 @@ export async function createTournamentEdition(
       throw new Error("tournamentId, editionNumber and startDate are required");
     }
 
-    const result = await db
-      .insert(tournamentEditions)
-      .values({
-        ...editionData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    return await db.transaction(async (tx) => {
+      // 1. Create Financial Account for Edition (Prize Pool)
+      const [account] = await tx
+        .insert(financialAccounts)
+        .values({
+          ownerEditionId: undefined, // Will link after edition is created
+          type: 'TOURNAMENT_POOL',
+          currency: editionData.prizeCurrency || 'GTC',
+          isActive: true,
+          createdAt: new Date(),
+        })
+        .returning();
 
-    return result[0];
+      // 2. Create Edition
+      const [newEdition] = await tx
+        .insert(tournamentEditions)
+        .values({
+          ...editionData,
+          financialAccountId: account.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      // 3. Update Financial Account with ownerEditionId
+      await tx
+        .update(financialAccounts)
+        .set({ ownerEditionId: newEdition.id })
+        .where(eq(financialAccounts.id, account.id));
+
+      return newEdition;
+    });
   } catch (error) {
     console.error("Error creating tournament edition:", error);
     if (error instanceof Error) {
@@ -1673,51 +1696,51 @@ export async function getEditionRegistrations(
         with: {
           member: options.populate.includes("member")
             ? {
-                with: {
-                  user:
-                    options.populate.includes("member.user") ||
+              with: {
+                user:
+                  options.populate.includes("member.user") ||
                     options.populate.includes("user")
-                      ? true
-                      : undefined,
-                  team:
-                    options.populate.includes("member.team") ||
+                    ? true
+                    : undefined,
+                team:
+                  options.populate.includes("member.team") ||
                     options.populate.includes("team")
-                      ? true
-                      : undefined,
-                },
-              }
+                    ? true
+                    : undefined,
+              },
+            }
             : undefined,
           payment:
             options.populate.includes("payment") ||
-            options.populate.includes("payments")
+              options.populate.includes("payments")
               ? {
-                  with: {
-                    transaction: options.populate.includes(
-                      "payment.transaction"
-                    )
-                      ? true
-                      : undefined,
-                  },
-                }
+                with: {
+                  transaction: options.populate.includes(
+                    "payment.transaction"
+                  )
+                    ? true
+                    : undefined,
+                },
+              }
               : undefined,
           edition: options.populate.includes("edition") ? true : undefined,
         },
         orderBy: options.sortBy
           ? options.sortOrder === "desc"
             ? [
-                desc(
-                  editionRegistrations[
-                    options.sortBy as keyof EditionRegistration
-                  ]
-                ),
-              ]
+              desc(
+                editionRegistrations[
+                options.sortBy as keyof EditionRegistration
+                ]
+              ),
+            ]
             : [
-                asc(
-                  editionRegistrations[
-                    options.sortBy as keyof EditionRegistration
-                  ]
-                ),
-              ]
+              asc(
+                editionRegistrations[
+                options.sortBy as keyof EditionRegistration
+                ]
+              ),
+            ]
           : [desc(editionRegistrations.registeredAt)],
       });
 
@@ -1881,27 +1904,27 @@ export async function getRegistrationPayments(
         with: {
           registration: options.populate.includes("registration")
             ? {
-                with: {
-                  member:
-                    options.populate.includes("registration.member") ||
+              with: {
+                member:
+                  options.populate.includes("registration.member") ||
                     options.populate.includes("member")
-                      ? {
-                          with: {
-                            user:
-                              options.populate.includes("member.user") ||
-                              options.populate.includes("user")
-                                ? true
-                                : undefined,
-                          },
-                        }
-                      : undefined,
-                  edition:
-                    options.populate.includes("registration.edition") ||
+                    ? {
+                      with: {
+                        user:
+                          options.populate.includes("member.user") ||
+                            options.populate.includes("user")
+                            ? true
+                            : undefined,
+                      },
+                    }
+                    : undefined,
+                edition:
+                  options.populate.includes("registration.edition") ||
                     options.populate.includes("edition")
-                      ? true
-                      : undefined,
-                },
-              }
+                    ? true
+                    : undefined,
+              },
+            }
             : undefined,
           transaction: options.populate.includes("transaction")
             ? true
@@ -1910,19 +1933,19 @@ export async function getRegistrationPayments(
         orderBy: options.sortBy
           ? options.sortOrder === "desc"
             ? [
-                desc(
-                  registrationPayments[
-                    options.sortBy as keyof RegistrationPayment
-                  ]
-                ),
-              ]
+              desc(
+                registrationPayments[
+                options.sortBy as keyof RegistrationPayment
+                ]
+              ),
+            ]
             : [
-                asc(
-                  registrationPayments[
-                    options.sortBy as keyof RegistrationPayment
-                  ]
-                ),
-              ]
+              asc(
+                registrationPayments[
+                options.sortBy as keyof RegistrationPayment
+                ]
+              ),
+            ]
           : [desc(registrationPayments.paidAt)],
       });
 

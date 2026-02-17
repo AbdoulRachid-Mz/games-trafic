@@ -390,12 +390,6 @@ export function useTracing(): TracingContextValue {
       setCurrentPage(page);
       pageViewStartTimeRef.current = now;
 
-      // Vérifier si on doit montrer une explication
-      if (config.showExplanations && shouldShowExplanation(page)) {
-        setTimeout(() => {
-          showExplanation(page);
-        }, config.autoShowExplanationDelay);
-      }
     },
     [config, currentPage],
   );
@@ -560,125 +554,15 @@ export function useTracing(): TracingContextValue {
   // GESTION DES EXPLICATIONS
   // ==========================================================================
 
-  const showExplanation = useCallback(
-    (page: string) => {
-      if (!config.showExplanations) return;
+  const parseExplanationKey = (input: string) => {
+    const idx = input.indexOf("@v");
+    if (idx >= 0) {
+      return { page: input.slice(0, idx), key: input, version: input.slice(idx + 2) };
+    }
+    return { page: input, key: input, version: undefined as string | undefined };
+  };
 
-      const explanation = PAGE_EXPLANATIONS.find((e) => {
-        if (e.page === page) return true;
-        if (e.page.includes("[") || e.page.includes("*")) {
-          const pattern = e.page
-            .replace(/\[[^\]]+\]/g, "[^/]+")
-            .replace(/\*\*/g, ".*")
-            .replace(/\*/g, "[^/]*");
-          const regex = new RegExp(`^${pattern}$`);
-          return regex.test(page);
-        }
-        return false;
-      });
-      if (!explanation) return;
-
-      // Mettre à jour l'état
-      explanationStatesRef.current[page] = {
-        page,
-        shown: true,
-        completed: false,
-        skipped: false,
-        shownAt: new Date(),
-      };
-
-      // Enregistrer la trace
-      trackAction("EXPLANATION_SHOWN", page, {
-        explanationId: explanation.version,
-        page,
-      });
-
-      // Sauvegarder (batched)
-      scheduleStorageUpdate();
-    },
-    [config, trackAction],
-  );
-
-  const completeExplanation = useCallback(
-    (page: string) => {
-      explanationStatesRef.current[page] = {
-        ...explanationStatesRef.current[page],
-        completed: true,
-        completedAt: new Date(),
-      };
-
-      trackAction("EXPLANATION_COMPLETED", page);
-      scheduleStorageUpdate();
-    },
-    [trackAction],
-  );
-
-  const skipExplanation = useCallback(
-    (page: string) => {
-      explanationStatesRef.current[page] = {
-        ...explanationStatesRef.current[page],
-        skipped: true,
-        skippedAt: new Date(),
-      };
-
-      trackAction("EXPLANATION_SKIPPED", page);
-      scheduleStorageUpdate();
-    },
-    [trackAction],
-  );
-
-  const shouldShowExplanation = useCallback(
-    (page: string): boolean => {
-      if (!config.showExplanations) return false;
-      if (config.explanationFrequency === "NEVER") return false;
-
-      const existingState = explanationStatesRef.current[page];
-      const globalDisabled = typeof window !== "undefined" && localStorage.getItem("gt_explanations_disabled") === "true";
-      const pageDisabled = typeof window !== "undefined" && localStorage.getItem(`gt_explanation_${page}_disabled`) === "true";
-      if (globalDisabled || pageDisabled) return false;
-      const explanationExists = PAGE_EXPLANATIONS.some((e) => {
-        if (e.page === page) return true;
-        if (e.page.includes("[") || e.page.includes("*")) {
-          const pattern = e.page
-            .replace(/\[[^\]]+\]/g, "[^/]+")
-            .replace(/\*\*/g, ".*")
-            .replace(/\*/g, "[^/]*");
-          const regex = new RegExp(`^${pattern}$`);
-          return regex.test(page);
-        }
-        return false;
-      });
-
-      if (!explanationExists) return false;
-
-      // Vérifier dans localStorage pour "une seule fois"
-      const key = `gt_explanation_${page}_shown`;
-      const hasBeenShown = localStorage.getItem(key);
-
-      switch (config.explanationFrequency) {
-        case "ALWAYS":
-          return true;
-        case "FIRST_TIME":
-          return !existingState?.shown && !hasBeenShown;
-        case "ONCE":
-          return !hasBeenShown;
-        default:
-          return false;
-      }
-    },
-    [config],
-  );
-
-  // ==========================================================================
-  // SYNCHRONISATION
-  // ==========================================================================
-
-  // const debouncedSync = useMemo(
-  //   () => debounce(() => syncTraces(), config.minSyncInterval),
-  //   [config.minSyncInterval],
-  // );
-
-  const syncTraces = useCallback(async (): Promise<void> => {
+    const syncTraces = useCallback(async (): Promise<void> => {
     if (syncInProgressRef.current || !config.isActive || !config.enabled)
       return;
 
@@ -745,6 +629,121 @@ export function useTracing(): TracingContextValue {
       syncInProgressRef.current = false;
     }
   }, [config, sessionId, user]);
+
+  const showExplanation = useCallback(
+    (pageOrKey: string) => {
+      if (!config.showExplanations) return;
+      const { page, key, version } = parseExplanationKey(pageOrKey);
+      const exists = PAGE_EXPLANATIONS.some((e) => {
+        if (e.page === page) return true;
+        if (e.page.includes("[") || e.page.includes("*")) {
+          const pattern = e.page
+            .replace(/\[[^\]]+\]/g, "[^/]+")
+            .replace(/\*\*/g, ".*")
+            .replace(/\*/g, "[^/]*");
+          const regex = new RegExp(`^${pattern}$`);
+          return regex.test(page);
+        }
+        return false;
+      });
+      if (!exists) return;
+      trackAction("EXPLANATION_OPENED", key, { page, version });
+    },
+    [config, trackAction],
+  );
+
+  const completeExplanation = useCallback(
+    (pageOrKey: string) => {
+      const { page, key, version } = parseExplanationKey(pageOrKey);
+      const prev = explanationStatesRef.current[key];
+      explanationStatesRef.current[key] = {
+        page,
+        shown: true,
+        completed: true,
+        skipped: false,
+        shownAt: prev?.shownAt || new Date(),
+        completedAt: new Date(),
+        skippedAt: undefined,
+      };
+      trackAction("EXPLANATION_COMPLETED", key, { page, version });
+      scheduleStorageUpdate();
+      syncTraces();
+    },
+    [trackAction, syncTraces],
+  );
+
+  const skipExplanation = useCallback(
+    (pageOrKey: string) => {
+      const { page, key, version } = parseExplanationKey(pageOrKey);
+      const prev = explanationStatesRef.current[key];
+      explanationStatesRef.current[key] = {
+        page,
+        shown: true,
+        completed: false,
+        skipped: true,
+        shownAt: prev?.shownAt || new Date(),
+        completedAt: undefined,
+        skippedAt: new Date(),
+      };
+      trackAction("EXPLANATION_SKIPPED", key, { page, version });
+      scheduleStorageUpdate();
+      syncTraces();
+    },
+    [trackAction, syncTraces],
+  );
+
+  const shouldShowExplanation = useCallback(
+    (pageOrKey: string): boolean => {
+      if (!config.showExplanations) return false;
+      if (config.explanationFrequency === "NEVER") return false;
+
+      const { page, key } = parseExplanationKey(pageOrKey);
+      const existingState = explanationStatesRef.current[key];
+      const globalDisabled = typeof window !== "undefined" && localStorage.getItem("gt_explanations_disabled") === "true";
+      const pageDisabled = typeof window !== "undefined" && localStorage.getItem(`gt_explanation_${page}_disabled`) === "true";
+      if (globalDisabled || pageDisabled) return false;
+      const explanationExists = PAGE_EXPLANATIONS.some((e) => {
+        if (e.page === page) return true;
+        if (e.page.includes("[") || e.page.includes("*")) {
+          const pattern = e.page
+            .replace(/\[[^\]]+\]/g, "[^/]+")
+            .replace(/\*\*/g, ".*")
+            .replace(/\*/g, "[^/]*");
+          const regex = new RegExp(`^${pattern}$`);
+          return regex.test(page);
+        }
+        return false;
+      });
+
+      if (!explanationExists) return false;
+
+      const lsKey = `gt_explanation_${page}_shown`;
+      const hasBeenShown = localStorage.getItem(lsKey);
+
+      switch (config.explanationFrequency) {
+        case "ALWAYS":
+          return true;
+        case "FIRST_TIME":
+          return !existingState?.shown && !hasBeenShown;
+        case "ONCE":
+          return !hasBeenShown;
+        default:
+          return false;
+      }
+    },
+    [config],
+  );
+
+  // ==========================================================================
+  // SYNCHRONISATION
+  // ==========================================================================
+
+  // const debouncedSync = useMemo(
+  //   () => debounce(() => syncTraces(), config.minSyncInterval),
+  //   [config.minSyncInterval],
+  // );
+
+
 
   const flushQueue = useCallback(async () => {
     await syncTraces();

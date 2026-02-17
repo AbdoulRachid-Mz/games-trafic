@@ -25,6 +25,7 @@ interface EditionPaymentDialogProps {
 }
 
 import { useUserProfile } from "@/hooks/use-profile";
+import { useWalletBalance } from "@/hooks/use-wallets";
 
 export function EditionPaymentDialog({
   edition,
@@ -38,9 +39,9 @@ export function EditionPaymentDialog({
     relations: ["wallet"],
   });
   const router = useRouter();
-  const balance = Number(completeData?.wallet?.balance || 0);
+  const balance = useWalletBalance(completeData?.wallet?.id || "");
   const entryFee = Number(edition.entryFee) || 0;
-  const canAfford = balance >= entryFee;
+  const canAfford = (balance.data ?? 0) >= entryFee;
   const [isRedirecting, setIsRedirecting] = React.useState(false);
 
   const handlePaymentRedirect = () => {
@@ -100,7 +101,7 @@ export function EditionPaymentDialog({
                 canAfford ? "text-green-600" : "text-red-500"
               }`}
             >
-              {balance} {edition.prizeCurrency || "GTC"}
+              {(balance.data ?? 0).toFixed(2)} {edition.prizeCurrency || "GTC"}
             </span>
           </div>
 

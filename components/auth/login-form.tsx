@@ -269,9 +269,8 @@ export function LoginForm({
 
           <div className="bg-muted relative hidden md:block">
             <Image
-              src="/placeholder.svg"
-              width={150}
-              height={150}
+              src="/images/icons/pages/auth/sign-in.jpg"
+              fill
               alt="Games-Trafics Platform"
               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
             />

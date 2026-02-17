@@ -31,7 +31,7 @@ export function PinVerification({
   const [pin, setPin] = useState("");
 
   const handleDigitClick = (digit: number) => {
-    if (pin.length < 4) {
+    if (pin.length < 8) {
       setPin((prev) => prev + digit);
     }
   };
@@ -42,7 +42,7 @@ export function PinVerification({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (pin.length === 4) {
+    if (pin.length >= 4) {
       await onVerify(pin);
     }
   };
@@ -57,14 +57,14 @@ export function PinVerification({
           Code de sécurité
         </Typography>
         <Typography variant="body-base" theme="muted">
-          Entrez votre code PIN à 4 chiffres
+          Entrez votre code PIN (min. 4 chiffres)
         </Typography>
       </div>
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-xl overflow-hidden">
         <CardContent className="p-8">
           <div className="flex justify-center gap-6 mb-8">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <motion.div
                 key={i}
                 initial={false}
@@ -91,7 +91,7 @@ export function PinVerification({
                 key={digit}
                 type="button"
                 onClick={() => handleDigitClick(digit)}
-                disabled={isLoading || pin.length >= 4}
+                disabled={isLoading || pin.length >= 8}
                 className="h-16 rounded-2xl bg-muted/30 hover:bg-muted/60 text-2xl font-bold transition-all active:scale-95 disabled:opacity-50"
               >
                 {digit}
@@ -110,7 +110,7 @@ export function PinVerification({
             <button
               type="button"
               onClick={() => handleDigitClick(0)}
-              disabled={isLoading || pin.length >= 4}
+              disabled={isLoading || pin.length >= 8}
               className="h-16 rounded-2xl bg-muted/30 hover:bg-muted/60 text-2xl font-bold transition-all active:scale-95 disabled:opacity-50"
             >
               0
@@ -127,7 +127,7 @@ export function PinVerification({
 
           <Button
             onClick={() => handleSubmit()}
-            disabled={pin.length !== 4 || isLoading}
+            disabled={pin.length < 4 || isLoading}
             className="w-full h-14 text-lg rounded-xl font-bold shadow-lg shadow-primary/25"
           >
             {isLoading ? (

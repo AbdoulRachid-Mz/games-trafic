@@ -11,6 +11,7 @@ import {
   SidebarItem,
   SidebarFooter,
   DashboardHeader,
+  SidebarContainer,
 } from "@/components/dashboard/enhanced-dashboard";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -63,7 +64,7 @@ export default function ShopDashboardLayout({
   const pageDescription = activeItem?.description || `Tableau de bord de la boutique`;
 
   const ShopSidebar = (
-    <div className="flex flex-col h-full bg-gradient-to-br from-emerald-900 to-teal-800 text-white">
+    <SidebarContainer sidebarBgType="gradient">
       <SidebarHeader
         title={shop?.name || "Boutique"}
         subtitle="Tableau de bord"
@@ -75,12 +76,12 @@ export default function ShopDashboardLayout({
       />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <SidebarGroup label="Général" sidebarBgType="gradient">
+        <SidebarGroup label="Vue d'ensemble" sidebarBgType="gradient">
           {navData.overviewItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
-              isActive={isActive(item.url, false)}
+            <SidebarItem
+              key={item.title}
+              {...item}
+              isActive={isActive(item.url, true)}
               sidebarBgType="gradient"
             />
           ))}
@@ -88,20 +89,20 @@ export default function ShopDashboardLayout({
 
         <SidebarGroup label="Produits" sidebarBgType="gradient">
           {navData.productItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
           ))}
         </SidebarGroup>
 
-        <SidebarGroup label="Ventes" sidebarBgType="gradient">
+        <SidebarGroup label="Commandes" sidebarBgType="gradient">
           {navData.orderItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
@@ -110,9 +111,9 @@ export default function ShopDashboardLayout({
 
         <SidebarGroup label="Clients" sidebarBgType="gradient">
           {navData.customerItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
@@ -121,9 +122,9 @@ export default function ShopDashboardLayout({
 
         <SidebarGroup label="Analyses" sidebarBgType="gradient">
           {navData.analyticsItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
@@ -132,9 +133,9 @@ export default function ShopDashboardLayout({
 
         <SidebarGroup label="Marketing" sidebarBgType="gradient">
           {navData.marketingItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
@@ -143,31 +144,31 @@ export default function ShopDashboardLayout({
 
         <SidebarGroup label="Apparence" sidebarBgType="gradient">
           {navData.appearanceItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
           ))}
         </SidebarGroup>
 
-        <SidebarGroup label="Finances" sidebarBgType="gradient">
+        <SidebarGroup label="Paiements" sidebarBgType="gradient">
           {navData.paymentItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
           ))}
         </SidebarGroup>
 
-        <SidebarGroup label="Configuration" sidebarBgType="gradient">
+        <SidebarGroup label="Paramètres" sidebarBgType="gradient">
           {navData.settingsItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
@@ -183,10 +184,10 @@ export default function ShopDashboardLayout({
         }}
         sidebarBgType="gradient"
       />
-    </div>
+    </SidebarContainer>
   );
 
-  const ShopHeader = (
+  const Header = (
     <DashboardHeader
       title={pageTitle}
       description={pageDescription}
@@ -195,12 +196,7 @@ export default function ShopDashboardLayout({
   );
 
   return (
-    <EnhancedDashboard
-      sidebar={ShopSidebar}
-      header={ShopHeader}
-      sidebarBgType="gradient"
-      className="min-h-screen"
-    >
+    <EnhancedDashboard sidebar={ShopSidebar} header={Header} sidebarBgType="gradient">
       {children}
     </EnhancedDashboard>
   );

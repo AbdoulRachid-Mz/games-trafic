@@ -27,7 +27,9 @@ import {
   groups,
   groupMembers,
   announcementReads,
+  financialAccounts,
 } from "@/database/schema";
+import { getAccountBalance } from "@/lib/ledger/ledger-utils";
 import {
   eq,
   and,
@@ -106,6 +108,7 @@ export interface UserWithAllRelations extends User {
   hasProducts?: boolean;
   hasTournaments?: boolean;
   hasActiveSubscription?: boolean;
+  ledgerBalance?: string;
 }
 
 export type ProfileMode = "minimal" | "partial" | "full";
@@ -157,11 +160,18 @@ export async function getProfile(
       // Pour minimal, on ne récupère que les infos de base + existence de wallet/vip
       const [wallet, vip] = await Promise.all([
         db
-          .select({ id: userWallets.id })
+          .select({ id: userWallets.id, financialAccountId: userWallets.financialAccountId })
           .from(userWallets)
           .where(eq(userWallets.userId, userId))
           .limit(1)
-          .then((res) => res[0]),
+          .then(async (res) => {
+            const w = res[0];
+            if (w?.financialAccountId) {
+              const balance = await getAccountBalance(w.financialAccountId);
+              return { ...w, balance: balance.toString() };
+            }
+            return w;
+          }),
         db
           .select({ id: vipSubscriptions.id })
           .from(vipSubscriptions)
@@ -175,12 +185,19 @@ export async function getProfile(
           .then((res) => res[0]),
       ]);
 
+      let ledgerBalance = "0";
+      if (wallet?.financialAccountId) {
+        const balance = await getAccountBalance(wallet.financialAccountId);
+        ledgerBalance = balance.toString();
+      }
+
       return {
         ...user,
         hasWallet: !!wallet,
         hasActiveSubscription: !!vip,
         wallet: wallet as any,
         vipSubscription: vip as any,
+        ledgerBalance,
       } as UserWithAllRelations;
     }
 
@@ -188,32 +205,32 @@ export async function getProfile(
     let relationsToInclude =
       mode === "full"
         ? [
-            "wallet",
-            "vipSubscription",
-            "shops",
-            "products",
-            "tournaments",
-            "posts",
-            "notifications",
-            "announcements",
-            "transactions",
-            "interactions",
-            "searches",
-            "sessions",
-            "accounts",
-            "verifications",
-            "themes",
-            "groups",
-            "traces",
-            "claims",
-          ]
+          "wallet",
+          "vipSubscription",
+          "shops",
+          "products",
+          "tournaments",
+          "posts",
+          "notifications",
+          "announcements",
+          "transactions",
+          "interactions",
+          "searches",
+          "sessions",
+          "accounts",
+          "verifications",
+          "themes",
+          "groups",
+          "traces",
+          "claims",
+        ]
         : options.includeRelations || [
-            "wallet",
-            "vipSubscription",
-            "shops",
-            "tournaments",
-            "posts",
-          ];
+          "wallet",
+          "vipSubscription",
+          "shops",
+          "tournaments",
+          "posts",
+        ];
 
     const limit =
       options.limitPerRelation ?? (mode === "full" ? undefined : 10);
@@ -228,7 +245,14 @@ export async function getProfile(
         .from(userWallets)
         .where(eq(userWallets.userId, userId))
         .limit(1)
-        .then((res) => res[0]);
+        .then(async (res) => {
+          const w = res[0];
+          if (w?.financialAccountId) {
+            const balance = await getAccountBalance(w.financialAccountId);
+            return { ...w, balance: balance.toString() };
+          }
+          return w;
+        });
     }
 
     // Abonnement VIP
@@ -584,10 +608,18 @@ export async function getProfile(
     // Mais ici on favorise la performance: si on n'a pas chargé les relations,
     // on ne fait pas de count() à moins que ce soit explicitement demandé.
 
+    // Si on a le wallet, on calcule le solde via ledger
+    let ledgerBalance = "0";
+    if (relationData.wallet?.financialAccountId) {
+      const balance = await getAccountBalance(relationData.wallet.financialAccountId);
+      ledgerBalance = balance.toString();
+    }
+
     return {
       ...user,
       ...relationData,
       ...userFlags,
+      ledgerBalance,
     } as UserWithAllRelations;
   } catch (error) {
     console.error("Error getting profile:", error);
@@ -601,12 +633,12 @@ export async function getProfile(
 export async function getMyProfile(
   options?: Omit<ProfileOptions, "includeFullData">,
 ) {
-  return getProfile("me", { includeFullData: true, ...options });
+  return getProfile("me", {
+    ...options,
+    mode: options?.mode || "full",
+  });
 }
 
-/**
- * Raccourci pour récupérer un profil public
- */
 export async function getUserProfile(userId: string, options?: ProfileOptions) {
   return getProfile(userId, options);
 }
@@ -1253,15 +1285,15 @@ function buildUserWhereConditions(
               eq(tournamentsCountSubquery.organizerId, users.id),
               filters.tournamentsCreatedCountMin !== undefined
                 ? gte(
-                    tournamentsCountSubquery.count,
-                    filters.tournamentsCreatedCountMin,
-                  )
+                  tournamentsCountSubquery.count,
+                  filters.tournamentsCreatedCountMin,
+                )
                 : undefined,
               filters.tournamentsCreatedCountMax !== undefined
                 ? lte(
-                    tournamentsCountSubquery.count,
-                    filters.tournamentsCreatedCountMax,
-                  )
+                  tournamentsCountSubquery.count,
+                  filters.tournamentsCreatedCountMax,
+                )
                 : undefined,
             ),
           ),
@@ -1424,3 +1456,4 @@ export async function migrateClaims(
     .set({ userId: newUserId })
     .where(eq(claims.userId, anonymousUserId));
 }
+

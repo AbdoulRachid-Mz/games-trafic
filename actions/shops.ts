@@ -1,21 +1,26 @@
 // @/actions/shops.ts
 'use server';
 
-import { 
+import {
   shops, users, themes, products, entityCategories, categories,
   type Shop, type NewShop, type User, type Theme,
   interactions
 } from '@/database/schema';
-import { 
-  eq, and, or, like, ilike, inArray, between, 
-  desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull, 
+import {
+  eq, and, or, like, ilike, inArray, between,
+  desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull,
   sum
 } from 'drizzle-orm';
-import { 
-  type ShopFilters, 
-  type ListQuery, 
+import {
+  financialAccounts,
+  ledgerEntries,
+  walletTransactions
+} from '@/database/schema';
+import {
+  type ShopFilters,
+  type ListQuery,
   type PaginationResponse,
-  type QueryOptions 
+  type QueryOptions
 } from '@/types/api';
 import { db } from '@/lib/db';
 
@@ -27,7 +32,7 @@ import { db } from '@/lib/db';
  * Récupère une boutique par son ID avec relations optionnelles
  */
 export async function getShopById(
-  id: string, 
+  id: string,
   options?: { populate?: string[] }
 ): Promise<(Shop & {
   owner?: User;
@@ -58,7 +63,7 @@ export async function getShopById(
 
       // Transformation des données pour inclure les counts
       const result: any = { ...shopWithRelations };
-      
+
       if (options.populate.includes('products')) {
         result.productsCount = shopWithRelations.products?.length || 0;
       }
@@ -229,6 +234,7 @@ export async function getPopularShops(
         address: shops.address,
         website: shops.website,
         socialMedia: shops.socialMedia,
+        financialAccountId: shops.financialAccountId, // Added this field
         productCount: sql<number>`COALESCE(${productCountSubquery.productCount}, 0)`,
         viewCount: shops.viewCount,
         balance: shops.balance,
@@ -265,7 +271,7 @@ export async function getPopularShops(
       )
       .limit(limit);
 
-    return result;
+    return result as Shop[];
   } catch (error) {
     console.error('Error getting popular shops:', error);
     throw new Error('Failed to fetch popular shops');
@@ -474,13 +480,48 @@ export async function getShopStatsById(
       productCount: productCountResult[0]?.count || 0,
       viewCount: shop.viewCount || 0,
       followerCount: followerCountResult[0]?.count || 0,
-      balance: shop.balance || '0',
+      balance: '0', // Managed via ledger
       averageRating: averageRatingResult[0]?.avg || 0,
       totalSales: totalSalesResult[0]?.count || 0,
     };
   } catch (error) {
     console.error('Error getting shop stats by ID:', error);
     throw new Error('Failed to fetch shop statistics');
+  }
+}
+
+/**
+ * Récupère les statistiques financières d'une boutique (via ledger)
+ */
+export async function getShopFinancialStats(shopId: string) {
+  try {
+    const shop = await getShopById(shopId);
+    if (!shop || !shop.financialAccountId) {
+      return { balance: 0, transactionsCount: 0 };
+    }
+
+    const [
+      balanceResult,
+      countResult,
+    ] = await Promise.all([
+      db.select({
+        balance: sql<string>`COALESCE(SUM(${ledgerEntries.credit}) - SUM(${ledgerEntries.debit}), '0')`,
+      })
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.accountId, shop.financialAccountId)),
+
+      db.select({ count: count() })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.financialAccountId, shop.financialAccountId))
+    ]);
+
+    return {
+      balance: parseFloat(balanceResult[0]?.balance || '0'),
+      transactionsCount: countResult[0]?.count || 0,
+    };
+  } catch (error) {
+    console.error('Error getting shop financial stats:', error);
+    throw new Error('Failed to fetch shop financial data');
   }
 }
 
@@ -518,25 +559,38 @@ export async function createShop(shopData: NewShop): Promise<Shop> {
       throw new Error('Owner user not found');
     }
 
-    const result = await db
-      .insert(shops)
-      .values({
-        ...shopData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    return await db.transaction(async (tx) => {
+      // 1. Create Financial Account
+      const [account] = await tx
+        .insert(financialAccounts)
+        .values({
+          ownerShopId: undefined, // Will link after shop is created
+          type: 'SHOP_WALLET',
+          currency: 'GTC',
+          isActive: true,
+          createdAt: new Date(),
+        })
+        .returning();
 
-    // Mise à jour du compteur de boutiques de l'utilisateur
-    // await db
-    //   .update(users)
-    //   .set({
-    //     shopsCount: sql`${users.shopsCount} + 1`,
-    //     updatedAt: new Date(),
-    //   })
-    //   .where(eq(users.id, shopData.ownerId));
+      // 2. Create Shop
+      const [newShop] = await tx
+        .insert(shops)
+        .values({
+          ...shopData,
+          financialAccountId: account.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-    return result[0];
+      // 3. Update Financial Account with ownerShopId
+      await tx
+        .update(financialAccounts)
+        .set({ ownerShopId: newShop.id })
+        .where(eq(financialAccounts.id, account.id));
+
+      return newShop;
+    });
   } catch (error) {
     console.error('Error creating shop:', error);
     if (error instanceof Error) {
@@ -550,7 +604,7 @@ export async function createShop(shopData: NewShop): Promise<Shop> {
  * Met à jour une boutique
  */
 export async function updateShop(
-  id: string, 
+  id: string,
   shopData: Partial<NewShop>
 ): Promise<Shop> {
   try {
@@ -669,7 +723,7 @@ export async function restoreShop(id: string): Promise<Shop> {
  * Met à jour les statistiques d'une boutique
  */
 export async function updateShopStats(
-  id: string, 
+  id: string,
   stats: Partial<{
     productCount: number;
     viewCount: number;
@@ -727,7 +781,7 @@ export async function incrementShopViews(id: string): Promise<Shop> {
  * Met à jour le thème d'une boutique
  */
 export async function updateShopTheme(
-  shopId: string, 
+  shopId: string,
   themeId: string | null,
   customTheme?: any
 ): Promise<Shop> {
@@ -761,7 +815,7 @@ export async function updateShopTheme(
  * Ajoute une catégorie à une boutique
  */
 export async function addShopCategory(
-  shopId: string, 
+  shopId: string,
   categoryId: string
 ): Promise<void> {
   try {
@@ -820,7 +874,7 @@ export async function addShopCategory(
  * Supprime une catégorie d'une boutique
  */
 export async function removeShopCategory(
-  shopId: string, 
+  shopId: string,
   categoryId: string
 ): Promise<void> {
   try {
@@ -839,16 +893,13 @@ export async function removeShopCategory(
   }
 }
 
-// ============================================================================
-// UTILITAIRES
-// ============================================================================
 
 /**
  * Construit les conditions WHERE pour les requêtes shops
  */
 // lib/actions/shops.ts
 function buildShopWhereConditions(
-  filters: ShopFilters, 
+  filters: ShopFilters,
   options: QueryOptions = {}
 ) {
   const conditions: any[] = [];

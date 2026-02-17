@@ -34,6 +34,7 @@ import {
   editionResults,
   requests,
   gameClips,
+  ledgerEntries,
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import {
@@ -58,6 +59,7 @@ import {
   not,
 } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getAccountBalance } from "@/lib/ledger/ledger-utils";
 
 // ============================================================================
 // TYPES
@@ -1289,13 +1291,18 @@ async function getNotificationsStats(userId: string) {
 
 async function getWalletStats(userId: string, filters: UserStatsFilters) {
   // Solde du portefeuille
-  const [wallet] = await db
+  const [walletRow] = await db
     .select({
-      balance: userWallets.balance,
+      accountId: userWallets.financialAccountId,
     })
     .from(userWallets)
     .where(eq(userWallets.userId, userId))
     .limit(1);
+  let walletBalance = 0;
+  if (walletRow?.accountId) {
+    const balance = await getAccountBalance(walletRow.accountId);
+    walletBalance = balance;
+  }
 
   const [stats] = await db
     .select({
@@ -1346,7 +1353,7 @@ async function getWalletStats(userId: string, filters: UserStatsFilters) {
     .limit(10);
 
   return {
-    balance: Number(wallet?.balance || 0),
+    balance: walletBalance,
     total_deposits: Number(stats.total_deposits || 0),
     total_withdrawals: Number(stats.total_withdrawals || 0),
     total_transactions: Number(stats.total_transactions || 0),
@@ -1838,7 +1845,7 @@ export async function getUserDashboardStats(userId?: string) {
         ),
 
       db
-        .select({ balance: userWallets.balance })
+        .select({ accountId: userWallets.financialAccountId })
         .from(userWallets)
         .where(eq(userWallets.userId, targetUserId))
         .limit(1),
@@ -1859,6 +1866,12 @@ export async function getUserDashboardStats(userId?: string) {
       ),
     ]);
 
+    // Calculate real balance from accountId
+    let balanceValue = 0;
+    if (walletBalance[0]?.accountId) {
+      balanceValue = await getAccountBalance(walletBalance[0].accountId);
+    }
+
     return {
       success: true,
       data: {
@@ -1867,7 +1880,7 @@ export async function getUserDashboardStats(userId?: string) {
           shops: Number(shopsCount[0]?.count || 0),
           products: Number(productsCount[0]?.count || 0),
           tournaments: Number(tournamentsCount[0]?.count || 0),
-          balance: Number(walletBalance[0]?.balance || 0),
+          balance: balanceValue,
           unread_notifications: Number(unreadNotifications[0]?.count || 0),
         },
         recent_activity: recentActivity,

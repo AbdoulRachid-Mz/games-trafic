@@ -119,7 +119,7 @@ export default function HeroSection() {
             {heroStats.map((stat, index) => (
               <div
                 key={index}
-                className="flex items-center justify-center gap-4 px-6 md:border-r last:border-0 border-border/30"
+                className="flex items-center gap-4 px-6 md:border-r last:border-0 border-border/30"
               >
                 <div className="p-2.5 rounded-lg bg-secondary/50">
                   {stat.icon}

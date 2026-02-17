@@ -45,10 +45,12 @@ import Image from "next/image";
 import { formatWalletNumber } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, UserWallet, UserWithRelations } from "@/database/schema";
+import { getWalletBalance } from "@/actions/wallets";
 
 interface AdvancedUserCardProps {
   wallet: UserWallet;
-  user: UserWithRelations;
+  user: UserWithRelations & { ledgerBalance?: string };
+  balance?: string; // Optionnel: solde calculé via ledger
   showBalance?: boolean;
   onRefresh?: () => Promise<void>;
   className?: string;
@@ -57,6 +59,7 @@ interface AdvancedUserCardProps {
 export function AdvancedUserCard({
   wallet,
   user,
+  balance,
   showBalance = true,
   onRefresh,
   className,
@@ -65,7 +68,22 @@ export function AdvancedUserCard({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showQRDrawer, setShowQRDrawer] = useState(false);
   const [copied, setCopied] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [realBalance, setRealBalance] = useState<string | null>(null);
+
+  // Fetch real balance on mount
+  React.useEffect(() => {
+    const fetchBalance = async () => {
+      if (wallet?.id) {
+        try {
+          const bal = await getWalletBalance(wallet.id);
+          setRealBalance(bal.toString());
+        } catch (error) {
+          console.error("Failed to fetch wallet balance", error);
+        }
+      }
+    };
+    fetchBalance();
+  }, [wallet?.id]);
 
   const appInfo = {
     name: "GAMES TRAFICS",
@@ -160,7 +178,9 @@ export function AdvancedUserCard({
     return <CardSkeleton />;
   }
 
-  const formattedBalance = parseFloat(wallet.balance || "0").toLocaleString(
+  // Utiliser le solde passé en prop, ou le solde réel récupéré, ou celui de l'utilisateur, ou 0
+  const displayBalance = balance || realBalance || user.ledgerBalance || "0";
+  const formattedBalance = parseFloat(displayBalance).toLocaleString(
     "fr-FR",
     {
       minimumFractionDigits: 2,
@@ -173,7 +193,6 @@ export function AdvancedUserCard({
       <div className="relative w-full mx-auto">
         {/* Carte 3D */}
         <motion.div
-          ref={cardRef}
           className={cn(
             "relative w-full h-56 min-h-fit max-w-md mx-auto transition-transform duration-600 preserve-3d cursor-pointer",
             isFlipped && "rotate-y-180",
@@ -220,9 +239,8 @@ export function AdvancedUserCard({
                     }}
                   >
                     <RefreshCw
-                      className={`h-4 w-4 ${
-                        isRefreshing ? "animate-spin" : ""
-                      }`}
+                      className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""
+                        }`}
                     />
                   </Button>
 

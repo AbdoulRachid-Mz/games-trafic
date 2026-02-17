@@ -24,6 +24,10 @@ import {
   Target,
   Scroll,
   QrCode,
+  Pin,
+  LayoutDashboard,
+  MoreVertical,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -53,6 +57,7 @@ import {
 } from "@/components/ui/drawer";
 import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface ProductDetailProps {
   productId: string;
@@ -63,10 +68,13 @@ interface ProductDetailProps {
 export function ProductDetail({ productId, initialProduct, initialRelated }: ProductDetailProps) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthContext();
+  // qr code state
+  const [qrCodeVisible, setQrCodeVisible] = useState(false);
 
   const { data: product, isLoading } = useProduct(productId, {
     populate: ["shop", "category", "user"]
   });
+
 
   const currentProduct = product || initialProduct;
   const [activeTab, setActiveTab] = useState("description");
@@ -83,7 +91,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
   const handleBuy = () => {
     if (!isAuthenticated) {
       toast.error("Vous devez être connecté pour acheter.");
-      router.push(`/auth/sign-in?callbackUrl=/products/${currentProduct.id}`);
+      router.push(`/sign-in?callbackUrl=/products/${currentProduct.id}`);
       return;
     }
 
@@ -122,6 +130,38 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     RESERVE: { label: "Réservé", color: "bg-amber-500 text-amber-950" },
     VENDU: { label: "Vendu", color: "bg-destructive text-destructive-foreground" },
   };
+
+  // actions buttons
+  const actionButtons = [
+    {
+      icon: <LayoutDashboard className="h-5 w-5" />,
+      label: "Dashboard",
+      onClick: () => router.push(`/marketplace/${currentProduct.id}/dashboard`),
+      condition: isOwner,
+      color: "bg-blue-600 text-white",
+    },
+    {
+      icon: <QrCode className="h-5 w-5" />,
+      label: "Code QR",
+      onClick: () => setQrCodeVisible(true),
+      condition: isAvailable,
+      color: "bg-purple-600 text-white",
+    },
+    {
+      icon: <Settings className="h-5 w-5" />,
+      label: "Paramètres",
+      onClick: () => router.push(`/marketplace/${currentProduct.id}/dashboard/settings`),
+      condition: isOwner,
+      color: "bg-gray-700 text-white",
+    },
+    {
+      icon: <ShoppingCart className="h-5 w-5" />,
+      label: "Acheter",
+      onClick: handleBuy,
+      condition: isAvailable && !isOwner,
+      color: "bg-green-600 text-white",
+    }
+  ];
 
   if (isLoading) {
     return <ProductDetailSkeleton />;
@@ -307,56 +347,110 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                 </Typography>
 
                 {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                  <Button
-                    size="lg"
-                    className="flex-1 text-lg h-12"
-                    onClick={handleBuy}
-                    disabled={!isAvailable}
-                  >
-                    <ShoppingCart className="mr-2 h-5 w-5" />
-                    {isAvailable ? "Acheter maintenant" : "Indisponible"}
-                  </Button>
+                <div className="flex gap-3 mt-6">
+                  {/* Always visible buttons */}
+                  {(() => {
+                    // Filter buttons that should be visible
+                    const visibleButtons = actionButtons.filter(btn => btn.condition !== false);
+                    // Take first two buttons for direct display
+                    const mainButtons = visibleButtons.slice(0, 2);
+                    // Remaining buttons go into dropdown
+                    const dropdownButtons = visibleButtons.slice(2);
 
-                  <Drawer>
-                    <DrawerTrigger asChild>
-                      <Button
+                    return (
+                      <>
+                        {/* Always show first two buttons */}
+                        {mainButtons.map((btn, idx) => (
+                          <Button
+                            key={idx}
+                            size="lg"
+                            className={cn(
+                              "flex-1 text-lg h-12",
+                              btn.color
+                            )}
+                            onClick={btn.onClick}
+                          >
+                            {btn.icon}
+                            <span className="ml-2">{btn.label}</span>
+                          </Button>
+                        ))}
+
+                        {/* Dropdown for additional actions if any //89585436 */}
+                        {dropdownButtons.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="lg"
+                                variant="outline"
+                                className={cn(
+                                  "text-lg h-12 px-3"
+                                )}
+                              >
+                                <MoreVertical className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {dropdownButtons.map((btn, idx) => (
+                                <DropdownMenuItem
+                                  key={idx}
+                                  onClick={btn.onClick}
+                                  className={cn(
+                                    "gap-2",
+                                    btn.color
+                                  )}
+                                >
+                                  {btn.icon}
+                                  {btn.label}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+                <Drawer
+                  open={qrCodeVisible}
+                  onOpenChange={setQrCodeVisible}
+                >
+                  <DrawerTrigger asChild>
+                    {/* <Button
                         variant="outline"
                         size="lg"
                         className="h-12"
                       >
                         <QrCode className="mr-2 h-5 w-5" />
                         QR Code
-                      </Button>
-                    </DrawerTrigger>
-                    <DrawerContent>
-                      <DrawerHeader>
-                        <DrawerTitle>Achat Rapide</DrawerTitle>
-                      </DrawerHeader>
-                      <div className="p-6 flex flex-col items-center">
-                        <Typography variant="body-sm" theme="muted" className="mb-4 text-center">
-                          Scannez ce QR Code pour acheter rapidement
-                        </Typography>
-                        <TransactionQRCode
-                          data={encodeTransactionQR({
-                            t: "PRODUCT_PURCHASE",
-                            id: currentProduct.id,
-                            a: typeof currentProduct.price === "number" ? currentProduct.price : parseFloat(currentProduct.price as string),
-                            m: { name: currentProduct.name }
-                          })}
-                          label={currentProduct.name}
-                          className="w-64 h-64"
-                        />
-                        <Typography variant="body-sm" weight="medium" className="mt-4">
-                          {currentProduct.name}
-                        </Typography>
-                        <Typography variant="h4" weight="bold" className="mt-2">
-                          {currentProduct.price} GTC
-                        </Typography>
-                      </div>
-                    </DrawerContent>
-                  </Drawer>
-                </div>
+                      </Button> */}
+                  </DrawerTrigger>
+                  <DrawerContent>
+                    <DrawerHeader>
+                      <DrawerTitle>Achat Rapide</DrawerTitle>
+                    </DrawerHeader>
+                    <div className="p-6 flex flex-col items-center">
+                      <Typography variant="body-sm" theme="muted" className="mb-4 text-center">
+                        Scannez ce QR Code pour acheter rapidement
+                      </Typography>
+                      <TransactionQRCode
+                        data={encodeTransactionQR({
+                          t: "PRODUCT_PURCHASE",
+                          id: currentProduct.id,
+                          a: typeof currentProduct.price === "number" ? currentProduct.price : parseFloat(currentProduct.price as string),
+                          m: { name: currentProduct.name }
+                        })}
+                        label={currentProduct.name}
+                        className="w-64 h-64"
+                      />
+                      <Typography variant="body-sm" weight="medium" className="mt-4">
+                        {currentProduct.name}
+                      </Typography>
+                      <Typography variant="h4" weight="bold" className="mt-2">
+                        {currentProduct.price} GTC
+                      </Typography>
+                    </div>
+                  </DrawerContent>
+                </Drawer>
               </CardContent>
             </Card>
 

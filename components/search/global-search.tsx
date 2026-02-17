@@ -27,10 +27,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { SearchHistoryItem } from "./search-history-item";
 import { useAuthContext } from "@/contexts/auth-context";
-import { useDebounce } from "@/hooks/use-debounce";
-import { useSearch } from "@/hooks/use-search";
-import { useSearchSession } from "@/hooks/use-search-session";
-import { searchWithSuggestions } from "@/actions/search";
+import { useLocalSearch } from "@/hooks/use-local-search";
 
 interface GlobalSearchProps {
   isOpen: boolean;
@@ -45,8 +42,8 @@ type SearchResultType =
   | 'theme'
   | 'service' 
   | 'guide' 
-  | 'blog' 
-  | 'news';
+  | 'blog'
+  | 'item';
 
 interface SearchResultItem {
   id: string;
@@ -66,39 +63,29 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user, isAuthenticated } = useAuthContext();
-  
-  // Utiliser le debounce personnalisé
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  
-  // Gestionnaire de session de recherche
-  const { 
-    sessionHistory, 
-    addToSession, 
-    clearSession,
-    syncToServer 
-  } = useSearchSession();
-
-  // Recherche unifiée avec cache
-  const { 
-    data: searchResults = [], 
-    isLoading,
-    refetch
-  } = useSearch<SearchResultItem>(
-    activeTab === 'all' 
-      ? 'shop,product,tournament,theme,service,guide,blog,news'
-      : activeTab,
-    debouncedSearchTerm,
-    { 
-      enabled: debouncedSearchTerm.length >= 2,
+ 
+  const selectedTypes = useMemo<('shop'|'product'|'tournament'|'theme'|'service'|'guide'|'blog'|'item')[]>(() => {
+    if (activeTab === 'all') {
+      return ['shop','product','tournament','theme','service','guide','blog','item'];
     }
-  );
+    return [activeTab] as any;
+  }, [activeTab]);
+ 
+  const {
+    results: searchResults,
+    isLoading,
+    addToHistory,
+    clearHistory,
+    deleteHistoryItem,
+    history: sessionHistory,
+    suggestions: localSuggestions,
+    debouncedTerm,
+  } = useLocalSearch(selectedTypes as any, searchTerm, { limitPerType: 8, debounceMs: 400 });
 
   // Filtrer les résultats par type
   const filteredResults = useMemo(() => {
-    if (activeTab === 'all') return searchResults;
-// components/search/global-search.tsx
-    return searchResults.filter((item: SearchResultItem) => item.type === activeTab);
-  }, [searchResults, activeTab]);
+    return searchResults as any[];
+  }, [searchResults]);
 
   // Suggestions depuis l'historique
   const historySuggestions = useMemo(() => {
@@ -113,24 +100,9 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   // Gestion de la recherche avec suggestions
   const handleSearch = useCallback(async (term: string) => {
     if (term.trim().length < 2) return;
-    
-    // Ajouter à la session
-    addToSession(term);
-    
-    // Mettre à jour les suggestions
-    try {
-      const response = await fetch(`/api/search/suggestions?term=${encodeURIComponent(term)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestions(data.suggestions || []);
-      }
-    } catch (error) {
-      console.error('Error getting suggestions:', error);
-    }
-    
-    // Rafraîchir les résultats
-    refetch();
-  }, [addToSession, refetch]);
+    addToHistory(term);
+    setSuggestions(localSuggestions);
+  }, [addToHistory, localSuggestions]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchTerm.trim().length > 0) {
@@ -142,13 +114,13 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   const handleResultClick = useCallback((item: SearchResultItem) => {
     // Enregistrer l'action
-    addToSession(item.title);
+    addToHistory(item.title);
     
     // Naviguer vers l'élément
     const path = getResultPath(item);
     router.push(path);
     onClose();
-  }, [addToSession, router, onClose]);
+  }, [addToHistory, router, onClose]);
 
   const getResultPath = useCallback((item: SearchResultItem): string => {
     switch (item.type) {
@@ -159,7 +131,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       case 'service': return `/services/${item.id}`;
       case 'guide': return `/guides/${item.id}`;
       case 'blog': return `/blog/${item.id}`;
-      case 'news': return `/news/${item.id}`;
+      case 'item': return `/items/${item.id}`;
       default: return '#';
     }
   }, []);
@@ -167,10 +139,9 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   // Synchroniser avec le serveur lors de la fermeture
   useEffect(() => {
     if (!isOpen) {
-      syncToServer();
       setSuggestions([]);
     }
-  }, [isOpen, syncToServer]);
+  }, [isOpen]);
 
   // Focus sur l'input à l'ouverture
   useEffect(() => {
@@ -185,10 +156,10 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   // Suggestions automatiques lors de la frappe
   useEffect(() => {
-    if (debouncedSearchTerm.length >= 2) {
-      handleSearch(debouncedSearchTerm);
+    if (debouncedTerm.length >= 2) {
+      handleSearch(debouncedTerm);
     }
-  }, [debouncedSearchTerm, handleSearch]);
+  }, [debouncedTerm, handleSearch]);
 
   const renderResults = () => {
     if (isLoading) {
@@ -200,12 +171,12 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       );
     }
 
-    if (filteredResults.length === 0 && debouncedSearchTerm.length >= 2) {
+    if (filteredResults.length === 0 && debouncedTerm.length >= 2) {
       return (
         <div className="p-8 text-center">
           <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-muted-foreground mb-2">
-            Aucun résultat trouvé pour "{debouncedSearchTerm}"
+            Aucun résultat trouvé pour "{debouncedTerm}"
           </p>
           {suggestions.length > 0 && (
             <div className="mt-4">
@@ -247,7 +218,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               <ViewMoreButton
                 count={filteredResults.length}
                 type={activeTab}
-                searchTerm={debouncedSearchTerm}
+                searchTerm={debouncedTerm}
                 onClose={onClose}
               />
             )}
@@ -260,11 +231,10 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogTitle className="hidden">Titre de la recherche</DialogTitle>
       <DialogContent 
         className="p-0 sm:max-w-[600px] lg:max-w-[700px] max-h-[90vh] flex flex-col"
-        onInteractOutside={(e) => e.preventDefault()}
       >
         {/* Header de recherche */}
         <div className="sticky top-0 z-10 bg-background border-b">
@@ -310,7 +280,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           )}
 
           {/* Tabs */}
-          {debouncedSearchTerm.length >= 2 && (
+          {debouncedTerm.length >= 2 && (
             <Tabs 
               value={activeTab} 
               onValueChange={(v) => setActiveTab(v as SearchResultType)}
@@ -332,8 +302,17 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 <TabsTrigger value="theme" className="text-xs">
                   <Palette className="h-3 w-3 mr-1" /> Thèmes
                 </TabsTrigger>
+                <TabsTrigger value="service" className="text-xs">
+                  <HelpCircle className="h-3 w-3 mr-1" /> Services
+                </TabsTrigger>
                 <TabsTrigger value="guide" className="text-xs">
                   <BookOpen className="h-3 w-3 mr-1" /> Guides
+                </TabsTrigger>
+                <TabsTrigger value="blog" className="text-xs">
+                  <Newspaper className="h-3 w-3 mr-1" /> Blog
+                </TabsTrigger>
+                <TabsTrigger value="item" className="text-xs">
+                  <ShoppingBag className="h-3 w-3 mr-1" /> Items
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -342,7 +321,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
         {/* Contenu */}
         <div className="flex-1 overflow-hidden">
-          {debouncedSearchTerm.length < 2 ? (
+          {debouncedTerm.length < 2 ? (
             // Historique
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
@@ -354,7 +333,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={clearSession}
+                    onClick={clearHistory}
                     className="text-xs"
                   >
                     Effacer
@@ -373,6 +352,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                           setSearchTerm(term);
                           handleSearch(term);
                         }}
+                        onDelete={() => deleteHistoryItem(item.id)}
                       />
                     ))}
                   </div>

@@ -9,6 +9,7 @@ import {
   type NewRequest,
   type WalletTransaction,
   userWallets,
+  NewWalletTransaction,
 } from '@/database/schema';
 import {
   eq,
@@ -34,6 +35,8 @@ import {
   type QueryOptions,
 } from '@/types/api';
 import { db } from '@/lib/db';
+import { executeTransaction, getOrCreatePlatformAccount } from '@/lib/ledger/ledger-utils';
+import { createTransaction } from './wallets';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -272,6 +275,23 @@ export async function createRequest(
       throw new Error('User not found');
     }
 
+    const last = await db
+      .select()
+      .from(requests)
+      .where(eq(requests.userId, requestData.userId))
+      .orderBy(desc(requests.createdAt))
+      .limit(1);
+    if (last[0]?.createdAt) {
+      const lastDate = new Date(last[0].createdAt as any).getTime();
+      const now = Date.now();
+      const minWait = 120_000;
+      const diff = now - lastDate;
+      if (diff < minWait) {
+        const remaining = Math.ceil((minWait - diff) / 1000);
+        throw new Error(`Veuillez patienter ${remaining}s avant une nouvelle demande`);
+      }
+    }
+
     // Pour les requêtes de type GAME_ITEMS, vérification de l'item
     if (requestData.type === 'GAME_ITEMS' && requestData.gameItemId) {
       const item = await db
@@ -313,7 +333,7 @@ export async function createRequest(
 }
 
 /**
- * Met à jour le statut d'une requête
+ * Update request status
  */
 export async function updateRequestStatus(
   id: string,
@@ -367,83 +387,99 @@ export async function updateRequestStatus(
 }
 
 /**
- * Approuve une requête et crée la transaction associée si nécessaire
+ * Approve a request and create the associated transaction if necessary
+ * Uses ledger-based wallet transactions instead of manual balance updates
  */
 export async function approveRequest(
   id: string,
-  adminUserId: string,
-  options?: {
-    createTransaction?: boolean;
-    transactionMetadata?: Record<string, any>;
-  }
-): Promise<Request> {
-  try {
-    // Récupération de la requête
-    const request = await getRequestById(id, { populate: ['user'] });
-    if (!request) {
-      throw new Error('Request not found');
+  adminUserId: string
+) {
+  return await db.transaction(async (tx) => {
+    const request = await tx
+      .select()
+      .from(requests)
+      .where(eq(requests.id, id))
+      .for("update")
+      .then((rows) => rows[0]);
+
+    if (!request) throw new Error("Request not found");
+    if (request.status !== "PENDING")
+      throw new Error("Request is not pending");
+
+    const wallet = await tx.query.userWallets.findFirst({
+      where: eq(userWallets.userId, request.userId),
+    });
+
+    if (!wallet?.financialAccountId)
+      throw new Error("User financial account missing");
+
+    let fromAccountId: string;
+    let toAccountId: string;
+
+    // ====================================================
+    // 💰 DEPOSIT
+    // ====================================================
+    if (request.type === "DEPOSIT") {
+      const systemAccount = await getOrCreatePlatformAccount(
+        tx,
+        "SYSTEM_ADJUSTMENT"
+      );
+
+      fromAccountId = systemAccount.id;
+      toAccountId = wallet.financialAccountId;
     }
 
-    if (request.status !== 'PENDING') {
-      throw new Error('Request is not pending');
+    // ====================================================
+    // 💸 WITHDRAWAL
+    // ====================================================
+    else if (request.type === "WITHDRAWAL") {
+      const escrow = await getOrCreatePlatformAccount(
+        tx,
+        "PLATFORM_ESCROW"
+      );
+
+      fromAccountId = wallet.financialAccountId;
+      toAccountId = escrow.id;
+    } else {
+      throw new Error("Unsupported request type");
     }
 
-    // Mise à jour du statut
-    const updatedRequest = await updateRequestStatus(id, 'APPROVED', adminUserId);
+    // 🚀 EXECUTE DOUBLE ENTRY
+    const result = await executeTransaction({
+      fromAccountId,
+      toAccountId,
+      amount: Number(request.amount),
+      type: request.type,
+      description: `Approved ${request.type} request ${request.id}`,
+      metadata: {
+        requestId: request.id,
+        approvedBy: adminUserId,
+      },
+      walletId: wallet.id,
+      userId: request.userId,
+      tx, // Pass the transaction context
+    });
 
-    // Création de la transaction si demandé et si c'est un DEPOSIT/WITHDRAWAL
-    if (options?.createTransaction && ['DEPOSIT', 'WITHDRAWAL'].includes(request.type)) {
-      const wallet = await db
-        .select()
-        .from(userWallets)
-        .where(eq(userWallets.userId, request.userId))
-        .limit(1);
+    // 📝 Update request
+    await tx
+      .update(requests)
+      .set({
+        status: "COMPLETED",
+        processedByUserId: adminUserId,
+        processedAt: new Date(),
+        completedAt: new Date(),
+        transactionId: result.transaction.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(requests.id, id));
 
-      if (wallet[0]) {
-        const transactionData = {
-          walletId: wallet[0].id,
-          fromUserId: request.type === 'DEPOSIT' ? adminUserId : request.userId,
-          toUserId: request.type === 'DEPOSIT' ? request.userId : adminUserId,
-          amount: request.amount,
-          fees: '0',
-          netAmount: request.amount,
-          balanceAfter: request.type === 'DEPOSIT' 
-            ? (parseFloat(wallet[0].balance ?? '0') + parseFloat(request.amount)).toFixed(2)
-            : (parseFloat(wallet[0].balance ?? '0') - parseFloat(request.amount)).toFixed(2),
-          type: request.type as WalletTransaction['type'],
-          status: 'COMPLETED' as const,
-          description: `${request.type} request approved: ${request.id}`,
-          metadata: {
-            requestId: id,
-            ...options.transactionMetadata,
-          },
-        };
-
-        await db.insert(walletTransactions).values(transactionData);
-
-        // Mise à jour du solde du wallet
-        await db
-          .update(userWallets)
-          .set({ 
-            balance: transactionData.balanceAfter,
-            updatedAt: new Date(),
-          })
-          .where(eq(userWallets.id, wallet[0].id));
-      }
-    }
-
-    return updatedRequest;
-  } catch (error) {
-    console.error('Error approving request:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to approve request');
-  }
+    return result.transaction;
+  });
 }
 
+
 /**
- * Rejette une requête
+ * Reject a request
  */
 export async function rejectRequest(
   id: string,
@@ -462,7 +498,7 @@ export async function rejectRequest(
 }
 
 /**
- * Annule une requête
+ * Cancel a request
  */
 export async function cancelRequest(
   id: string,
@@ -470,7 +506,7 @@ export async function cancelRequest(
   reason?: string
 ): Promise<Request> {
   try {
-    // Vérification que l'utilisateur est le propriétaire
+    // Verify that the user is the owner
     const request = await getRequestById(id);
     if (!request) {
       throw new Error('Request not found');

@@ -27,6 +27,7 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
+  MoreHorizontal
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -38,6 +39,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   getRequests,
   getRequestStats,
@@ -129,10 +136,7 @@ export default function AdminRequestsPage() {
       const shouldCreateTx =
         selectedRequest.type === "DEPOSIT" ||
         selectedRequest.type === "WITHDRAWAL";
-      await approveRequest(selectedRequest.id, auth?.id, {
-        createTransaction: shouldCreateTx,
-      });
-
+      await approveRequest(selectedRequest.id, auth?.id);
       await createNotification({
         userId: selectedRequest.userId,
         title: "Demande approuvée",
@@ -140,8 +144,8 @@ export default function AdminRequestsPage() {
           selectedRequest.type === "DEPOSIT"
             ? "Votre dépôt a été approuvé et crédité."
             : selectedRequest.type === "WITHDRAWAL"
-            ? "Votre retrait a été approuvé."
-            : "Votre demande d’items a été approuvée.",
+              ? "Votre retrait a été approuvé."
+              : "Votre demande d’items a été approuvée.",
         type: "REQUEST_APPROVED",
         linkUrl: "/app/(protected)/wallet/transactions",
       });
@@ -172,7 +176,7 @@ export default function AdminRequestsPage() {
       if (selectedRequest.transactionId) {
         try {
           await refundTransaction(selectedRequest.transactionId, actionReason);
-        } catch {}
+        } catch { }
       }
 
       await createNotification({
@@ -354,29 +358,26 @@ export default function AdminRequestsPage() {
                             <StatusBadge status={request.status} />
                           </TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openApproveDialog(request)}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approuver
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => openRejectDialog(request)}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Rejeter
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openDetailsDialog(request)}
-                            >
-                              Détails
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openApproveDialog(request)}>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Approuver
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openRejectDialog(request)}>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Rejeter
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openDetailsDialog(request)}>
+                                  Détails
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))

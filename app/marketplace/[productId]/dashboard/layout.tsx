@@ -11,6 +11,7 @@ import {
   SidebarItem,
   SidebarFooter,
   DashboardHeader,
+  SidebarContainer,
 } from "@/components/dashboard/enhanced-dashboard";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -52,7 +53,7 @@ export default function ProductDashboardLayout({
   const pageDescription = activeItem?.description || `Tableau de bord du produit`;
 
   const ProductSidebar = (
-    <div className="flex flex-col h-full bg-gradient-to-br from-amber-900 to-orange-800 text-white">
+    <SidebarContainer sidebarBgType="gradient">
       <SidebarHeader
         title={product?.name || "Produit"}
         subtitle="Tableau de bord"
@@ -64,12 +65,12 @@ export default function ProductDashboardLayout({
       />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <SidebarGroup label="Analyses" sidebarBgType="gradient">
+        <SidebarGroup label="Général" sidebarBgType="gradient">
           {navData.overviewItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
-              isActive={isActive(item.url, false)}
+            <SidebarItem
+              key={item.title}
+              {...item}
+              isActive={isActive(item.url, true)}
               sidebarBgType="gradient"
             />
           ))}
@@ -77,20 +78,20 @@ export default function ProductDashboardLayout({
 
         <SidebarGroup label="Gestion" sidebarBgType="gradient">
           {navData.editItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
           ))}
         </SidebarGroup>
 
-        <SidebarGroup label="Visualisation" sidebarBgType="gradient">
+        <SidebarGroup label="Aperçu" sidebarBgType="gradient">
           {navData.viewItems.map((item) => (
-            <SidebarItem 
-              key={item.title} 
-              {...item} 
+            <SidebarItem
+              key={item.title}
+              {...item}
               isActive={isActive(item.url, false)}
               sidebarBgType="gradient"
             />
@@ -106,10 +107,10 @@ export default function ProductDashboardLayout({
         }}
         sidebarBgType="gradient"
       />
-    </div>
+    </SidebarContainer>
   );
 
-  const ProductHeader = (
+  const Header = (
     <DashboardHeader
       title={pageTitle}
       description={pageDescription}
@@ -118,12 +119,7 @@ export default function ProductDashboardLayout({
   );
 
   return (
-    <EnhancedDashboard
-      sidebar={ProductSidebar}
-      header={ProductHeader}
-      sidebarBgType="gradient"
-      className="min-h-screen"
-    >
+    <EnhancedDashboard sidebar={ProductSidebar} header={Header} sidebarBgType="gradient">
       {children}
     </EnhancedDashboard>
   );
