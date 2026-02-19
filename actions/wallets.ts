@@ -49,6 +49,7 @@ import {
   getAccountBalance
 } from '@/lib/ledger/ledger-utils';
 import { createTransaction as createWalletTransaction } from '@/actions/transactions';
+import { revalidatePath } from 'next/cache';
 
 // ============================================================================
 // USER WALLETS - Queries
@@ -339,6 +340,7 @@ export async function createWalletServer(
       pinHash,
     });
 
+    revalidatePath('/wallet')
     return {
       success: true,
       wallet,

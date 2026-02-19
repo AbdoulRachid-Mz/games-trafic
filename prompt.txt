@@ -1,170 +1,452 @@
-Nous devons refactorer complètement l’architecture financière de l’application pour adopter un modèle comptable basé sur un ledger (double entrée).
+🎯 OBJECTIF GÉNÉRAL
 
-Objectif :
+Refactoriser et structurer correctement :
 
-financial_accounts devient le wallet universel
+Création de tournoi
 
-ledger_entries devient la source de vérité des soldes
+Pages d’édition
 
-user_wallets devient uniquement une couche de sécurité / KYC
+Gestion des membres
 
-wallet_transactions reste l’historique visible utilisateur
+Gestion des phases
 
-Supprimer toute dépendance au champ balance comme source de vérité
+Gestion des groupes
 
-🧱 ÉTAPE 1 — Corriger la structure des relations
+Génération des nodes
 
-financial_accounts devient l’unique entité représentant un wallet.
+Organisation des matches
 
-Un wallet peut appartenir à :
+En respectant :
 
-un user (ownerUserId)
+La logique des compétitions réelles
 
-une shop (ownerShopId)
+La cohérence avec les tables existantes
 
-un tournoi (via metadata si nécessaire)
+Une UX claire et professionnelle
 
-la plateforme
+1️⃣ CRÉATION D’UN TOURNOI
+📌 Logique métier
 
-Le champ type détermine la nature du wallet :
-USER_WALLET
-SHOP_WALLET
-TOURNAMENT_POOL
-PLATFORM_ESCROW
-PLATFORM_FEES
-SYSTEM_ADJUSTMENT
+Un tournoi est une entité permanente.
+Les prix et frais d’inscription appartiennent aux éditions, pas au tournoi.
 
-ledger_entries
+✅ Formulaire de création (minimal et propre)
 
-Chaque mouvement financier doit créer AU MOINS deux entrées :
+Supprimer tout ce qui concerne :
 
-un débit
+❌ prizePool
 
-un crédit
+❌ entryFee
 
-Le solde réel d’un wallet = SUM(credit - debit)
+Garder uniquement :
 
-user_wallets
+🏷 Identité
 
-Devient une extension de sécurité liée à un wallet financier
+name
 
-Ajouter financialAccountId
+slug
 
-Supprimer balance ou le garder uniquement comme cache
+description
 
-Contient uniquement :
+shortDescription
 
-pinHash
+profileImage
 
-KYC
+coverImage
 
-failedAttempts
+🎮 Configuration jeu
 
-verrouillage
+game
 
-wallet_transactions
+platform
 
-Doit référencer financialAccountId
+gameMode (1v1, 5v5, etc.)
 
-Ne doit pas être utilisé pour calculer les soldes
+allowedTeams
 
-Sert uniquement d’historique utilisateur
+👥 Configuration participants
 
-Supprimer toute logique métier qui modifie directement un champ balance.
+minParticipants
 
-🧮 ÉTAPE 2 — Corriger les filtres et requêtes
+maxParticipantsPerEdition
 
-Toute récupération de solde doit utiliser :
+🌍 Visibilité
 
-SUM(credit - debit)
-FROM ledger_entries
-WHERE account_id = ?
+visibility
 
-Les requêtes de transactions utilisateur doivent :
+inviteOnly
 
-passer par son financial account
+requiresAccessCode
 
-filtrer proprement par ownerUserId
+📞 Contact
 
-Vérifier toutes les jointures :
+contactEmail
 
-éviter les dépendances directes sur user_wallets.balance
+contactPhone
 
-utiliser financial_accounts comme pivot principal
+discordServer
 
-⚙️ ÉTAPE 3 — Corriger les Server Actions & API
+whatsappGroup
 
-Créer une fonction transaction atomique :
+2️⃣ PAGE D’UNE ÉDITION (editionId)
 
-executeTransaction({
-fromAccountId,
-toAccountId,
-amount,
-type,
-metadata
-})
+Cette page doit devenir le centre de gestion réel.
 
-Cette fonction doit :
+🔐 Boutons dynamiques selon rôle
 
-Ouvrir une transaction DB
+Si l’utilisateur est :
 
-Vérifier que le solde est suffisant (via ledger sum)
+organizer
 
-Créer :
+co-organizer
 
-une ledger entry débit
+Afficher :
 
-une ledger entry crédit
+🔘 Dashboard
 
-Créer un wallet_transaction pour affichage
+🔘 Gérer les phases
 
-Commit
+🔘 Gérer les participants
 
-Rollback si erreur
+🔘 Modifier édition
 
-Aucune autre action serveur ne doit modifier les soldes directement.
+🔘 Gérer les résultats
 
-🖥️ ÉTAPE 4 — Corriger composants & pages
+Sinon :
 
-Toutes les pages affichant un solde doivent :
+Bouton s’inscrire
 
-appeler une fonction getWalletBalance(accountId)
+Voir bracket
 
-ne jamais lire un champ balance directement
+Voir classement
 
-Les dashboards shop/tournoi doivent :
+💰 QR Code logique
 
-récupérer leur financial_account
+Si :
 
-calculer les soldes via ledger
+entryFee === 0
 
-Supprimer toute logique front qui dépend d’un champ balance stocké.
 
-🛡️ RÈGLES IMPORTANTES
+➡ Ne pas afficher QR code
+➡ Afficher badge "GRATUIT"
 
-Le ledger est la seule source de vérité.
+Même logique :
 
-Aucun update direct de balance.
+Sur card
 
-Toute opération financière passe par une transaction atomique.
+Sur page détail
 
-Les comptes financiers sont indépendants des users.
+Sur listing
 
-Les shops et tournois ont leurs propres wallets.
+3️⃣ MEMBRES DU TOURNOI
 
-Objectif final :
-Obtenir une architecture financière scalable, cohérente et prête pour des paiements réels.
+Dans tournamentMembers
 
-🔥 Pourquoi ce prompt est bon
+Chaque membre doit :
 
-Il :
+Renseigner contactPhone obligatoire
 
-définit la vision
+contactEmail optionnel
 
-sépare les étapes
+discordId optionnel
 
-empêche les erreurs
+📇 Dans la card membre afficher :
 
-structure la migration
+displayName
 
-évite de casser le front trop tôt
+avatar
+
+gameTag
+
+contactPhone
+
+Ajouter :
+
+📞 Bouton Appel
+
+🟢 Bouton WhatsApp (lien wa.me/numero)
+
+4️⃣ CRÉATION D’UNE PHASE
+
+Une phase représente :
+
+Phase de groupes
+
+Phase éliminatoire
+
+Phase finale
+
+Qualification
+
+🎯 Dans le formulaire de création phase
+
+Champ obligatoire :
+
+Type de phase :
+
+ELIMINATION
+
+DOUBLE_ELIMINATION
+
+ROUND_ROBIN
+
+GROUP_STAGE
+
+GROUP + ELIMINATION
+
+📌 Selon le type :
+🔵 ROUND ROBIN
+
+Créer automatiquement :
+
+1 groupe
+
+Tous les participants dedans
+
+Demander :
+
+Aller simple ou Aller-Retour
+
+Points par victoire
+
+Points nul
+
+Points défaite
+
+Méthode de départage
+
+🟢 GROUP_STAGE
+
+Demander :
+
+Nombre de groupes
+
+Participants par groupe
+
+Nombre qualifiés par groupe
+
+Aller simple ou aller-retour
+
+Créer automatiquement :
+
+phaseGroups
+
+participants répartis
+
+matches générés
+
+🔴 ELIMINATION
+
+Demander :
+
+Seeding method (RANDOM / RANKING / MANUAL)
+
+Simple ou Double elimination
+
+Créer automatiquement :
+
+bracketNodes
+
+matches
+
+structure parent/enfant
+
+5️⃣ CRÉATION DES GROUPES
+
+Un groupe détermine :
+
+Organisation des nodes
+
+Génération des matches
+
+Classement
+
+🧩 Dans la page groupe
+
+Afficher :
+
+📊 Stats globales
+
+total participants
+
+matches joués
+
+matches restants
+
+matches complétés
+
+👥 Participants
+
+Avec :
+
+status
+
+matchesPlayed
+
+points
+
+scoreDifference
+
+qualified
+
+🔄 Actions multiples
+
+Permettre :
+
+Ajouter participants
+
+Retirer participants
+
+Seeder manuellement
+
+Lock group
+
+6️⃣ CRÉATION DES NODES
+
+Deux modes :
+
+🔁 AUTO
+
+Répartition aléatoire (tirage au sort réel)
+
+Respect du nombre
+
+Gestion automatique des BYE si nombre impair
+
+Logique :
+
+Mélanger participants
+
+Créer arbre
+
+Affecter rounds
+
+Lier parentNodeId
+
+✍️ MANUEL
+
+Admin choisit les matchs
+
+Drag & drop possible
+
+Affectation directe
+
+7️⃣ MATCHES
+
+Les matches sont la source de vérité.
+
+Ils doivent :
+
+Être générés automatiquement selon format
+
+Être liés :
+
+editionId
+
+phaseId
+
+groupId (si applicable)
+
+bracketNodeId (si applicable)
+
+📌 Round Robin
+
+Chaque participant rencontre tous les autres :
+
+Formule :
+
+n(n-1)/2
+
+
+Ou x2 si aller-retour
+
+📌 Elimination
+
+Matches générés par round :
+
+Round 1 → 8 matches
+Round 2 → 4 matches
+Semi → 2
+Final → 1
+
+8️⃣ ORGANISATION UX DES PAGES
+📄 Edition Page Structure
+
+Header
+
+Banner
+
+Status
+
+Prize
+
+Entry fee
+
+Tabs :
+
+Overview
+
+Participants
+
+Phases
+
+Matches
+
+Results
+
+📄 Phase Page
+
+Header
+
+Type
+
+Progress
+
+Stats
+
+Liste groupes ou bracket
+
+📄 Group Page
+
+Classement dynamique
+
+Liste matches
+
+Stats temps réel
+
+9️⃣ COHÉRENCE RÉALITÉ COMPÉTITIONS
+
+Ton système doit refléter :
+
+Compétition réelle	Ton système
+Tirage au sort	AUTO seeding
+Phase de groupes	phaseGroups
+Classement	phaseGroupParticipants
+Bracket	bracketNodes
+Match officiel	matches
+Résultats finaux	editionResults
+🔟 RÈGLES IMPORTANTES
+
+On ne peut pas modifier un groupe si :
+
+matches déjà commencés
+
+On ne peut pas supprimer une phase active
+
+On ne peut pas ajouter participant après checkin clôturé
+
+Si autoAdvance = true → progression automatique
+
+💎 Résultat attendu
+
+Un système :
+
+Structuré
+
+Pro
+
+Proche des compétitions FIFA / eSport
+
+Évolutif
+
+Performant

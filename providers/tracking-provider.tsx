@@ -11,7 +11,7 @@ const TrackingProviders = ({ children }: Props) => {
     <TracingProvider
       options={{
         isActive: true, // Peut être piloté par une config ou env
-        enabled: process.env.NODE_ENV !== "production",
+        enabled: process.env.NODE_ENV === "production",
         showExplanations: true,
         redirectFirstTimeUsers: true,
       }}

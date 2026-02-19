@@ -273,7 +273,7 @@ export default function CreateWalletPage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-10 px-4">
       <div className="max-w-xl mx-auto space-y-8">
         <div className="text-center space-y-3">
-          <Typography variant="h2" weight="bold" gradient>
+          <Typography variant="h2" weight="bold">
             Créer mon wallet
           </Typography>
           <Typography variant="body-base" theme="muted">
@@ -366,11 +366,11 @@ export default function CreateWalletPage() {
           }
           confetti={dialogError ? "none" : "celebration"}
           primaryAction={{
-            label: dialogError ? "Réessayer" : "Voir mon wallet",
+            label: dialogError ? "Réessayer" : "completer le wallet",
             onClick: () => {
               setDialogOpen(false);
               if (dialogError) return;
-              router.push("/wallet");
+              router.push("/wallet/verification");
             },
             primary: true,
           }}
@@ -388,6 +388,7 @@ export default function CreateWalletPage() {
       </div>
     </div>
   );
+  
   const [step, setStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
@@ -808,10 +809,9 @@ function HeaderSection({ step, setStep, router }: any) {
         </motion.div>
 
         <Typography
-          variant="h1"
+          variant="h2"
           weight="bold"
           className="mb-3"
-          gradient
           animated
         >
           Créer Votre Wallet

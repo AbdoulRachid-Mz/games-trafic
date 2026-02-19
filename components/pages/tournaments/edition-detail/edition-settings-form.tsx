@@ -18,11 +18,12 @@ import {
   TournamentEdition,
   TournamentEditionWithRelations,
 } from "@/database/schema";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useUpdateEdition, useDeleteEdition } from "@/hooks/use-editions";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 interface EditionSettingsFormProps {
   edition: TournamentEditionWithRelations;
@@ -40,6 +41,7 @@ export function EditionSettingsForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty },
   } = useForm({
     defaultValues: {
@@ -79,6 +81,7 @@ export function EditionSettingsForm({
       id: edition.id,
       data: {
         ...data,
+        editionSlug: data.slug,
         entryFee: Number(data.entryFee),
         maxParticipants: Number(data.maxParticipants),
         startDate: new Date(data.startDate),
@@ -137,7 +140,7 @@ export function EditionSettingsForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="name">slug de l'édition</Label>
+                <Label htmlFor="slug">Slug de l'édition</Label>
                 <Input
                   id="slug"
                   {...register("slug")}
@@ -223,24 +226,62 @@ export function EditionSettingsForm({
                 <div className="font-medium">Notifications & Avancement</div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="notificationsEnabled">Notifications activées</Label>
-                  <Switch id="notificationsEnabled" checked={!!edition.notificationsEnabled} {...register("notificationsEnabled")} />
+                  <Controller
+                    name="notificationsEnabled"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="notificationsEnabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="autoAdvance">Avancement automatique</Label>
-                  <Switch id="autoAdvance" checked={!!edition.autoAdvance} {...register("autoAdvance")} />
+                  <Controller
+                    name="autoAdvance"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="autoAdvance"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
                 </div>
               </div>
               <div className="space-y-3 p-4 border rounded-xl">
                 <div className="font-medium">Configuration compétition</div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="config_checkinRequired">Check-in requis</Label>
-                  {/* @ts-ignore */}
-                  <Switch id="config_checkinRequired" checked={!!edition.editionConfig?.checkinRequired} {...register("config_checkinRequired")} />
+                  <Controller
+                    name="config_checkinRequired"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="config_checkinRequired"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="config_autoStart">Démarrage auto</Label>
-                  {/* @ts-ignore */}
-                  <Switch id="config_autoStart" checked={!!edition.editionConfig?.autoStart} {...register("config_autoStart")} />
+                  <Controller
+                    name="config_autoStart"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="config_autoStart"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="config_seedMethod">Méthode de seed</Label>

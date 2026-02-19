@@ -8,9 +8,8 @@ export default async function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const session = await getCurrentUser();
-
   if (!session?.id) {
-    redirect("/sign-in");
+    redirect("/offline");
   }
 
   return <>{children}</>;

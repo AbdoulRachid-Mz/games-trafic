@@ -406,6 +406,7 @@ export function useTracing(): TracingContextValue {
   const trackAction = useCallback(
     (type: TraceType, entityId?: string, payload?: any) => {
       if (!config.isActive || !config.enabled) return;
+      if (shouldDropTrace(type, entityId)) return;
 
       // Logic pour éviter de tracker trop de choses répétitives
       const traceKey = `${type}:${entityId || "none"}`;
@@ -515,6 +516,14 @@ export function useTracing(): TracingContextValue {
     }
 
     return { value: "Truncated payload", _truncated: true };
+  };
+
+  const shouldDropTrace = (type: TraceType, entityId?: string): boolean => {
+    if (type === "VIEW") {
+      const id = (entityId || "").toUpperCase();
+      if (["SCROLL_DEPTH", "PAGE_DURATION", "CLICK"].includes(id)) return true;
+    }
+    return false;
   };
 
   const isLowPriorityTrace = (type: TraceType): boolean => {
@@ -665,6 +674,9 @@ export function useTracing(): TracingContextValue {
         completedAt: new Date(),
         skippedAt: undefined,
       };
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`gt_explanation_${page}_shown`, "true");
+      }
       trackAction("EXPLANATION_COMPLETED", key, { page, version });
       scheduleStorageUpdate();
       syncTraces();
@@ -685,6 +697,9 @@ export function useTracing(): TracingContextValue {
         completedAt: undefined,
         skippedAt: new Date(),
       };
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`gt_explanation_${page}_shown`, "true");
+      }
       trackAction("EXPLANATION_SKIPPED", key, { page, version });
       scheduleStorageUpdate();
       syncTraces();

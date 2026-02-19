@@ -14,6 +14,7 @@ import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
+import { Badge } from "@/components/ui/badge";
 
 interface PageProps {
   params: Promise<{
@@ -115,12 +116,14 @@ export default async function EditionPage({ params }: PageProps) {
     }
   }
 
-  // 2. Vérifier si l'utilisateur est membre du tournoi
+  // 2. Vérifier si l'utilisateur est organisateur
+  const isOrganizer = !!(user && tournament.organizerId === user.id);
+
+  // 3. Vérifier si l'utilisateur est membre du tournoi
   let currentUserMember: TournamentMember | undefined;
   let currentUserRegistration: any = undefined;
 
   if (user) {
-    // Vérifier si l'utilisateur est membre du tournoi
     const memberResponse = await getTournamentMembers({
       filters: { tournamentId, userId: user.id },
       pagination: { limit: 1, page: 1 },
@@ -130,7 +133,6 @@ export default async function EditionPage({ params }: PageProps) {
     if (member) {
       currentUserMember = member;
 
-      // Vérifier si ce membre est déjà inscrit à cette édition
       const existingRegistration = edition.registrations?.find(
         (reg) => reg.memberId === member.id
       );
@@ -139,6 +141,12 @@ export default async function EditionPage({ params }: PageProps) {
       }
     }
   }
+
+  const entryFee = Number(edition.entryFee || "0");
+  const isFree = entryFee === 0;
+  const isRegistered = !!currentUserRegistration;
+  const hasPaid = currentUserRegistration?.feePaid ?? false;
+  const showQR = !isFree && isRegistered && !hasPaid;
 
   return (
     <div className="space-y-8">
@@ -149,12 +157,24 @@ export default async function EditionPage({ params }: PageProps) {
         standings={standings}
         currentUserMember={currentUserMember}
         currentUserRegistration={currentUserRegistration}
+        isOrganizer={isOrganizer}
       />
-      {Number(edition.entryFee || "0") > 0 && (
+
+      {/* Free badge */}
+      {isFree && (
+        <div className="max-w-md mx-auto text-center">
+          <Badge className="bg-green-600 text-white text-lg px-6 py-2 font-black uppercase tracking-wider">
+            🎉 GRATUIT — Inscription libre
+          </Badge>
+        </div>
+      )}
+
+      {/* QR code only for registered users who haven't paid */}
+      {showQR && (
         <Card className="max-w-md mx-auto">
           <CardContent className="p-6 flex flex-col items-center">
             <Typography variant="h4" className="font-black italic uppercase tracking-tighter mb-2">
-              Paiement d’inscription
+              Paiement d&apos;inscription
             </Typography>
             <Typography variant="caption1" theme="muted" className="mb-4 text-center">
               Scannez pour régler {edition.entryFee} {edition.prizeCurrency || "GTC"}
@@ -163,7 +183,7 @@ export default async function EditionPage({ params }: PageProps) {
               data={encodeTransactionQR({
                 t: "TOURNAMENT_PARTICIPATION",
                 id: edition.id,
-                a: Number(edition.entryFee || 0),
+                a: entryFee,
                 m: { tournamentId, editionNumber: edition.editionNumber }
               })}
               label={edition.name || `Édition #${edition.editionNumber}`}
@@ -171,6 +191,15 @@ export default async function EditionPage({ params }: PageProps) {
             />
           </CardContent>
         </Card>
+      )}
+
+      {/* Paid confirmation */}
+      {!isFree && isRegistered && hasPaid && (
+        <div className="max-w-md mx-auto text-center">
+          <Badge className="bg-green-600 text-white text-sm px-4 py-1.5">
+            ✅ Paiement confirmé
+          </Badge>
+        </div>
       )}
     </div>
   );

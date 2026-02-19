@@ -49,6 +49,7 @@ interface EditionPageContentProps {
   }>;
   currentUserMember?: TournamentMember & { team?: Team };
   currentUserRegistration?: EditionRegistrationWithRelations;
+  isOrganizer?: boolean;
 }
 
 export function EditionPageContent({
@@ -58,6 +59,7 @@ export function EditionPageContent({
   standings = [],
   currentUserMember,
   currentUserRegistration,
+  isOrganizer = false,
 }: EditionPageContentProps) {
   const { user } = useAuthContext();
   const router = useRouter();
@@ -70,7 +72,7 @@ export function EditionPageContent({
   const handleJoinClick = () => {
     if (!user) {
       toast.error("Vous devez être connecté pour participer");
-      router.push("/auth/sign-in");
+      router.push("/sign-in");
       return;
     }
     setShowJoinDialog(true);
@@ -112,7 +114,7 @@ export function EditionPageContent({
       <EditionDetailHeader
         tournament={tournament}
         edition={edition}
-        isOrganizer={false}
+        isOrganizer={isOrganizer}
         onJoinClick={handleJoinClick}
         onPaymentClick={() => setShowPaymentDialog(true)}
         onCancelJoin={() => setShowJoinDialog(false)}
@@ -125,6 +127,21 @@ export function EditionPageContent({
         <div className="flex flex-col md:flex-row gap-4 items-start">
           <div className="flex-1 w-full space-y-4">
             <EditionStatsGrid edition={edition} />
+
+            {/* Organizer dashboard link */}
+            {isOrganizer && (
+              <div className="bg-card border border-primary/30 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                <div>
+                  <h3 className="text-sm font-bold">Vous organisez cette édition</h3>
+                  <p className="text-muted-foreground text-xs">Accédez au dashboard pour gérer les phases, participants et matchs.</p>
+                </div>
+                <Button variant="default" size="sm" asChild>
+                  <a href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}>
+                    Dashboard organisateur
+                  </a>
+                </Button>
+              </div>
+            )}
 
             {!isRegistered && (
               <div className="bg-card border rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">

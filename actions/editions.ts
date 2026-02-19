@@ -227,3 +227,148 @@ export async function deleteEdition(id: string) {
     throw error;
   }
 }
+/**
+ * Delete Edition Registration
+ */
+export async function deleteEditionRegistrationAction(id: string) {
+  try {
+    const registration = await db.query.editionRegistrations.findFirst({
+      where: eq(editionRegistrations.id, id),
+    });
+
+    if (!registration) throw new Error("Registration not found");
+
+    await db.delete(editionRegistrations).where(eq(editionRegistrations.id, id));
+
+    revalidatePath(`/tournaments/${registration.editionId}/dashboard/participants`);
+    return { success: true };
+  } catch (error) {
+    console.error("Delete registration failed", error);
+    throw error;
+  }
+}
+
+/**
+ * Add Participant to Edition (Server Action)
+ * This handles both existing tournament members and new users
+ */
+export async function addEditionParticipantAction(data: {
+  editionId: string;
+  tournamentId: string;
+  userId?: string;
+  displayName: string;
+  email?: string;
+  phone?: string;
+}) {
+  try {
+    const { getTournamentMembers, addTournamentMember } = await import("./members");
+
+    let member;
+
+    // 1. Find or Create Member
+    if (data.userId) {
+      const memberRes = await getTournamentMembers({
+        filters: { tournamentId: data.tournamentId, userId: data.userId }
+      });
+      member = memberRes.data[0];
+    }
+
+    if (!member) {
+      member = await addTournamentMember({
+        tournamentId: data.tournamentId,
+        userId: data.userId || null,
+        displayName: data.displayName,
+        contactEmail: data.email || null,
+        contactPhone: data.phone || null,
+        role: "PARTICIPANT",
+      });
+    }
+
+    // 2. Register for Edition
+    const [registration] = await db.insert(editionRegistrations).values({
+      editionId: data.editionId,
+      memberId: member.id,
+      status: "REGISTERED",
+      checkedIn: false,
+      feePaid: true, // Default to paid if added by organizer
+    }).returning();
+
+    revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/participants`);
+
+    return { success: true, registration };
+  } catch (error) {
+    console.error("Add participant failed", error);
+    throw error;
+  }
+}
+
+/**
+ * Reorder Phases
+ */
+export async function reorderPhasesAction(data: {
+  id: string;
+  direction: "up" | "down";
+  editionId: string;
+  tournamentId: string;
+}) {
+  try {
+    const { getTournamentPhases } = await import("./tournaments");
+    const { updateTournamentPhase } = await import("./phases");
+
+    const list = await getTournamentPhases({
+      filters: { editionId: data.editionId },
+      options: { sortBy: "order", sortOrder: "asc" },
+      pagination: { page: 1, limit: 500 },
+    });
+
+    const phasesArr = list.data.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const idx = phasesArr.findIndex((p) => p.id === data.id);
+
+    if (idx === -1) return { success: false };
+
+    const swapWith = data.direction === "up" ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= phasesArr.length) return { success: false };
+
+    const a = phasesArr[idx];
+    const b = phasesArr[swapWith];
+
+    await updateTournamentPhase(a.id, { order: b.order ?? swapWith + 1 });
+    await updateTournamentPhase(b.id, { order: a.order ?? idx + 1 });
+
+    revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`);
+    return { success: true };
+  } catch (error) {
+    console.error("Reorder failed", error);
+    throw error;
+  }
+}
+
+/**
+ * Activate Phase (and deactivate others)
+ */
+export async function activatePhaseAction(data: {
+  id: string;
+  editionId: string;
+  tournamentId: string;
+}) {
+  try {
+    const { getTournamentPhases } = await import("./tournaments");
+    const { updateTournamentPhase } = await import("./phases");
+
+    const list = await getTournamentPhases({
+      filters: { editionId: data.editionId },
+      options: { sortBy: "order", sortOrder: "asc" },
+      pagination: { page: 1, limit: 500 },
+    });
+
+    for (const p of list.data) {
+      await updateTournamentPhase(p.id, { isActive: p.id === data.id });
+    }
+
+    revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`);
+    return { success: true };
+  } catch (error) {
+    console.error("Activate phase failed", error);
+    throw error;
+  }
+}

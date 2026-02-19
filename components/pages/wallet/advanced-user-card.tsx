@@ -286,7 +286,7 @@ export function AdvancedUserCard({
                     NUMÉRO DE WALLET
                   </Typography>
                   <Typography
-                    variant="h3"
+                    variant="h5"
                     weight="bold"
                     className="font-mono tracking-widest select-all"
                     copyable

@@ -11,6 +11,7 @@ import { getTournamentById } from "@/actions/tournaments";
 import { AdvancedChart } from "@/components/ui/advanced-chart";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 
 export default function TournamentOverviewPage() {
@@ -30,13 +31,21 @@ export default function TournamentOverviewPage() {
     setLoading(false);
   };
 
-  const StatCard = ({ title, value, icon: Icon, color = "primary" }: any) => {
+  const StatCard = ({ title, value, icon: Icon, color = "blue" }: any) => {
+    const colorClasses: Record<string, string> = {
+      blue: "text-blue-500 bg-blue-500/10",
+      purple: "text-purple-500 bg-purple-500/10",
+      yellow: "text-amber-500 bg-amber-500/10",
+      green: "text-emerald-500 bg-emerald-500/10",
+    };
+    const activeColor = colorClasses[color] || colorClasses.blue;
+
     return (
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className={`p-3 rounded-lg bg-${color}/10`}>
-              <Icon className={`h-6 w-6 text-${color}`} />
+            <div className={cn("p-3 rounded-lg", activeColor.split(" ")[1])}>
+              <Icon className={cn("h-6 w-6", activeColor.split(" ")[0])} />
             </div>
           </div>
           <Typography variant="h3" weight="bold" className="mb-1">
@@ -53,7 +62,7 @@ export default function TournamentOverviewPage() {
   if (loading || !tournament) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <Typography variant="h2" weight="bold">Tableau de bord</Typography>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[140px]"><SelectValue placeholder="Période" /></SelectTrigger>
@@ -76,7 +85,7 @@ export default function TournamentOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <Typography variant="h2" weight="bold" className="mb-1">Tableau de bord</Typography>
           <Typography variant="body-base" theme="muted">Statistiques générales du tournoi</Typography>
@@ -85,17 +94,17 @@ export default function TournamentOverviewPage() {
           <Link href={`/tournaments/${params.tournamentId}/dashboard/settings`}>
             <Button variant="outline">Compléter les infos</Button>
           </Link>
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Période" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24h">24h</SelectItem>
+              <SelectItem value="7j">7 jours</SelectItem>
+              <SelectItem value="30j">30 jours</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Période" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="24h">24h</SelectItem>
-            <SelectItem value="7j">7 jours</SelectItem>
-            <SelectItem value="30j">30 jours</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Éditions" value={tournament.totalEditions ?? 0} icon={Calendar} color="blue" />
         <StatCard title="Participants" value={tournament.totalParticipants ?? 0} icon={Users} color="purple" />
         <StatCard title="Cashprize total" value={`${Number(tournament.totalPrizePool || 0)} GTC`} icon={Trophy} color="yellow" />

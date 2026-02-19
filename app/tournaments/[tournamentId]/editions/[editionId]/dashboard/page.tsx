@@ -147,7 +147,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
               </CardTitle>
             </div>
             <Button variant="ghost" size="sm" className="text-xs h-8" asChild>
-              <Link href={`/tournaments/${tournamentId}/dashboard/editions/${editionId}/participants`}>
+              <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants`}>
                 Tout voir <ArrowRight className="ml-1 h-3 w-3" />
               </Link>
             </Button>
@@ -229,7 +229,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                     </div>
                   </div>
                   <Button variant="outline" size="sm" className="w-full bg-white hover:bg-amber-50 text-amber-600 border-amber-200" asChild>
-                    <Link href={`/tournaments/${tournamentId}/dashboard/editions/${editionId}/phases`}>
+                    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`}>
                       Configurer les phases
                     </Link>
                   </Button>

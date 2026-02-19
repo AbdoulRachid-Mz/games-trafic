@@ -31,6 +31,7 @@ export default function VerificationPage() {
   const router = useRouter();
   const { user } = useAuthContext();
   const { data: completeData } = useUserProfile(!!user?.id);
+  console.log(completeData)
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -51,8 +52,7 @@ export default function VerificationPage() {
   const steps = [
     { number: 1, title: "Informations personnelles", icon: UserCheck },
     { number: 2, title: "Document d'identité", icon: FileText },
-    { number: 3, title: "Vérification faciale", icon: Camera },
-    { number: 4, title: "Soumission", icon: Shield },
+    { number: 3, title: "Soumission", icon: Shield },
   ];
 
   const documentTypes = [
@@ -71,7 +71,7 @@ export default function VerificationPage() {
   ];
 
   const handleSubmit = async () => {
-    if (step < 4) {
+    if (step < 3) {
       // Valider l'étape courante
       if (step === 1) {
         if (!formData.firstName || !formData.lastName || !formData.birthDate) {
@@ -114,7 +114,7 @@ export default function VerificationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-4">
       <div className="mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -122,16 +122,16 @@ export default function VerificationPage() {
           className="max-w-4xl mx-auto"
         >
           {/* En-tête */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-4">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center"
+              className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center"
             >
               <Shield className="h-10 w-10 text-white" />
             </motion.div>
             
-            <Typography variant="h1" weight="bold" gradient animated>
+            <Typography variant="h2" weight="bold" animated>
               Vérification d'Identité
             </Typography>
             <Typography variant="body-lg" theme="muted" className="mt-2 max-w-2xl mx-auto">
@@ -140,9 +140,9 @@ export default function VerificationPage() {
           </div>
 
           {/* Étapes */}
-          <div className="mb-6">
-            <Progress value={(step / 4) * 100} className="h-2 mb-4" />
-            <div className="grid grid-cols-4 gap-4">
+          <div className="mb-4">
+            <Progress value={(step / 3) * 100} className="h-2 mb-4" />
+            <div className="grid grid-cols-3 gap-4">
               {steps.map((s) => {
                 const StepIcon = s.icon;
                 return (
@@ -172,7 +172,7 @@ export default function VerificationPage() {
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Étape 1: Informations personnelles */}
             {step === 1 && (
               <motion.div
@@ -510,7 +510,7 @@ export default function VerificationPage() {
             )} */}
 
             {/* Étape 4: Soumission */}
-            {step === 4 && (
+            {step === 3 && (
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -641,7 +641,7 @@ export default function VerificationPage() {
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-                {step < 4 ? (
+                {step < 3 ? (
                   <>
                     Suivant
                     <ArrowRight className="h-4 w-4" />

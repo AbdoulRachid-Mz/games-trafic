@@ -5,24 +5,47 @@ import { resolveRoute } from "@/lib/routes/resolver";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 1️⃣ Lire le cookie
   const sessionCookie = getSessionCookie(request);
 
   const isAuthenticated = Boolean(sessionCookie);
 
+  // ⚠️ Ici on ne peut pas interroger la DB directement.
+  // Donc on considère que le rôle admin doit être dans le JWT.
+  let isAdmin = false;
+  let isVip = false;
+  let hasWallet = true;
+
+  if (sessionCookie) {
+    try {
+      // Si ton cookie est un JWT :
+      const payload = JSON.parse(
+        Buffer.from(sessionCookie.split(".")[1], "base64").toString()
+      );
+
+      isAdmin = payload.role === "admin";
+      isVip = payload.role === "vip";
+      hasWallet = !!payload.walletId;
+    } catch {
+      // fallback silencieux
+    }
+  }
+
+  // 2️⃣ Résolution via ta config
   const resolved = resolveRoute(pathname, {
     isAuthenticated,
-    isAdmin: false, // on ne vérifie pas ici
-    isVip: false,
-    hasWallet: true, // ⚠️ important si tu ne vérifies pas encore en DB
+    isAdmin,
+    isVip,
+    hasWallet,
   });
 
+  // 3️⃣ Gestion accès refusé
   if (!resolved.hasAccess) {
-    const url = new URL(
+    const redirectTo =
       resolved.redirectTo ||
-        `/sign-in?redirect=${encodeURIComponent(pathname)}`,
-      request.url
-    );
-    return NextResponse.redirect(url);
+      `/sign-in?redirect=${encodeURIComponent(pathname)}`;
+
+    return NextResponse.redirect(new URL(redirectTo, request.url));
   }
 
   return NextResponse.next();

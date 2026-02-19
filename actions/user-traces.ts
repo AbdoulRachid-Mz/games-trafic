@@ -247,7 +247,19 @@ export async function createUserTracesBatch(
       }
     }
 
-    const tracesWithTimestamps = tracesData.map(trace => ({
+    const filtered = tracesData.filter(trace => {
+      const id = (trace.entityId || '').toUpperCase();
+      if (trace.type === 'VIEW' && ['SCROLL_DEPTH', 'PAGE_DURATION', 'CLICK'].includes(id)) {
+        return false;
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      return [];
+    }
+
+    const tracesWithTimestamps = filtered.map(trace => ({
       ...trace,
       createdAt: new Date(),
     }));

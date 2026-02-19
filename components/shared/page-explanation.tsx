@@ -14,8 +14,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Info, X, ChevronRight, ChevronLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -27,7 +25,6 @@ export function PageExplanation() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [dontShowAgain, setDontShowAgain] = useState(false);
 
   const explanation = PAGE_EXPLANATIONS.find((e) => {
     if (e.page === pathname) return true;
@@ -42,9 +39,10 @@ export function PageExplanation() {
     return false;
   });
   const steps = explanation?.steps || [];
+  const key = explanation ? `${explanation.page}@v${explanation.version}` : pathname;
 
   useEffect(() => {
-    if (explanation && shouldShowExplanation(pathname)) {
+    if (explanation && shouldShowExplanation(key)) {
       // Délai avant d'afficher l'explication
       const timer = setTimeout(() => {
         setIsOpen(true);
@@ -52,42 +50,32 @@ export function PageExplanation() {
 
       return () => clearTimeout(timer);
     }
-  }, [pathname, explanation, shouldShowExplanation]);
+  }, [pathname, explanation, shouldShowExplanation, key]);
 
   const handleClose = () => {
     setIsOpen(false);
     setCurrentStep(0);
-
-    if (dontShowAgain) {
-      localStorage.setItem(`gt_explanation_${pathname}_shown`, "true");
-    }
-
-    skipExplanation(pathname);
+    skipExplanation(key);
   };
 
   const handleDisablePage = () => {
-    localStorage.setItem(`gt_explanation_${pathname}_disabled`, "true");
+    localStorage.setItem(`gt_explanation_${explanation?.page || pathname}_disabled`, "true");
     setIsOpen(false);
     setCurrentStep(0);
-    skipExplanation(pathname);
+    skipExplanation(key);
   };
 
   const handleDisableAll = () => {
     localStorage.setItem("gt_explanations_disabled", "true");
     setIsOpen(false);
     setCurrentStep(0);
-    skipExplanation(pathname);
+    skipExplanation(key);
   };
 
   const handleComplete = () => {
     setIsOpen(false);
     setCurrentStep(0);
-
-    if (dontShowAgain) {
-      localStorage.setItem(`gt_explanation_${pathname}_shown`, "true");
-    }
-
-    completeExplanation(pathname);
+    completeExplanation(key);
   };
 
   const handleNext = () => {
@@ -189,21 +177,7 @@ export function PageExplanation() {
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-4">
-          <div className="flex items-center gap-2 flex-1">
-            <Checkbox
-              id="dont-show"
-              checked={dontShowAgain}
-              onCheckedChange={(checked) =>
-                setDontShowAgain(checked as boolean)
-              }
-            />
-            <Label
-              htmlFor="dont-show"
-              className="text-sm text-muted-foreground cursor-pointer"
-            >
-              Ne plus afficher une seule fois
-            </Label>
-          </div>
+          <div className="flex items-center gap-2 flex-1"></div>
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleDisablePage}>

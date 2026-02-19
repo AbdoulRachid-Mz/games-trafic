@@ -292,4 +292,78 @@ export const PAGE_EXPLANATIONS: PageExplanation[] = [
       }
     ]
   },
+  {
+    page: '/welcome',
+    title: 'Bienvenue',
+    description: 'Présentation rapide pour bien démarrer',
+    version: 1,
+    steps: [
+      {
+        id: 'welcome-1',
+        title: 'Découverte',
+        content: 'Parcourez les sections clés de la plateforme',
+        position: { placement: 'center' }
+      }
+    ]
+  },
+  {
+    page: '/settings',
+    title: 'Paramètres',
+    description: 'Gérez vos préférences et la sécurité',
+    version: 1,
+    steps: [
+      {
+        id: 'settings-1',
+        title: 'Profil et préférences',
+        content: 'Modifiez vos informations et vos préférences',
+        position: { elementSelector: '[data-section="preferences"]', placement: 'right' }
+      },
+      {
+        id: 'settings-2',
+        title: 'Sécurité',
+        content: 'Gérez la sécurité et les connexions',
+        position: { elementSelector: '[data-section="security"]', placement: 'bottom' }
+      }
+    ]
+  },
+  {
+    page: '/shops',
+    title: 'Boutiques',
+    description: 'Explorez les boutiques et leurs produits',
+    version: 1,
+    steps: [
+      {
+        id: 'shops-1',
+        title: 'Liste des boutiques',
+        content: 'Parcourez et filtrez les boutiques',
+        position: { elementSelector: '[data-section="shops-list"]', placement: 'bottom' }
+      },
+      {
+        id: 'shops-2',
+        title: 'Actions rapides',
+        content: 'Accédez aux actions disponibles',
+        position: { elementSelector: '[data-section="quick-actions"]', placement: 'right' }
+      }
+    ]
+  },
+  {
+    page: '/products',
+    title: 'Produits',
+    description: 'Découvrez les produits disponibles',
+    version: 1,
+    steps: [
+      {
+        id: 'products-1',
+        title: 'Catalogue',
+        content: 'Filtrez et consultez les produits',
+        position: { elementSelector: '[data-section="catalog"]', placement: 'bottom' }
+      },
+      {
+        id: 'products-2',
+        title: 'Achat',
+        content: 'Achetez directement depuis la fiche produit',
+        position: { placement: 'center' }
+      }
+    ]
+  },
 ];

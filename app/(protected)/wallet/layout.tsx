@@ -21,11 +21,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { WalletNavigation } from "@/components/pages/wallet/wallet-navigation";
 import { useUserProfile } from "@/hooks/use-profile";
+import CreateWalletPage from "./create/page";
 
 interface WalletLayoutProps {
   children: React.ReactNode;
 }
-
 export default function WalletLayout({ children }: WalletLayoutProps) {
   const { user, loading, isAuthenticated } = useAuthContext();
   const { data: completeData } = useUserProfile({
@@ -34,6 +34,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
     relations: ["wallet"],
   });
   const router = useRouter();
+  const pathname = usePathname();
   const [walletCheckComplete, setWalletCheckComplete] = useState(false);
   const [walletStatus, setWalletStatus] = useState<{
     hasWallet: boolean;
@@ -55,7 +56,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
         hasWallet,
         is_locked: wallet?.isLocked ?? false,
         is_active: wallet?.isActive ?? false,
-        verification_status: wallet?.verificationStatus ?? "PENDING",  
+        verification_status: wallet?.verificationStatus ?? "PENDING",
         failed_attempts: wallet?.failedAttempts ?? 0,
       });
       setWalletCheckComplete(true);
@@ -63,17 +64,29 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
 
     checkWallet();
   }, [completeData, loading]);
+
   // Redirection si non authentifié ou pas de wallet
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push("/sign-in");
-    } else if (walletCheckComplete && !walletStatus?.hasWallet) {
-      // Utilisez une redirection plus sûre
-      if (window.location.pathname !== "/wallet/create") {
-        router.push("/wallet/create");
-      }
+      return;
     }
-  }, [loading, isAuthenticated, walletCheckComplete, walletStatus, router]);
+
+    if (
+      walletCheckComplete &&
+      !walletStatus?.hasWallet &&
+      pathname !== "/wallet/create"
+    ) {
+      router.replace("/wallet/create");
+    }
+  }, [
+    loading,
+    isAuthenticated,
+    walletCheckComplete,
+    walletStatus,
+    pathname,
+    router,
+  ]);
 
   // États de chargement
   if (loading || (!walletCheckComplete && isAuthenticated)) {
@@ -94,10 +107,14 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
   }
 
   // Si pas de wallet, on retourne null en attendant la redirection (pour éviter le flash)
-  if (walletCheckComplete && !walletStatus?.hasWallet) {
-    return <WalletCreationScreen user={user} />;
+  if (
+    !walletStatus?.hasWallet
+  ) {
+    if(pathname === "/wallet/create") {
+      return children
+    } 
+    return <WalletCreationScreen user={user} />
   }
-  // console.log(walletStatus);
 
   if (walletStatus?.is_locked) {
     return <WalletLockedScreen walletStatus={walletStatus} />;
@@ -110,8 +127,11 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
 
   if (
     walletStatus?.verification_status &&
-    walletStatus.verification_status !==  "VERIFIED"
+    walletStatus.verification_status !== "VERIFIED"
   ) {
+    if (pathname === "/wallet/verification") {
+      return children;
+    }
     return <WalletVerificationScreen walletStatus={walletStatus} />;
   }
 
@@ -142,13 +162,6 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
 // Écran de création de wallet amélioré
 function WalletCreationScreen({ user }: { user: any }) {
   const router = useRouter();
-  const pathname = usePathname();
-
-  // Empêcher l'accès direct à certaines pages sans wallet
-  if (pathname !== "/wallet/create") {
-    router.push("/wallet/create");
-    return null;
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -164,7 +177,7 @@ function WalletCreationScreen({ user }: { user: any }) {
             </div>
           </motion.div>
 
-          <Typography variant="h3" weight="bold" gradient>
+          <Typography variant="h3" weight="bold">
             Bienvenue sur Games Trafics Wallet
           </Typography>
 

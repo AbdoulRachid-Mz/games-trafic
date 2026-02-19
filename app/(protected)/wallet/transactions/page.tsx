@@ -37,6 +37,8 @@ import { useUserProfile } from "@/hooks/use-profile";
 import { getWalletLedgerStats } from "@/actions/wallets";
 import { getWalletTransactions as getWalletTransactionsAction } from "@/actions/transactions";
 import type { WalletTransaction } from "@/database/schema";
+import { useScreenSize } from "@/hooks/use-screen";
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -44,6 +46,9 @@ export default function TransactionsPage() {
   const { data: completeData } = useUserProfile(!!user?.id);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drawerDisplay, isDrawerDisplay] = useState(false);
+  const { matchesBreakpoint } = useScreenSize()
+  const isMobile = !matchesBreakpoint('md')
   const [stats, setStats] = useState({
     total: 0,
     income: 0,
@@ -220,7 +225,7 @@ export default function TransactionsPage() {
             className="gap-2 items-center flex justify-center"
           >
             <Download className="h-4 w-4" />
-            <span className="hidden md:inline-block">
+            <span className="">
               Exporter
             </span>
           </Button>
@@ -309,81 +314,177 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filtres */}
-      <Card className="p-3">
-        <CardContent className="p-2">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Typography variant="body-sm" weight="medium" className="mb-2">
-                Recherche
-              </Typography>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Référence, description..."
-                  value={filters.search}
-                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                  className="pl-10"
+      {isMobile ? (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => isDrawerDisplay(true)}
+            className="gap-2 items-center flex justify-center md:hidden"
+          >
+            <Filter className="h-4 w-4" />
+            <span>Filtres</span>
+          </Button>
+
+          <Sheet open={drawerDisplay} onOpenChange={isDrawerDisplay}>
+            <SheetContent side="bottom" className="p-4">
+              <SheetHeader>
+                <SheetTitle>Filtres</SheetTitle>
+              </SheetHeader>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <div>
+                  <Typography variant="body-sm" weight="medium" className="mb-2">
+                    Recherche
+                  </Typography>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Référence, description..."
+                      value={filters.search}
+                      onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Typography variant="body-sm" weight="medium" className="mb-2">
+                    Type
+                  </Typography>
+                  <Select
+                    value={filters.type}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tous les types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les types</SelectItem>
+                      <SelectItem value="DEPOSIT">Dépôts</SelectItem>
+                      <SelectItem value="WITHDRAWAL">Retraits</SelectItem>
+                      <SelectItem value="TRANSFER">Transferts</SelectItem>
+                      <SelectItem value="PRODUCT_PURCHASE">Achats produits</SelectItem>
+                      <SelectItem value="THEME_PURCHASE">Achats thèmes</SelectItem>
+                      <SelectItem value="VIP_SUBSCRIPTION">Abonnements VIP</SelectItem>
+                      <SelectItem value="TOURNAMENT_PARTICIPATION">Participations</SelectItem>
+                      <SelectItem value="GAME_ITEM_PURCHASE">Items jeu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Typography variant="body-sm" weight="medium" className="mb-2">
+                    Statut
+                  </Typography>
+                  <Select
+                    value={filters.status}
+                    onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tous les statuts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les statuts</SelectItem>
+                      <SelectItem value="COMPLETED">Complétées</SelectItem>
+                      <SelectItem value="PENDING">En attente</SelectItem>
+                      <SelectItem value="FAILED">Échouées</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Typography variant="body-sm" weight="medium" className="mb-2">
+                    Période
+                  </Typography>
+                  <DateRangePicker
+                    value={filters.dateRange}
+                    onChange={(range) => setFilters(prev => ({ ...prev, dateRange: range }))}
+                  />
+                </div>
+              </div>
+              <SheetFooter className="mt-4">
+                <Button onClick={() => isDrawerDisplay(false)}>Appliquer</Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </>
+      ) : (
+        <Card className="p-3">
+          <CardContent className="p-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Typography variant="body-sm" weight="medium" className="mb-2">
+                  Recherche
+                </Typography>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Référence, description..."
+                    value={filters.search}
+                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Typography variant="body-sm" weight="medium" className="mb-2">
+                  Type
+                </Typography>
+                <Select
+                  value={filters.type}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tous les types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les types</SelectItem>
+                    <SelectItem value="DEPOSIT">Dépôts</SelectItem>
+                    <SelectItem value="WITHDRAWAL">Retraits</SelectItem>
+                    <SelectItem value="TRANSFER">Transferts</SelectItem>
+                    <SelectItem value="PRODUCT_PURCHASE">Achats produits</SelectItem>
+                    <SelectItem value="THEME_PURCHASE">Achats thèmes</SelectItem>
+                    <SelectItem value="VIP_SUBSCRIPTION">Abonnements VIP</SelectItem>
+                    <SelectItem value="TOURNAMENT_PARTICIPATION">Participations</SelectItem>
+                    <SelectItem value="GAME_ITEM_PURCHASE">Items jeu</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Typography variant="body-sm" weight="medium" className="mb-2">
+                  Statut
+                </Typography>
+                <Select
+                  value={filters.status}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tous les statuts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les statuts</SelectItem>
+                    <SelectItem value="COMPLETED">Complétées</SelectItem>
+                    <SelectItem value="PENDING">En attente</SelectItem>
+                    <SelectItem value="FAILED">Échouées</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Typography variant="body-sm" weight="medium" className="mb-2">
+                  Période
+                </Typography>
+                <DateRangePicker
+                  value={filters.dateRange}
+                  onChange={(range) => setFilters(prev => ({ ...prev, dateRange: range }))}
                 />
               </div>
             </div>
-
-            <div>
-              <Typography variant="body-sm" weight="medium" className="mb-2">
-                Type
-              </Typography>
-              <Select
-                value={filters.type}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Tous les types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les types</SelectItem>
-                  <SelectItem value="DEPOSIT">Dépôts</SelectItem>
-                  <SelectItem value="WITHDRAWAL">Retraits</SelectItem>
-                  <SelectItem value="TRANSFER">Transferts</SelectItem>
-                  <SelectItem value="PRODUCT_PURCHASE">Achats produits</SelectItem>
-                  <SelectItem value="THEME_PURCHASE">Achats thèmes</SelectItem>
-                  <SelectItem value="VIP_SUBSCRIPTION">Abonnements VIP</SelectItem>
-                  <SelectItem value="TOURNAMENT_PARTICIPATION">Participations</SelectItem>
-                  <SelectItem value="GAME_ITEM_PURCHASE">Items jeu</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Typography variant="body-sm" weight="medium" className="mb-2">
-                Statut
-              </Typography>
-              <Select
-                value={filters.status}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Tous les statuts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="COMPLETED">Complétées</SelectItem>
-                  <SelectItem value="PENDING">En attente</SelectItem>
-                  <SelectItem value="FAILED">Échouées</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Typography variant="body-sm" weight="medium" className="mb-2">
-                Période
-              </Typography>
-              <DateRangePicker
-                value={filters.dateRange}
-                onChange={(range) => setFilters(prev => ({ ...prev, dateRange: range }))}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Liste des transactions */}
       <Card className="p-4">

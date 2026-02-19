@@ -1,42 +1,35 @@
 // components/shared/enhanced-dashboard.tsx
-"use client";
+"use client"
 
-import React from "react";
-import { cn } from "@/lib/utils";
+import React from "react"
+import { cn } from "@/lib/utils"
 import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
-  Sidebar,
   useSidebar,
-} from "@/components/ui/sidebar";
-import { Typography } from "@/components/ui/typography";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bell, Sparkles, Zap } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import Link from "next/link";
-import { useTheme } from "next-themes";
-// import { ThemeToggle } from "../shared/ThemeToggle"
-import { motion } from "framer-motion";
-import { ThemeToggle } from "../layout/ThemeToggle";
-import { useScreenSize } from "@/hooks/use-screen";
- 
+} from "@/components/ui/sidebar"
+import { Typography } from "@/components/ui/typography"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Bell, Sparkles, Menu } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import Link from "next/link"
+import { useTheme } from "next-themes"
+import { motion } from "framer-motion"
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { useScreenSize } from "@/hooks/use-screen"
+import { ThemeToggle } from "../layout/ThemeToggle"
 
 interface EnhancedDashboardProps {
-  children: React.ReactNode;
-  sidebar: React.ReactNode;
-  header: React.ReactNode;
-  className?: string;
-  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
-  showSidebarTrigger?: boolean;
-  mobileBreakpoint?: number; // Breakpoint en pixels, default: 768
+  children: React.ReactNode
+  sidebar: React.ReactNode
+  header: React.ReactNode
+  className?: string
+  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default"
+  showSidebarTrigger?: boolean
+  mobileBreakpoint?: number
 }
 
 export function EnhancedDashboard({
@@ -46,44 +39,74 @@ export function EnhancedDashboard({
   className,
   sidebarBgType = "default",
   showSidebarTrigger = true,
-  mobileBreakpoint = 768,
+  mobileBreakpoint = 768
 }: EnhancedDashboardProps) {
-  const { screenSize } = useScreenSize();
+  const { screenSize } = useScreenSize()
+  const [isMobileOpen, setIsMobileOpen] = React.useState(false)
 
-  // Déterminer si on doit ouvrir la sidebar par défaut
-  // false sur mobile (< mobileBreakpoint), true sur desktop (>= mobileBreakpoint)
-  const defaultOpen = screenSize.width >= mobileBreakpoint;
+  const isMobile = screenSize.width < mobileBreakpoint
 
+  // Version mobile avec Sheet
+  if (isMobile) {
+    return (
+      <div className={cn("flex min-h-screen w-full flex-col ", className)}>
+        {/* Header mobile avec bouton menu */}
+        <header className="flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+          <div className="flex items-center gap-2">
+            <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+              <SheetTitle className='hidden'>title</SheetTitle>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[280px] overflow-y-auto">
+                {sidebar}
+              </SheetContent>
+            </Sheet>
+            <Typography variant="h6" weight="semibold">
+              {typeof header === 'string' ? header : 'Dashboard'}
+            </Typography>
+          </div>
+          <ThemeToggle />
+        </header>
+
+        {/* Contenu mobile */}
+        <main className="flex-1 p-3">
+          {children}
+        </main>
+      </div>
+    )
+  }
+
+  // Version desktop avec SidebarProvider
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
+    <SidebarProvider defaultOpen={true}>
       <div className={cn("flex min-h-screen w-full", className)}>
-        <Sidebar collapsible="icon" variant="sidebar" className="md:block">
-          {sidebar}
-        </Sidebar>
+        {sidebar}
         <SidebarInset className="flex-1">
           {header}
-          <main className="flex-1 p-4 max-md:p-3 max-md:space-y-4 space-y-3">
+          <main className="flex-1 p-6 max-md:p-3 max-md:space-y-4 space-y-6">
             {children}
           </main>
         </SidebarInset>
       </div>
     </SidebarProvider>
-  );
+  )
 }
 
 // Composants pour les éléments de sidebar réutilisables
 interface SidebarItemProps {
-  title: string;
-  url?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  description?: string;
-  isActive?: boolean;
-  onClick?: () => void;
-  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
+  title: string
+  url?: string
+  icon: React.ComponentType<{ className?: string }>
+  badge?: string
+  description?: string
+  isActive?: boolean
+  onClick?: () => void
+  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default"
 }
 
-// components/shared/enhanced-dashboard.tsx - Partie SidebarItem uniquement
 export function SidebarItem({
   title,
   url,
@@ -92,11 +115,20 @@ export function SidebarItem({
   description,
   isActive = false,
   onClick,
-  sidebarBgType = "default",
+  sidebarBgType = "default"
 }: SidebarItemProps) {
-  const { state } = useSidebar();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  // Gestion du cas où useSidebar n'est pas disponible (mobile)
+  let state = "expanded"
+  try {
+    const sidebarContext = useSidebar()
+    state = sidebarContext.state
+  } catch (e) {
+    // En mode mobile, on considère que c'est toujours expanded
+    state = "expanded"
+  }
+
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
 
   const getItemStyles = () => {
     switch (sidebarBgType) {
@@ -107,7 +139,7 @@ export function SidebarItem({
           isActive
             ? "bg-white/20 shadow-lg text-white backdrop-blur-sm border-l-4 border-yellow-400"
             : "hover:bg-white/10 text-white/80 hover:text-white"
-        );
+        )
       case "glass":
         return cn(
           "group relative overflow-hidden transition-all duration-300 p-2 rounded-lg",
@@ -115,7 +147,7 @@ export function SidebarItem({
           isActive
             ? "bg-white/20 shadow-lg text-white backdrop-blur-sm border border-white/30 border-l-4 border-yellow-400"
             : "hover:bg-white/10 text-white/80 hover:text-white border border-transparent hover:border-white/10"
-        );
+        )
       case "neuomorphic":
         return cn(
           "group relative overflow-hidden transition-all duration-300 p-2 rounded-lg",
@@ -123,7 +155,7 @@ export function SidebarItem({
           isActive
             ? "bg-primary/20 shadow-inner text-primary border-l-4 border-primary"
             : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-        );
+        )
       case "solid":
         return cn(
           "group relative overflow-hidden transition-all duration-300 p-2 rounded-lg",
@@ -131,7 +163,7 @@ export function SidebarItem({
           isActive
             ? "bg-primary/20 shadow-md text-primary border-l-4 border-primary"
             : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-        );
+        )
       case "default":
       default:
         return cn(
@@ -140,9 +172,9 @@ export function SidebarItem({
           isActive
             ? "bg-primary/10 text-primary shadow-md border-l-4 border-primary"
             : "hover:bg-accent/50 text-accent-foreground hover:text-foreground"
-        );
+        )
     }
-  };
+  }
 
   const getIconStyles = () => {
     switch (sidebarBgType) {
@@ -153,21 +185,21 @@ export function SidebarItem({
           isActive
             ? "bg-yellow-400/20 text-yellow-400"
             : "group-hover:bg-white/10 text-white/70 group-hover:text-white"
-        );
+        )
       case "neuomorphic":
         return cn(
           "p-1.5 rounded-lg transition-all duration-300",
           isActive
             ? "bg-primary text-primary-foreground"
             : "group-hover:bg-primary/10 text-muted-foreground group-hover:text-foreground"
-        );
+        )
       case "solid":
         return cn(
           "p-1.5 rounded-lg transition-all duration-300",
           isActive
             ? "bg-primary text-primary-foreground"
             : "group-hover:bg-primary/10 text-muted-foreground group-hover:text-foreground"
-        );
+        )
       case "default":
       default:
         return cn(
@@ -175,35 +207,30 @@ export function SidebarItem({
           isActive
             ? "bg-primary text-primary-foreground"
             : "group-hover:bg-accent text-muted-foreground group-hover:text-foreground"
-        );
+        )
     }
-  };
+  }
 
   const getTextColor = () => {
     switch (sidebarBgType) {
       case "gradient":
       case "glass":
-        return isActive ? "text-yellow-300" : "text-white/80";
+        return isActive ? "text-yellow-300" : "text-white/80"
       case "neuomorphic":
-        return isActive
-          ? "text-primary"
-          : isDark
-            ? "text-white/80"
-            : "text-foreground/80";
+        return isActive ? "text-primary" : isDark ? "text-white/80" : "text-foreground/80"
       case "solid":
-        return isActive
-          ? "text-primary"
-          : isDark
-            ? "text-white/80"
-            : "text-foreground/80";
+        return isActive ? "text-primary" : isDark ? "text-white/80" : "text-foreground/80"
       case "default":
       default:
-        return isActive ? "text-primary" : "text-foreground/80";
+        return isActive ? "text-primary" : "text-foreground/80"
     }
-  };
+  }
 
   const content = (
-    <div className={getItemStyles()} onClick={onClick}>
+    <div
+      className={getItemStyles()}
+      onClick={onClick}
+    >
       <div className="flex items-center gap-3 w-full">
         <div className={getIconStyles()}>
           <Icon className="h-4 w-4" />
@@ -215,7 +242,10 @@ export function SidebarItem({
               <Typography
                 variant="body-sm"
                 weight={isActive ? "semibold" : "medium"}
-                className={cn("truncate", getTextColor())}
+                className={cn(
+                  "truncate",
+                  getTextColor()
+                )}
               >
                 {title}
               </Typography>
@@ -224,13 +254,9 @@ export function SidebarItem({
                   variant="caption2"
                   className={cn(
                     "text-xs",
-                    sidebarBgType === "gradient" || sidebarBgType === "glass"
-                      ? isActive
-                        ? "text-yellow-300/70"
-                        : "text-white/60"
-                      : isActive
-                        ? "text-primary/70"
-                        : "text-muted-foreground"
+                    (sidebarBgType === "gradient" || sidebarBgType === "glass")
+                      ? isActive ? "text-yellow-300/70" : "text-white/60"
+                      : isActive ? "text-primary/70" : "text-muted-foreground"
                   )}
                 >
                   {description}
@@ -243,7 +269,7 @@ export function SidebarItem({
                 variant="secondary"
                 className={cn(
                   "text-xs px-1.5 py-0.5",
-                  sidebarBgType === "gradient" || sidebarBgType === "glass"
+                  (sidebarBgType === "gradient" || sidebarBgType === "glass")
                     ? isActive
                       ? "bg-yellow-400/30 text-yellow-300 border-yellow-400/40"
                       : "bg-yellow-400/20 text-yellow-300/80 border-yellow-400/30"
@@ -264,28 +290,33 @@ export function SidebarItem({
           animate={{ opacity: 1, scale: 1 }}
           className={cn(
             "absolute top-0 right-0 w-2 h-2 rounded-full",
-            sidebarBgType === "gradient" || sidebarBgType === "glass"
+            (sidebarBgType === "gradient" || sidebarBgType === "glass")
               ? "bg-yellow-400"
               : "bg-primary"
           )}
         />
       )}
     </div>
-  );
+  )
 
   // Si une URL est fournie, wrapper avec Link
   const wrappedContent = url ? (
     <Link href={url} passHref>
       {content}
     </Link>
-  ) : (
-    content
-  );
+  ) : content
+
+  // Ne pas afficher de tooltip en mode mobile
+  if (state === "expanded") {
+    return wrappedContent
+  }
 
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>{wrappedContent}</TooltipTrigger>
+        <TooltipTrigger asChild>
+          {wrappedContent}
+        </TooltipTrigger>
         {/* Afficher le tooltip seulement quand la sidebar est fermée */}
         {state === "collapsed" && (
           <TooltipContent side="right">
@@ -295,49 +326,49 @@ export function SidebarItem({
                 {isActive && " (actif)"}
               </p>
               {description && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {description}
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">{description}</p>
               )}
             </div>
           </TooltipContent>
         )}
       </Tooltip>
     </TooltipProvider>
-  );
+  )
 }
 
 interface SidebarGroupProps {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
+  label: string
+  children: React.ReactNode
+  className?: string
+  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default"
 }
 
-export function SidebarGroup({
-  label,
-  children,
-  className,
-  sidebarBgType = "default",
-}: SidebarGroupProps) {
-  const { state } = useSidebar();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+export function SidebarGroup({ label, children, className, sidebarBgType = "default" }: SidebarGroupProps) {
+  let state = "expanded"
+  try {
+    const sidebarContext = useSidebar()
+    state = sidebarContext.state
+  } catch (e) {
+    state = "expanded"
+  }
+
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
 
   const getLabelColor = () => {
     switch (sidebarBgType) {
       case "gradient":
       case "glass":
-        return "text-white/60";
+        return "text-white/60"
       case "neuomorphic":
-        return isDark ? "text-white/60" : "text-muted-foreground";
+        return isDark ? "text-white/60" : "text-muted-foreground"
       case "solid":
-        return isDark ? "text-white/60" : "text-muted-foreground";
+        return isDark ? "text-white/60" : "text-muted-foreground"
       case "default":
       default:
-        return "text-muted-foreground";
+        return "text-muted-foreground"
     }
-  };
+  }
 
   return (
     <div className={cn("mb-4", className)}>
@@ -353,95 +384,98 @@ export function SidebarGroup({
           {label}
         </Typography>
       )}
-      <div className="space-y-1">{children}</div>
+      <div className="space-y-1">
+        {children}
+      </div>
     </div>
-  );
+  )
 }
 
 interface SidebarHeaderProps {
-  title: string;
-  subtitle?: string;
+  title: string
+  subtitle?: string
   user?: {
-    username?: string;
-    profileImage?: string;
-    level?: string;
-  };
-  className?: string;
-  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
+    username?: string
+    profileImage?: string
+    level?: string
+  }
+  className?: string
+  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default"
 }
 
-export function SidebarHeader({
-  title,
-  subtitle,
-  user,
-  className,
-  sidebarBgType = "default",
-}: SidebarHeaderProps) {
-  const { state } = useSidebar();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+export function SidebarHeader({ title, subtitle, user, className, sidebarBgType = "default" }: SidebarHeaderProps) {
+  let state = "expanded"
+  try {
+    const sidebarContext = useSidebar()
+    state = sidebarContext.state
+  } catch (e) {
+    state = "expanded"
+  }
+
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
 
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-foreground";
+        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-white"
       case "glass":
-        return "glass border-b border-white/20 text-foreground";
+        return "glass border-b border-white/20 text-white"
       case "neuomorphic":
-        return "bg-sidebar neomorphic text-foreground";
+        return "bg-sidebar neomorphic text-foreground"
       case "solid":
-        return "bg-sidebar border-b text-foreground";
+        return "bg-sidebar border-b text-foreground"
       case "default":
       default:
-        return "bg-sidebar border-b text-foreground";
+        return "bg-sidebar border-b text-foreground"
     }
-  };
+  }
 
   const getTextColor = () => {
     switch (sidebarBgType) {
       case "gradient":
       case "glass":
-        return "text-white";
+        return "text-white"
       case "neuomorphic":
-        return isDark ? "text-white" : "text-foreground";
+        return isDark ? "text-white" : "text-foreground"
       case "solid":
-        return isDark ? "text-white" : "text-foreground";
+        return isDark ? "text-white" : "text-foreground"
       case "default":
       default:
-        return "text-foreground";
+        return "text-foreground"
     }
-  };
+  }
 
   return (
     <div className={cn("px-4 py-6", getBackgroundStyles(), className)}>
       <div className="flex items-center gap-3">
-        <div
-          className={cn(
-            "p-2 rounded-xl transition-all duration-300",
-            sidebarBgType === "gradient" || sidebarBgType === "glass"
-              ? "bg-white/20 backdrop-blur-sm"
-              : "bg-primary/10"
-          )}
-        >
-          <Sparkles
-            className={cn(
-              "h-6 w-6",
-              sidebarBgType === "gradient" || sidebarBgType === "glass"
-                ? "text-yellow-400"
-                : "text-primary"
-            )}
-          />
+        <div className={cn(
+          "p-2 rounded-xl transition-all duration-300",
+          (sidebarBgType === "gradient" || sidebarBgType === "glass")
+            ? "bg-white/20 backdrop-blur-sm"
+            : "bg-primary/10"
+        )}>
+          <Sparkles className={cn(
+            "h-6 w-6",
+            (sidebarBgType === "gradient" || sidebarBgType === "glass")
+              ? "text-yellow-400"
+              : "text-primary"
+          )} />
         </div>
         {state === "expanded" && (
           <div className="animate-in slide-in-from-left-2 duration-300">
-            <Typography variant="h4" weight="bold" className={getTextColor()}>
+            <Typography
+              variant="h4"
+              weight="bold"
+              className={getTextColor()}
+            >
               {title}
             </Typography>
             {subtitle && (
               <Typography
                 variant="caption1"
                 className={cn(
-                  sidebarBgType === "gradient" || sidebarBgType === "glass"
+                  (sidebarBgType === "gradient" || sidebarBgType === "glass")
                     ? "text-white/70"
                     : "text-muted-foreground"
                 )}
@@ -453,7 +487,7 @@ export function SidebarHeader({
               <Typography
                 variant="caption1"
                 className={cn(
-                  sidebarBgType === "gradient" || sidebarBgType === "glass"
+                  (sidebarBgType === "gradient" || sidebarBgType === "glass")
                     ? "text-white/70"
                     : "text-muted-foreground"
                 )}
@@ -465,93 +499,89 @@ export function SidebarHeader({
         )}
       </div>
     </div>
-  );
+  )
 }
 
 interface SidebarFooterProps {
   user: {
-    username?: string;
-    profileImage?: string;
-    status?: "online" | "offline" | "busy";
-  };
-  className?: string;
-  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
+    username?: string
+    profileImage?: string
+    status?: "online" | "offline" | "busy"
+  }
+  className?: string
+  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default"
 }
 
-export function SidebarFooter({
-  user,
-  className,
-  sidebarBgType = "default",
-}: SidebarFooterProps) {
-  const { state } = useSidebar();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+export function SidebarFooter({ user, className, sidebarBgType = "default" }: SidebarFooterProps) {
+  let state = "expanded"
+  try {
+    const sidebarContext = useSidebar()
+    state = sidebarContext.state
+  } catch (e) {
+    state = "expanded"
+  }
+
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
 
   const statusColors = {
     online: "bg-emerald-400",
     offline: "bg-gray-400",
-    busy: "bg-amber-400",
-  };
+    busy: "bg-amber-400"
+  }
 
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-t from-slate-900/80 to-slate-900/50 border-t border-white/20 text-white";
+        return "bg-gradient-to-t from-slate-900/80 to-slate-900/50 border-t border-white/20 text-white"
       case "glass":
-        return "glass border-t border-white/20 text-white";
+        return "glass border-t border-white/20 text-white"
       case "neuomorphic":
-        return "bg-sidebar neomorphic border-t text-foreground";
+        return "bg-sidebar neomorphic border-t text-foreground"
       case "solid":
-        return "bg-sidebar border-t text-foreground";
+        return "bg-sidebar border-t text-foreground"
       case "default":
       default:
-        return "bg-sidebar border-t text-foreground";
+        return "bg-sidebar border-t text-foreground"
     }
-  };
+  }
 
   const getContentStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
       case "glass":
-        return "bg-white/10 backdrop-blur-sm border border-white/20";
+        return "bg-white/10 backdrop-blur-sm border border-white/20"
       default:
-        return "bg-muted";
+        return "bg-muted"
     }
-  };
+  }
 
   const getTextColor = () => {
     switch (sidebarBgType) {
       case "gradient":
       case "glass":
-        return "text-white";
+        return "text-white"
       case "neuomorphic":
-        return isDark ? "text-white" : "text-foreground";
+        return isDark ? "text-white" : "text-foreground"
       case "solid":
-        return isDark ? "text-white" : "text-foreground";
+        return isDark ? "text-white" : "text-foreground"
       case "default":
       default:
-        return "text-foreground";
+        return "text-foreground"
     }
-  };
+  }
 
   return (
     <div className={cn("p-4", getBackgroundStyles(), className)}>
-      <div
-        className={cn(
-          "flex items-center gap-3 p-3 rounded-xl",
-          getContentStyles()
-        )}
-      >
+      <div className={cn("flex items-center gap-3 p-3 rounded-xl", getContentStyles())}>
         <Avatar className="h-8 w-8">
           <AvatarImage src={user?.profileImage} />
-          <AvatarFallback
-            className={cn(
-              "text-xs",
-              sidebarBgType === "gradient" || sidebarBgType === "glass"
-                ? "bg-white/20 text-white"
-                : ""
-            )}
-          >
+          <AvatarFallback className={cn(
+            "text-xs",
+            (sidebarBgType === "gradient" || sidebarBgType === "glass")
+              ? "bg-white/20 text-white"
+              : ""
+          )}>
             {user?.username?.charAt(0)?.toUpperCase() || "U"}
           </AvatarFallback>
         </Avatar>
@@ -561,7 +591,10 @@ export function SidebarFooter({
             <Typography
               variant="body-sm"
               weight="medium"
-              className={cn("truncate", getTextColor())}
+              className={cn(
+                "truncate",
+                getTextColor()
+              )}
             >
               {user?.username || "Utilisateur"}
             </Typography>
@@ -570,40 +603,31 @@ export function SidebarFooter({
                 variant="secondary"
                 className={cn(
                   "text-xs px-1.5 py-0.5",
-                  sidebarBgType === "gradient" || sidebarBgType === "glass"
+                  (sidebarBgType === "gradient" || sidebarBgType === "glass")
                     ? "bg-emerald-400/20 text-emerald-300 border-emerald-400/30"
                     : ""
                 )}
               >
-                <div
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full mr-1",
-                    statusColors[user?.status || "online"]
-                  )}
-                />
-                {user?.status === "online"
-                  ? "En ligne"
-                  : user?.status === "busy"
-                    ? "Occupé"
-                    : "Hors ligne"}
+                <div className={cn("w-1.5 h-1.5 rounded-full mr-1", statusColors[user?.status || "online"])} />
+                {user?.status === "online" ? "En ligne" : user?.status === "busy" ? "Occupé" : "Hors ligne"}
               </Badge>
             </div>
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
 
 interface DashboardHeaderProps {
-  title: string;
-  description?: string;
-  actions?: React.ReactNode;
-  showSidebarTrigger?: boolean;
-  className?: string;
-  onNotificationButtonClick?: () => void;
-  notificationCount?: number;
-  children?: React.ReactNode;
+  title: string
+  description?: string
+  actions?: React.ReactNode
+  showSidebarTrigger?: boolean
+  className?: string
+  onNotificationButtonClick?: () => void
+  notificationCount?: number
+  children?: React.ReactNode
 }
 
 export function DashboardHeader({
@@ -614,15 +638,13 @@ export function DashboardHeader({
   className,
   onNotificationButtonClick,
   notificationCount,
-  children,
+  children
 }: DashboardHeaderProps) {
   return (
-    <header
-      className={cn(
-        "flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6",
-        className
-      )}
-    >
+    <header className={cn(
+      "flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4",
+      className
+    )}>
       <div className="flex items-center gap-4">
         {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />}
         <div>
@@ -654,45 +676,39 @@ export function DashboardHeader({
         <ThemeToggle />
       </div>
     </header>
-  );
+  )
 }
 
 // Composant de conteneur de sidebar avec styles dynamiques
 interface SidebarContainerProps {
-  children: React.ReactNode;
-  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
-  className?: string;
+  children: React.ReactNode
+  sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default"
+  className?: string
 }
 
-export function SidebarContainer({
-  children,
-  sidebarBgType = "default",
-  className,
-}: SidebarContainerProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+export function SidebarContainer({ children, sidebarBgType = "default", className }: SidebarContainerProps) {
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
 
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-white";
+        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-white"
       case "glass":
-        return "glass text-white border-r border-white/20";
+        return "glass text-white border-r border-white/20"
       case "neuomorphic":
-        return "bg-sidebar neomorphic text-foreground";
+        return "bg-sidebar neomorphic text-foreground"
       case "solid":
-        return "bg-sidebar text-foreground";
+        return "bg-sidebar text-foreground"
       case "default":
       default:
-        return "bg-primary text-foreground";
+        return "bg-primary text-foreground"
     }
-  };
+  }
 
   return (
-    <div
-      className={cn("flex flex-col h-full overflow-y-auto", getBackgroundStyles(), className)}
-    >
+    <div className={cn("flex flex-col h-full", getBackgroundStyles(), className)}>
       {children}
     </div>
-  );
+  )
 }

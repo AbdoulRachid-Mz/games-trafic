@@ -2,15 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { getTournamentPhases } from "@/actions/tournaments";
 import { getPhaseGroups } from "@/actions/phases";
-import { updateTournamentPhase, createPhaseGroup, updatePhaseGroup, deletePhaseGroup } from "@/actions/phases";
-import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { Settings2, ArrowUp, ArrowDown } from "lucide-react";
+import { Settings2, Users, Swords, ChevronLeft } from "lucide-react";
 import type { TournamentPhase, PhaseGroup } from "@/database/schema";
+import { PhaseDetailActions } from "@/components/pages/tournaments/edition-detail/phase-detail-actions";
+import { GroupItemActions } from "@/components/pages/tournaments/edition-detail/group-item-actions";
+import { CreateGroupDialog } from "@/components/pages/tournaments/edition-detail/create-group-dialog";
 
 interface PageProps {
   params: Promise<{
@@ -20,6 +19,17 @@ interface PageProps {
   }>;
 }
 
+const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  ELIMINATION: { label: "Élimination directe", color: "text-red-700", bgColor: "bg-red-100 border-red-200" },
+  DOUBLE_ELIMINATION: { label: "Double élimination", color: "text-orange-700", bgColor: "bg-orange-100 border-orange-200" },
+  ROUND_ROBIN: { label: "Round Robin", color: "text-blue-700", bgColor: "bg-blue-100 border-blue-200" },
+  GROUP_STAGE: { label: "Phase de groupes", color: "text-green-700", bgColor: "bg-green-100 border-green-200" },
+  SWISS: { label: "Suisse", color: "text-purple-700", bgColor: "bg-purple-100 border-purple-200" },
+  KNOCKOUT: { label: "K.O.", color: "text-pink-700", bgColor: "bg-pink-100 border-pink-200" },
+  CUSTOM: { label: "Personnalisé", color: "text-gray-700", bgColor: "bg-gray-100 border-gray-200" },
+  GROUP_ELIMINATION: { label: "Groupes + Élimination", color: "text-teal-700", bgColor: "bg-teal-100 border-teal-200" },
+};
+
 export default async function PhaseDetailPage({ params }: PageProps) {
   const { tournamentId, editionId, phaseId } = await params;
 
@@ -28,168 +38,131 @@ export default async function PhaseDetailPage({ params }: PageProps) {
     pagination: { page: 1, limit: 1 },
   });
   const phase = phaseRes.data[0] as TournamentPhase | undefined;
+
   const groupsRes = await getPhaseGroups({
     filters: { phaseId },
     options: { sortBy: "order", sortOrder: "asc" },
     pagination: { page: 1, limit: 500 },
   });
 
-  async function toggleCompletedAction() {
-    "use server";
-    await updateTournamentPhase(phaseId, { isCompleted: !(phase?.isCompleted ?? false) });
-    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`);
-  }
-
-  async function createGroupAction(formData: FormData) {
-    "use server";
-    const name = ((formData.get("name") as string) || "").trim() || "Groupe";
-    const existingGroups = await getPhaseGroups({
-      filters: { phaseId },
-      options: { sortBy: "order", sortOrder: "asc" },
-      pagination: { page: 1, limit: 500 },
-    });
-    const order = (existingGroups?.data?.length || 0) + 1;
-    await createPhaseGroup({ phaseId, name, order } as any);
-    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`);
-  }
-
-  async function moveGroupAction(formData: FormData) {
-    "use server";
-    const id = (formData.get("id") as string) || "";
-    const direction = (formData.get("direction") as string) || "up";
-    const list = await getPhaseGroups({
-      filters: { phaseId },
-      options: { sortBy: "order", sortOrder: "asc" },
-      pagination: { page: 1, limit: 500 },
-    });
-    const arr = list.data.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const idx = arr.findIndex((g) => g.id === id);
-    const swapWith = direction === "up" ? idx - 1 : idx + 1;
-    if (idx === -1 || swapWith < 0 || swapWith >= arr.length) {
-      revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`);
-      return;
-    }
-    const a = arr[idx];
-    const b = arr[swapWith];
-    await updatePhaseGroup(a.id, { order: b.order ?? swapWith + 1 } as any);
-    await updatePhaseGroup(b.id, { order: a.order ?? idx + 1 } as any);
-    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`);
-  }
-
-  async function deleteGroupAction(formData: FormData) {
-    "use server";
-    const id = (formData.get("id") as string) || "";
-    await deletePhaseGroup(id);
-    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`);
-  }
+  const basePath = `/tournaments/${tournamentId}/editions/${editionId}/dashboard`;
+  const typeConf = phaseTypeConfig[phase?.phaseType || ""] || phaseTypeConfig.CUSTOM;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <Typography variant="h3" weight="bold">Gestion de la Phase</Typography>
-          <Typography variant="body-sm" theme="muted">Configurez cette phase et ses groupes.</Typography>
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Button variant="ghost" size="sm" className="h-7 px-2 -ml-2 hover:bg-transparent" asChild>
+              <Link href={`${basePath}/phases`}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Retour aux phases
+              </Link>
+            </Button>
+          </div>
+          <Typography variant="h3" weight="bold">{phase?.name || "Détails de la phase"}</Typography>
         </div>
-        <Button variant="outline" asChild>
-          <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`}>Retour</Link>
-        </Button>
       </div>
 
+      {/* Phase info card */}
       {phase && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                {phase.name}
-                <Badge variant="secondary" className="text-[10px] h-4">{phase.phaseType}</Badge>
-              </CardTitle>
-              <Typography variant="caption1" theme="muted" className="flex items-center gap-2">
-                <Settings2 className="h-3 w-3" /> Ordre: {phase.order} • Statut: {phase.isCompleted ? "Terminé" : "En cours"}
-              </Typography>
+        <Card className="overflow-hidden border-border/50">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="space-y-4">
+                {/* Type badge + status */}
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <Badge className={`${typeConf.bgColor} ${typeConf.color} border shadow-sm text-xs font-bold px-3 py-0.5`}>
+                    {typeConf.label}
+                  </Badge>
+                  {phase.isActive && (
+                    <Badge className="bg-green-600/10 text-green-600 border-green-600/20 shadow-sm text-xs px-3 py-0.5">Active</Badge>
+                  )}
+                  {!phase.isActive && (
+                    <Badge variant="outline" className="text-muted-foreground text-xs px-3 py-0.5">Inactive</Badge>
+                  )}
+                  {phase.isCompleted && (
+                    <Badge variant="secondary" className="text-xs px-3 py-0.5">Terminée</Badge>
+                  )}
+                </div>
+
+                {/* Config details */}
+                <div className="flex items-center gap-6 text-sm text-muted-foreground flex-wrap font-medium">
+                  <span className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" /> Ordre de passage: {phase.order}
+                  </span>
+                  {(phase as any).seedingMethod && (
+                    <span className="flex items-center gap-2">
+                      <div className="w-1 h-1 rounded-full bg-border" />
+                      Seeding: {(phase as any).seedingMethod}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <PhaseDetailActions
+                phaseId={phaseId}
+                isActive={phase.isActive ?? false}
+                isCompleted={phase.isCompleted ?? false}
+              />
             </div>
-            <form action={toggleCompletedAction}>
-              <Button variant={phase.isCompleted ? "outline" : "default"}>
-                {phase.isCompleted ? "Marquer en cours" : "Marquer terminé"}
-              </Button>
-            </form>
-          </CardHeader>
+          </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Groupes</CardTitle>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Ajouter un groupe</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nouveau groupe</DialogTitle>
-              </DialogHeader>
-              <form action={createGroupAction} className="space-y-3">
-                <input
-                  name="name"
-                  placeholder="Nom du groupe"
-                  className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full"
-                  defaultValue={`Groupe ${(groupsRes.data?.length || 0) + 1}`}
-                />
-                <DialogFooter>
-                  <Button type="submit">Créer</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3">
-            {(groupsRes.data as PhaseGroup[]).map((group) => (
-              <div key={group.id} className="border rounded-xl p-4 flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Typography variant="body-base" weight="bold">{group.name}</Typography>
-                    <Badge variant="secondary" className="text-[10px] h-4">Ordre {group.order}</Badge>
-                  </div>
-                  <Typography variant="caption1" theme="muted">
-                    Participants: {group.participantCount ?? 0} • Matchs: {group.matchCount ?? 0}
-                  </Typography>
-                </div>
-                <div className="flex items-center gap-2">
-                  <form action={moveGroupAction}>
-                    <input type="hidden" name="id" value={group.id} />
-                    <input type="hidden" name="direction" value="up" />
-                    <Button variant="outline" size="sm"><ArrowUp className="h-3 w-3" /></Button>
-                  </form>
-                  <form action={moveGroupAction}>
-                    <input type="hidden" name="id" value={group.id} />
-                    <input type="hidden" name="direction" value="down" />
-                    <Button variant="outline" size="sm"><ArrowDown className="h-3 w-3" /></Button>
-                  </form>
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}`}>Gérer</Link>
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="destructive">Supprimer</Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer le groupe</AlertDialogTitle>
-                        <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <form action={deleteGroupAction}>
-                          <input type="hidden" name="id" value={group.id} />
-                          <AlertDialogAction type="submit" variant="destructive">Supprimer</AlertDialogAction>
-                        </form>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-            ))}
+      {/* Groups */}
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b py-5 px-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Groupes & Écuries</CardTitle>
+              <Typography variant="caption1" theme="muted" className="mt-0.5">
+                {groupsRes.data.length} groupe{groupsRes.data.length > 1 ? 's' : ''} configuré{groupsRes.data.length > 1 ? 's' : ''}
+              </Typography>
+            </div>
           </div>
+          <CreateGroupDialog phaseId={phaseId} nextOrder={groupsRes.data.length + 1} />
+        </CardHeader>
+        <CardContent className="p-6">
+          {groupsRes.data.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <Users className="h-8 w-8 opacity-20" />
+              </div>
+              <Typography variant="body-base" weight="semibold">Aucun groupe</Typography>
+              <Typography variant="body-sm" theme="muted" className="mt-1 max-w-xs mx-auto">
+                Commencez par créer un groupe pour y ajouter des participants et générer des matchs.
+              </Typography>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {(groupsRes.data as PhaseGroup[]).map((group, idx) => (
+                <div key={group.id} className="group relative border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Typography variant="body-base" weight="bold">{group.name}</Typography>
+                      <Badge variant="outline" className="text-[10px] h-5 bg-background font-bold tracking-wider">ORDRE {group.order}</Badge>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
+                      <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {group.participantCount ?? 0} participants</span>
+                      <span className="flex items-center gap-1.5"><Swords className="h-3.5 w-3.5" /> {group.matchCount ?? 0} matchs</span>
+                    </div>
+                  </div>
+
+                  <GroupItemActions
+                    group={group}
+                    basePath={basePath}
+                    isFirst={idx === 0}
+                    isLast={idx === groupsRes.data.length - 1}
+                    phaseId={phaseId}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

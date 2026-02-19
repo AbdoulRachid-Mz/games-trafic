@@ -204,6 +204,7 @@ export async function executeTransaction(
         const feeCalc = await calculateTransactionFees(type, amount);
         const fees = feeCalc.fees;
         const netAmount = amount - fees;
+        const totalAmount = amount + (fees || 0);
 
         // Calculer les nouveaux soldes
         const newFromBalance = fromBalance - amount;
@@ -232,6 +233,7 @@ export async function executeTransaction(
                 fromAccountId,
                 toAccountId,
                 calculatedFees: feeCalc,
+                totalAmount: totalAmount.toFixed(2),
             },
             createdAt: new Date(),
         };
@@ -254,7 +256,7 @@ export async function executeTransaction(
             .values({
                 transactionId: transaction.id,
                 accountId: fromAccountId,
-                debit: amount.toFixed(2),
+                debit: totalAmount.toFixed(2),
                 credit: "0",
                 currency: "GTC",
                 createdAt: new Date(),

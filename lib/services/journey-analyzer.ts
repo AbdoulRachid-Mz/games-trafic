@@ -9,7 +9,9 @@ export async function analyzeUserJourney(
 ): Promise<JourneyAnalysis> {
   // Filtrer et organiser les traces
   const navigationTraces = traces.filter(t => t.type === 'NAVIGATION');
-  const actionTraces = traces.filter(t => t.type !== 'NAVIGATION');
+  const actionTraces = traces
+    .filter(t => t.type !== 'NAVIGATION')
+    .filter(t => !(t.type === 'VIEW' && ['SCROLL_DEPTH', 'PAGE_DURATION', 'CLICK'].includes((t.entityId || '').toUpperCase())));
   
   // Extraire les pages visitées
   const pagesVisited = navigationTraces

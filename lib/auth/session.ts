@@ -1,15 +1,17 @@
 // lib/auth/session.ts - MISE À JOUR
 import { auth } from "../auth";
-import { headers } from "next/headers";
-import { getMyProfile } from "@/actions/users";
+import { headers, cookies } from "next/headers";
 
 /**
  * Récupère la session côté serveur avec profil complet
  */
 export async function getServerSession() {
   try {
+    const cookieStore = await cookies();
     const session = await auth.api.getSession({
-      headers: await headers(),
+      headers: {
+        cookie: cookieStore.toString(),
+      },
     });
 
     return session;
@@ -18,7 +20,6 @@ export async function getServerSession() {
     return null;
   }
 }
-
 /**
  * Vérifie si l'utilisateur est authentifié
  */
