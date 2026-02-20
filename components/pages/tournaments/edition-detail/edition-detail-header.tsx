@@ -39,6 +39,7 @@ import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
 import { EditionJoinDialog } from "./edition-join-dialog";
+import { InteractionButton } from "@/components/shared/interaction-button";
 
 interface EditionDetailHeaderProps {
   tournament: Tournament;
@@ -70,6 +71,23 @@ export function EditionDetailHeader({
   const { isMobile } = useScreenSize();
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
+
+  const dropdownData = [
+    {
+      label: "Modifier",
+      icon: <Edit className="w-4 h-4" />,
+      onClick: onEdit,
+      disabled: !onEdit,
+      requireOrganizer: true,
+    },
+    {
+      label: "Supprimer",
+      icon: <Trash2 className="w-4 h-4" />,
+      onClick: onDelete,
+      disabled: !onDelete,
+      requireOrganizer: true,
+    },
+  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -234,8 +252,34 @@ export function EditionDetailHeader({
                 Joindre
               </Button>
             )}
+            <InteractionButton
+              entityId={edition.id}
+              entityType="EDITION"
+              type="follow"
+            />
 
-            {/* Organizer actions dropdown */}
+            {/* Share button for non-organizers */}
+            {!isOrganizer && (
+              <Button variant="outline" size="sm" className="gap-2">
+                <Share2 className="h-4 w-4" />
+                Partager
+              </Button>
+            )}
+
+            {/* Map button */}
+            {edition.locationType !== "ONLINE" && edition.location && (
+              <Button variant="default" className="gap-2" asChild>
+                <a
+                  href={`https://maps.google.com/?q=${edition.location}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MapPin className="h-4 w-4" />
+                  Voir sur la carte
+                </a>
+              </Button>
+            )}
+                        {/* Organizer actions dropdown */}
             {isOrganizer && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -283,28 +327,6 @@ export function EditionDetailHeader({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-
-            {/* Share button for non-organizers */}
-            {!isOrganizer && (
-              <Button variant="outline" size="sm" className="gap-2">
-                <Share2 className="h-4 w-4" />
-                Partager
-              </Button>
-            )}
-
-            {/* Map button */}
-            {edition.locationType !== "ONLINE" && edition.location && (
-              <Button variant="default" className="gap-2" asChild>
-                <a
-                  href={`https://maps.google.com/?q=${edition.location}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MapPin className="h-4 w-4" />
-                  Voir sur la carte
-                </a>
-              </Button>
             )}
           </div>
         </div>

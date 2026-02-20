@@ -69,14 +69,24 @@ export default async function EditionMatchesPage({ params }: PageProps) {
                         <div className="text-xs text-muted-foreground">Match {m.matchNumber}</div>
                         <div className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{m.status}</div>
                       </div>
-                      <div className="mt-2">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{m.participant1RegistrationId ? "Joueur 1" : "TBD"}</span>
-                          <span className="text-sm">{m.score1 ?? "-"}</span>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex justify-between items-center bg-muted/30 p-2 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-muted-foreground w-4 text-center">1</span>
+                            <span className="font-semibold truncate max-w-[150px]">
+                              {(m as any).participant1?.member?.displayName || (m as any).participant1?.member?.user?.username || "TBD"}
+                            </span>
+                          </div>
+                          <span className="font-black tabular-nums">{m.score1 ?? "-"}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">{m.participant2RegistrationId ? "Joueur 2" : "TBD"}</span>
-                          <span className="text-sm">{m.score2 ?? "-"}</span>
+                        <div className="flex justify-between items-center bg-muted/30 p-2 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-muted-foreground w-4 text-center">2</span>
+                            <span className="font-semibold truncate max-w-[150px]">
+                              {(m as any).participant2?.member?.displayName || (m as any).participant2?.member?.user?.username || "TBD"}
+                            </span>
+                          </div>
+                          <span className="font-black tabular-nums">{m.score2 ?? "-"}</span>
                         </div>
                       </div>
                     </div>

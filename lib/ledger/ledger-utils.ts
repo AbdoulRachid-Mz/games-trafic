@@ -107,6 +107,82 @@ export async function verifyLedgerBalance(accountId: string): Promise<{
     }
 }
 
+/**
+ * Vérifie les depenses d'un compte
+ * Utile pour le debugging et les audits
+ */
+export async function verifyAccountExpenses(accountId: string): Promise<{
+    isValid: boolean;
+    ledgerBalance: number;
+    entryCount: number;
+}> {
+    try {
+        const [stats] = await db
+            .select({
+                entryCount: sql<number>`COUNT(*)`, // Nombre d'écritures
+                totalDebit: sql<string>`COALESCE(SUM(${ledgerEntries.debit}), '0')`, // Total débité
+                totalCredit: sql<string>`COALESCE(SUM(${ledgerEntries.credit}), '0')`, // Total crédité
+            })
+            .from(ledgerEntries)
+            .where(eq(ledgerEntries.accountId, accountId));
+
+        const ledgerBalance =
+            parseFloat(stats?.totalCredit || "0") -
+            parseFloat(stats?.totalDebit || "0");
+
+        return {
+            isValid: true,
+            ledgerBalance,
+            entryCount: stats?.entryCount || 0,
+        };
+    } catch (error) {
+        console.error("Error verifying ledger balance:", error);
+        return {
+            isValid: false,
+            ledgerBalance: 0,
+            entryCount: 0,
+        };
+    }
+}
+
+/**
+ * Vérifie les revenus
+ * Utile pour le debugging et les audits
+ */
+export async function verifyAccountRevenues(accountId: string): Promise<{
+    isValid: boolean;
+    ledgerBalance: number;
+    entryCount: number;
+}> {
+    try {
+        const [stats] = await db
+            .select({
+                entryCount: sql<number>`COUNT(*)`, // Nombre d'écritures
+                totalDebit: sql<string>`COALESCE(SUM(${ledgerEntries.debit}), '0')`, // Total débité
+                totalCredit: sql<string>`COALESCE(SUM(${ledgerEntries.credit}), '0')`, // Total crédité
+            })
+            .from(ledgerEntries)
+            .where(eq(ledgerEntries.accountId, accountId));
+
+        const ledgerBalance =
+            parseFloat(stats?.totalCredit || "0") -
+            parseFloat(stats?.totalDebit || "0");
+
+        return {
+            isValid: true,
+            ledgerBalance,
+            entryCount: stats?.entryCount || 0,
+        };
+    } catch (error) {
+        console.error("Error verifying ledger balance:", error);
+        return {
+            isValid: false,
+            ledgerBalance: 0,
+            entryCount: 0,
+        };
+    }
+}
+
 // ============================================================================
 // CORE TRANSACTION EXECUTION
 // ============================================================================

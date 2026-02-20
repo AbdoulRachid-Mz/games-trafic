@@ -16,7 +16,7 @@ export const VerificationEnum = pgEnum('verification_status', ['PENDING', 'VERIF
 export const teamRoleEnum = pgEnum('team_role', ['PLAYER', 'COACH', 'MANAGER', 'SUBSTITUTE', 'CAPTAIN', 'VICE_CAPTAIN']);
 export const tournamentStatusEnum = pgEnum('tournament_status', ['UPCOMING', 'LIVE', 'COMPLETED', 'CANCELLED']);
 export const tournamentFormatEnum = pgEnum('tournament_format', ['ELIMINATION', 'GROUP_STAGE', 'ROUND_ROBIN', 'SWISS', 'KNOCKOUT', 'CUSTOM']);
-export const matchStatusEnum = pgEnum('match_status', ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']);
+export const matchStatusEnum = pgEnum('match_status', ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'PENDING_REVIEW', 'AWAITING_ADMIN_CONFIRMATION', 'DISPUTED']);
 export const transactionStatusEnum = pgEnum('transaction_status', ['PENDING', 'COMPLETED', 'PROCESSING', 'FAILED', 'REFUNDED']);
 export const transactionTypeEnum = pgEnum('transaction_type', [
   'PURCHASE', 'VIP_SUBSCRIPTION', 'GAME_ITEM_PURCHASE', 'THEME_PURCHASE',

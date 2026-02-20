@@ -9,6 +9,7 @@ import {
   TournamentEdition,
   NewEditionRegistration,
   TournamentEditionWithRelations,
+  tournamentPhases,
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -95,6 +96,32 @@ export async function getTournamentEditionWithRelations(
     } as any;
   } catch (error) {
     console.error("Error fetching edition with relations:", error);
+    return null;
+  }
+}
+
+/**
+ * Get the active phase of an edition, or the most recent one if none is active
+ */
+export async function getEditionActivePhase(editionId: string) {
+  try {
+    const phases = await db.query.tournamentPhases.findMany({
+      where: and(
+        eq(tournamentPhases.editionId, editionId),
+        eq(tournamentPhases.isDeleted, false)
+      ),
+      orderBy: (phases, { asc }) => [asc(phases.order)],
+    });
+
+    if (phases.length === 0) return null;
+
+    const activePhase = phases.find((p) => p.isActive);
+    if (activePhase) return activePhase;
+
+    // If no active phase, return the last one (highest order)
+    return phases[phases.length - 1];
+  } catch (error) {
+    console.error("Error fetching active phase:", error);
     return null;
   }
 }

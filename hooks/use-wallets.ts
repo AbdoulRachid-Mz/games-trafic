@@ -1,3 +1,4 @@
+import { getWalletExpenses, getWalletRevenues } from "@/actions/wallets";
 import { getAccountBalance } from "@/lib/ledger/ledger-utils";
 import { useQuery } from "@tanstack/react-query";
 // hooks/use-wallets.ts
@@ -16,4 +17,33 @@ export function useWalletBalance(accountId: string | undefined) {
     gcTime: 5 * 60_000, // garde en cache 5min après inutilisé
   });
 }
+
+/**
+ * Hook ultra-optimisé pour récupérer les dépenses d’un wallet.
+ * Utilise TanStack Query pour le cache, le background-refetch, etc.
+ */
+export function useWalletExpenses(walletId: string | undefined) {
+  return useQuery({
+    queryKey: ["wallet-expenses", walletId],
+    queryFn: () => getWalletExpenses(walletId!),
+    enabled: !!walletId,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Hook ultra-optimisé pour récupérer les revenus d’un wallet.
+ * Utilise TanStack Query pour le cache, le background-refetch, etc.
+ */
+export function useWalletRevenues(walletId: string | undefined) {
+  return useQuery({
+    queryKey: ["wallet-revenues", walletId],
+    queryFn: () => getWalletRevenues(walletId!),
+    enabled: !!walletId,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  });
+}
+
 

@@ -46,6 +46,8 @@ export default function ClientWalletPage() {
   const [stats, setStats] = useState({
     totalTransactions: 0,
     totalAmount: 0,
+    income: 0,
+    expense: 0,
     monthlyChange: 0,
     pendingTransactions: 0,
   });
@@ -77,6 +79,8 @@ export default function ClientWalletPage() {
       setStats({
         totalTransactions: statsData.total,
         totalAmount: statsData.income,
+        income: statsData.income,
+        expense: statsData.expense,
         monthlyChange: 0,
         pendingTransactions: statsData.pending,
       });
@@ -178,6 +182,60 @@ export default function ClientWalletPage() {
         transition={{ delay: 0.3 }}
       >
         <StatsOverview stats={stats} walletId={wallet.id} />
+      </motion.div>
+
+      {/* Revenus / Dépenses */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-500/10">
+                    <ArrowDownLeft className="h-5 w-5 text-green-600" />
+                  </div>
+                  <Typography variant="h4" weight="semibold">
+                    Revenus
+                  </Typography>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Typography variant="h2" weight="bold" className="text-green-600">
+                  {stats.income.toFixed(2)} GTC
+                </Typography>
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                  Total
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-red-500/10">
+                    <ArrowUpRight className="h-5 w-5 text-red-600" />
+                  </div>
+                  <Typography variant="h4" weight="semibold">
+                    Dépenses
+                  </Typography>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Typography variant="h2" weight="bold" className="text-red-600">
+                  {stats.expense.toFixed(2)} GTC
+                </Typography>
+                <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
+                  Total
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </motion.div>
 
       {/* Onglets principaux - Simplifié pour ne garder que l'aperçu global */}

@@ -1491,8 +1491,178 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
   }
 }
 
+import { recalculateGroupStandings } from "./phases";
+
 /**
- * Met à jour les résultats d'un match
+ * Soumet un résultat de match par un participant ou un admin.
+ */
+export async function submitMatchResult(
+  id: string,
+  score1: number,
+  score2: number,
+  submittedByUserId: string,
+  proofUrl?: string
+): Promise<Match> {
+  try {
+    const match = await db.query.matches.findFirst({
+      where: eq(matches.id, id),
+    });
+
+    if (!match) throw new Error("Match not found");
+
+    const updateData: any = {
+      score1,
+      score2,
+      submittedByUserId,
+      proofUrl,
+      updatedAt: new Date(),
+    };
+
+    // Determine status and confirmations
+    const isParticipant1 = match.participant1RegistrationId && await isUserRegistered(submittedByUserId, match.participant1RegistrationId);
+    const isParticipant2 = match.participant2RegistrationId && await isUserRegistered(submittedByUserId, match.participant2RegistrationId);
+
+    if (isParticipant1) {
+      updateData.confirmedByParticipant1 = true;
+      updateData.status = "PENDING_REVIEW";
+    } else if (isParticipant2) {
+      updateData.confirmedByParticipant2 = true;
+      updateData.status = "PENDING_REVIEW";
+    } else {
+      // Admin submission
+      updateData.status = "AWAITING_ADMIN_CONFIRMATION";
+    }
+
+    const result = await db
+      .update(matches)
+      .set(updateData)
+      .where(eq(matches.id, id))
+      .returning();
+
+    return result[0];
+  } catch (error) {
+    console.error("Error submitting match result:", error);
+    throw error;
+  }
+}
+
+/**
+ * Confirme un résultat de match par l'autre participant.
+ */
+export async function confirmMatchResult(
+  id: string,
+  registrationId: string
+): Promise<Match> {
+  try {
+    const match = await db.query.matches.findFirst({
+      where: eq(matches.id, id),
+    });
+
+    if (!match) throw new Error("Match not found");
+
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+
+    if (match.participant1RegistrationId === registrationId) {
+      updateData.confirmedByParticipant1 = true;
+    } else if (match.participant2RegistrationId === registrationId) {
+      updateData.confirmedByParticipant2 = true;
+    } else {
+      throw new Error("Invalid participant for this match");
+    }
+
+    // If both confirmed, move to awaiting admin
+    if ((updateData.confirmedByParticipant1 || match.confirmedByParticipant1) &&
+      (updateData.confirmedByParticipant2 || match.confirmedByParticipant2)) {
+      updateData.status = "AWAITING_ADMIN_CONFIRMATION";
+    }
+
+    const result = await db
+      .update(matches)
+      .set(updateData)
+      .where(eq(matches.id, id))
+      .returning();
+
+    return result[0];
+  } catch (error) {
+    console.error("Error confirming match result:", error);
+    throw error;
+  }
+}
+
+/**
+ * Validation finale par l'administrateur.
+ */
+export async function adminConfirmMatchResult(
+  id: string,
+  score1?: number,
+  score2?: number
+): Promise<Match> {
+  try {
+    const match = await db.query.matches.findFirst({
+      where: eq(matches.id, id),
+    });
+
+    if (!match) throw new Error("Match not found");
+
+    const s1 = score1 ?? match.score1 ?? 0;
+    const s2 = score2 ?? match.score2 ?? 0;
+
+    // Determine winner
+    let winnerId = null;
+    let loserId = null;
+    if (s1 > s2) {
+      winnerId = match.participant1RegistrationId;
+      loserId = match.participant2RegistrationId;
+    } else if (s1 < s2) {
+      winnerId = match.participant2RegistrationId;
+      loserId = match.participant1RegistrationId;
+    }
+
+    const result = await db
+      .update(matches)
+      .set({
+        score1: s1,
+        score2: s2,
+        winnerRegistrationId: winnerId,
+        loserRegistrationId: loserId,
+        status: "COMPLETED",
+        confirmedByAdmin: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(matches.id, id))
+      .returning();
+
+    const updatedMatch = result[0];
+
+    // Trigger standings recalculation
+    if (updatedMatch.groupId) {
+      await recalculateGroupStandings(updatedMatch.groupId);
+    }
+
+    return updatedMatch;
+  } catch (error) {
+    console.error("Error admin confirming match result:", error);
+    throw error;
+  }
+}
+
+/**
+ * Helper to check if a user is linked to a registration
+ */
+async function isUserRegistered(userId: string, registrationId: string): Promise<boolean> {
+  const reg = await db.query.editionRegistrations.findFirst({
+    where: eq(editionRegistrations.id, registrationId),
+    with: {
+      member: true,
+    }
+  });
+  return reg?.member?.userId === userId;
+}
+
+/**
+ * Met à jour les résultats d'un match (Legacy/Admin)
  */
 export async function updateMatchResult(
   id: string,
@@ -1501,31 +1671,7 @@ export async function updateMatchResult(
   winnerRegistrationId: string,
   submittedByUserId: string
 ): Promise<Match> {
-  try {
-    const result = await db
-      .update(matches)
-      .set({
-        score1,
-        score2,
-        winnerRegistrationId,
-        submittedByUserId,
-        status: "COMPLETED",
-        updatedAt: new Date(),
-      })
-      .where(eq(matches.id, id))
-      .returning();
-
-    if (result.length === 0) {
-      throw new Error("Match not found");
-    }
-    return result[0];
-  } catch (error) {
-    console.error("Error updating match result:", error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Failed to update match result");
-  }
+  return adminConfirmMatchResult(id, score1, score2);
 }
 
 /**
@@ -1544,36 +1690,51 @@ export async function getMatches(
 
     const whereConditions = buildMatchWhereConditions(filters, options);
 
-    const matchesQuery = db
-      .select()
-      .from(matches)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
+    const matchesData = await db.query.matches.findMany({
+      where: whereConditions,
+      limit: pagination.limit,
+      offset: offset,
+      orderBy: (matches, { asc, desc }) => {
+        if (options.sortBy) {
+          const sortField = options.sortBy as keyof Match;
+          return options.sortOrder === "desc" ? [desc(matches[sortField])] : [asc(matches[sortField])];
+        }
+        return [desc(matches.createdAt)];
+      },
+      with: {
+        participant1: {
+          with: {
+            member: {
+              with: {
+                user: true,
+                team: true,
+              },
+            },
+          },
+        },
+        participant2: {
+          with: {
+            member: {
+              with: {
+                user: true,
+                team: true,
+              },
+            },
+          },
+        },
+      },
+    });
 
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Match;
-      const sortOrder = options.sortOrder === "desc" ? desc : asc;
-      matchesQuery.orderBy(sortOrder(matches[sortField]));
-    } else {
-      matchesQuery.orderBy(desc(matches.createdAt));
-    }
-
-    const countQuery = db
+    const countResult = await db
       .select({ count: count() })
       .from(matches)
       .where(whereConditions);
 
-    const [matchesData, totalResult] = await Promise.all([
-      matchesQuery,
-      countQuery,
-    ]);
-
-    const total = totalResult[0]?.count || 0;
+    const total = countResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: matchesData,
+      data: matchesData as any,
       pagination: {
         page: pagination.page,
         limit: pagination.limit,

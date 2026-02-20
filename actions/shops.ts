@@ -525,6 +525,54 @@ export async function getShopFinancialStats(shopId: string) {
   }
 }
 
+/**
+ * Récupère les agrégats ledger (revenus/dépenses) pour une boutique
+ */
+export async function getShopLedgerStats(shopId: string, params?: { startDate?: string; endDate?: string }) {
+  try {
+    const shop = await getShopById(shopId);
+    if (!shop || !shop.financialAccountId) {
+      return { income: 0, expense: 0, total: 0, pending: 0 };
+    }
+
+    const ledgerWhere: any[] = [eq(ledgerEntries.accountId, shop.financialAccountId)];
+    if (params?.startDate) {
+      ledgerWhere.push(gte(ledgerEntries.createdAt, new Date(params.startDate)));
+    }
+    if (params?.endDate) {
+      ledgerWhere.push(lte(ledgerEntries.createdAt, new Date(params.endDate)));
+    }
+
+    const [ledgerAgg, txAgg, pendingAgg] = await Promise.all([
+      db
+        .select({
+          income: sql<string>`COALESCE(SUM(${ledgerEntries.credit}), '0')`,
+          expense: sql<string>`COALESCE(SUM(${ledgerEntries.debit}), '0')`,
+        })
+        .from(ledgerEntries)
+        .where(and(...ledgerWhere)),
+      db
+        .select({ count: count() })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.financialAccountId, shop.financialAccountId)),
+      db
+        .select({ count: count() })
+        .from(walletTransactions)
+        .where(and(eq(walletTransactions.financialAccountId, shop.financialAccountId), eq(walletTransactions.status, 'PENDING'))),
+    ]);
+
+    return {
+      total: txAgg[0]?.count || 0,
+      pending: pendingAgg[0]?.count || 0,
+      income: parseFloat(ledgerAgg[0]?.income || '0'),
+      expense: parseFloat(ledgerAgg[0]?.expense || '0'),
+    };
+  } catch (error) {
+    console.error('Error getting shop ledger stats:', error);
+    return { income: 0, expense: 0, total: 0, pending: 0 };
+  }
+}
+
 
 
 

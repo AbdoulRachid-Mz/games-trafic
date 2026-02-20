@@ -1,9 +1,10 @@
 // contexts/tracing-context.tsx
 "use client";
 
-import React, { createContext, useContext, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, ReactNode, useEffect, useState, Suspense } from "react";
 import { useTracing } from "@/hooks/use-tracing";
 import { TracingContextValue } from "@/types/tracing";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const TracingContext = createContext<TracingContextValue | undefined>(
   undefined
@@ -19,10 +20,15 @@ interface TracingProviderProps {
   };
 }
 
-export function TracingProvider({ children, options }: TracingProviderProps) {
-  const tracing = useTracing();
 
-  // Configuration initiale basée sur les options
+function TracingProviderInner({ children, options }: TracingProviderProps) {
+  const tracing = useTracing();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [canRender, setCanRender] = useState(false);
+
+  // Initial configuration based on options
   useEffect(() => {
     if (options) {
       const updates: Partial<typeof tracing.config> = {};
@@ -50,6 +56,23 @@ export function TracingProvider({ children, options }: TracingProviderProps) {
   }, [options, tracing.updateConfig]);
 
   useEffect(() => {
+    const ignore = searchParams?.get("ignore_visite") === "true";
+    const shouldRedirect = (options?.redirectFirstTimeUsers ?? tracing.config.redirectFirstTimeUsers) === true;
+    const redirectPath = tracing.config.redirectPath || "/welcome";
+    const isWelcome = pathname === redirectPath;
+    if (ignore || !shouldRedirect) {
+      setCanRender(true);
+      return;
+    }
+    const hasVisited = typeof window !== "undefined" ? localStorage.getItem("gt_welcome_visited") : null;
+    if (!hasVisited && !isWelcome && (tracing.config.checkRedirectConditions ?? true)) {
+      router.replace(redirectPath);
+      return;
+    }
+    setCanRender(true);
+  }, [searchParams, pathname, router, options?.redirectFirstTimeUsers, tracing.config.redirectFirstTimeUsers, tracing.config.redirectPath, tracing.config.checkRedirectConditions]);
+
+  useEffect(() => {
     const disabled = typeof window !== "undefined" && localStorage.getItem("gt_explanations_disabled") === "true";
     if (disabled) {
       tracing.updateConfig({ showExplanations: false });
@@ -58,8 +81,18 @@ export function TracingProvider({ children, options }: TracingProviderProps) {
 
   return (
     <TracingContext.Provider value={tracing}>
-      {children}
+      {canRender ? children : null}
     </TracingContext.Provider>
+  );
+}
+
+export function TracingProvider({ children, options }: TracingProviderProps) {
+  return (
+    <Suspense fallback={null}>
+      <TracingProviderInner options={options}>
+        {children}
+      </TracingProviderInner>
+    </Suspense>
   );
 }
 

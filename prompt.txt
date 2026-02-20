@@ -1,452 +1,449 @@
-🎯 OBJECTIF GÉNÉRAL
+🎯 OBJECTIF GLOBAL
 
-Refactoriser et structurer correctement :
+Refactoriser entièrement la gestion des matches afin de :
 
-Création de tournoi
+Permettre aux participants de soumettre les résultats
 
-Pages d’édition
+Éviter toute incohérence dans les standings (int fields)
 
-Gestion des membres
+Implémenter un système de confirmation sécurisé
 
-Gestion des phases
+Corriger la génération automatique des matches dans les groupes
 
-Gestion des groupes
+Corriger l’erreur ECONNRESET dans getPhaseGroupParticipants
 
-Génération des nodes
+Empêcher toute duplication automatique
 
-Organisation des matches
+Centraliser la logique de mise à jour des stats
 
-En respectant :
+⚠️ IMPORTANT
 
-La logique des compétitions réelles
+Ne pas recréer des fichiers existants inutilement
 
-La cohérence avec les tables existantes
+Analyser toute la logique actuelle avant modification
 
-Une UX claire et professionnelle
+Respecter strictement la table matches existante
 
-1️⃣ CRÉATION D’UN TOURNOI
-📌 Logique métier
+1️⃣ ARCHITECTURE SOURCE DE VÉRITÉ
 
-Un tournoi est une entité permanente.
-Les prix et frais d’inscription appartiennent aux éditions, pas au tournoi.
+La table matches est la source unique de vérité.
 
-✅ Formulaire de création (minimal et propre)
+Les standings (phase_group_participants) sont une projection calculée basée sur :
 
-Supprimer tout ce qui concerne :
+score1
 
-❌ prizePool
+score2
 
-❌ entryFee
-
-Garder uniquement :
-
-🏷 Identité
-
-name
-
-slug
-
-description
-
-shortDescription
-
-profileImage
-
-coverImage
-
-🎮 Configuration jeu
-
-game
-
-platform
-
-gameMode (1v1, 5v5, etc.)
-
-allowedTeams
-
-👥 Configuration participants
-
-minParticipants
-
-maxParticipantsPerEdition
-
-🌍 Visibilité
-
-visibility
-
-inviteOnly
-
-requiresAccessCode
-
-📞 Contact
-
-contactEmail
-
-contactPhone
-
-discordServer
-
-whatsappGroup
-
-2️⃣ PAGE D’UNE ÉDITION (editionId)
-
-Cette page doit devenir le centre de gestion réel.
-
-🔐 Boutons dynamiques selon rôle
-
-Si l’utilisateur est :
-
-organizer
-
-co-organizer
-
-Afficher :
-
-🔘 Dashboard
-
-🔘 Gérer les phases
-
-🔘 Gérer les participants
-
-🔘 Modifier édition
-
-🔘 Gérer les résultats
-
-Sinon :
-
-Bouton s’inscrire
-
-Voir bracket
-
-Voir classement
-
-💰 QR Code logique
-
-Si :
-
-entryFee === 0
-
-
-➡ Ne pas afficher QR code
-➡ Afficher badge "GRATUIT"
-
-Même logique :
-
-Sur card
-
-Sur page détail
-
-Sur listing
-
-3️⃣ MEMBRES DU TOURNOI
-
-Dans tournamentMembers
-
-Chaque membre doit :
-
-Renseigner contactPhone obligatoire
-
-contactEmail optionnel
-
-discordId optionnel
-
-📇 Dans la card membre afficher :
-
-displayName
-
-avatar
-
-gameTag
-
-contactPhone
-
-Ajouter :
-
-📞 Bouton Appel
-
-🟢 Bouton WhatsApp (lien wa.me/numero)
-
-4️⃣ CRÉATION D’UNE PHASE
-
-Une phase représente :
-
-Phase de groupes
-
-Phase éliminatoire
-
-Phase finale
-
-Qualification
-
-🎯 Dans le formulaire de création phase
-
-Champ obligatoire :
-
-Type de phase :
-
-ELIMINATION
-
-DOUBLE_ELIMINATION
-
-ROUND_ROBIN
-
-GROUP_STAGE
-
-GROUP + ELIMINATION
-
-📌 Selon le type :
-🔵 ROUND ROBIN
-
-Créer automatiquement :
-
-1 groupe
-
-Tous les participants dedans
-
-Demander :
-
-Aller simple ou Aller-Retour
-
-Points par victoire
-
-Points nul
-
-Points défaite
-
-Méthode de départage
-
-🟢 GROUP_STAGE
-
-Demander :
-
-Nombre de groupes
-
-Participants par groupe
-
-Nombre qualifiés par groupe
-
-Aller simple ou aller-retour
-
-Créer automatiquement :
-
-phaseGroups
-
-participants répartis
-
-matches générés
-
-🔴 ELIMINATION
-
-Demander :
-
-Seeding method (RANDOM / RANKING / MANUAL)
-
-Simple ou Double elimination
-
-Créer automatiquement :
-
-bracketNodes
-
-matches
-
-structure parent/enfant
-
-5️⃣ CRÉATION DES GROUPES
-
-Un groupe détermine :
-
-Organisation des nodes
-
-Génération des matches
-
-Classement
-
-🧩 Dans la page groupe
-
-Afficher :
-
-📊 Stats globales
-
-total participants
-
-matches joués
-
-matches restants
-
-matches complétés
-
-👥 Participants
-
-Avec :
+winnerRegistrationId
 
 status
 
+confirmedByAdmin
+
+⚠️ On ne doit JAMAIS modifier les stats directement sans passer par une logique transactionnelle.
+
+2️⃣ PROBLÈME ACTUEL : INCOHÉRENCE DES INT (STANDINGS)
+
+Les champs :
+
 matchesPlayed
+
+matchesWon
+
+matchesDrawn
+
+matchesLost
 
 points
 
+scoreFor
+
+scoreAgainst
+
 scoreDifference
 
-qualified
+Sont des int.
 
-🔄 Actions multiples
+Si un participant soumet un résultat → on met à jour ces champs
+Mais si le résultat est modifié → incohérence.
 
-Permettre :
+✅ SOLUTION OBLIGATOIRE
 
-Ajouter participants
+Les standings doivent être recalculés :
 
-Retirer participants
+❌ PAS :
 
-Seeder manuellement
+update +1 / -1
 
-Lock group
+✅ MAIS :
 
-6️⃣ CRÉATION DES NODES
+Recalcul complet à partir des matches confirmés
 
-Deux modes :
+Créer une fonction serveur centralisée :
 
-🔁 AUTO
+recalculateGroupStandings(groupId)
 
-Répartition aléatoire (tirage au sort réel)
-
-Respect du nombre
-
-Gestion automatique des BYE si nombre impair
 
 Logique :
 
-Mélanger participants
+Récupérer tous les matches du groupe :
 
-Créer arbre
+status = COMPLETED
 
-Affecter rounds
+confirmedByAdmin = true
 
-Lier parentNodeId
+Reset toutes les stats du groupe à 0
 
-✍️ MANUEL
+Recalculer pour chaque match :
 
-Admin choisit les matchs
+matchesPlayed++
 
-Drag & drop possible
+matchesWon++
 
-Affectation directe
+points += config.pointsWin
 
-7️⃣ MATCHES
+etc.
 
-Les matches sont la source de vérité.
+Sauvegarder les nouvelles stats
 
-Ils doivent :
+⚠️ Cette fonction doit être transactionnelle.
 
-Être générés automatiquement selon format
+3️⃣ SOUMISSION DES RÉSULTATS – LOGIQUE PROPRE
+Règles :
+CAS 1 – Participant soumet un score
 
-Être liés :
+Peut soumettre si :
 
-editionId
+Il est participant1 OU participant2
 
-phaseId
+score1 et score2 sont null
 
-groupId (si applicable)
+status = PENDING
 
-bracketNodeId (si applicable)
+Action :
 
-📌 Round Robin
+Mettre à jour :
 
-Chaque participant rencontre tous les autres :
+score1
 
-Formule :
+score2
+
+winnerRegistrationId
+
+submittedByUserId
+
+confirmedByParticipant1 ou confirmedByParticipant2
+
+⚠️ NE PAS recalculer les standings ici.
+
+CAS 2 – Les deux participants confirment
+
+Si :
+
+confirmedByParticipant1 = true
+
+confirmedByParticipant2 = true
+
+Alors :
+
+status = AWAITING_ADMIN_CONFIRMATION
+
+CAS 3 – Admin confirme
+
+Si admin confirme :
+
+confirmedByAdmin = true
+
+confirmedAt = now
+
+status = COMPLETED
+
+➡️ Appeler :
+
+recalculateGroupStandings(groupId)
+
+
+⚠️ Seul l’admin déclenche la mise à jour des standings.
+
+4️⃣ OPTION ALTERNATIVE : PREUVE PAR SCREENSHOT
+
+Si mode screenshot activé :
+
+Participants peuvent :
+
+Upload screenshot via composant AdvancedUpload
+
+Ajouter proofLinks
+
+Ajouter notes
+
+Mais :
+
+score reste null
+
+status = PENDING_REVIEW
+
+Admin :
+
+Vérifie preuve
+
+Entre score
+
+Confirme
+
+Déclenche recalcul
+
+5️⃣ MATCH CARD COMPONENT
+
+Créer un composant unique :
+
+<MatchCard />
+
+
+Il doit :
+
+Afficher :
+
+Participants réels (via editionRegistrations join)
+
+Avatar / Nom équipe
+
+Score
+
+Status
+
+Round
+
+Confirmation state
+
+Afficher dynamiquement :
+
+Si participant :
+
+Bouton "Soumettre résultat" si score null
+
+Si score déjà soumis :
+
+Badge "En attente confirmation"
+
+Si admin :
+
+Bouton "Confirmer"
+
+Bouton "Modifier"
+
+Bouton "Annuler confirmation"
+
+6️⃣ CORRECTION GÉNÉRATION MATCHES GROUP
+Problème :
+
+Erreur ECONNRESET dans getPhaseGroupParticipants
+
+Cause probable :
+
+Trop de données
+
+Mauvaise gestion Promise.all
+
+Requête lourde
+
+Problème de pool DB
+
+Correction requise :
+
+Supprimer limite 500 inutile
+
+Charger uniquement :
+
+id
+
+registrationId
+
+seedOrder
+
+Ne pas faire countQuery si non nécessaire
+
+Génération logique :
+
+Avant génération :
+
+Vérifier config du groupe
+
+Vérifier nombre de participants
+
+Vérifier si matches existent déjà
+
+Pour ROUND ROBIN :
+
+Algorithme :
+
+n participants
+
+Matches =
 
 n(n-1)/2
 
 
-Ou x2 si aller-retour
+Si aller-retour :
+×2
 
-📌 Elimination
+Avant insertion :
 
-Matches générés par round :
+Pour chaque pair (A,B) :
 
-Round 1 → 8 matches
-Round 2 → 4 matches
-Semi → 2
-Final → 1
+Vérifier si match existe :
 
-8️⃣ ORGANISATION UX DES PAGES
-📄 Edition Page Structure
+(A,B)
 
-Header
+OU (B,A)
 
-Banner
+Si existe :
 
-Status
+Afficher Dialog :
 
-Prize
+Match entre A et B existe déjà.
+Voulez-vous le recréer ?
 
-Entry fee
+Si confirmer :
 
-Tabs :
+delete ancien
 
-Overview
+insert nouveau
 
-Participants
+Sinon :
 
-Phases
+skip
 
-Matches
+7️⃣ BRACKET PAGE – MULTI MATCH CREATION
 
-Results
+Dans page bracketId :
 
-📄 Phase Page
+Supprimer champ order dans formulaire
 
-Header
+matchNumber généré automatiquement
 
-Type
+round déterminé automatiquement
 
-Progress
+tri automatique par :
 
-Stats
+round asc
 
-Liste groupes ou bracket
+matchNumber asc
 
-📄 Group Page
+Pas besoin que l’utilisateur saisisse l’ordre.
 
-Classement dynamique
+8️⃣ RÈGLES DE SÉCURITÉ
 
-Liste matches
+Un participant :
 
-Stats temps réel
+Peut :
 
-9️⃣ COHÉRENCE RÉALITÉ COMPÉTITIONS
+Soumettre résultat
 
-Ton système doit refléter :
+Confirmer son match
 
-Compétition réelle	Ton système
-Tirage au sort	AUTO seeding
-Phase de groupes	phaseGroups
-Classement	phaseGroupParticipants
-Bracket	bracketNodes
-Match officiel	matches
-Résultats finaux	editionResults
-🔟 RÈGLES IMPORTANTES
+Ne peut pas :
 
-On ne peut pas modifier un groupe si :
+Modifier après confirmation admin
 
-matches déjà commencés
+Modifier si match COMPLETED
 
-On ne peut pas supprimer une phase active
+Admin :
 
-On ne peut pas ajouter participant après checkin clôturé
+Peut :
 
-Si autoAdvance = true → progression automatique
+Modifier score
 
-💎 Résultat attendu
+Annuler confirmation
 
-Un système :
+Forcer victoire
 
-Structuré
+Résoudre dispute
 
-Pro
+9️⃣ DISPUTE SYSTEM
 
-Proche des compétitions FIFA / eSport
+Si participant conteste :
 
-Évolutif
+disputed = true
 
-Performant
+disputeReason rempli
+
+Admin :
+
+resolvedBy
+
+resolution
+
+Peut recalculer standings après correction
+
+🔟 MISE À JOUR AUTOMATIQUE UI
+
+Après confirmation admin :
+
+Invalider cache
+
+Refresh dashboard
+
+Refresh classement
+
+Refresh détail édition
+
+Sans reload complet.
+
+1️⃣1️⃣ STRUCTURE TRANSACTIONNELLE
+
+Toute confirmation admin doit être dans une transaction :
+
+BEGIN
+  update match
+  recalculateGroupStandings
+COMMIT
+
+
+Si erreur :
+ROLLBACK
+
+🎯 RÉSULTAT ATTENDU
+
+✔ Participants peuvent soumettre résultats
+✔ Aucune incohérence dans standings
+✔ Aucun doublon de match
+✔ Génération stable
+✔ Confirmation sécurisée
+✔ Bracket auto-ordonné
+✔ UI claire et professionnelle
+✔ Logique transactionnelle propre
+
+
+Error getting phase group participants: Error: Failed query: select "id", "group_id", "registration_id", "matches_played", "matches_won", "matches_drawn", "matches_lost", "points", "score_for", "score_against", "score_difference", "position", "is_seeded", "seed_order", "qualified", "qualification_position", "stats", "metadata", "is_deleted", "created_at", "updated_at" from "phase_group_participants" where ("phase_group_participants"."is_deleted" = $1 and "phase_group_participants"."group_id" = $2) order by "phase_group_participants"."points" desc limit $3
+params: false,257bca97-e4b5-47c7-87a7-df16988f6a56,500
+    at async getPhaseGroupParticipants (actions\phases.ts:362:45)
+    at async generateGroupMatchesAction (app\tournaments\[tournamentId]\editions\[editionId]\dashboard\groups\[groupId]\page.tsx:92:18)
+  360 |       .where(whereConditions);
+  361 |
+> 362 |     const [participantsData, totalResult] = await Promise.all([participantsQuery, countQuery]);
+      |                                             ^
+  363 |
+  364 |     const total = totalResult[0]?.count || 0;
+  365 |     const totalPages = Math.ceil(total / pagination.limit); {
+  query: 'select "id", "group_id", "registration_id", "matches_played", "matches_won", "matches_drawn", "matches_lost", "points", "score_for", "score_against", "score_difference", "position", "is_seeded", "seed_order", "qualified", "qualification_position", "stats", "metadata", "is_deleted", "created_at", "updated_at" from "phase_group_participants" where ("phase_group_participants"."is_deleted" = $1 and "phase_group_participants"."group_id" = $2) order by "phase_group_participants"."points" desc limit $3',
+  params: [Array],
+  [cause]: Error: read ECONNRESET
+      at ignore-listed frames {
+    errno: -4077,
+    code: 'ECONNRESET',
+    syscall: 'read'
+  }
+}
+⨯ Error: Failed to fetch phase group participants
+    at getPhaseGroupParticipants (actions\phases.ts:380:11)
+    at async generateGroupMatchesAction (app\tournaments\[tournamentId]\editions\[editionId]\dashboard\groups\[groupId]\page.tsx:92:18)
+  378 |   } catch (error) {
+  379 |     console.error('Error getting phase group participants:', error);
+> 380 |     throw new Error('Failed to fetch phase group participants');
+      |           ^
+  381 |   }
+  382 | }
+  383 | {
+  digest: '410046497'
+}

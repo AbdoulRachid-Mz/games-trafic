@@ -303,6 +303,31 @@ export async function getPhaseGroupParticipantById(
 }
 
 /**
+ * Supprime un participant de groupe par son ID et recalcule les classements.
+ */
+export async function deletePhaseGroupParticipant(id: string): Promise<void> {
+  try {
+    const [participant] = await db
+      .select({ id: phaseGroupParticipants.id, groupId: phaseGroupParticipants.groupId })
+      .from(phaseGroupParticipants)
+      .where(eq(phaseGroupParticipants.id, id))
+      .limit(1);
+
+    if (!participant) return;
+
+    await db.delete(phaseGroupParticipants).where(eq(phaseGroupParticipants.id, id));
+
+    // Recalculate standings if groupId exists
+    if (participant.groupId) {
+      await recalculateGroupStandings(participant.groupId);
+    }
+  } catch (error) {
+    console.error("Error deleting phase group participant:", error);
+    throw new Error("Failed to delete phase group participant");
+  }
+}
+
+/**
  * Liste les participants d'un groupe avec pagination et filtres
  */
 export async function getPhaseGroupParticipants(
@@ -806,29 +831,29 @@ export async function updatePhaseGroupParticipant(
 /**
  * Supprime un participant de groupe (soft delete)
  */
-export async function deletePhaseGroupParticipant(id: string): Promise<PhaseGroupParticipant> {
-  try {
-    const result = await db
-      .update(phaseGroupParticipants)
-      .set({
-        isDeleted: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(phaseGroupParticipants.id, id))
-      .returning();
+// export async function deletePhaseGroupParticipant(id: string): Promise<PhaseGroupParticipant> {
+//   try {
+//     const result = await db
+//       .update(phaseGroupParticipants)
+//       .set({
+//         isDeleted: true,
+//         updatedAt: new Date(),
+//       })
+//       .where(eq(phaseGroupParticipants.id, id))
+//       .returning();
 
-    if (result.length === 0) {
-      throw new Error('Phase group participant not found');
-    }
-    return result[0];
-  } catch (error) {
-    console.error('Error deleting phase group participant:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to delete phase group participant');
-  }
-}
+//     if (result.length === 0) {
+//       throw new Error('Phase group participant not found');
+//     }
+//     return result[0];
+//   } catch (error) {
+//     console.error('Error deleting phase group participant:', error);
+//     if (error instanceof Error) {
+//       throw error;
+//     }
+//     throw new Error('Failed to delete phase group participant');
+//   }
+// }
 
 /**
  * Crée un nouveau nœud de bracket
@@ -1319,4 +1344,101 @@ function buildMatchWhereConditions(
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+/**
+ * Recalcule les statistiques et le classement pour un groupe spécifique
+ */
+export async function recalculateGroupStandings(groupId: string): Promise<void> {
+  try {
+    const group = await db.query.phaseGroups.findFirst({
+      where: eq(phaseGroups.id, groupId),
+      with: {
+        participants: true,
+      },
+    });
+
+    if (!group) throw new Error("Group not found");
+
+    const finishedMatches = await db.query.matches.findMany({
+      where: and(
+        eq(matches.groupId, groupId),
+        eq(matches.status, "COMPLETED"),
+        eq(matches.confirmedByAdmin, true)
+      ),
+    });
+
+    const config = (group.config as any) || {};
+    const ptsWin = config.pointsPerWin ?? 3;
+    const ptsDraw = config.pointsPerDraw ?? 1;
+    const ptsLoss = config.pointsPerLoss ?? 0;
+
+    // Reset stats for all participants
+    const statsMap = new Map();
+    for (const p of group.participants) {
+      statsMap.set(p.registrationId, {
+        matchesPlayed: 0,
+        matchesWon: 0,
+        matchesDrawn: 0,
+        matchesLost: 0,
+        points: 0,
+        scoreFor: 0,
+        scoreAgainst: 0,
+      });
+    }
+
+    // Accumulate stats from matches
+    for (const m of finishedMatches) {
+      if (!m.participant1RegistrationId || !m.participant2RegistrationId) continue;
+
+      const p1 = statsMap.get(m.participant1RegistrationId);
+      const p2 = statsMap.get(m.participant2RegistrationId);
+
+      if (p1 && p2) {
+        p1.matchesPlayed++;
+        p2.matchesPlayed++;
+        p1.scoreFor += m.score1 ?? 0;
+        p1.scoreAgainst += m.score2 ?? 0;
+        p2.scoreFor += m.score2 ?? 0;
+        p2.scoreAgainst += m.score1 ?? 0;
+
+        if ((m.score1 ?? 0) > (m.score2 ?? 0)) {
+          p1.matchesWon++;
+          p1.points += ptsWin;
+          p2.matchesLost++;
+          p2.points += ptsLoss;
+        } else if ((m.score1 ?? 0) < (m.score2 ?? 0)) {
+          p2.matchesWon++;
+          p2.points += ptsWin;
+          p1.matchesLost++;
+          p1.points += ptsLoss;
+        } else {
+          p1.matchesDrawn++;
+          p1.points += ptsDraw;
+          p2.matchesDrawn++;
+          p2.points += ptsDraw;
+        }
+      }
+    }
+
+    // Update database for each participant
+    await db.transaction(async (tx) => {
+      for (const [regId, stats] of statsMap.entries()) {
+        const participant = group.participants.find((p) => p.registrationId === regId);
+        if (participant) {
+          await tx
+            .update(phaseGroupParticipants)
+            .set({
+              ...stats,
+              updatedAt: new Date(),
+            })
+            .where(eq(phaseGroupParticipants.id, participant.id));
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Error recalculating group standings:", error);
+    throw error;
+  }
 }

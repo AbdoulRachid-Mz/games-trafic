@@ -142,8 +142,10 @@ export function MemberCard({
 
   // Grid View
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
-      <CardContent className="p-3 flex flex-col items-center text-center gap-3 relative">
+    <Card className="overflow-hidden group hover:shadow-xl transition-all duration-300 border-none bg-gradient-to-br from-card to-card/50 relative">
+      <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+      <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative z-10">
         {userDisplay !== "member" && (
           <div className="absolute top-2 right-2">
             <DropdownMenu>
@@ -151,7 +153,7 @@ export function MemberCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground"
+                  className="h-8 w-8 text-muted-foreground hover:bg-background/80"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -177,57 +179,76 @@ export function MemberCard({
           </div>
         )}
 
-        <Avatar className="h-20 w-20 border-2 border-background shadow-sm">
-          <AvatarImage src={member.avatar || user?.profileImage || user?.image || undefined} alt={member.displayName || user?.username || "User"} />
-          <AvatarFallback className="text-lg bg-primary/5 text-primary">
-            {(member.displayName || user?.username || "U")
-              .substring(0, 2)
-              .toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-24 w-24 border-4 border-background shadow-xl scale-100 group-hover:scale-105 transition-transform duration-300">
+            <AvatarImage src={member.avatar || user?.profileImage || user?.image || undefined} alt={member.displayName || user?.username || "User"} />
+            <AvatarFallback className="text-2xl bg-primary/10 text-primary font-black italic">
+              {(member.displayName || user?.username || "U")
+                .substring(0, 2)
+                .toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          {isActive && (
+            <span className="absolute bottom-1 right-1 h-5 w-5 bg-green-500 border-4 border-background rounded-full shadow-sm" title="Actif" />
+          )}
+        </div>
 
-        <div className="space-y-1 w-full">
+        <div className="space-y-1 w-full flex flex-col items-center">
           <h3
-            className="font-bold truncate"
+            className="font-black italic uppercase tracking-tighter text-lg truncate max-w-full"
             title={member.displayName || user?.username || "Inconnu"}
           >
-            {member.displayName || user?.username || "Inconnu"} {isMe && <Badge variant="default">Moi</Badge>}
+            {member.displayName || user?.username || "Inconnu"}
+            {isMe && <Badge className="ml-2 bg-primary text-[10px] h-4">Moi</Badge>}
           </h3>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+            <Mail className="w-3 h-3" />
             {member.contactEmail || "Pas d'email"}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 justify-center w-full">
+        <div className="flex flex-wrap gap-2 justify-center w-full min-h-[24px]">
           {getRoleBadge(role)}
-          {isBanned && <Badge variant="destructive">BANNED</Badge>}
-          {!isActive && <Badge variant="secondary">INACTIVE</Badge>}
+          {isBanned && <Badge variant="destructive" className="animate-pulse">BANNED</Badge>}
           {member.team && (
             <Badge
               variant="outline"
-              className="truncate max-w-[120px]"
+              className="bg-background/50 backdrop-blur-sm border-primary/20"
               title={member.team.name}
             >
+              <Trophy className="w-3 h-3 mr-1 text-primary" />
               {member.team.name}
             </Badge>
           )}
         </div>
 
-        {member.joinedAt && (
-          <div className="text-xs text-muted-foreground pt-1 border-t w-full mt-1">
-            Membre depuis le: {new Date(member.joinedAt).toLocaleDateString()}
-          </div>
-        )}
-        {/* voir profil */}
-
+        <div className="grid grid-cols-1 w-full gap-2 mt-2 pt-4 border-t border-primary/10">
           <Button
-            variant="link"
-            size="default"
-            className="text-sm text-muted-foreground"
+            variant="secondary"
+            size="sm"
+            className="w-full font-bold h-9"
             onClick={() => actions?.onViewProfile?.(member.id)}
           >
             Voir le profil
           </Button>
+
+          {member.team && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full font-bold h-9 bg-primary/5 border-primary/20 hover:bg-primary/10"
+              onClick={() => {/* Gérer logic */ }}
+            >
+              Gérer l&apos;équipe
+            </Button>
+          )}
+        </div>
+
+        {member.joinedAt && (
+          <div className="text-[10px] text-muted-foreground font-medium opacity-60">
+            Dpuis le {new Date(member.joinedAt).toLocaleDateString()}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

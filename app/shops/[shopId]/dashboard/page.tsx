@@ -20,6 +20,7 @@ import {
   Download,
   Filter,
   MoreVertical,
+  TrendingDown,
 } from "lucide-react";
 import {
   Card,
@@ -40,7 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getShopStats, getShopStatsById } from "@/actions/shops";
+import { getShopStats, getShopStatsById, getShopLedgerStats } from "@/actions/shops";
 import { getOrderStats, getShopOrderStats } from "@/actions/orders";
 import { getProductStats } from "@/actions/products";
 import { AdvancedChart } from "@/components/ui/advanced-chart";
@@ -80,6 +81,7 @@ export default function ShopOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     revenue: { current: 0, change: 0 },
+    expenses: { current: 0, change: 0 },
     orders: { current: 0, change: 0 },
     products: { current: 0, change: 0 },
     visitors: { current: 0, change: 0 },
@@ -93,14 +95,16 @@ export default function ShopOverviewPage() {
     setLoading(true);
     try {
       // Ici, vous intégrerez les vraies données
-      const [shopStats, orderStats, productStats] = await Promise.all([
+      const [shopStats, orderStats, productStats, ledgerStats] = await Promise.all([
         getShopStatsById(params.id as string),
         getShopOrderStats(params.id as string),
         getProductStats({ shopId: params.id as string }),
+        getShopLedgerStats(params.id as string),
       ]);
 
       setStats({
-        revenue: { current: 2450, change: 12.5 },
+        revenue: { current: ledgerStats?.income || 0, change: 12.5 },
+        expenses: { current: ledgerStats?.expense || 0, change: -4.2 },
         orders: { current: orderStats?.total || 24, change: 8.2 },
         products: { current: productStats?.total || 18, change: 5.4 },
         visitors: { current: 1242, change: -2.1 },
@@ -204,7 +208,7 @@ export default function ShopOverviewPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
       >
         <StatCard
           title="Revenus totaux"
@@ -212,6 +216,13 @@ export default function ShopOverviewPage() {
           change={stats.revenue.change}
           icon={DollarSign}
           color="green"
+        />
+        <StatCard
+          title="Dépenses totales"
+          value={`${stats.expenses.current} GTC`}
+          change={stats.expenses.change}
+          icon={TrendingDown}
+          color="red"
         />
 
         <StatCard

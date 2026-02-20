@@ -2,12 +2,26 @@
 
 import React from "react";
 import Link from "next/link";
-import { ChevronRight, Home } from "lucide-react";
-import { Typography } from "@/components/ui/typography";
+import { Home } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 import { ROUTE_CONFIG } from "@/config/routes-config";
 import { usePathname } from "next/navigation";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbEllipsis,
+} from "@/components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface BreadcrumbItem {
   name: string;
@@ -51,51 +65,92 @@ function resolveBreadcrumbSegments(pathname: string): BreadcrumbItem[] {
 
 export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   const pathname = usePathname();
+  const { isMobile } = useScreenSize(); // Hook to detect mobile screens
   const breadcrumbItems = items || resolveBreadcrumbSegments(pathname);
 
+  const depth = breadcrumbItems.length;
+  const first = breadcrumbItems[0];
+  const last = breadcrumbItems[depth - 1];
+  const second = breadcrumbItems[1];
+  const middle = breadcrumbItems.slice(2, depth - 1);
+
+  // Determine max visible depth: 3 for mobile, unlimited for larger screens
+  const maxVisibleDepth = isMobile ? 3 : Infinity;
+
   return (
-    <nav className={cn("py-1", className)} aria-label="Breadcrumb">
-      <ol className="flex items-center gap-2 overflow-x-auto">
-        {breadcrumbItems.map((item, index) => (
-          <motion.li
-            key={item.path}
-            className="flex items-center"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            {index === 0 ? (
-              <Link href={item.path}>
-                <div className="flex items-center gap-2 p-1 rounded-lg hover:bg-muted transition-colors">
-                  <Home className="h-4 w-4 text-muted-foreground" />
-                  <Typography variant="caption1" theme="muted">
-                    {item.name}
-                  </Typography>
-                </div>
-              </Link>
-            ) : (
+    <Breadcrumb className={cn("py-1", className)}>
+      <BreadcrumbList>
+        {first && (
+          <>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={first.path}>
+                  <span className="inline-flex items-center gap-1">
+                    <Home className="h-4 w-4 text-muted-foreground" />
+                    {first.name}
+                  </span>
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            {depth > 1 && <BreadcrumbSeparator />}
+          </>
+        )}
+
+        {depth <= maxVisibleDepth ? (
+          <>
+            {breadcrumbItems.slice(1, depth - 1).map((item) => (
+              <React.Fragment key={item.path}>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href={item.path}>{item.name}</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </React.Fragment>
+            ))}
+            {last && (
+              <BreadcrumbItem>
+                <BreadcrumbPage>{last.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            )}
+          </>
+        ) : (
+          <>
+            {second && (
               <>
-                <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />
-                {index === breadcrumbItems.length - 1 ? (
-                  <div className="flex items-center gap-2 p-1">
-                    <Typography variant="caption1" weight="medium">
-                      {item.name}
-                    </Typography>
-                  </div>
-                ) : (
-                  <Link href={item.path}>
-                    <div className="flex items-center gap-2 p-1 rounded-lg hover:bg-muted transition-colors">
-                      <Typography variant="caption1" theme="muted">
-                        {item.name}
-                      </Typography>
-                    </div>
-                  </Link>
-                )}
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href={second.path}>{second.name}</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
               </>
             )}
-          </motion.li>
-        ))}
-      </ol>
-    </nav>
+            <BreadcrumbItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button">
+                    <BreadcrumbEllipsis />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {middle.map((item) => (
+                    <DropdownMenuItem key={item.path} asChild>
+                      <Link href={item.path}>{item.name}</Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            {last && (
+              <BreadcrumbItem>
+                <BreadcrumbPage>{last.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            )}
+          </>
+        )}
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 }

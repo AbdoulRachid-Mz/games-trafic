@@ -18,7 +18,9 @@ import { EditionParticipantsList } from "./edition-participants-list";
 import { EditionPhasesView } from "./edition-phases-view";
 import { EditionJoinDialog } from "./edition-join-dialog";
 import { EditionPaymentDialog } from "./edition-payment-dialog"; // Import new dialog
+import { StandingsTable } from "./standings-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useJoinEdition } from "@/hooks/use-editions";
@@ -169,26 +171,27 @@ export function EditionPageContent({
               </div>
             )}
 
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 lg:w-[500px]">
-                <TabsTrigger value="overview">Aperçu</TabsTrigger>
-                <TabsTrigger value="participants">Joueurs</TabsTrigger>
-                <TabsTrigger value="phases">Arbre</TabsTrigger>
+            <Tabs defaultValue="standings" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-8">
+                <TabsTrigger value="overview">Infos</TabsTrigger>
                 <TabsTrigger value="standings">Classement</TabsTrigger>
-                <TabsTrigger value="comments">Discussion</TabsTrigger>
+                <TabsTrigger value="groups">Groupes</TabsTrigger>
+                <TabsTrigger value="calendar">Calendrier</TabsTrigger>
+                <TabsTrigger value="matches">Matches</TabsTrigger>
+                <TabsTrigger value="members">Membres</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview" className="space-y-4 mt-6">
-                <div className="bg-card border rounded-xl p-3">
+              <TabsContent value="overview" className="space-y-4">
+                <div className="bg-card border rounded-xl p-6">
                   <h3 className="text-xl font-bold mb-4">
                     À propos de cette édition
                   </h3>
                   <div className="prose dark:prose-invert max-w-none">
-                    <p>
+                    <p className="text-muted-foreground">
                       {edition.name ||
                         "Aucune description disponible pour cette édition."}
                     </p>
-                    {edition.description && <p>{edition.description}</p>}
+                    {edition.description && <p className="mt-2">{edition.description}</p>}
                   </div>
 
                   {edition.editionRules && (
@@ -196,108 +199,68 @@ export function EditionPageContent({
                       <h4 className="text-lg font-bold mb-3">
                         Règles spécifiques
                       </h4>
-                      <div className="bg-muted p-4 rounded-lg text-sm">
+                      <div className="bg-muted p-4 rounded-lg text-sm border">
                         {edition.editionRules}
                       </div>
                     </div>
                   )}
                 </div>
-                <div className="bg-card border rounded-xl p-3">
-                  <h4 className="text-lg font-bold mb-3">Navigation</h4>
-                  <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" asChild>
-                      <a href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}>
-                        Voir les matchs
-                      </a>
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <a href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
-                        Calendrier
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
 
-              <TabsContent value="participants" className="mt-6">
-                <EditionParticipantsList
-                  participants={edition.registrations || []}
-                />
-              </TabsContent>
-
-              <TabsContent value="phases" className="mt-6">
-                <EditionPhasesView phases={phases} editionId={edition.id} />
-              </TabsContent>
-
-              <TabsContent value="standings" className="mt-6">
-                <div className="space-y-6">
-                  {standings.length === 0 ? (
-                    <div className="bg-card border rounded-xl p-3 text-sm text-muted-foreground">
-                      Aucun classement disponible pour la phase active.
-                    </div>
-                  ) : (
-                    standings.map((g) => (
-                      <div key={g.groupId} className="bg-card border rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-bold">Groupe {g.groupName}</h4>
-                          <div className="text-xs text-muted-foreground">
-                            {g.rows.length} participants
-                          </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="text-muted-foreground">
-                                <th className="text-left p-2">#</th>
-                                <th className="text-left p-2">Joueur</th>
-                                <th className="text-right p-2">Pts</th>
-                                <th className="text-right p-2">J</th>
-                                <th className="text-right p-2">V</th>
-                                <th className="text-right p-2">N</th>
-                                <th className="text-right p-2">D</th>
-                                <th className="text-right p-2">+/-</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {g.rows.map((row, idx) => {
-                                const reg = (edition.registrations || []).find(
-                                  (r: any) => r.id === row.registrationId
-                                ) as any;
-                                const name =
-                                  reg?.member?.displayName ||
-                                  reg?.member?.user?.username ||
-                                  reg?.member?.team?.name ||
-                                  "Joueur";
-                                return (
-                                  <tr key={row.registrationId} className="border-t">
-                                    <td className="p-2">{row.position ?? idx + 1}</td>
-                                    <td className="p-2">{name}</td>
-                                    <td className="p-2 text-right font-bold">{row.points}</td>
-                                    <td className="p-2 text-right">{row.matchesPlayed}</td>
-                                    <td className="p-2 text-right">{row.matchesWon}</td>
-                                    <td className="p-2 text-right">{row.matchesDrawn}</td>
-                                    <td className="p-2 text-right">{row.matchesLost}</td>
-                                    <td className="p-2 text-right">{row.scoreDifference}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="comments" className="mt-6">
-                <div className="bg-card border rounded-xl p-3">
+                <div className="bg-card border rounded-xl p-6">
                   <CommentsSection
                     entityId={edition.id}
                     entityType="EDITION"
                     title="Discussion de l'édition"
                   />
                 </div>
+              </TabsContent>
+
+              <TabsContent value="standings" className="mt-6">
+                <StandingsTable
+                  groups={standings}
+                  registrations={edition.registrations}
+                  title="Classement de la phase active"
+                />
+              </TabsContent>
+
+              <TabsContent value="groups" className="mt-6">
+                <EditionPhasesView
+                  phases={phases}
+                  editionId={edition.id}
+                  currentUserId={user?.id}
+                  isAdmin={isOrganizer}
+                  onUpdate={() => router.refresh()}
+                />
+              </TabsContent>
+
+              <TabsContent value="calendar" className="mt-6">
+                <div className="bg-card border rounded-xl p-12 text-center space-y-4">
+                  <Typography variant="h4" weight="bold">Calendrier des matches</Typography>
+                  <Typography variant="body-sm" theme="muted">Consultez les dates et heures de tous les matches de l&apos;édition.</Typography>
+                  <Button variant="default" asChild>
+                    <a href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
+                      Ouvrir le calendrier complet
+                    </a>
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="matches" className="mt-6">
+                <div className="bg-card border rounded-xl p-12 text-center space-y-4">
+                  <Typography variant="h4" weight="bold">Liste des matches</Typography>
+                  <Typography variant="body-sm" theme="muted">Suivez les résultats en direct et consultez l&apos;historique des matches.</Typography>
+                  <Button variant="default" asChild>
+                    <a href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}>
+                      Voir tous les matches
+                    </a>
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="members" className="mt-6">
+                <EditionParticipantsList
+                  participants={edition.registrations || []}
+                />
               </TabsContent>
             </Tabs>
           </div>
@@ -342,6 +305,6 @@ export function EditionPageContent({
         onOpenChange={setShowPaymentDialog}
         memberId={currentUserMember?.id}
       />
-    </div>
+    </div >
   );
 }

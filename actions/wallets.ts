@@ -121,6 +121,52 @@ export async function getWalletBalance(walletId: string): Promise<number> {
   }
 }
 
+
+/**
+ * Récupère les dépenses réelles d'un wallet via le ledger
+ */
+export async function getWalletExpenses(walletId: string): Promise<number> {
+  try {
+    const wallet = await getUserWalletById(walletId);
+    if (!wallet?.financialAccountId) return 0;
+
+    const [result] = await db
+      .select({
+        totalDebit: sql<string>`COALESCE(SUM(${ledgerEntries.debit}), '0')`,
+      })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.accountId, wallet.financialAccountId));
+
+    return parseFloat(result?.totalDebit || '0');
+  } catch (error) {
+    console.error('Error getting wallet expenses:', error);
+    return 0;
+  }
+}
+
+/**
+ * Récupère les revenus réels d'un wallet via le ledger
+ */
+export async function getWalletRevenues(walletId: string): Promise<number> {
+  try {
+    const wallet = await getUserWalletById(walletId);
+    if (!wallet?.financialAccountId) return 0;
+
+    const [result] = await db
+      .select({
+        totalCredit: sql<string>`COALESCE(SUM(${ledgerEntries.credit}), '0')`,
+      })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.accountId, wallet.financialAccountId));
+
+    return parseFloat(result?.totalCredit || '0');
+  } catch (error) {
+    console.error('Error getting wallet revenues:', error);
+    return 0;
+  }
+}
+
+
 /**
  * Liste les wallets avec pagination
  */

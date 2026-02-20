@@ -7,7 +7,7 @@ import {
   TournamentMember,
 } from "@/database/schema";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getTournamentEditionWithRelations } from "@/actions/editions";
+import { getTournamentEditionWithRelations, getEditionActivePhase } from "@/actions/editions";
 import { getTournamentById, getTournamentEditionById, getTournamentMembers, getTournamentPhases } from "@/actions/tournaments";
 import { getPhaseGroups, getPhaseGroupParticipants } from "@/actions/phases";
 import { TransactionQRCode } from "@/components/shared/qr-code";
@@ -50,31 +50,15 @@ export default async function EditionPage({ params }: PageProps) {
 
   const edition = editionWithRelations;
 
-  // 1. Phases
+  // 1. Phases & Active Phase Logic
+  const activePhase = await getEditionActivePhase(editionId);
   const phasesResponse = await getTournamentPhases({
     filters: { editionId },
     options: { sortBy: "order", sortOrder: "asc" },
   });
-  const phases = phasesResponse.data;
-  const activePhase = phases.find((p) => p.isActive) || phases[0];
+  const phases = phasesResponse.data || edition.phases;
 
-  let standings: Array<{
-    groupId: string;
-    groupName: string;
-    rows: Array<{
-      registrationId: string;
-      points: number;
-      matchesPlayed: number;
-      matchesWon: number;
-      matchesDrawn: number;
-      matchesLost: number;
-      scoreFor: number;
-      scoreAgainst: number;
-      scoreDifference: number;
-      position?: number;
-      qualified?: boolean;
-    }>;
-  }> = [];
+  let standings: any[] = [];
 
   if (activePhase) {
     const groupsRes = await getPhaseGroups({
@@ -98,16 +82,11 @@ export default async function EditionPage({ params }: PageProps) {
         matchesLost: p.matchesLost ?? 0,
         scoreFor: p.scoreFor ?? 0,
         scoreAgainst: p.scoreAgainst ?? 0,
-        scoreDifference: p.scoreDifference ?? 0,
+        scoreDifference: (p.scoreFor ?? 0) - (p.scoreAgainst ?? 0),
         position: p.position ?? undefined,
         qualified: p.qualified ?? false,
       }));
-      rows.sort((a, b) => {
-        if ((b.points ?? 0) !== (a.points ?? 0)) return (b.points ?? 0) - (a.points ?? 0);
-        if ((b.scoreDifference ?? 0) !== (a.scoreDifference ?? 0)) return (b.scoreDifference ?? 0) - (a.scoreDifference ?? 0);
-        if ((b.matchesWon ?? 0) !== (a.matchesWon ?? 0)) return (b.matchesWon ?? 0) - (a.matchesWon ?? 0);
-        return 0;
-      });
+
       standings.push({
         groupId: g.id,
         groupName: g.name,
@@ -153,7 +132,7 @@ export default async function EditionPage({ params }: PageProps) {
       <EditionPageContent
         tournament={tournament}
         edition={edition}
-        phases={phases}
+        phases={phases || edition.phases}
         standings={standings}
         currentUserMember={currentUserMember}
         currentUserRegistration={currentUserRegistration}

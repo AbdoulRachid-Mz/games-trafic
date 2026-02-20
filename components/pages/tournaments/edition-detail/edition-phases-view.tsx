@@ -6,17 +6,24 @@ import { Typography } from "@/components/ui/typography";
 import { GitBranch } from "lucide-react";
 import { TournamentPhase } from "@/database/schema";
 import { useEditionRegistrations, usePhaseBracketNodes, usePhaseMatches } from "@/hooks/use-editions";
+import { MatchCard } from "@/components/cards/match-card";
 
 interface EditionPhasesViewProps {
   phases: TournamentPhase[];
   isLoading?: boolean;
   editionId: string;
+  currentUserId?: string;
+  isAdmin?: boolean;
+  onUpdate?: () => void;
 }
 
 export function EditionPhasesView({
   phases,
   isLoading,
   editionId,
+  currentUserId,
+  isAdmin,
+  onUpdate,
 }: EditionPhasesViewProps) {
   if (isLoading) {
     return <div>Chargement des phases...</div>;
@@ -51,7 +58,13 @@ export function EditionPhasesView({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PhaseBracket phase={phase} editionId={editionId} />
+            <PhaseBracket
+              phase={phase}
+              editionId={editionId}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+              onUpdate={onUpdate}
+            />
           </CardContent>
         </Card>
       ))}
@@ -59,29 +72,30 @@ export function EditionPhasesView({
   );
 }
 
-function PhaseBracket({ phase, editionId }: { phase: TournamentPhase; editionId: string }) {
+function PhaseBracket({
+  phase,
+  editionId,
+  currentUserId,
+  isAdmin,
+  onUpdate
+}: {
+  phase: TournamentPhase;
+  editionId: string;
+  currentUserId?: string;
+  isAdmin?: boolean;
+  onUpdate?: () => void;
+}) {
   const { data: registrationsRes } = useEditionRegistrations(
     { editionId },
     { populate: ["member", "member.user", "member.team"] }
   );
   const registrations = registrationsRes?.data || [];
-  const nameByRegistrationId = React.useMemo(() => {
-    const map = new Map<string, string>();
-    for (const reg of registrations as any[]) {
-      const member = reg.member;
-      const username = member?.user?.username || member?.user?.fullName;
-      const teamName = member?.team?.name;
-      const display = username || teamName || "TBD";
-      map.set(reg.id, display);
-    }
-    return map;
-  }, [registrations]);
 
   const { data: nodesRes, isLoading: nodesLoading } = usePhaseBracketNodes(phase.id, {
     filters: { phaseId: phase.id },
     options: { sortBy: "order", sortOrder: "asc" },
   });
-  const { data: matchesRes, isLoading: matchesLoading } = usePhaseMatches(phase.id, {
+  const { data: matchesRes, isLoading: matchesLoading, refetch } = usePhaseMatches(phase.id, {
     filters: { phaseId: phase.id },
     options: { sortBy: "round", sortOrder: "asc" },
   });
@@ -114,43 +128,29 @@ function PhaseBracket({ phase, editionId }: { phase: TournamentPhase; editionId:
   }
   const sortedRounds = Array.from(rounds.entries()).sort((a, b) => a[0] - b[0]);
 
+  const handleUpdate = () => {
+    refetch();
+    onUpdate?.();
+  };
+
   return (
     <div className="overflow-x-auto">
       <div className="flex gap-4 min-w-full">
         {sortedRounds.map(([roundNumber, roundMatches]) => (
-          <div key={roundNumber} className="min-w-[260px]">
-            <div className="mb-2 text-xs font-semibold text-muted-foreground">Round {roundNumber}</div>
-            <div className="space-y-3">
+          <div key={roundNumber} className="min-w-[300px] max-w-[400px]">
+            <div className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">Round {roundNumber}</div>
+            <div className="space-y-4">
               {roundMatches
                 .sort((a: any, b: any) => (a.matchNumber ?? 0) - (b.matchNumber ?? 0))
-                .map((match: any) => {
-                  const p1 = nameByRegistrationId.get(match.participant1RegistrationId) || "TBD";
-                  const p2 = nameByRegistrationId.get(match.participant2RegistrationId) || "TBD";
-                  const statusLabel =
-                    match.status === "COMPLETED"
-                      ? "Terminé"
-                      : match.status === "LIVE"
-                      ? "En cours"
-                      : "À venir";
-                  return (
-                    <div key={match.id} className="rounded-lg border bg-card p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-muted-foreground">Match {match.matchNumber}</div>
-                        <div className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{statusLabel}</div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{p1}</span>
-                          <span className="text-sm">{match.score1 ?? "-"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">{p2}</span>
-                          <span className="text-sm">{match.score2 ?? "-"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                .map((match: any) => (
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
+                    onUpdate={handleUpdate}
+                  />
+                ))}
             </div>
           </div>
         ))}
