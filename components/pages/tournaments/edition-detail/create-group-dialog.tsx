@@ -37,11 +37,27 @@ export function CreateGroupDialog({
         const formData = new FormData(e.currentTarget);
         const name = formData.get("name") as string;
 
+        // Advanced data
+        const seeding = formData.get("seeding") as string || "RANDOM";
+        const advanceCount = parseInt(formData.get("advanceCount") as string) || 2;
+        const pointsPerWin = parseInt(formData.get("pointsPerWin") as string) || 3;
+        const pointsPerDraw = parseInt(formData.get("pointsPerDraw") as string) || 1;
+        const pointsPerLoss = parseInt(formData.get("pointsPerLoss") as string) || 0;
+        const matchesPerParticipant = parseInt(formData.get("matchesPerParticipant") as string) || 1;
+
         try {
             await createPhaseGroup({
                 phaseId,
                 name,
                 order: nextOrder,
+                config: {
+                    seeding,
+                    advanceCount,
+                    pointsPerWin,
+                    pointsPerDraw,
+                    pointsPerLoss,
+                    matchesPerParticipant,
+                } as any
             } as any);
 
             toast.success("Groupe créé avec succès");
@@ -61,7 +77,7 @@ export function CreateGroupDialog({
                     <Plus className="h-4 w-4 mr-1.5" /> Ajouter un groupe
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Nouveau groupe</DialogTitle>
                 </DialogHeader>
@@ -75,6 +91,47 @@ export function CreateGroupDialog({
                             defaultValue={`Groupe ${nextOrder}`}
                             required
                         />
+                    </div>
+
+                    <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="seeding">Seeding</Label>
+                                <select
+                                    name="seeding"
+                                    id="seeding"
+                                    className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full"
+                                >
+                                    <option value="RANDOM">Aléatoire</option>
+                                    <option value="RANKING">Classement</option>
+                                    <option value="MANUAL">Manuel</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="advanceCount">Qualifiés</Label>
+                                <Input type="number" id="advanceCount" name="advanceCount" defaultValue={2} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="pointsPerWin">Pts Victoire</Label>
+                                <Input type="number" id="pointsPerWin" name="pointsPerWin" defaultValue={3} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="pointsPerDraw">Pts Nul</Label>
+                                <Input type="number" id="pointsPerDraw" name="pointsPerDraw" defaultValue={1} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="pointsPerLoss">Pts Défaite</Label>
+                                <Input type="number" id="pointsPerLoss" name="pointsPerLoss" defaultValue={0} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="matchesPerParticipant">Matches par participant</Label>
+                            <Input type="number" id="matchesPerParticipant" name="matchesPerParticipant" defaultValue={1} />
+                        </div>
                     </div>
 
                     <DialogFooter>

@@ -6,7 +6,6 @@ import { Loader2, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { deleteEditionRegistrationAction } from "@/actions/editions";
 import { updateEditionRegistration } from "@/actions/tournaments";
 import { toast } from "sonner";
-import { revalidatePath } from "next/cache";
 
 interface ParticipantRowActionsProps {
     registrationId: string;
