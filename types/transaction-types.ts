@@ -144,6 +144,12 @@ export interface TransactionData {
     description?: string;
     feePercentage?: number;
     entityData?: any;
+    gameAccount?: string;
+    encryptedPassword?: string;
+    additionalInfo?: string;
+    buyerInstructions?: string;
+    sellerInstructions?: string;
+    originalAmount?: number;
   };
 }
 

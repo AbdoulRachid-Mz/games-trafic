@@ -141,7 +141,6 @@ function addPurchaseDetails(doc: jsPDF, data: ReceiptData, itemType: string) {
 export function generateEnhancedReceipt(data: ReceiptData) {
   const doc = new jsPDF();
   
-  // En-tête avec logo
   doc.setFillColor(99, 102, 241); // Indigo
   doc.rect(0, 0, 210, 30, 'F');
   
@@ -151,7 +150,6 @@ export function generateEnhancedReceipt(data: ReceiptData) {
   
   doc.setTextColor(0, 0, 0);
   
-  // Informations de base
   doc.setFontSize(16);
   doc.text("REÇU DE TRANSACTION", 105, 45, { align: "center" });
   
@@ -159,18 +157,16 @@ export function generateEnhancedReceipt(data: ReceiptData) {
   doc.text(`Référence: ${data.reference}`, 20, 60);
   doc.text(`Date: ${data.date.toLocaleString("fr-FR")}`, 20, 67);
   doc.text(`Transaction ID: ${data.transactionId}`, 20, 74);
+  doc.text("Adresse: Tahoua, Niger", 20, 81);
   
-  // Séparateur
   doc.setLineWidth(0.5);
-  doc.line(20, 80, 190, 80);
+  doc.line(20, 86, 190, 86);
   
-  // Détails spécifiques au type
   const template = templates[data.type];
   if (template) {
     template.generate(doc, data);
   }
   
-  // Détails financiers
   let yPos = 150;
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -181,7 +177,7 @@ export function generateEnhancedReceipt(data: ReceiptData) {
   doc.text(`Montant: ${data.amount.toFixed(2)} GTC`, 30, yPos);
   
   yPos += 8;
-  doc.text(`Frais (${(data.fees / data.amount * 100).toFixed(2)}%): ${data.fees.toFixed(2)} GTC`, 30, yPos);
+  doc.text(`Frais (${data.amount > 0 ? (data.fees / data.amount * 100).toFixed(2) : "0.00"}%): ${data.fees.toFixed(2)} GTC`, 30, yPos);
   
   yPos += 12;
   doc.setFont("helvetica", "bold");
@@ -189,23 +185,18 @@ export function generateEnhancedReceipt(data: ReceiptData) {
   doc.setFont("helvetica", "normal");
   
   yPos += 12;
+  doc.text(`Net: ${(data.totalAmount - data.fees).toFixed(2)} GTC`, 30, yPos);
+  yPos += 8;
   doc.text(`Nouveau solde: ${data.newBalance.toFixed(2)} GTC`, 30, yPos);
   
-  // Pied de page
   doc.setLineWidth(0.5);
   doc.line(20, 250, 190, 250);
   
   doc.setFontSize(9);
-  doc.text("Merci pour votre confiance !", 105, 260, { align: "center" });
-  doc.text("Support: support@gamestrafics.com | Tél: +XXX XX XX XX XX", 105, 265, { align: "center" });
-  doc.text("www.gamestrafics.com", 105, 270, { align: "center" });
+  doc.text("Support: support@gamestrafics.com | Tél: +227 00 00 00 00", 105, 258, { align: "center" });
+  doc.text("Tahoua - Niger", 105, 263, { align: "center" });
+  doc.text("© Games Trafics", 105, 268, { align: "center" });
   
-  // QR Code pour vérification
-  doc.setFontSize(8);
-  doc.text("Scan pour vérifier:", 20, 280);
-  // Note: Vous pouvez ajouter un QR code avec une librairie comme 'qrcode'
-  
-  // Enregistrer le PDF
   doc.save(`receipt-${data.reference}.pdf`);
 }
 

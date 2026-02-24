@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
@@ -26,10 +26,21 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TransactionRecipientSelector } from "@/components/pages/transactions/create/recipient-selector";
+import { TransactionDepositForm } from "@/components/pages/transactions/create/deposit-form";
+import { TransactionWithdrawalForm } from "@/components/pages/transactions/create/withdrawal-form";
+import { TransactionAmountInput } from "@/components/pages/transactions/create/amount-input";
+import { useTransactionFees } from "@/hooks/use-transaction-fees";
+import { TransactionType } from "@/types/transaction-types";
+import { useAuthContext } from "@/contexts/auth-context";
+import { useUserProfile } from "@/hooks/use-profile";
+import { createTransaction } from "@/actions/transactions";
+import { createRequest } from "@/actions/requests";
 import {
   getWalletTransactions,
   getTransactionStats,
@@ -52,6 +63,8 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 export default function AdminTransactionsPage() {
+  const { user } = useAuthContext();
+  const { data: completeData, refresh: refreshProfile } = useUserProfile(!!user?.id);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,6 +75,33 @@ export default function AdminTransactionsPage() {
     useState<WalletTransaction | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [actionType, setActionType] = useState<TransactionType | null>(null);
+  const [actionStep, setActionStep] = useState<"DETAILS" | "AMOUNT" | "CONFIRM">("DETAILS");
+  const [actionData, setActionData] = useState<{
+    amount: number;
+    metadata: Record<string, any>;
+    recipientWalletId?: string;
+    recipientUser?: { id: string; name: string; walletNumber: string };
+  }>({ amount: 0, metadata: {} });
+
+  const {
+    fees: actionFees,
+    total: actionTotal,
+  } = useTransactionFees(actionType as TransactionType, actionData.amount, {
+    enabled: !!actionType && actionData.amount > 0,
+  });
+
+  const actionFeesObj = useMemo(() => {
+    const baseAmount = actionData.amount || 0;
+    const feeAmount = typeof actionFees === "number" ? actionFees : 0;
+    const totalAmount = typeof actionTotal === "number" ? actionTotal : baseAmount;
+    const percentage = baseAmount > 0 ? feeAmount / baseAmount : 0;
+    return {
+      percentage,
+      amount: feeAmount,
+      totalAmount,
+    };
+  }, [actionFees, actionTotal, actionData.amount]);
 
   useEffect(() => {
     loadData();
@@ -94,6 +134,64 @@ export default function AdminTransactionsPage() {
       toast.error("Erreur lors du chargement");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openActionDialog = (type: TransactionType) => {
+    setActionType(type);
+    setActionStep("DETAILS");
+    setActionData({ amount: 0, metadata: {} });
+  };
+
+  const closeActionDialog = () => {
+    setActionType(null);
+    setActionStep("DETAILS");
+    setActionData({ amount: 0, metadata: {} });
+  };
+
+  const handleActionConfirm = async () => {
+    if (!actionType || !completeData?.wallet?.id || !user?.id) return;
+    try {
+      if (actionType === "TRANSFER") {
+        if (!actionData.recipientWalletId) {
+          toast.error("Destinataire requis");
+          return;
+        }
+        await createTransaction(
+          {
+            walletId: completeData.wallet.id,
+            type: "TRANSFER",
+            amount: actionData.amount.toFixed(2),
+            description: `Transfert à ${actionData.recipientUser?.name || "utilisateur"}`,
+            metadata: {
+              recipientWalletId: actionData.recipientWalletId,
+              recipientName: actionData.recipientUser?.name,
+            },
+          },
+          { allowDuplicate: false }
+        );
+      } else if (actionType === "DEPOSIT" || actionType === "WITHDRAWAL") {
+        await createRequest(
+          {
+            userId: user.id,
+            type: actionType,
+            amount: actionData.amount.toString(),
+            paymentMethod: actionData.metadata.paymentMethod || "WALLET",
+            paymentProvider: actionData.metadata.paymentProvider,
+            paymentAccountId: actionData.metadata.paymentAccountId,
+            paymentReference: actionData.metadata.paymentReference,
+            paymentConfirmationCode: actionData.metadata.paymentConfirmationCode,
+            paymentImage: actionData.metadata.paymentImage,
+          },
+          { allowDuplicate: false }
+        );
+      }
+      toast.success("Action effectuée");
+      await refreshProfile();
+      await loadData();
+      closeActionDialog();
+    } catch (error: any) {
+      toast.error(error?.message || "Erreur lors de l'action");
     }
   };
 
@@ -148,10 +246,39 @@ export default function AdminTransactionsPage() {
             Gestion de toutes les transactions financières
           </Typography>
         </div>
-        <Button onClick={loadData} variant="outline" className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openActionDialog("TRANSFER")}
+            className="gap-2 items-center flex justify-center"
+          >
+            <ArrowUpRight className="h-4 w-4" />
+            <span className="hidden md:inline-block">Transférer</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openActionDialog("WITHDRAWAL")}
+            className="gap-2 items-center flex justify-center"
+          >
+            <CreditCard className="h-4 w-4" />
+            <span className="hidden md:inline-block">Retrait</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openActionDialog("DEPOSIT")}
+            className="gap-2 items-center flex justify-center"
+          >
+            <ArrowDownLeft className="h-4 w-4" />
+            <span className="hidden md:inline-block">Dépôt</span>
+          </Button>
+          <Button onClick={loadData} variant="outline" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -424,6 +551,142 @@ export default function AdminTransactionsPage() {
                   </Button>
                 )}
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!actionType} onOpenChange={(open) => !open && closeActionDialog()}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === "TRANSFER"
+                ? "Transférer des fonds"
+                : actionType === "WITHDRAWAL"
+                  ? "Demande de retrait"
+                  : "Dépôt de fonds"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {actionType === "TRANSFER" && actionStep === "DETAILS" && (
+            <TransactionRecipientSelector
+              onSelect={(recipient) => {
+                setActionData({
+                  amount: 0,
+                  metadata: {},
+                  recipientWalletId: recipient.walletId,
+                  recipientUser: {
+                    id: recipient.user.id,
+                    name: recipient.user.name,
+                    walletNumber: recipient.user.walletNumber,
+                  },
+                });
+                setActionStep("AMOUNT");
+              }}
+              onBack={closeActionDialog}
+            />
+          )}
+
+          {actionType === "DEPOSIT" && actionStep === "DETAILS" && (
+            <TransactionDepositForm
+              onSubmit={(details) => {
+                setActionData((prev) => ({
+                  ...prev,
+                  metadata: { ...prev.metadata, ...details },
+                }));
+                setActionStep("AMOUNT");
+              }}
+              onBack={closeActionDialog}
+            />
+          )}
+
+          {actionType === "WITHDRAWAL" && actionStep === "DETAILS" && (
+            <TransactionWithdrawalForm
+              onSubmit={(details) => {
+                setActionData((prev) => ({
+                  ...prev,
+                  metadata: { ...prev.metadata, ...details },
+                }));
+                setActionStep("AMOUNT");
+              }}
+              onBack={closeActionDialog}
+            />
+          )}
+
+          {actionType && actionStep === "AMOUNT" && (
+            <TransactionAmountInput
+              amount={actionData.amount}
+              onChange={(amount) =>
+                setActionData((prev) => ({ ...prev, amount }))
+              }
+              walletBalance={parseFloat(completeData?.ledgerBalance || "0")}
+              fees={actionFeesObj}
+              transactionType={actionType}
+              metadata={actionData.metadata}
+              onMetadataChange={(data) =>
+                setActionData((prev) => ({
+                  ...prev,
+                  metadata: { ...prev.metadata, ...data },
+                }))
+              }
+              onContinue={() => setActionStep("CONFIRM")}
+              onBack={() => setActionStep("DETAILS")}
+            />
+          )}
+
+          {actionType && actionStep === "CONFIRM" && (
+            <div className="space-y-6">
+              {actionType === "TRANSFER" && actionData.recipientUser && (
+                <div className="space-y-2">
+                  <Typography variant="caption1" theme="muted">
+                    Destinataire
+                  </Typography>
+                  <div className="flex items-center justify-between bg-muted/20 rounded-xl p-4 border border-border/50">
+                    <div>
+                      <Typography variant="body-sm" weight="bold">
+                        {actionData.recipientUser.name}
+                      </Typography>
+                      <Typography variant="caption1" theme="muted" className="font-mono">
+                        {actionData.recipientUser.walletNumber}
+                      </Typography>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 bg-card/30 rounded-xl p-4 border border-border/50">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Montant brut</span>
+                  <span className="font-bold">{actionData.amount.toFixed(2)} GTC</span>
+                </div>
+                {actionFeesObj.percentage > 0 && (
+                  <div className="flex justify-between items-center text-sm text-orange-500">
+                    <span>Frais</span>
+                    <span className="font-bold">{actionFeesObj.amount.toFixed(2)} GTC</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                  <span className="font-bold text-sm">Montant débité</span>
+                  <span className="font-black text-lg text-primary">
+                    {actionFeesObj.totalAmount.toFixed(2)} GTC
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Montant reçu</span>
+                  <span className="font-bold">
+                    {Math.max(0, actionData.amount - actionFeesObj.amount).toFixed(2)} GTC
+                  </span>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setActionStep("AMOUNT")}>
+                  Retour
+                </Button>
+                <Button onClick={handleActionConfirm}>
+                  Confirmer
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>

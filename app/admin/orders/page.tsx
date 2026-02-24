@@ -50,7 +50,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getOrders, completeOrderAdmin, rejectOrder } from "@/actions/orders";
-import { getProductById } from "@/actions/products";
+import { getProductById, getProductCredentialsForAdmin } from "@/actions/products";
 import { useAuthContext } from "@/contexts/auth-context";
 
 type UiOrder = {
@@ -86,6 +86,11 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [productCredentials, setProductCredentials] = useState<{
+    accountLogin: string | null;
+    password: string | null;
+  } | null>(null);
+  const [isCredentialsLoading, setIsCredentialsLoading] = useState(false);
   const [verificationChecks, setVerificationChecks] = useState({
     accountAccessible: false,
     infoCorrect: false,
@@ -158,6 +163,25 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const loadCredentials = async () => {
+      if (!selectedOrder?.productId) {
+        setProductCredentials(null);
+        return;
+      }
+      setIsCredentialsLoading(true);
+      try {
+        const creds = await getProductCredentialsForAdmin(selectedOrder.productId);
+        setProductCredentials(creds);
+      } catch {
+        setProductCredentials(null);
+      } finally {
+        setIsCredentialsLoading(false);
+      }
+    };
+    loadCredentials();
+  }, [selectedOrder?.productId]);
 
   const handleApprove = async (orderId: string) => {
     const allChecked = Object.values(verificationChecks).every((v) => v);
@@ -495,21 +519,21 @@ export default function AdminOrdersPage() {
                       </Typography>
                     </div>
                     <div className="space-y-3">
-                      {selectedOrder.accountLogin && (
+                      {(productCredentials?.accountLogin || selectedOrder.accountLogin) && (
                         <div>
                           <Typography variant="caption1" theme="muted">
                             Login / Email
                           </Typography>
                           <div className="flex items-center gap-2 mt-1">
                             <code className="flex-1 px-3 py-2 bg-background rounded-lg font-mono text-sm">
-                              {selectedOrder.accountLogin}
+                              {productCredentials?.accountLogin || selectedOrder.accountLogin}
                             </code>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() =>
                                 copyToClipboard(
-                                  selectedOrder.accountLogin,
+                                  productCredentials?.accountLogin || selectedOrder.accountLogin,
                                   "Login"
                                 )
                               }
@@ -519,6 +543,42 @@ export default function AdminOrdersPage() {
                           </div>
                         </div>
                       )}
+                      <div>
+                        <Typography variant="caption1" theme="muted">
+                          Mot de passe
+                        </Typography>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 px-3 py-2 bg-background rounded-lg font-mono text-sm">
+                            {isCredentialsLoading
+                              ? "Chargement..."
+                              : showPassword
+                                ? productCredentials?.password || "—"
+                                : productCredentials?.password
+                                  ? "••••••••••••"
+                                  : "—"}
+                          </code>
+                          {productCredentials?.password && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                              >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  copyToClipboard(productCredentials.password || "", "Mot de passe")
+                                }
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
                           <Typography variant="caption2" theme="muted">

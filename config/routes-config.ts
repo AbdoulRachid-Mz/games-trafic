@@ -28,7 +28,7 @@ export interface RouteConfig {
   menuOrder?: number;
   hideTopMiddleOnScroll?: boolean; // Nouveau: cacher top-middle au scroll
   hideFloatingActions?: boolean; // Nouveau: cacher FAB
-dockLinks?: DockLinkConfig[]
+  dockLinks?: DockLinkConfig[]
 }
 
 export interface FABAction {
@@ -183,9 +183,9 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   },
   {
     path: [
-      "/tournaments/[tournamentId]/editions/[editionId]/dashboard", 
-      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**", 
-      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/**", 
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard",
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**",
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/**",
       "/tournaments/[tournamentId]/editions/[editionId]/dashboard/groupes/**"
     ],
     name: "Dashboard Édition",
@@ -344,7 +344,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   },
   {
     path: "/wallet/transactions/create",
-    name: "Create Transaction",
+    name: "Nouveau Transfert",
     // excludeLayout: true,
     styleGroup: "wallet",
     footer: false

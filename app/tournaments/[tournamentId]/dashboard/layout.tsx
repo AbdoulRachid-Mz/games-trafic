@@ -4,6 +4,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 // import { getTournamentById } from "@/actions/tournanents";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { useAuthContext } from "@/contexts/auth-context";
+import { useActiveRoute } from "@/hooks/use-active-route";
+import { getTournamentNavData } from "@/constants/tournament-constants";
+import { getTournamentById } from "@/actions/tournaments";
 import {
   EnhancedDashboard,
   SidebarHeader,
@@ -12,11 +17,6 @@ import {
   SidebarFooter,
   DashboardHeader,
 } from "@/components/dashboard/enhanced-dashboard";
-import { PageSkeleton } from "@/components/ui/page-skeleton";
-import { useAuthContext } from "@/contexts/auth-context";
-import { useActiveRoute } from "@/hooks/use-active-route";
-import { getTournamentNavData } from "@/constants/tournament-constants";
-import { getTournamentById } from "@/actions/tournaments";
 
 export default function TournamentDashboardLayout({
   children,

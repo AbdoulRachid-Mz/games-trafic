@@ -8,9 +8,12 @@ type StatusType =
   | "PENDING"
   | "COMPLETED"
   | "ACCEPTED"
+  | "ACCEPTED_BY_SHOP"
   | "PROCESSING"
   | "FAILED"
   | "REJECTED"
+  | "REJECTED_BY_SHOP"
+  | "REJECTED_BY_ADMIN"
   | "REFUNDED"
   | "CANCELLED"
   | "ACTIVE"
@@ -36,6 +39,10 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     className: "bg-green-500/10 text-green-600 border-green-500/20",
     label: "Accepté",
   },
+  ACCEPTED_BY_SHOP: {
+    className: "bg-green-500/10 text-green-600 border-green-500/20",
+    label: "Accepté",
+  },
   PROCESSING: {
     className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
     label: "En cours",
@@ -45,6 +52,14 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     label: "Échoué",
   },
   REJECTED: {
+    className: "bg-red-500/10 text-red-600 border-red-500/20",
+    label: "Rejeté",
+  },
+  REJECTED_BY_SHOP: {
+    className: "bg-red-500/10 text-red-600 border-red-500/20",
+    label: "Rejeté",
+  },
+  REJECTED_BY_ADMIN: {
     className: "bg-red-500/10 text-red-600 border-red-500/20",
     label: "Rejeté",
   },

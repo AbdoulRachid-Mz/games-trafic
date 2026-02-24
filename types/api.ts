@@ -452,7 +452,7 @@ export interface OrderFilters extends BaseFilters {
   createdFrom?: Date | string;
   createdTo?: Date | string;
 }
-export type OrderStatus = 'COMPLETED' | 'CANCELLED' | 'REJECTED_BY_SHOP' | 'REJECTED_BY_ADMIN';
+export type OrderStatus = 'COMPLETED' | 'CANCELLED' | 'REJECTED_BY_SHOP' | 'REJECTED_BY_ADMIN' | 'PENDING' | 'ACCEPTED_BY_SHOP';
 
 export interface OrderStats {
   total: number;

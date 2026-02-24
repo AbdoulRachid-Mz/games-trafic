@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Package, RefreshCw, Layers } from "lucide-react";
 import { Typography } from "@/components/ui/typography";
+import { useRouter } from "next/navigation";
 
 interface GamesGridProps {
   items: GameItemWithRelations[];
@@ -63,6 +64,11 @@ export function GamesGrid({
       </div>
     );
   }
+  const router = useRouter();
+
+      const handleViewGame = (gameId: string) => {
+      router.push(`/games/${gameId}`);
+    };
 
   return (
     <div className="space-y-16">

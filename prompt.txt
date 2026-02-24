@@ -1,449 +1,213 @@
-🎯 OBJECTIF GLOBAL
+🎯 Objectif
 
-Refactoriser entièrement la gestion des matches afin de :
+Refactoriser et compléter :
 
-Permettre aux participants de soumettre les résultats
+marketplace/page.tsx
 
-Éviter toute incohérence dans les standings (int fields)
+filters.tsx
 
-Implémenter un système de confirmation sécurisé
+use-products.ts
 
-Corriger la génération automatique des matches dans les groupes
+game-clip-player.tsx
 
-Corriger l’erreur ECONNRESET dans getPhaseGroupParticipants
+Gestion interactions (use-interactions.ts, interactions.ts)
 
-Empêcher toute duplication automatique
+Gestion messages (use-messages.ts, messages.ts)
 
-Centraliser la logique de mise à jour des stats
+⚠️ Important :
 
-⚠️ IMPORTANT
+Analyser tous les fichiers existants avant modification
 
-Ne pas recréer des fichiers existants inutilement
+Ne pas recréer des fichiers inutiles
 
-Analyser toute la logique actuelle avant modification
+Harmoniser le design
 
-Respecter strictement la table matches existante
+Améliorer UX et performance
 
-1️⃣ ARCHITECTURE SOURCE DE VÉRITÉ
+1️⃣ Page marketplace/page.tsx
+✅ Affichage des statistiques dynamiques
 
-La table matches est la source unique de vérité.
+Dans chaque card produit, afficher :
 
-Les standings (phase_group_participants) sont une projection calculée basée sur :
+👁 Vues (views)
 
-score1
+❤️ Likes (via use-interactions.ts)
 
-score2
+💬 Conversations / messages (via use-messages.ts)
 
-winnerRegistrationId
+Les données doivent être :
 
-status
+Dynamiques
 
-confirmedByAdmin
+Réactives
 
-⚠️ On ne doit JAMAIS modifier les stats directement sans passer par une logique transactionnelle.
+Synchronisées avec la base
 
-2️⃣ PROBLÈME ACTUEL : INCOHÉRENCE DES INT (STANDINGS)
 
-Les champs :
+2️⃣ Suppression enhanced-dashboard.tsx
 
-matchesPlayed
+Actuellement :
 
-matchesWon
+Il n’y a que overview et settings
 
-matchesDrawn
+enhanced-dashboard.tsx est inutile
 
-matchesLost
+✅ Action demandée
 
-points
+Supprimer son utilisation
 
-scoreFor
+Tout centraliser dans page.tsx
 
-scoreAgainst
+Compléter les autres tabs manquants
 
-scoreDifference
+3️⃣ Harmonisation Design
 
-Sont des int.
+Toutes les tabs dans page.tsx doivent :
 
-Si un participant soumet un résultat → on met à jour ces champs
-Mais si le résultat est modifié → incohérence.
+Avoir exactement le même design system
 
-✅ SOLUTION OBLIGATOIRE
+Même spacing
 
-Les standings doivent être recalculés :
+Même cards
 
-❌ PAS :
+Même header layout
 
-update +1 / -1
+Même logique responsive
 
-✅ MAIS :
+Objectif : cohérence visuelle complète.
 
-Recalcul complet à partir des matches confirmés
+4️⃣ Correction filtre qui recharge la page
+❌ Problème actuel
 
-Créer une fonction serveur centralisée :
+Dans filters.tsx + use-products.ts :
 
-recalculateGroupStandings(groupId)
+Le filtre provoque un rechargement complet de la page
 
+✅ Correction demandée
 
-Logique :
+Utiliser router.replace() avec shallow
 
-Récupérer tous les matches du groupe :
+Ou gestion state interne sans refresh
 
-status = COMPLETED
+Conserver scroll position
 
-confirmedByAdmin = true
+Pas de reload complet
 
-Reset toutes les stats du groupe à 0
+Filtre doit être :
 
-Recalculer pour chaque match :
+Instantané
 
-matchesPlayed++
+Fluide
 
-matchesWon++
+UX moderne
 
-points += config.pointsWin
+5️⃣ Pause lecture si commentaires ouverts
 
-etc.
+Dans marketplace/page.tsx :
 
-Sauvegarder les nouvelles stats
+Si section commentaires est ouverte pour un clip :
 
-⚠️ Cette fonction doit être transactionnelle.
+Mettre automatiquement en pause la vidéo active
 
-3️⃣ SOUMISSION DES RÉSULTATS – LOGIQUE PROPRE
-Règles :
-CAS 1 – Participant soumet un score
+Reprendre uniquement si commentaires fermés
 
-Peut soumettre si :
+Objectif : meilleure UX type TikTok / Reels.
 
-Il est participant1 OU participant2
+6️⃣ Game Clip Player – Ajout bouton création
 
-score1 et score2 sont null
+Dans game-clip-player.tsx :
 
-status = PENDING
+Ajouter un bouton :
 
-Action :
 
-Mettre à jour :
+Quand cliqué :
 
-score1
+Active ?create=true dans params
 
-score2
+Ouvre dialog de création clip
 
-winnerRegistrationId
+Sans redirection
 
-submittedByUserId
+Le dialog doit être contrôlé par params.
 
-confirmedByParticipant1 ou confirmedByParticipant2
+7️⃣ Clips en boucle infinie
+🎥 Infinite Loop Behavior
 
-⚠️ NE PAS recalculer les standings ici.
+Quand :
 
-CAS 2 – Les deux participants confirment
+On atteint le dernier clip
+→ Retour automatique au premier
 
-Si :
+Effet boucle infinie.
 
-confirmedByParticipant1 = true
+8️⃣ Clips minimum = 20
 
-confirmedByParticipant2 = true
+Si le nombre réel de clips < 20 :
 
-Alors :
+Ajouter automatiquement des clips de présentation mockés.
 
-status = AWAITING_ADMIN_CONFIRMATION
+🎮 Clips mock à créer
 
-CAS 3 – Admin confirme
+Ajouter en dur des clips cohérents avec l’app :
 
-Si admin confirme :
+Exemples :
 
-confirmedByAdmin = true
+Présentation tournoi
 
-confirmedAt = now
+Présentation marketplace comptes gaming
 
-status = COMPLETED
+Présentation wallet GTC
 
-➡️ Appeler :
+Présentation VIP
 
-recalculateGroupStandings(groupId)
+Présentation transferts
 
+Highlights gameplay
 
-⚠️ Seul l’admin déclenche la mise à jour des standings.
+Promo compétition
 
-4️⃣ OPTION ALTERNATIVE : PREUVE PAR SCREENSHOT
+Ces clips doivent :
 
-Si mode screenshot activé :
+Avoir miniatures
 
-Participants peuvent :
+Titres
 
-Upload screenshot via composant AdvancedUpload
+Descriptions
 
-Ajouter proofLinks
+Fake stats réalistes
 
-Ajouter notes
+Ils doivent être clairement identifiables comme clips système.
 
-Mais :
+9️⃣ Performance & UX attendues
 
-score reste null
+Scroll fluide
 
-status = PENDING_REVIEW
+Pas de refresh inutile
 
-Admin :
+Pause intelligente
 
-Vérifie preuve
+Chargement optimisé
 
-Entre score
+Design cohérent
 
-Confirme
+Param routing propre
 
-Déclenche recalcul
+🔟 Résultat final attendu
 
-5️⃣ MATCH CARD COMPONENT
+Après refactor :
 
-Créer un composant unique :
+Page produits propre
 
-<MatchCard />
+Stats dynamiques fonctionnelles
 
+Interactions & messages synchronisés
 
-Il doit :
+Pas de reload au filtre
 
-Afficher :
+Clip player amélioré
 
-Participants réels (via editionRegistrations join)
+Infinite scroll circulaire
 
-Avatar / Nom équipe
+UX moderne type TikTok
 
-Score
-
-Status
-
-Round
-
-Confirmation state
-
-Afficher dynamiquement :
-
-Si participant :
-
-Bouton "Soumettre résultat" si score null
-
-Si score déjà soumis :
-
-Badge "En attente confirmation"
-
-Si admin :
-
-Bouton "Confirmer"
-
-Bouton "Modifier"
-
-Bouton "Annuler confirmation"
-
-6️⃣ CORRECTION GÉNÉRATION MATCHES GROUP
-Problème :
-
-Erreur ECONNRESET dans getPhaseGroupParticipants
-
-Cause probable :
-
-Trop de données
-
-Mauvaise gestion Promise.all
-
-Requête lourde
-
-Problème de pool DB
-
-Correction requise :
-
-Supprimer limite 500 inutile
-
-Charger uniquement :
-
-id
-
-registrationId
-
-seedOrder
-
-Ne pas faire countQuery si non nécessaire
-
-Génération logique :
-
-Avant génération :
-
-Vérifier config du groupe
-
-Vérifier nombre de participants
-
-Vérifier si matches existent déjà
-
-Pour ROUND ROBIN :
-
-Algorithme :
-
-n participants
-
-Matches =
-
-n(n-1)/2
-
-
-Si aller-retour :
-×2
-
-Avant insertion :
-
-Pour chaque pair (A,B) :
-
-Vérifier si match existe :
-
-(A,B)
-
-OU (B,A)
-
-Si existe :
-
-Afficher Dialog :
-
-Match entre A et B existe déjà.
-Voulez-vous le recréer ?
-
-Si confirmer :
-
-delete ancien
-
-insert nouveau
-
-Sinon :
-
-skip
-
-7️⃣ BRACKET PAGE – MULTI MATCH CREATION
-
-Dans page bracketId :
-
-Supprimer champ order dans formulaire
-
-matchNumber généré automatiquement
-
-round déterminé automatiquement
-
-tri automatique par :
-
-round asc
-
-matchNumber asc
-
-Pas besoin que l’utilisateur saisisse l’ordre.
-
-8️⃣ RÈGLES DE SÉCURITÉ
-
-Un participant :
-
-Peut :
-
-Soumettre résultat
-
-Confirmer son match
-
-Ne peut pas :
-
-Modifier après confirmation admin
-
-Modifier si match COMPLETED
-
-Admin :
-
-Peut :
-
-Modifier score
-
-Annuler confirmation
-
-Forcer victoire
-
-Résoudre dispute
-
-9️⃣ DISPUTE SYSTEM
-
-Si participant conteste :
-
-disputed = true
-
-disputeReason rempli
-
-Admin :
-
-resolvedBy
-
-resolution
-
-Peut recalculer standings après correction
-
-🔟 MISE À JOUR AUTOMATIQUE UI
-
-Après confirmation admin :
-
-Invalider cache
-
-Refresh dashboard
-
-Refresh classement
-
-Refresh détail édition
-
-Sans reload complet.
-
-1️⃣1️⃣ STRUCTURE TRANSACTIONNELLE
-
-Toute confirmation admin doit être dans une transaction :
-
-BEGIN
-  update match
-  recalculateGroupStandings
-COMMIT
-
-
-Si erreur :
-ROLLBACK
-
-🎯 RÉSULTAT ATTENDU
-
-✔ Participants peuvent soumettre résultats
-✔ Aucune incohérence dans standings
-✔ Aucun doublon de match
-✔ Génération stable
-✔ Confirmation sécurisée
-✔ Bracket auto-ordonné
-✔ UI claire et professionnelle
-✔ Logique transactionnelle propre
-
-
-Error getting phase group participants: Error: Failed query: select "id", "group_id", "registration_id", "matches_played", "matches_won", "matches_drawn", "matches_lost", "points", "score_for", "score_against", "score_difference", "position", "is_seeded", "seed_order", "qualified", "qualification_position", "stats", "metadata", "is_deleted", "created_at", "updated_at" from "phase_group_participants" where ("phase_group_participants"."is_deleted" = $1 and "phase_group_participants"."group_id" = $2) order by "phase_group_participants"."points" desc limit $3
-params: false,257bca97-e4b5-47c7-87a7-df16988f6a56,500
-    at async getPhaseGroupParticipants (actions\phases.ts:362:45)
-    at async generateGroupMatchesAction (app\tournaments\[tournamentId]\editions\[editionId]\dashboard\groups\[groupId]\page.tsx:92:18)
-  360 |       .where(whereConditions);
-  361 |
-> 362 |     const [participantsData, totalResult] = await Promise.all([participantsQuery, countQuery]);
-      |                                             ^
-  363 |
-  364 |     const total = totalResult[0]?.count || 0;
-  365 |     const totalPages = Math.ceil(total / pagination.limit); {
-  query: 'select "id", "group_id", "registration_id", "matches_played", "matches_won", "matches_drawn", "matches_lost", "points", "score_for", "score_against", "score_difference", "position", "is_seeded", "seed_order", "qualified", "qualification_position", "stats", "metadata", "is_deleted", "created_at", "updated_at" from "phase_group_participants" where ("phase_group_participants"."is_deleted" = $1 and "phase_group_participants"."group_id" = $2) order by "phase_group_participants"."points" desc limit $3',
-  params: [Array],
-  [cause]: Error: read ECONNRESET
-      at ignore-listed frames {
-    errno: -4077,
-    code: 'ECONNRESET',
-    syscall: 'read'
-  }
-}
-⨯ Error: Failed to fetch phase group participants
-    at getPhaseGroupParticipants (actions\phases.ts:380:11)
-    at async generateGroupMatchesAction (app\tournaments\[tournamentId]\editions\[editionId]\dashboard\groups\[groupId]\page.tsx:92:18)
-  378 |   } catch (error) {
-  379 |     console.error('Error getting phase group participants:', error);
-> 380 |     throw new Error('Failed to fetch phase group participants');
-      |           ^
-  381 |   }
-  382 | }
-  383 | {
-  digest: '410046497'
-}
+Minimum 20 clips garantis

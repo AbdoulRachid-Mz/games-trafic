@@ -14,12 +14,16 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from '@/lib/ledger/ledger-utils';
 
 /**
- * Creates a new product order and moves funds to Escrow.
+ * Creates a new product order and reserves the product.
  */
-export async function createProductOrder(data: {
-  productId: string;
-  buyerInstructions?: string;
-}): Promise<{ success: boolean; orderId?: string; error?: string }> {
+export async function createProductOrder(
+  data: {
+    productId: string;
+    buyerInstructions?: string;
+    totalAmount?: number;
+  },
+  options?: { allowDuplicate?: boolean }
+): Promise<{ success: boolean; orderId?: string; error?: string }> {
   try {
     const user = await getCurrentUser();
     if (!user) throw new Error("Non authentifié");
@@ -35,6 +39,23 @@ export async function createProductOrder(data: {
       if (product.status !== 'NON_VENDU') throw new Error("Produit non disponible");
       if (product.shop?.ownerId === user.id) throw new Error("Vous ne pouvez pas acheter votre propre produit");
 
+      if (!options?.allowDuplicate) {
+        const existing = await tx
+          .select({ id: orders.id })
+          .from(orders)
+          .where(
+            and(
+              eq(orders.productId, product.id),
+              eq(orders.buyerId, user.id),
+              inArray(orders.status, ['PENDING', 'ACCEPTED_BY_SHOP', 'PROCESSING_BY_ADMIN'])
+            )
+          )
+          .limit(1);
+        if (existing.length > 0) {
+          throw new Error("Une commande similaire est déjà en cours");
+        }
+      }
+
       // 2. Fetch Buyer Wallet
       const buyerWallet = await tx.query.userWallets.findFirst({
         where: eq(userWallets.userId, user.id)
@@ -46,7 +67,8 @@ export async function createProductOrder(data: {
 
       // 3. Check Balance
       const balance = await getAccountBalance(buyerWallet.financialAccountId);
-      const price = parseFloat(product.price);
+      const unitPrice = parseFloat(product.price);
+      const price = typeof data.totalAmount === 'number' && data.totalAmount > 0 ? data.totalAmount : unitPrice;
 
       if (balance < price) {
         throw new Error(`Solde insuffisant. Requis: ${price} GTC, Disponible: ${balance} GTC`);
@@ -57,36 +79,14 @@ export async function createProductOrder(data: {
         productId: product.id,
         buyerId: user.id,
         shopId: product.shopId,
-        price: product.price,
+        price: price.toFixed(2),
         status: 'PENDING',
         buyerInstructions: data.buyerInstructions,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
 
-      // 5. Move funds to Escrow
-      const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
-
-      const { transaction } = await executeTransaction({
-        fromAccountId: buyerWallet.financialAccountId,
-        toAccountId: escrowAccount.id,
-        amount: price,
-        type: 'ORDER_PURCHASE',
-        description: `Achat du produit: ${product.name} (Commande #${newOrder.id.slice(0, 8)})`,
-        userId: user.id,
-        walletId: buyerWallet.id,
-        metadata: {
-          orderId: newOrder.id,
-          productId: product.id,
-          shopId: product.shopId
-        }
-      });
-
-      // 6. Update Order with transaction link and mark product as reserved
-      await tx.update(orders)
-        .set({ walletTransactionId: transaction.id })
-        .where(eq(orders.id, newOrder.id));
-
+      // 5. Mark product as reserved
       await tx.update(products)
         .set({ status: 'RESERVE' })
         .where(eq(products.id, product.id));
@@ -164,10 +164,37 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         shopAccountId = fa.id;
       }
 
-      // 2. Move funds from Escrow to Shop
+      // 2. Move funds from Buyer to Escrow (admin validation)
       const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
-      const amount = parseFloat(order.price);
+      const buyerWallet = await tx.query.userWallets.findFirst({
+        where: eq(userWallets.userId, order.buyerId)
+      });
+      if (!buyerWallet?.financialAccountId) {
+        throw new Error("Wallet acheteur introuvable");
+      }
 
+      const amount = parseFloat(order.price);
+      const buyerBalance = await getAccountBalance(buyerWallet.financialAccountId);
+      if (buyerBalance < amount) {
+        throw new Error("Solde insuffisant pour valider la commande");
+      }
+
+      const { transaction } = await executeTransaction({
+        fromAccountId: buyerWallet.financialAccountId,
+        toAccountId: escrowAccount.id,
+        amount: amount,
+        type: 'ORDER_PURCHASE',
+        description: `Achat du produit: ${order.product?.name || 'Produit'} (Commande #${order.id.slice(0, 8)})`,
+        userId: order.buyerId,
+        walletId: buyerWallet.id,
+        metadata: {
+          orderId: order.id,
+          productId: order.productId,
+          shopId: order.shopId
+        }
+      });
+
+      // 3. Move funds from Escrow to Shop
       await executeTransaction({
         fromAccountId: escrowAccount.id,
         toAccountId: shopAccountId!,
@@ -177,8 +204,12 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         metadata: { orderId: order.id, type: 'SHOP_PAYOUT' }
       });
 
-      // 3. Finalize Order and Product
-      await tx.update(orders).set({ status: 'COMPLETED', updatedAt: new Date() }).where(eq(orders.id, order.id));
+      // 4. Finalize Order and Product
+      await tx.update(orders).set({
+        status: 'COMPLETED',
+        walletTransactionId: transaction.id,
+        updatedAt: new Date()
+      }).where(eq(orders.id, order.id));
       await tx.update(products).set({
         status: 'VENDU',
         deliveredToUserId: order.buyerId,
@@ -223,21 +254,23 @@ export async function rejectOrder(orderId: string, reason: string): Promise<{ su
       if (isShop) newStatus = 'REJECTED_BY_SHOP';
       if (isAdmin) newStatus = 'REJECTED_BY_ADMIN';
 
-      // Refund if status was PENDING or ACCEPTED_BY_SHOP
-      const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
-      const buyerWallet = await tx.query.userWallets.findFirst({
-        where: eq(userWallets.userId, order.buyerId)
-      });
-
-      if (buyerWallet?.financialAccountId) {
-        await executeTransaction({
-          fromAccountId: escrowAccount.id,
-          toAccountId: buyerWallet.financialAccountId,
-          amount: parseFloat(order.price),
-          type: 'REFUND',
-          description: `Remboursement de la commande #${order.id.slice(0, 8)}: ${reason}`,
-          metadata: { orderId: order.id, refundReason: reason }
+      // Refund only if funds were already captured
+      if (order.walletTransactionId) {
+        const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
+        const buyerWallet = await tx.query.userWallets.findFirst({
+          where: eq(userWallets.userId, order.buyerId)
         });
+
+        if (buyerWallet?.financialAccountId) {
+          await executeTransaction({
+            fromAccountId: escrowAccount.id,
+            toAccountId: buyerWallet.financialAccountId,
+            amount: parseFloat(order.price),
+            type: 'REFUND',
+            description: `Remboursement de la commande #${order.id.slice(0, 8)}: ${reason}`,
+            metadata: { orderId: order.id, refundReason: reason }
+          });
+        }
       }
 
       await tx.update(orders).set({
@@ -503,6 +536,31 @@ export async function getUserOrderStats(userId: string) {
     console.error('Error getting user order stats:', error);
     throw new Error('Failed to fetch user order stats');
   }
+}
+
+export async function getOrderCredentialsForBuyer(orderId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Non authentifié");
+  }
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+  });
+  if (!order) {
+    throw new Error("Commande non trouvée");
+  }
+  if (order.buyerId !== user.id) {
+    throw new Error("Accès refusé");
+  }
+  const allowedStatuses = ["COMPLETED", "ACCEPTED_BY_SHOP"] as OrderStatus[];
+  if (!allowedStatuses.includes(order.status as OrderStatus)) {
+    throw new Error("Identifiants indisponibles");
+  }
+  const credentials = order.sellerCredentials as any;
+  return {
+    login: credentials?.login || credentials?.accountLogin || null,
+    password: credentials?.pass || credentials?.password || null,
+  };
 }
 
 export async function getOrdersByBuyerId(

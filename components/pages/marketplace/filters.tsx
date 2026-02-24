@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { countries } from "@/lib/countries";
 
 const POPULAR_GAMES = [
+  "Efootball Pes",
   "Valorant",
   "League of Legends",
   "Fortnite",
@@ -135,7 +136,7 @@ export function MarketplaceFilters() {
     params.set("maxLevel", levelRange[1].toString());
     params.set("sortBy", sortBy);
 
-    router.push(`/marketplace?${params.toString()}`);
+    router.replace(`/marketplace?${params.toString()}`, { scroll: false });
   };
 
   const resetFilters = () => {
@@ -148,7 +149,7 @@ export function MarketplaceFilters() {
     setPriceRange([0, 10000]);
     setLevelRange([1, 100]);
     setSortBy("popularity");
-    router.push("/marketplace");
+    router.replace("/marketplace", { scroll: false });
   };
 
   const hasActiveFilters =
@@ -177,7 +178,7 @@ export function MarketplaceFilters() {
   };
 
   // Popular countries for gaming
-  const popularCountries = countries.filter(c => 
+  const popularCountries = countries.filter(c =>
     ["US", "FR", "DE", "GB", "CA", "AU", "BR", "JP", "KR"].includes(c.code)
   );
 
@@ -295,7 +296,7 @@ export function MarketplaceFilters() {
                   className={cn(
                     "p-2 rounded-lg border transition-all hover:scale-105 text-xs font-medium",
                     selectedRanks.includes(rank.value)
-                      ? "bg-primary/10 border-primary text-primary" 
+                      ? "bg-primary/10 border-primary text-primary"
                       : "hover:bg-muted"
                   )}
                 >

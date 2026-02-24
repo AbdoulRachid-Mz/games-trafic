@@ -190,7 +190,7 @@ export default function ClientWalletPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="bg-card/40 backdrop-blur-xl border-border/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -239,8 +239,8 @@ export default function ClientWalletPage() {
       </motion.div>
 
       {/* Onglets principaux - Simplifié pour ne garder que l'aperçu global */}
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="bg-card/40 backdrop-blur-xl border-border/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -307,7 +307,7 @@ export default function ClientWalletPage() {
             </Card>
 
             <Card className="bg-card/40 backdrop-blur-xl border-border/50">
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 rounded-lg bg-blue-500/10">
                     <Shield className="h-5 w-5 text-blue-500" />
@@ -331,7 +331,7 @@ export default function ClientWalletPage() {
                     onClick={() => router.push("/wallet/claims")}
                   >
                     <Bell className="h-4 w-4" />
-                    Réclamations (Claims)
+                    Réclamations
                   </Button>
                 </div>
               </CardContent>

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { TransactionType, TransactionEntity } from "@/types/transaction-types";
@@ -23,6 +24,17 @@ interface TransactionAmountInputProps {
   transactionType: TransactionType;
   entity?: TransactionEntity;
   alreadyVip?: boolean;
+  metadata?: {
+    gameAccount?: string;
+    encryptedPassword?: string;
+    additionalInfo?: string;
+    originalAmount?: number;
+  };
+  onMetadataChange?: (data: {
+    gameAccount?: string;
+    encryptedPassword?: string;
+    additionalInfo?: string;
+  }) => void;
   onContinue: () => void;
   onBack: () => void;
 }
@@ -35,6 +47,8 @@ export function TransactionAmountInput({
   transactionType,
   entity,
   alreadyVip,
+  metadata,
+  onMetadataChange,
   onContinue,
   onBack,
 }: TransactionAmountInputProps) {
@@ -62,6 +76,24 @@ export function TransactionAmountInput({
   const requiresQuantity =
     isGameItem && !(itemType === "COIN" || itemType === "CURRENCY");
   const unitPrice = entity?.price || 0;
+  const grossAmount = amount || 0;
+  const feeAmount = fees.amount || 0;
+  const debitedAmount = grossAmount;
+  const receivedAmount = Math.max(0, grossAmount - feeAmount);
+  const originalAmount = metadata?.originalAmount;
+
+  const [gameAccount, setGameAccount] = React.useState(metadata?.gameAccount || "");
+  const [gamePassword, setGamePassword] = React.useState(metadata?.encryptedPassword || "");
+  const [additionalInfo, setAdditionalInfo] = React.useState(metadata?.additionalInfo || "");
+
+  React.useEffect(() => {
+    if (!onMetadataChange || !isGameItem) return;
+    onMetadataChange({
+      gameAccount,
+      encryptedPassword: gamePassword,
+      additionalInfo,
+    });
+  }, [gameAccount, gamePassword, additionalInfo, isGameItem, onMetadataChange]);
 
   const hasSufficientBalance =
     isDeposit ||
@@ -129,6 +161,19 @@ export function TransactionAmountInput({
               </div>
             </div>
           )}
+          {isGameItem &&
+            typeof originalAmount === "number" &&
+            originalAmount > 0 &&
+            Math.abs(originalAmount - grossAmount) > 0.01 && (
+              <div className="mb-6 p-4 rounded-xl border border-amber-300/40 bg-amber-200/15">
+                <Typography variant="body-sm" className="font-bold text-amber-700">
+                  Montant réel appliqué: {grossAmount.toFixed(2)} GTC
+                </Typography>
+                <Typography variant="caption1" theme="muted">
+                  Montant initial reçu: {originalAmount.toFixed(2)} GTC
+                </Typography>
+              </div>
+            )}
 
           {(requiresAmountInput || requiresQuantity) && (
             <div className="space-y-8">
@@ -202,9 +247,9 @@ export function TransactionAmountInput({
           {/* Breakdown Info */}
           <div className="space-y-3 bg-card/30 rounded-xl p-4 border border-border/50">
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Montant</span>
+              <span className="text-muted-foreground">Montant brut</span>
               <span className="font-bold">
-                {(amount || 0).toFixed(2)} GTC
+                {grossAmount.toFixed(2)} GTC
               </span>
             </div>
             {fees.percentage > 0 && (
@@ -212,16 +257,55 @@ export function TransactionAmountInput({
                 <span className="flex items-center gap-1">
                   Frais <Info className="w-3 h-3" />
                 </span>
-                <span className="font-bold">+{fees.amount.toFixed(2)} GTC</span>
+                <span className="font-bold">{feeAmount.toFixed(2)} GTC</span>
               </div>
             )}
             <div className="flex justify-between items-center pt-2 border-t border-border/50">
-              <span className="font-bold text-lg">Total</span>
-              <span className="font-black text-xl text-primary">
-                {fees.totalAmount.toFixed(2)} GTC
+              <span className="font-bold text-sm">Montant débité</span>
+              <span className="font-black text-lg text-primary">
+                {debitedAmount.toFixed(2)} GTC
               </span>
             </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Montant reçu</span>
+              <span className="font-bold">{receivedAmount.toFixed(2)} GTC</span>
+            </div>
           </div>
+
+          {isGameItem && (
+            <div className="mt-8 space-y-4">
+              <div className="space-y-2">
+                <Label>Compte de jeu</Label>
+                <Input
+                  className="bg-background/50 h-11"
+                  placeholder="Identifiant du compte"
+                  value={gameAccount}
+                  onChange={(e) => setGameAccount(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mot de passe</Label>
+                <Input
+                  type="password"
+                  className="bg-background/50 h-11"
+                  placeholder="Mot de passe du compte"
+                  value={gamePassword}
+                  onChange={(e) => setGamePassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Infos supplémentaires</Label>
+                <Textarea
+                  className="bg-background/50 min-h-[90px]"
+                  placeholder="Serveur, pseudo, contraintes particulières..."
+                  value={additionalInfo}
+                  onChange={(e) => setAdditionalInfo(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           {!isDeposit && (
             <div

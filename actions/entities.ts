@@ -774,35 +774,6 @@ export async function deleteEntity(
 }
 
 /**
- * Calculer les frais de transaction
- */
-export async function calculateTransactionFees(
-  type: string,
-  amount: number,
-): Promise<{ fees: number; total: number }> {
-  // Structure de frais basée sur le type de transaction
-  const feeStructure: Record<string, number> = {
-    PURCHASE: 0.02, // 2%
-    VIP_SUBSCRIPTION: 0.0, // Pas de frais
-    GAME_ITEM_PURCHASE: 0.015, // 1.5%
-    THEME_PURCHASE: 0.01, // 1%
-    DEPOSIT: 0.0, // Pas de frais
-    WITHDRAWAL: 0.03, // 3%
-    REFUND: 0.0, // Pas de frais
-    TRANSFER: 0.01, // 1%
-    ORDER_PURCHASE: 0.025, // 2.5%
-    TOURNAMENT_PARTICIPATION: 0.015, // 1.5%
-    BONUS: 0.0, // Pas de frais
-  };
-
-  const feePercentage = feeStructure[type] || 0.02; // 2% par défaut
-  const fees = amount * feePercentage;
-  const total = amount + fees;
-
-  return { fees, total };
-}
-
-/**
  * Approuver une commande
  */
 export async function approveOrder(

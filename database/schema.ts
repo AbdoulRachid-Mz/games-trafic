@@ -1626,6 +1626,7 @@ export const requests = pgTable('requests', {
   cancelledAt: timestamp('cancelled_at'),
   cancellationReason: text('cancellation_reason'),
   isDeleted: boolean('is_deleted').default(false),
+  metadata: jsonb('metadata').default({}),
 
   // Timestamps
   createdAt: timestamp('created_at').defaultNow(),

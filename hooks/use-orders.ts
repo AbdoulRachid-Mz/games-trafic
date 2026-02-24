@@ -48,11 +48,11 @@ export function useOrderStats() {
   });
 }
 
-// ---------- MUTATIONS ----------
 export function useCreateOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: createProductOrder,
+    mutationFn: (data: { productId: string; buyerInstructions?: string; totalAmount?: number }) =>
+      createProductOrder(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [ORDERS_QUERY_KEY] });
       qc.invalidateQueries({ queryKey: [ORDER_STATS_QUERY_KEY] });

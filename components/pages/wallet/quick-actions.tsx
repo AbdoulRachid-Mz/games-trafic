@@ -172,7 +172,7 @@ export function QuickActions({ walletId }: QuickActionsProps) {
           <div className="flex items-center justify-between pt-6 mt-6 border-t border-white/5">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
               <Shield className="h-3.5 w-3.5 text-green-500" />
-              <span className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">
+              <span className="text-xs max-md:text-sm font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">
                 Sécurisé par GTC-Guard™
               </span>
             </div>
@@ -180,6 +180,7 @@ export function QuickActions({ walletId }: QuickActionsProps) {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => router.push("/wallet/settings")}
               className="text-xs font-medium text-muted-foreground hover:text-primary gap-2"
             >
               <Settings className="h-3.5 w-3.5" />

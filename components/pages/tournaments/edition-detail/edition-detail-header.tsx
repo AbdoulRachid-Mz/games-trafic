@@ -74,19 +74,26 @@ export function EditionDetailHeader({
 
   const dropdownData = [
     {
-      label: "Modifier",
-      icon: <Edit className="w-4 h-4" />,
-      onClick: onEdit,
-      disabled: !onEdit,
+      label: "Tableau de bord",
+      icon: null,
+      onClick: () => router.push(`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`),
+      disabled: false,
       requireOrganizer: true,
     },
     {
-      label: "Supprimer",
-      icon: <Trash2 className="w-4 h-4" />,
-      onClick: onDelete,
-      disabled: !onDelete,
+      label: "Matchs",
+      icon: null,
+      onClick: () => router.push(`/tournaments/${tournament.id}/editions/${edition.id}/matches`),
+      disabled: false,
       requireOrganizer: true,
     },
+    {
+      label: "Calendrier",
+      icon: null,
+      onClick: () => router.push(`/tournaments/${tournament.id}/editions/${edition.id}/calendar`),
+      disabled: false,
+      requireOrganizer: true,
+    }
   ];
 
   const getStatusColor = (status: string) => {
@@ -259,12 +266,12 @@ export function EditionDetailHeader({
             />
 
             {/* Share button for non-organizers */}
-            {!isOrganizer && (
+            {/* {!isOrganizer && (
               <Button variant="outline" size="sm" className="gap-2">
                 <Share2 className="h-4 w-4" />
                 Partager
               </Button>
-            )}
+            )} */}
 
             {/* Map button */}
             {edition.locationType !== "ONLINE" && edition.location && (

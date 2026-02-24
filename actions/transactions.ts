@@ -249,15 +249,18 @@ export async function getTransactionStats(filters?: WalletTransactionFilters) {
  * Crée une transaction wallet
  * ⚠️ REFACTORÉ: Utilise maintenant executeTransaction pour garantir la comptabilité double-entry
  */
-export async function createTransaction(data: {
-  walletId: string;
-  type: NewWalletTransaction["type"];
-  amount: string;
-  description?: string;
-  metadata?: Record<string, any>;
-  fees?: string;
-  netAmount?: string;
-}): Promise<WalletTransaction> {
+export async function createTransaction(
+  data: {
+    walletId: string;
+    type: NewWalletTransaction["type"];
+    amount: string;
+    description?: string;
+    metadata?: Record<string, any>;
+    fees?: string;
+    netAmount?: string;
+  },
+  options?: { allowDuplicate?: boolean }
+): Promise<WalletTransaction> {
   if (!data.walletId || !data.type || !data.amount) {
     throw new Error("Données de transaction incomplètes");
   }
@@ -293,6 +296,26 @@ export async function createTransaction(data: {
     if (diff < minWait) {
       const remaining = Math.ceil((minWait - diff) / 1000);
       throw new Error(`Veuillez patienter ${remaining}s avant une nouvelle transaction`);
+    }
+  }
+
+  if (
+    !options?.allowDuplicate &&
+    ["GAME_ITEM_PURCHASE", "DEPOSIT", "WITHDRAWAL", "PRODUCT_PURCHASE", "ORDER_PURCHASE"].includes(data.type)
+  ) {
+    const existing = await db
+      .select({ id: walletTransactions.id })
+      .from(walletTransactions)
+      .where(
+        and(
+          eq(walletTransactions.fromUserId, user.id),
+          eq(walletTransactions.type, data.type),
+          inArray(walletTransactions.status, ["PENDING", "PROCESSING"])
+        )
+      )
+      .limit(1);
+    if (existing.length > 0) {
+      throw new Error("Une transaction du même type est déjà en cours");
     }
   }
 
@@ -510,37 +533,38 @@ export async function getTransactionFees(type: string, amount: number) {
       case "THEME_PURCHASE":
       case "PRODUCT_PURCHASE":
       case "GAME_ITEM_PURCHASE":
+      case "ORDER_PURCHASE":
         feePercentage = parseFloat(
-          settings?.purchaseFeePercentage?.toString() || "0.02"
+          settings?.purchaseFeePercentage?.toString() || "0"
         );
         break;
       case "VIP_SUBSCRIPTION":
         feePercentage = parseFloat(
-          settings?.transactionFeePercentage?.toString() || "0.001"
+          settings?.transactionFeePercentage?.toString() || "0"
         );
         break;
       case "TOURNAMENT_PARTICIPATION":
         feePercentage = parseFloat(
-          settings?.tournamentParticipationFeePercentage?.toString() || "0.015"
+          settings?.tournamentParticipationFeePercentage?.toString() || "0"
         );
         break;
       case "DEPOSIT":
         feePercentage = parseFloat(
-          settings?.depositFeePercentage?.toString() || "0.001"
+          settings?.depositFeePercentage?.toString() || "0"
         );
         break;
       case "WITHDRAWAL":
         feePercentage = parseFloat(
-          settings?.withdrawalFeePercentage?.toString() || "0.02"
+          settings?.withdrawalFeePercentage?.toString() || "0"
         );
         break;
       case "TRANSFER":
         feePercentage = parseFloat(
-          settings?.transferFeePercentage?.toString() || "0.005"
+          settings?.transferFeePercentage?.toString() || "0"
         );
         break;
       default:
-        feePercentage = 0.01;
+        feePercentage = 0;
     }
 
     const sessionUser = await getCurrentUser();
@@ -557,7 +581,7 @@ export async function getTransactionFees(type: string, amount: number) {
     }
 
     const fees = amount * feePercentage;
-    const totalAmount = amount + fees;
+    const totalAmount = amount;
 
     return {
       feePercentage,
@@ -566,10 +590,9 @@ export async function getTransactionFees(type: string, amount: number) {
     };
   } catch (error) {
     console.error("Error calculating fees:", error);
-    // Fallback
-    const feePercentage = 0.01;
-    const fees = amount * feePercentage;
-    const totalAmount = amount + fees;
+    const feePercentage = 0;
+    const fees = 0;
+    const totalAmount = amount;
     return { feePercentage, fees, totalAmount };
   }
 }

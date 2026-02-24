@@ -152,6 +152,34 @@ export function TransactionEntitySelector({
     });
   }, [entities, search]);
 
+  const mappedEntities = useMemo(() => {
+    return filteredEntities.map((entity: any) => {
+      const image =
+        type === "THEME_PURCHASE"
+          ? entity.thumbnail || entity.image
+          : type === "PRODUCT_PURCHASE"
+            ? entity.featuredImage || entity.images?.[0] || entity.image
+            : type === "GAME_ITEM_PURCHASE"
+              ? entity.icon || entity.image
+              : type === "TOURNAMENT_PARTICIPATION"
+                ? entity.tournament?.profileImage || entity.tournament?.coverImage
+                : entity.image;
+
+      const price =
+        type === "GAME_ITEM_PURCHASE"
+          ? parseFloat(entity.priceGtc || entity.price || "0")
+          : type === "TOURNAMENT_PARTICIPATION"
+            ? parseFloat(entity.entryFee || "0")
+            : parseFloat(entity.price || "0");
+
+      return {
+        ...entity,
+        image: image || undefined,
+        price: entity.price !== undefined ? entity.price : price,
+      };
+    });
+  }, [filteredEntities, type]);
+
   const Icon = getEntityIcon();
   const entityLabel = getEntityLabel();
 
@@ -236,7 +264,7 @@ export function TransactionEntitySelector({
                   )}
                 </div>
               ) : (
-                filteredEntities.map((entity, index) => (
+                mappedEntities.map((entity, index) => (
                   <motion.div
                     key={entity.id}
                     initial={{ opacity: 0, y: 15 }}

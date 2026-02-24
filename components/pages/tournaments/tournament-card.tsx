@@ -102,6 +102,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           </Badge>
         </div>
 
+{/* 
         <div className="absolute top-3 left-3 z-10">
           <Dialog>
             <DialogTrigger asChild>
@@ -135,7 +136,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
+        </div> */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-60" />
 
         <div className="absolute bottom-3 left-3 right-3">

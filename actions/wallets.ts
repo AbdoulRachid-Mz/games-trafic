@@ -16,6 +16,7 @@ import {
   type LedgerEntry,
   VerificationEnum,
   shops,
+  tournamentEditions,
 } from '@/database/schema';
 import {
   eq,
@@ -789,9 +790,19 @@ export async function transferMoney(
     }
     if (fromBalance < amount) return { success: false, error: 'Solde insuffisant' };
 
-    // Calculer les frais
-    const fees = WalletUtils.calculateFees(amount, 'TRANSFER', false);
-    const netAmount = amount - fees.amount;
+    const settings = await getAppSettings();
+    let feePercentage = parseFloat(settings?.transferFeePercentage?.toString() || "0");
+    const [fromUser] = await db
+      .select({ isVip: users.isVip })
+      .from(users)
+      .where(eq(users.id, fromUserId))
+      .limit(1);
+    if (fromUser?.isVip) {
+      feePercentage = Math.max(0, feePercentage * 0.5);
+    }
+    const feeAmount = amount * feePercentage;
+    const netAmount = amount - feeAmount;
+    const fees = { amount: feeAmount, percentage: feePercentage, netAmount };
 
     // Créer la transaction de transfert
     const transaction = await createTransaction({
@@ -885,6 +896,14 @@ export async function transferBetweenIdentities(params: {
         const shop = await tx.query.shops.findFirst({ where: eq(shops.id, params.fromIdentityId) });
         if (shop?.ownerId !== user.id) throw new Error("Accès refusé (Non propriétaire)");
         fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop.financialAccountId!) });
+      } else if (params.fromType === 'TOURNAMENT') {
+        const edition = await tx.query.tournamentEditions.findFirst({
+          where: eq(tournamentEditions.id, params.fromIdentityId),
+          with: { tournament: true },
+        });
+        if (!edition) throw new Error("Édition introuvable");
+        if (edition.tournament?.organizerId !== user.id) throw new Error("Accès refusé (Non organisateur)");
+        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId!) });
       }
 
       // 2. Resolve destination account
@@ -895,6 +914,14 @@ export async function transferBetweenIdentities(params: {
       } else if (params.toType === 'SHOP') {
         const shop = await tx.query.shops.findFirst({ where: eq(shops.id, params.toIdentityId) });
         toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop!.financialAccountId!) });
+      } else if (params.toType === 'TOURNAMENT') {
+        const edition = await tx.query.tournamentEditions.findFirst({
+          where: eq(tournamentEditions.id, params.toIdentityId),
+          with: { tournament: true },
+        });
+        if (!edition) throw new Error("Édition introuvable");
+        if (edition.tournament?.organizerId !== user.id) throw new Error("Accès refusé (Non organisateur)");
+        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId!) });
       }
 
       if (!fromAccount || !toAccount) throw new Error("Comptes introuvables");

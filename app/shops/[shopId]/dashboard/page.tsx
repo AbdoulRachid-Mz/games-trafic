@@ -41,10 +41,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getShopStats, getShopStatsById, getShopLedgerStats } from "@/actions/shops";
-import { getOrderStats, getShopOrderStats } from "@/actions/orders";
+import { getShopStatsById, getShopLedgerStats } from "@/actions/shops";
+import { getShopOrderStats } from "@/actions/orders";
 import { getProductStats } from "@/actions/products";
 import { AdvancedChart } from "@/components/ui/advanced-chart";
+import { useAuthContext } from "@/contexts/auth-context";
+import { Input } from "@/components/ui/input";
+import { transferBetweenIdentities } from "@/actions/wallets";
+import { toast } from "sonner";
 
 // Données pour les charts
 const salesData = [
@@ -77,8 +81,11 @@ const revenueData = [
 
 export default function ShopOverviewPage() {
   const params = useParams();
+  const { user } = useAuthContext();
   const [timeRange, setTimeRange] = useState("7j");
   const [loading, setLoading] = useState(true);
+  const [transferAmount, setTransferAmount] = useState("");
+  const [isTransferring, setIsTransferring] = useState(false);
   const [stats, setStats] = useState({
     revenue: { current: 0, change: 0 },
     expenses: { current: 0, change: 0 },
@@ -86,6 +93,7 @@ export default function ShopOverviewPage() {
     products: { current: 0, change: 0 },
     visitors: { current: 0, change: 0 },
   });
+  const [shopBalance, setShopBalance] = useState(0);
 
   useEffect(() => {
     loadStats();
@@ -94,21 +102,45 @@ export default function ShopOverviewPage() {
   const loadStats = async () => {
     setLoading(true);
     try {
-      // Ici, vous intégrerez les vraies données
-      const [shopStats, orderStats, productStats, ledgerStats] = await Promise.all([
+      const now = new Date();
+      const days = timeRange === "24h" ? 1 : timeRange === "7j" ? 7 : timeRange === "30j" ? 30 : 90;
+      const currentStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      const previousStart = new Date(now.getTime() - days * 2 * 24 * 60 * 60 * 1000);
+      const previousEnd = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+      const [shopStats, orderStats, productStats, ledgerStats, previousLedgerStats] = await Promise.all([
         getShopStatsById(params.id as string),
         getShopOrderStats(params.id as string),
         getProductStats({ shopId: params.id as string }),
-        getShopLedgerStats(params.id as string),
+        getShopLedgerStats(params.id as string, {
+          startDate: currentStart.toISOString(),
+          endDate: now.toISOString(),
+        }),
+        getShopLedgerStats(params.id as string, {
+          startDate: previousStart.toISOString(),
+          endDate: previousEnd.toISOString(),
+        }),
       ]);
 
+      const revenueChange = previousLedgerStats.income
+        ? ((ledgerStats.income - previousLedgerStats.income) / previousLedgerStats.income) * 100
+        : ledgerStats.income > 0
+          ? 100
+          : 0;
+      const expenseChange = previousLedgerStats.expense
+        ? ((ledgerStats.expense - previousLedgerStats.expense) / previousLedgerStats.expense) * 100
+        : ledgerStats.expense > 0
+          ? 100
+          : 0;
+
       setStats({
-        revenue: { current: ledgerStats?.income || 0, change: 12.5 },
-        expenses: { current: ledgerStats?.expense || 0, change: -4.2 },
-        orders: { current: orderStats?.total || 24, change: 8.2 },
-        products: { current: productStats?.total || 18, change: 5.4 },
-        visitors: { current: 1242, change: -2.1 },
+        revenue: { current: ledgerStats?.income || 0, change: Number(revenueChange.toFixed(1)) },
+        expenses: { current: ledgerStats?.expense || 0, change: Number(expenseChange.toFixed(1)) },
+        orders: { current: orderStats?.total || 0, change: 0 },
+        products: { current: productStats?.total || 0, change: 0 },
+        visitors: { current: 0, change: 0 },
       });
+      setShopBalance(parseFloat(shopStats?.balance || "0"));
     } catch (error) {
       console.error("Erreur chargement stats:", error);
     } finally {
@@ -165,6 +197,41 @@ export default function ShopOverviewPage() {
   if (loading) {
     return <OverviewSkeleton />;
   }
+
+  const handleTransfer = async () => {
+    if (!user?.id) return;
+    const amount = parseFloat(transferAmount || "0");
+    if (!amount || amount <= 0) {
+      toast.error("Montant invalide");
+      return;
+    }
+    if (amount > shopBalance) {
+      toast.error("Solde insuffisant");
+      return;
+    }
+    setIsTransferring(true);
+    try {
+      const res = await transferBetweenIdentities({
+        fromIdentityId: params.id as string,
+        fromType: "SHOP",
+        toIdentityId: user.id,
+        toType: "USER",
+        amount,
+        description: "Virement des revenus boutique vers wallet",
+      });
+      if (!res.success) {
+        toast.error(res.error || "Erreur lors du virement");
+        return;
+      }
+      toast.success("Virement effectué vers votre wallet");
+      setTransferAmount("");
+      loadStats();
+    } catch {
+      toast.error("Erreur lors du virement");
+    } finally {
+      setIsTransferring(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -249,6 +316,33 @@ export default function ShopOverviewPage() {
           color="amber"
         />
       </motion.div>
+
+      <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+        <CardHeader>
+          <CardTitle>Virement vers votre wallet</CardTitle>
+          <CardDescription>
+            Disponible: {shopBalance.toFixed(2)} GTC
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row gap-3">
+          <Input
+            value={transferAmount}
+            onChange={(e) => setTransferAmount(e.target.value)}
+            placeholder="Montant en GTC"
+            type="number"
+            min="0"
+            className="max-w-sm"
+          />
+          <Button
+            onClick={handleTransfer}
+            disabled={isTransferring || !transferAmount}
+            className="gap-2"
+          >
+            {isTransferring ? "Traitement..." : "Virement vers mon wallet"}
+            <ArrowUpRight className="h-4 w-4" />
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Onglets de performance */}
       <Tabs defaultValue="sales" className="space-y-4">

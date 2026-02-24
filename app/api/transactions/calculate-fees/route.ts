@@ -43,31 +43,29 @@ export async function POST(request: NextRequest) {
     switch (data.type) {
       case "THEME_PURCHASE":
       case "PRODUCT_PURCHASE":
-        feePercentage = Number(settings.purchaseFeePercentage ?? 0.01);
+      case "GAME_ITEM_PURCHASE":
+      case "ORDER_PURCHASE":
+        feePercentage = Number(settings.purchaseFeePercentage ?? 0);
         break;
 
       case "VIP_SUBSCRIPTION":
-        feePercentage = Number(settings.transactionFeePercentage ?? 0.005);
+        feePercentage = Number(settings.transactionFeePercentage ?? 0);
         break;
 
       case "TOURNAMENT_PARTICIPATION":
-        feePercentage = Number(settings.tournamentParticipationFeePercentage ?? 0.015);
-        break;
-
-      case "GAME_ITEM_PURCHASE":
-        feePercentage = Number(settings.gameItemCommissionPercentage ?? 0.03);
+        feePercentage = Number(settings.tournamentParticipationFeePercentage ?? 0);
         break;
 
       case "DEPOSIT":
-        feePercentage = Number(settings.depositFeePercentage ?? 0.001);
+        feePercentage = Number(settings.depositFeePercentage ?? 0);
         break;
 
       case "WITHDRAWAL":
-        feePercentage = Number(settings.withdrawalFeePercentage ?? 0.02);
+        feePercentage = Number(settings.withdrawalFeePercentage ?? 0);
         break;
 
       case "TRANSFER":
-        feePercentage = Number(settings.transferFeePercentage ?? 0.005);
+        feePercentage = Number(settings.transferFeePercentage ?? 0);
         break;
 
       default:
@@ -78,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     const fees = Number((amount * feePercentage).toFixed(2));
-    const totalAmount = Number((amount + fees).toFixed(2));
+    const totalAmount = Number(amount.toFixed(2));
 
     return NextResponse.json({
       feePercentage,

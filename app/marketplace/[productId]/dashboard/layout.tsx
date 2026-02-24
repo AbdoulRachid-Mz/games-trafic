@@ -1,126 +1,49 @@
 // app/marketplace/[productId]/dashboard/layout.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { getProductById } from "@/actions/products";
-import {
-  EnhancedDashboard,
-  SidebarHeader,
-  SidebarGroup,
-  SidebarItem,
-  SidebarFooter,
-  DashboardHeader,
-  SidebarContainer,
-} from "@/components/dashboard/enhanced-dashboard";
-import { PageSkeleton } from "@/components/ui/page-skeleton";
-import { useAuthContext } from "@/contexts/auth-context";
-import { useActiveRoute } from "@/hooks/use-active-route";
-import { getProductNavData } from "@/constants/product-constants";
+import React from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft } from "lucide-react";
+import { Typography } from "@/components/ui/typography";
 
 export default function ProductDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const params = useParams();
-  const productId = params.productId as string;
-  const [product, setProduct] = useState<any>(null);
-  const { user, loading } = useAuthContext();
-  const { isActive } = useActiveRoute();
-
-  useEffect(() => {
-    getProductById(productId).then(setProduct);
-  }, [productId]);
-
-  if (loading || !product) {
-    return <PageSkeleton type="dashboard" />;
-  }
-
-  // Obtenir les données de navigation
-  const navData = getProductNavData(productId);
-
-  // Récupérer tous les items pour le header
-  const allItems = [
-    ...navData.overviewItems,
-    ...navData.editItems,
-    ...navData.viewItems,
-  ];
-
-  // Trouver l'item actif pour le titre du header
-  const activeItem = allItems.find(item => item.url && isActive(item.url, false));
-  const pageTitle = activeItem?.title || product?.name || "Produit";
-  const pageDescription = activeItem?.description || `Tableau de bord du produit`;
-
-  const ProductSidebar = (
-    <SidebarContainer sidebarBgType="gradient">
-      <SidebarHeader
-        title={product?.name || "Produit"}
-        subtitle="Tableau de bord"
-        user={{
-          username: user?.username || "Vendeur",
-          level: "Product Owner",
-        }}
-        sidebarBgType="gradient"
-      />
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <SidebarGroup label="Général" sidebarBgType="gradient">
-          {navData.overviewItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, true)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-
-        <SidebarGroup label="Gestion" sidebarBgType="gradient">
-          {navData.editItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-
-        <SidebarGroup label="Aperçu" sidebarBgType="gradient">
-          {navData.viewItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-      </div>
-
-      <SidebarFooter
-        user={{
-          username: user?.username || "Vendeur",
-          profileImage: user?.profileImage || undefined,
-          status: "online",
-        }}
-        sidebarBgType="gradient"
-      />
-    </SidebarContainer>
-  );
-
-  const Header = (
-    <DashboardHeader
-      title={pageTitle}
-      description={pageDescription}
-      showSidebarTrigger={true}
-    />
-  );
+  const router = useRouter();
 
   return (
-    <EnhancedDashboard sidebar={ProductSidebar} header={Header} sidebarBgType="gradient">
-      {children}
-    </EnhancedDashboard>
+    <div className="min-h-screen bg-background">
+      {/* Dashboard Header Shell */}
+      <header className="border-b bg-card/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full hover:bg-primary/10 hover:text-primary transition-all"
+              onClick={() => router.back()}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Typography variant="body-base" weight="bold" className="hidden sm:block">
+              Tableau de bord Vendeur
+            </Typography>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+              <span className="text-xs font-bold text-primary">GT</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="animate-in fade-in duration-700">
+        {children}
+      </main>
+    </div>
   );
 }

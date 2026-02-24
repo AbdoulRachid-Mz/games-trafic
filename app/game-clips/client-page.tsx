@@ -28,17 +28,17 @@ export function ClientGameClipsContent() {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [currentActiveId, setCurrentActiveId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"comments" | "likes" | "shares">("comments");
-  
+
   // Utiliser un ref pour éviter les mises à jour en boucle
   const isInitialized = useRef(false);
 
-  const { 
-    clips, 
-    loading, 
-    hasNextPage, 
-    fetchNextPage, 
+  const {
+    clips,
+    loading,
+    hasNextPage,
+    fetchNextPage,
     isFetchingNextPage,
-    refresh 
+    refresh
   } = useGameClips({
     sortBy: "createdAt",
     sortOrder: "desc",
@@ -65,7 +65,7 @@ export function ClientGameClipsContent() {
   // Mise à jour de l'URL sans re-render infini
   const handleClipChange = useCallback((clipId: string) => {
     setCurrentActiveId(clipId);
-    
+
     // Mettre à jour l'URL sans navigation complète
     const params = new URLSearchParams(searchParams.toString());
     params.set("activeClipId", clipId);
@@ -96,6 +96,7 @@ export function ClientGameClipsContent() {
           onFetchNextPage={handleFetchNext}
           onClipChange={handleClipChange}
           onCommentsToggle={() => setCommentsOpen(!commentsOpen)}
+          areCommentsOpen={commentsOpen}
         />
         <GameClipCreationDialog />
       </div>
@@ -119,15 +120,15 @@ export function ClientGameClipsContent() {
                 <Typography variant="caption1" className="text-white/40">
                   {currentClip.createdAt
                     ? new Date(currentClip.createdAt).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })
                     : ''}
                 </Typography>
               </div>
             </div>
-            
+
             {/* Caption */}
             {currentClip.caption && (
               <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/5">
@@ -162,8 +163,8 @@ export function ClientGameClipsContent() {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={cn(
                   "flex-1 py-4 text-xs font-bold uppercase tracking-wider transition-all relative",
-                  activeTab === tab.id 
-                    ? "text-primary" 
+                  activeTab === tab.id
+                    ? "text-primary"
                     : "text-white/30 hover:text-white/60"
                 )}
               >
@@ -184,23 +185,23 @@ export function ClientGameClipsContent() {
             <ScrollArea className="h-full">
               <div className="p-6">
                 {activeTab === "comments" && (
-                  <CommentsSection 
-                    entityId={currentClip.id} 
+                  <CommentsSection
+                    entityId={currentClip.id}
                     entityType="GAMECLIP"
-                    // compact
+                  // compact
                   />
                 )}
-                
+
                 {activeTab === "likes" && (
-                  <InteractionList 
+                  <InteractionList
                     entityId={currentClip.id}
                     entityType="GAMECLIP"
                     interactionType="LIKE"
                   />
                 )}
-                
+
                 {activeTab === "shares" && (
-                  <InteractionList 
+                  <InteractionList
                     entityId={currentClip.id}
                     entityType="GAMECLIP"
                     interactionType="SHARE"

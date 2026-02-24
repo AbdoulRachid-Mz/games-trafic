@@ -28,6 +28,7 @@ import Image from "next/image";
 import { SearchHistoryItem } from "./search-history-item";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useLocalSearch } from "@/hooks/use-local-search";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface GlobalSearchProps {
   isOpen: boolean;
@@ -63,6 +64,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user, isAuthenticated } = useAuthContext();
+  const {isMobile, isTablet, isDesktop} = useScreenSize()
  
   const selectedTypes = useMemo<('shop'|'product'|'tournament'|'theme'|'service'|'guide'|'blog'|'item')[]>(() => {
     if (activeTab === 'all') {
@@ -124,14 +126,14 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   const getResultPath = useCallback((item: SearchResultItem): string => {
     switch (item.type) {
-      case 'shop': return `/boutiques/${item.id}`;
-      case 'product': return `/produits/${item.id}`;
-      case 'tournament': return `/tournois/${item.id}`;
+      case 'shop': return `/shop/${item.id}`;
+      case 'product': return `/marketplace/${item.id}`;
+      case 'tournament': return `/tournaments/${item.id}`;
       case 'theme': return `/themes/${item.id}`;
       case 'service': return `/services/${item.id}`;
       case 'guide': return `/guides/${item.id}`;
-      case 'blog': return `/blog/${item.id}`;
-      case 'item': return `/items/${item.id}`;
+      case 'blog': return `/blogs/${item.id}`;
+      case 'item': return `/games/${item.id}`;
       default: return '#';
     }
   }, []);
@@ -286,7 +288,8 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               onValueChange={(v) => setActiveTab(v as SearchResultType)}
               className="px-4 pb-2"
             >
-              <TabsList className="w-full grid grid-cols-4 lg:grid-cols-6 h-auto p-1 gap-1 overflow-x-auto">
+              <TabsList className="w-full grid grid-cols-3 lg:grid-cols-6 h-auto p-1 gap-1 overflow-x-auto">
+                {/* Always visible tabs */}
                 <TabsTrigger value="all" className="text-xs">
                   Tous
                 </TabsTrigger>
@@ -296,24 +299,44 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 <TabsTrigger value="product" className="text-xs">
                   <ShoppingBag className="h-3 w-3 mr-1" /> Produits
                 </TabsTrigger>
-                <TabsTrigger value="tournament" className="text-xs">
-                  <Trophy className="h-3 w-3 mr-1" /> Tournois
-                </TabsTrigger>
-                <TabsTrigger value="theme" className="text-xs">
-                  <Palette className="h-3 w-3 mr-1" /> Thèmes
-                </TabsTrigger>
-                <TabsTrigger value="service" className="text-xs">
-                  <HelpCircle className="h-3 w-3 mr-1" /> Services
-                </TabsTrigger>
-                <TabsTrigger value="guide" className="text-xs">
-                  <BookOpen className="h-3 w-3 mr-1" /> Guides
-                </TabsTrigger>
-                <TabsTrigger value="blog" className="text-xs">
-                  <Newspaper className="h-3 w-3 mr-1" /> Blog
-                </TabsTrigger>
-                <TabsTrigger value="item" className="text-xs">
-                  <ShoppingBag className="h-3 w-3 mr-1" /> Items
-                </TabsTrigger>
+                {/* Tablet+ visible tabs */}
+                {!isMobile && (
+                  <>
+                    <TabsTrigger value="tournament" className="text-xs">
+                      <Trophy className="h-3 w-3 mr-1" /> Tournois
+                    </TabsTrigger>
+                    <TabsTrigger value="theme" className="text-xs">
+                      <Palette className="h-3 w-3 mr-1" /> Thèmes
+                    </TabsTrigger>
+                    <TabsTrigger value="service" className="text-xs">
+                      <HelpCircle className="h-3 w-3 mr-1" /> Services
+                    </TabsTrigger>
+                    <TabsTrigger value="guide" className="text-xs">
+                      <BookOpen className="h-3 w-3 mr-1" /> Guides
+                    </TabsTrigger>
+                    <TabsTrigger value="blog" className="text-xs">
+                      <Newspaper className="h-3 w-3 mr-1" /> Blog
+                    </TabsTrigger>
+                    <TabsTrigger value="item" className="text-xs">
+                      <ShoppingBag className="h-3 w-3 mr-1" /> Items
+                    </TabsTrigger>
+                  </>
+                )}
+                {/* Mobile dropdown for remaining tabs */}
+                {isMobile && (
+                  <select
+                    value={activeTab}
+                    onChange={(e) => setActiveTab(e.target.value as SearchResultType)}
+                    className="text-xs bg-background border border-border rounded-md px-2 py-1 h-7"
+                  >
+                    <option value="tournament">Tournois</option>
+                    <option value="theme">Thèmes</option>
+                    <option value="service">Services</option>
+                    <option value="guide">Guides</option>
+                    <option value="blog">Blog</option>
+                    <option value="item">Items</option>
+                  </select>
+                )}
               </TabsList>
             </Tabs>
           )}

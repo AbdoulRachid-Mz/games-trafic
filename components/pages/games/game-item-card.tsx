@@ -30,12 +30,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { QrCode } from "lucide-react";
+import Image from "next/image";
 
 interface GameItemCardProps {
   item: GameItemWithRelations;
+  onView?: (id: number) => void;
 }
 
-export function GameItemCard({ item }: GameItemCardProps) {
+export function GameItemCard({ item, onView }: GameItemCardProps) {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "COIN":
@@ -78,11 +80,14 @@ export function GameItemCard({ item }: GameItemCardProps) {
           {/* Media Section */}
           <div className="relative aspect-[4/3] overflow-hidden bg-muted/30">
             {item.icon ? (
-              <img
+              <div className="relative">
+              <Image
                 src={item.icon}
+                fill
                 alt={item.name}
                 className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-              />
+                />
+                </div>
             ) : (
               <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-purple-500/10">
                 <Package className="h-14 w-14 text-muted-foreground/20" />
@@ -186,7 +191,6 @@ export function GameItemCard({ item }: GameItemCardProps) {
                 <Link
                   href={`/games/${item.gameId}`}
                   className="text-[10px] font-black text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-widest transition-colors"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   {item.game?.name?.split(' ')[0]} <ChevronRight className="h-3 w-3" />
                 </Link>

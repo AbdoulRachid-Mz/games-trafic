@@ -177,7 +177,7 @@ export function TransactionConfirmation({
                 <div className="flex flex-col gap-2 p-4 rounded-xl bg-background/40 backdrop-blur-md border border-white/5">
                   <div className="flex justify-between items-center">
                     <Typography variant="body-sm" theme="muted">
-                      Montant
+                      Montant brut
                     </Typography>
                     <Typography variant="body-lg" weight="bold">
                       {transactionData.amount.toFixed(2)} GTC
@@ -188,13 +188,13 @@ export function TransactionConfirmation({
                       Frais
                     </Typography>
                     <Typography variant="body-sm" weight="medium">
-                      + {transactionData.fees.toFixed(2)} GTC
+                      {transactionData.fees.toFixed(2)} GTC
                     </Typography>
                   </div>
                   <Separator className="bg-white/10 my-1" />
                   <div className="flex justify-between items-center">
                     <Typography variant="body-lg" weight="bold">
-                      Total
+                      Montant débité
                     </Typography>
                     <Typography
                       variant="h3"
@@ -203,6 +203,14 @@ export function TransactionConfirmation({
                     >
                       {transactionData.totalAmount.toFixed(2)}{" "}
                       <span className="text-lg font-bold opacity-70">GTC</span>
+                    </Typography>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <Typography variant="body-sm" theme="muted">
+                      Montant reçu
+                    </Typography>
+                    <Typography variant="body-sm" weight="medium">
+                      {Math.max(0, transactionData.amount - transactionData.fees).toFixed(2)} GTC
                     </Typography>
                   </div>
                 </div>

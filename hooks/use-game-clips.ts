@@ -8,6 +8,30 @@ import { toast } from "sonner";
 import { useCallback } from "react";
 import { ClipFilters, GameClipWithRelations } from "@/types/game-clips";
 
+const MOCK_CLIPS: Partial<GameClipWithRelations>[] = [
+  {
+    id: "mock-1",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-gaming-setup-with-neon-lights-40011-large.mp4",
+    caption: "Bienvenue sur Game Trafic ! 🎮 Découvrez notre nouvelle marketplace.",
+    likesCount: 1500,
+    commentsCount: 45,
+    author: { id: "system", username: "GT_System", profileImage: "/logo.png" } as any,
+    game: { id: "gt", name: "Game Trafic" } as any,
+    createdAt: new Date()
+  },
+  {
+    id: "mock-2",
+    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-professional-gamer-playing-an-action-video-game-40012-large.mp4",
+    caption: "Sécurisez vos transactions avec notre système de Wallet intégré. 💰",
+    likesCount: 890,
+    commentsCount: 12,
+    author: { id: "system", username: "GT_Security", profileImage: "/logo.png" } as any,
+    game: { id: "gt", name: "Wallet" } as any,
+    createdAt: new Date()
+  }
+  // ... on peut en ajouter d'autres dynamiquement pour arriver à 20
+];
+
 // @/hooks/use-game-clips.ts
 export function useGameClips(filters: ClipFilters = {}) {
   const { user } = useAuthContext();
@@ -47,7 +71,19 @@ export function useGameClips(filters: ClipFilters = {}) {
     initialPageParam: 0,
   });
 
-  const clips = data?.pages.flatMap((page) => page.data) || [];
+  let clips = data?.pages.flatMap((page) => page.data) || [];
+
+  // S'assurer qu'il y a au moins 20 clips (en ajoutant des mocks si besoin)
+  if (!isLoading && !isFetchingNextPage && clips.length < 20 && clips.length > 0) {
+    const remaining = 20 - clips.length;
+    const paddedMocks = Array.from({ length: remaining }).map((_, i) => ({
+      ...MOCK_CLIPS[i % MOCK_CLIPS.length],
+      id: `mock-extra-${i}`,
+      caption: `${MOCK_CLIPS[i % MOCK_CLIPS.length].caption} (Clip System #${i + 1})`
+    })) as unknown as GameClipWithRelations[];
+
+    clips = [...clips, ...paddedMocks];
+  }
 
   const createMutation = useMutation({
     mutationFn: async (data: {

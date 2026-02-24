@@ -166,7 +166,7 @@ function WalletCreationScreen({ user }: { user: any }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full border-0 shadow-2xl">
-        <CardContent className="p-8 text-center space-y-6">
+        <CardContent className="p-4 text-center space-y-4">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -269,7 +269,7 @@ function WalletLockedScreen({ walletStatus }: { walletStatus: any }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full border-destructive/20 border-2">
-        <CardContent className="p-8 text-center space-y-6">
+        <CardContent className="p-4 text-center space-y-4">
           <div className="w-20 h-20 mx-auto rounded-full bg-destructive/10 flex items-center justify-center mb-4">
             <Lock className="h-10 w-10 text-destructive" />
           </div>
@@ -335,7 +335,7 @@ function WalletInactiveScreen({ walletStatus }: { walletStatus: any }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
-        <CardContent className="p-8 text-center space-y-6">
+        <CardContent className="p-4 text-center space-y-4">
           <div className="w-20 h-20 mx-auto rounded-full bg-yellow-100 flex items-center justify-center mb-4">
             <Clock className="h-10 w-10 text-yellow-600" />
           </div>
@@ -391,7 +391,7 @@ function WalletVerificationScreen({ walletStatus }: { walletStatus: any }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
-        <CardContent className="p-8 text-center space-y-6">
+        <CardContent className="p-4 text-center space-y-4">
           <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 flex items-center justify-center mb-4">
             <Shield className="h-10 w-10 text-blue-600" />
           </div>

@@ -47,11 +47,13 @@ interface Recipient {
 interface TransactionRecipientSelectorProps {
   onSelect: (recipient: Recipient) => void;
   onBack: () => void;
+  initialWalletId?: string;
 }
 
 export function TransactionRecipientSelector({
   onSelect,
   onBack,
+  initialWalletId,
 }: TransactionRecipientSelectorProps) {
   const [search, setSearch] = useState("");
   const [recipients, setRecipients] = useState<Recipient[]>([]);
@@ -59,12 +61,54 @@ export function TransactionRecipientSelector({
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(
     null
   );
+  const [prefillLoaded, setPrefillLoaded] = useState(false);
   const [searchType, setSearchType] = useState<"USER" | "WALLET" | "PHONE">(
     "USER"
   );
   const [showScanner, setShowScanner] = useState(false);
   const walletBalance = useWalletBalance(selectedRecipient?.walletId || "");
   
+  React.useEffect(() => {
+    const prefillRecipient = async () => {
+      if (!initialWalletId || prefillLoaded) return;
+      setLoading(true);
+      try {
+        const wallet = await getUserWalletById(initialWalletId);
+        if (!wallet) {
+          setPrefillLoaded(true);
+          return;
+        }
+        const user = await getUserById(wallet.userId, { populate: ["wallet"] });
+        if (!user) {
+          setPrefillLoaded(true);
+          return;
+        }
+        const recipient: Recipient = {
+          id: user.id,
+          walletId: wallet.id,
+          user: {
+            id: user.id,
+            name: (user as any).fullName || (user as any).username || "Utilisateur",
+            email: (user as any).email,
+            avatar: (user as any).avatarUrl,
+            walletNumber: formatWalletNumber(wallet.cardNumberHash || wallet.id),
+          },
+          wallet: {
+            isActive: !!wallet.isActive,
+            isLocked: !!wallet.isLocked,
+            balance: walletBalance.data?.toString() || "0",
+          },
+        };
+        setRecipients([recipient]);
+        setSelectedRecipient(recipient);
+      } finally {
+        setPrefillLoaded(true);
+        setLoading(false);
+      }
+    };
+    prefillRecipient();
+  }, [initialWalletId, prefillLoaded, walletBalance.data]);
+
 
   const searchRecipient = async () => {
     if (!search.trim()) return;

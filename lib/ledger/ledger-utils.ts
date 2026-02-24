@@ -280,7 +280,7 @@ export async function executeTransaction(
         const feeCalc = await calculateTransactionFees(type, amount);
         const fees = feeCalc.fees;
         const netAmount = amount - fees;
-        const totalAmount = amount + (fees || 0);
+        const totalAmount = amount;
 
         // Calculer les nouveaux soldes
         const newFromBalance = fromBalance - amount;
@@ -332,7 +332,7 @@ export async function executeTransaction(
             .values({
                 transactionId: transaction.id,
                 accountId: fromAccountId,
-                debit: totalAmount.toFixed(2),
+                debit: amount.toFixed(2),
                 credit: "0",
                 currency: "GTC",
                 createdAt: new Date(),
@@ -406,17 +406,17 @@ async function calculateTransactionFees(
             case "GAME_ITEM_PURCHASE":
             case "ORDER_PURCHASE":
                 feePercentage = parseFloat(
-                    settings?.purchaseFeePercentage?.toString() || "0.03"
+                    settings?.purchaseFeePercentage?.toString() || "0"
                 );
                 break;
             case "VIP_SUBSCRIPTION":
                 feePercentage = parseFloat(
-                    settings?.transactionFeePercentage?.toString() || "0.001"
+                    settings?.transactionFeePercentage?.toString() || "0"
                 );
                 break;
             case "TOURNAMENT_PARTICIPATION":
                 feePercentage = parseFloat(
-                    settings?.tournamentParticipationFeePercentage?.toString() || "0.015"
+                    settings?.tournamentParticipationFeePercentage?.toString() || "0"
                 );
                 break;
             case "DEPOSIT":
@@ -426,12 +426,12 @@ async function calculateTransactionFees(
                 break;
             case "WITHDRAWAL":
                 feePercentage = parseFloat(
-                    settings?.withdrawalFeePercentage?.toString() || "0.02"
+                    settings?.withdrawalFeePercentage?.toString() || "0"
                 );
                 break;
             case "TRANSFER":
                 feePercentage = parseFloat(
-                    settings?.transferFeePercentage?.toString() || "0.003"
+                    settings?.transferFeePercentage?.toString() || "0"
                 );
                 break;
             case "BONUS":
@@ -439,7 +439,7 @@ async function calculateTransactionFees(
                 feePercentage = 0;
                 break;
             default:
-                feePercentage = 0.01;
+                feePercentage = 0;
         }
 
         // Réduction VIP (50%)
@@ -448,7 +448,7 @@ async function calculateTransactionFees(
         }
 
         const fees = amount * feePercentage;
-        const totalAmount = amount + fees;
+        const totalAmount = amount;
 
         return {
             feePercentage,
@@ -457,10 +457,9 @@ async function calculateTransactionFees(
         };
     } catch (error) {
         console.error("Error calculating fees:", error);
-        // Fallback
-        const feePercentage = 0.01;
-        const fees = amount * feePercentage;
-        const totalAmount = amount + fees;
+        const feePercentage = 0;
+        const fees = 0;
+        const totalAmount = amount;
         return { feePercentage, fees, totalAmount };
     }
 }

@@ -69,7 +69,6 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   const breadcrumbItems = items || resolveBreadcrumbSegments(pathname);
 
   const depth = breadcrumbItems.length;
-  const first = breadcrumbItems[0];
   const last = breadcrumbItems[depth - 1];
   const second = breadcrumbItems[1];
   const middle = breadcrumbItems.slice(2, depth - 1);
@@ -80,52 +79,52 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
   return (
     <Breadcrumb className={cn("py-1", className)}>
       <BreadcrumbList>
-        {first && (
-          <>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={first.path}>
-                  <span className="inline-flex items-center gap-1">
-                    <Home className="h-4 w-4 text-muted-foreground" />
-                    {first.name}
-                  </span>
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            {depth > 1 && <BreadcrumbSeparator />}
-          </>
-        )}
+        {/* Home is always rendered once as the first item */}
+        <BreadcrumbItem>
+          <BreadcrumbLink asChild>
+            <Link href="/">
+              <span className="inline-flex items-center gap-1">
+                <Home className="h-4 w-4 text-muted-foreground" />
+                Accueil
+              </span>
+            </Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
 
         {depth <= maxVisibleDepth ? (
           <>
             {breadcrumbItems.slice(1, depth - 1).map((item) => (
               <React.Fragment key={item.path}>
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
                     <Link href={item.path}>{item.name}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator />
               </React.Fragment>
             ))}
-            {last && (
-              <BreadcrumbItem>
-                <BreadcrumbPage>{last.name}</BreadcrumbPage>
-              </BreadcrumbItem>
+            {depth > 1 && (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{last.name}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </>
             )}
           </>
         ) : (
           <>
             {second && (
               <>
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   <BreadcrumbLink asChild>
                     <Link href={second.path}>{second.name}</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator />
               </>
             )}
+            <BreadcrumbSeparator />
             <BreadcrumbItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -143,11 +142,9 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
               </DropdownMenu>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
-            {last && (
-              <BreadcrumbItem>
-                <BreadcrumbPage>{last.name}</BreadcrumbPage>
-              </BreadcrumbItem>
-            )}
+            <BreadcrumbItem>
+              <BreadcrumbPage>{last.name}</BreadcrumbPage>
+            </BreadcrumbItem>
           </>
         )}
       </BreadcrumbList>

@@ -17,6 +17,7 @@ interface GameClipReelProps {
   onFetchNextPage?: () => void;
   onClipChange?: (clipId: string) => void;
   onCommentsToggle?: () => void;
+  areCommentsOpen?: boolean;
   className?: string;
 }
 
@@ -29,12 +30,13 @@ export function GameClipReel({
   onFetchNextPage,
   onClipChange,
   onCommentsToggle,
+  areCommentsOpen = false,
   className,
 }: GameClipReelProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
   const wheelTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -63,7 +65,7 @@ export function GameClipReel({
 
   const goToNext = useCallback(() => {
     if (isTransitioning) return;
-    
+
     setIsTransitioning(true);
     setTimeout(() => setIsTransitioning(false), 500);
 
@@ -73,12 +75,16 @@ export function GameClipReel({
       handleClipChange(newIndex);
     } else if (hasNextPage && onFetchNextPage && !isFetchingNextPage) {
       onFetchNextPage();
+    } else if (clips.length > 1) {
+      // Loop back to start
+      setActiveIndex(0);
+      handleClipChange(0);
     }
   }, [activeIndex, clips.length, hasNextPage, onFetchNextPage, isFetchingNextPage, isTransitioning, handleClipChange]);
 
   const goToPrev = useCallback(() => {
     if (isTransitioning) return;
-    
+
     setIsTransitioning(true);
     setTimeout(() => setIsTransitioning(false), 500);
 
@@ -86,13 +92,18 @@ export function GameClipReel({
       const newIndex = activeIndex - 1;
       setActiveIndex(newIndex);
       handleClipChange(newIndex);
+    } else if (clips.length > 1) {
+      // Loop to end
+      const newIndex = clips.length - 1;
+      setActiveIndex(newIndex);
+      handleClipChange(newIndex);
     }
-  }, [activeIndex, isTransitioning, handleClipChange]);
+  }, [activeIndex, isTransitioning, handleClipChange, clips.length]);
 
   // Wheel navigation with throttling
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    
+
     if (isTransitioning) return;
 
     clearTimeout(wheelTimeout.current);
@@ -183,9 +194,9 @@ export function GameClipReel({
               isActive={index === activeIndex}
               isMuted={isMuted}
               onMuteToggle={() => setIsMuted(!isMuted)}
-              onAutoNext={goToNext}
               onAutoPrev={goToPrev}
               onCommentsToggle={onCommentsToggle}
+              isPaused={areCommentsOpen}
               hasMore={hasNextPage}
             />
           </div>

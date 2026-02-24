@@ -1,37 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSessionCookie } from "better-auth/cookies";
+import { getCookieCache } from "better-auth/cookies";
 import { resolveRoute } from "@/lib/routes/resolver";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1️⃣ Lire le cookie
-  const sessionCookie = getSessionCookie(request);
+  // 1️⃣ Lire session correctement via Better Auth
+  const session = await getCookieCache(request);
+  const isAuthenticated = Boolean(session);
 
-  const isAuthenticated = Boolean(sessionCookie);
-
-  // ⚠️ Ici on ne peut pas interroger la DB directement.
-  // Donc on considère que le rôle admin doit être dans le JWT.
   let isAdmin = false;
   let isVip = false;
   let hasWallet = true;
 
-  if (sessionCookie) {
-    try {
-      // Si ton cookie est un JWT :
-      const payload = JSON.parse(
-        Buffer.from(sessionCookie.split(".")[1], "base64").toString()
-      );
+  if (session?.user) {
+    isAdmin =
+      session.user.role === "admin" ||
+      session.user.isAdmin === true;
 
-      isAdmin = payload.role === "admin";
-      isVip = payload.role === "vip";
-      hasWallet = !!payload.walletId;
-    } catch {
-      // fallback silencieux
-    }
+    isVip =
+      session.user.role === "vip" ||
+      session.user.isVip === true;
+
+    hasWallet = !!session.user.walletId;
   }
 
-  // 2️⃣ Résolution via ta config
+  // 2️⃣ Résolution via config routes
   const resolved = resolveRoute(pathname, {
     isAuthenticated,
     isAdmin,

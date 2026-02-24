@@ -23,6 +23,7 @@ export function QrScanner({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [laserActive, setLaserActive] = useState(false);
 
   useEffect(() => {
     scanCallbackRef.current = onScan;
@@ -52,6 +53,7 @@ export function QrScanner({
           videoRef.current!,
           (result) => {
             if (result) {
+              setLaserActive(true);
               scanCallbackRef.current?.(result.getText());
 
               // ✅ arrêt propre du scanner
@@ -59,6 +61,7 @@ export function QrScanner({
               controlsRef.current = null;
 
               setIsScanning(false);
+              setTimeout(() => setLaserActive(false), 600);
             }
           }
         );
@@ -115,6 +118,10 @@ export function QrScanner({
 
                     {/* Scanning Line Animation */}
                     <div className="absolute top-[15%] left-[15%] right-[15%] h-1 bg-primary/50 shadow-[0_0_15px_rgba(var(--primary),0.8)] animate-scan-line" />
+
+                    {laserActive && (
+                      <div className="absolute top-1/2 left-[10%] right-[10%] h-1 bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.9)] animate-pulse" />
+                    )}
 
                     {/* Status Badge */}
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-primary/20 backdrop-blur-md rounded-full border border-primary/30">

@@ -522,7 +522,7 @@ export default function VerificationPage() {
                       Soumission & Vérification
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-4">
                     <div className="text-center py-4">
                       <motion.div
                         animate={{ rotate: 360 }}
@@ -542,7 +542,7 @@ export default function VerificationPage() {
                     <div className="space-y-4">
                       <Card>
                         <CardContent className="p-4">
-                          <Typography variant="body-sm" weight="medium" className="mb-3">
+                          <Typography variant="body-sm" weight="medium" className="mb-2">
                             Résumé de votre soumission:
                           </Typography>
                           <div className="space-y-2">
@@ -575,7 +575,7 @@ export default function VerificationPage() {
                         </CardContent>
                       </Card>
 
-                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
                         <div className="flex items-start gap-3">
                           <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                           <div>

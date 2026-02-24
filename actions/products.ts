@@ -4,7 +4,8 @@ import { products, type Product, type NewProduct, shops, orders, interactions, c
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull } from 'drizzle-orm';
 import { type ProductFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
-import { encryptData } from '@/lib/encryption';
+import { encryptData, decryptData } from '@/lib/encryption';
+import { getCurrentUser } from '@/lib/auth/session';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -477,6 +478,24 @@ export async function setProductCredentials(
     if (error instanceof Error) throw error;
     throw new Error('Failed to set product credentials');
   }
+}
+
+export async function getProductCredentialsForAdmin(productId: string) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") {
+    throw new Error("Accès refusé");
+  }
+  const product = await getProductById(productId);
+  if (!product) {
+    throw new Error("Product not found");
+  }
+  const decryptedPassword = product.encryptedPassword
+    ? decryptData(product.encryptedPassword)
+    : "";
+  return {
+    accountLogin: product.accountLogin || null,
+    password: decryptedPassword || null,
+  };
 }
 
 // ============================================================================

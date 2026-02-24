@@ -37,17 +37,7 @@ export function useTransaction({ walletId, userId }: UseTransactionProps) {
       return feeCalc.fees;
     } catch (error) {
       console.error("Error calculating fees:", error);
-      // Fallback aux taux par défaut
-      const feeRates: Record<string, number> = {
-        THEME_PURCHASE: 0.01,
-        VIP_SUBSCRIPTION: 0.005,
-        PRODUCT_PURCHASE: 0.02,
-        TOURNAMENT_PARTICIPATION: 0.015,
-        GAME_ITEM_PURCHASE: 0.03,
-        DEPOSIT: 0.001,
-        TRANSFER: 0.005,
-      };
-      return amount * (feeRates[type] || 0.01);
+      return 0;
     }
   }, []);
 

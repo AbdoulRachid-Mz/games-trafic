@@ -8,7 +8,7 @@ import { Typography } from "@/components/ui/typography";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { fireConfettiPreset } from "@/utils/confetti";
-import { generateTransactionReceipt } from "@/utils/pdf-generator";
+import { generateEnhancedReceipt } from "@/utils/receipt-templates";
 import { TransactionStepper } from "@/components/pages/transactions/create/transaction-stepper";
 import { TransactionTypeSelector } from "@/components/pages/transactions/create/type-selector";
 import { TransactionEntitySelector } from "@/components/pages/transactions/create/entity-selector";
@@ -21,7 +21,11 @@ import { TransactionConfirmation } from "@/components/pages/transactions/create/
 import { TransactionSuccess } from "@/components/pages/transactions/create/success";
 import { createRequest } from "@/actions/requests";
 import { createTransaction } from "@/actions/transactions";
-import { getEntities } from "@/actions/entities";
+import { createProductOrder } from "@/actions/orders";
+import { getThemeById } from "@/actions/themes";
+import { getProductById } from "@/actions/products";
+import { getGameItemById } from "@/actions/game-items";
+import { getTournamentEditionWithRelations } from "@/actions/editions";
 import {
   TRANSACTION_CONFIGS,
   type TransactionType,
@@ -33,9 +37,18 @@ import { decodeTransactionQR, isValidTransactionQR } from "@/utils/qr-utils";
 import { QrScanner } from "@/components/shared/qr-scanner";
 import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getTournamentEditions } from "@/actions/tournaments";
 import { useTransactionFees } from "@/hooks/use-transaction-fees";
 import { getTournamentMembers } from "@/actions/members";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function CreateTransactionPage() {
   const searchParams = useSearchParams();
@@ -56,7 +69,7 @@ function CreateTransactionContent({
   router: any;
 }) {
   const { user } = useAuthContext();
-  const { data: completeData } = useUserProfile({
+  const { data: completeData, refresh: refreshProfile } = useUserProfile({
     enabled: true,
     mode: "minimal",
   });
@@ -71,6 +84,8 @@ function CreateTransactionContent({
     metadata: {},
   });
   const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [prefilledRecipientWalletId, setPrefilledRecipientWalletId] = useState<string | null>(null);
 
   // Fetch fees via the dedicated hook
   const {
@@ -98,6 +113,77 @@ function CreateTransactionContent({
     };
   }, [fees, total, transactionData.amount]);
 
+  const fetchEntityByType = async (type: TransactionType, id: string) => {
+    if (!id) return null;
+    switch (type) {
+      case "THEME_PURCHASE": {
+        const theme = await getThemeById(id);
+        if (!theme || theme.id !== id) return null;
+        return {
+          id: theme.id,
+          name: theme.name,
+          description: theme.description || "",
+          price: parseFloat(theme.price || "0"),
+          currency: "GTC",
+          image: theme.thumbnail || undefined,
+          metadata: {
+            creatorId: theme.creatorId,
+          },
+        };
+      }
+      case "PRODUCT_PURCHASE": {
+        const product = await getProductById(id);
+        if (!product || product.id !== id) return null;
+        return {
+          id: product.id,
+          name: product.name,
+          description: product.description || "",
+          price: parseFloat(product.price || "0"),
+          currency: product.currency || "GTC",
+          image: product.featuredImage || product.images?.[0] || undefined,
+          metadata: {
+            shopId: product.shopId,
+            sellerId: product.userId,
+          },
+        };
+      }
+      case "GAME_ITEM_PURCHASE": {
+        const item = await getGameItemById(id);
+        if (!item || item.id !== id) return null;
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description || "",
+          price: parseFloat(item.priceGtc || "0"),
+          currency: "GTC",
+          image: item.icon || undefined,
+          metadata: {
+            gameId: item.gameId,
+            type: item.type,
+          },
+        };
+      }
+      case "TOURNAMENT_PARTICIPATION": {
+        const edition = await getTournamentEditionWithRelations(id);
+        if (!edition || edition.id !== id) return null;
+        return {
+          id: edition.id,
+          name: edition.name || `Édition #${edition.editionNumber}`,
+          description: edition.description || "",
+          price: parseFloat(edition.entryFee || "0"),
+          currency: edition.prizeCurrency || "GTC",
+          image: edition.tournament?.profileImage || edition.tournament?.coverImage || undefined,
+          metadata: {
+            tournamentId: edition.tournamentId,
+            editionNumber: edition.editionNumber,
+          },
+        };
+      }
+      default:
+        return null;
+    }
+  };
+
   // Récupération des paramètres d'URL et fetch de l'entité
   useEffect(() => {
     const loadTransactionFromParams = async () => {
@@ -105,10 +191,11 @@ function CreateTransactionContent({
       const amount = searchParams.get("amount");
       const entityId = searchParams.get("entityId");
       const targetId = searchParams.get("targetId"); // Fallback
+      const itemId = searchParams.get("itemId");
 
       if (type && TRANSACTION_CONFIGS[type]) {
         const config = TRANSACTION_CONFIGS[type];
-        const actualEntityId = entityId || targetId;
+        const actualEntityId = entityId || targetId || itemId;
 
         const newData: TransactionData = {
           type,
@@ -122,48 +209,29 @@ function CreateTransactionContent({
             newData.amount = monthly;
           }
         }
-        // Fetch entity from database if entityId is provided
+        if (type === "TRANSFER" && actualEntityId) {
+          newData.recipientWalletId = actualEntityId;
+          setPrefilledRecipientWalletId(actualEntityId);
+        } else {
+          setPrefilledRecipientWalletId(null);
+        }
+
         if (actualEntityId && config.needsTargetId) {
           try {
-            const entityType = getEntityTypeFromTransactionType(type);
-            if (entityType === "tournamentEditions") {
-              const res = await getTournamentEditions({
-                pagination: { page: 1, limit: 1 },
-                filters: { id: actualEntityId, entryFeeMin: 0.01 } as any,
-                options: { includeDeleted: false, includeInactive: false },
-              });
-              const entity = res.data?.[0];
-              if (entity) {
-                newData.targetId = actualEntityId;
-                newData.entity = {
-                  id: entity.id,
-                  name: entity.name || `Édition #${entity.editionNumber}`,
-                  description: entity.description,
-                  price: parseFloat(entity.entryFee || "0"),
-                  currency: entity.prizeCurrency || "GTC",
-                  image: undefined,
-                  metadata: {
-                    tournamentId: entity.tournamentId,
-                    editionNumber: entity.editionNumber,
-                  },
-                } as any;
-                if (!newData.amount) {
-                  newData.amount = parseFloat(entity.entryFee || "0");
+            const entity = await fetchEntityByType(type, actualEntityId);
+            if (entity) {
+              newData.targetId = actualEntityId;
+              newData.entity = entity as any;
+              if (type === "GAME_ITEM_PURCHASE" && entity.price) {
+                if (newData.amount && Math.abs(newData.amount - entity.price) > 0.01) {
+                  newData.metadata = {
+                    ...newData.metadata,
+                    originalAmount: newData.amount,
+                  };
                 }
-              }
-            } else if (entityType) {
-              const result = await getEntities(entityType as any, {
-                id: actualEntityId,
-                limit: 1,
-                page: 1,
-              });
-              const entity = result.data.find((e: any) => e.id === actualEntityId);
-              if (entity) {
-                newData.targetId = actualEntityId;
-                newData.entity = entity;
-                if (!newData.amount && (entity.priceGtc || entity.price)) {
-                  newData.amount = parseFloat(entity.priceGtc || entity.price || "0");
-                }
+                newData.amount = entity.price;
+              } else if (!newData.amount && entity.price) {
+                newData.amount = entity.price;
               }
             }
           } catch (error) {
@@ -177,7 +245,7 @@ function CreateTransactionContent({
         const initialStepIndex = getInitialStepForType(
           type,
           config,
-          !!newData.targetId
+          !!newData.targetId || !!newData.recipientWalletId
         );
         setCurrentStep(initialStepIndex);
 
@@ -205,7 +273,16 @@ function CreateTransactionContent({
     config: (typeof TRANSACTION_CONFIGS)[TransactionType],
     hasTargetId: boolean
   ): number => {
+    if (type === "TRANSFER") {
+      const recipientStepIndex = config.steps.indexOf("RECIPIENT_SELECTION");
+      return recipientStepIndex >= 0 ? recipientStepIndex : 0;
+    }
+
     if (config.requiresEntity) {
+      if (hasTargetId) {
+        const amountStepIndex = config.steps.indexOf("AMOUNT_INPUT");
+        return amountStepIndex >= 0 ? amountStepIndex : 0;
+      }
       const entityStepIndex = config.steps.indexOf("ENTITY_SELECTION");
       if (entityStepIndex >= 0) return entityStepIndex;
     }
@@ -218,28 +295,14 @@ function CreateTransactionContent({
     return config.steps.indexOf("TYPE_SELECTION") >= 0 ? 1 : 0;
   };
 
-  const getEntityTypeFromTransactionType = (
-    type: TransactionType
-  ): string | null => {
-    switch (type) {
-      case "THEME_PURCHASE":
-        return "themes";
-      case "PRODUCT_PURCHASE":
-        return "products";
-      case "GAME_ITEM_PURCHASE":
-        return "gameItems";
-      case "TOURNAMENT_PARTICIPATION":
-        return "tournamentEditions";
-      default:
-        return null;
-    }
-  };
-
   const handleTypeSelect = (type: TransactionType | "QR_SCAN") => {
     if (type === "QR_SCAN") {
       setShowScanner(true);
+      setTransactionData({ type: null as any, amount: 0, metadata: {} });
+      setCurrentStep(0);
       return;
     }
+    setPrefilledRecipientWalletId(null);
     setTransactionData({
       type,
       amount: 0,
@@ -260,49 +323,30 @@ function CreateTransactionContent({
       const newData: TransactionData = {
         type,
         amount: amount || 0,
-        targetId: entityId,
         metadata: decoded.m || {},
       };
+      if (type === "TRANSFER" && entityId) {
+        newData.recipientWalletId = entityId;
+        setPrefilledRecipientWalletId(entityId);
+      } else {
+        setPrefilledRecipientWalletId(null);
+      }
 
-      // Fetch entity details
       try {
-        const entityType = getEntityTypeFromTransactionType(type);
-        if (entityType === "tournamentEditions") {
-          const res = await getTournamentEditions({
-            pagination: { page: 1, limit: 1 },
-            filters: { id: entityId, entryFeeMin: 0.01 } as any,
-            options: { includeDeleted: false, includeInactive: false },
-          });
-          const entity = res.data?.[0];
-          if (entity) {
-            newData.entity = {
-              id: entity.id,
-              name: entity.name || `Édition #${entity.editionNumber}`,
-              description: entity.description,
-              price: parseFloat(entity.entryFee || "0"),
-              currency: entity.prizeCurrency || "GTC",
-              image: undefined,
-              metadata: {
-                tournamentId: entity.tournamentId,
-                editionNumber: entity.editionNumber,
-              },
-            } as any;
-            if (!newData.amount) {
-              newData.amount = parseFloat(entity.entryFee || "0");
+        const entity = await fetchEntityByType(type, entityId);
+        if (entity) {
+          newData.targetId = entityId;
+          newData.entity = entity as any;
+          if (type === "GAME_ITEM_PURCHASE" && entity.price) {
+            if (newData.amount && Math.abs(newData.amount - entity.price) > 0.01) {
+              newData.metadata = {
+                ...newData.metadata,
+                originalAmount: newData.amount,
+              };
             }
-          }
-        } else if (entityType) {
-          const result = await getEntities(entityType as any, {
-            id: entityId,
-            limit: 1,
-            page: 1,
-          });
-          const entity = result.data.find((e: any) => e.id === entityId);
-          if (entity) {
-            newData.entity = entity;
-            if (!newData.amount && (entity.priceGtc || entity.price)) {
-              newData.amount = parseFloat(entity.priceGtc || entity.price || "0");
-            }
+            newData.amount = entity.price;
+          } else if (!newData.amount && entity.price) {
+            newData.amount = entity.price;
           }
         }
       } catch (err) {
@@ -312,7 +356,11 @@ function CreateTransactionContent({
       setTransactionData(newData);
 
       const config = TRANSACTION_CONFIGS[type];
-      const initialStep = getInitialStepForType(type, config, !!newData.targetId);
+      const initialStep = getInitialStepForType(
+        type,
+        config,
+        !!newData.targetId || !!newData.recipientWalletId
+      );
       setCurrentStep(initialStep);
 
       toast.success("QR Code scanné avec succès");
@@ -350,11 +398,33 @@ function CreateTransactionContent({
       }
     }
 
-    const price = entity.priceGtc ? parseFloat(entity.priceGtc) : entity.price || 0;
+    let finalEntity = entity;
+    if (transactionData.type === "TOURNAMENT_PARTICIPATION") {
+      const edition = await getTournamentEditionWithRelations(entity.id);
+      if (edition) {
+        finalEntity = {
+          ...entity,
+          name: edition.name || entity.name,
+          description: edition.description || entity.description,
+          price: parseFloat(edition.entryFee || "0"),
+          currency: edition.prizeCurrency || "GTC",
+          image: edition.tournament?.profileImage || edition.tournament?.coverImage || entity.image,
+          metadata: {
+            ...(entity.metadata || {}),
+            tournamentId: edition.tournamentId,
+            editionNumber: edition.editionNumber,
+          },
+        };
+      }
+    }
+
+    const price = finalEntity.priceGtc
+      ? parseFloat(finalEntity.priceGtc)
+      : finalEntity.price || 0;
     setTransactionData((prev) => ({
       ...prev,
-      targetId: entity.id,
-      entity: entity,
+      targetId: finalEntity.id,
+      entity: finalEntity,
       amount: price || prev.amount,
     }));
 
@@ -433,6 +503,7 @@ function CreateTransactionContent({
       });
 
       if (!response.ok) throw new Error("PIN incorrect");
+      await refreshProfile();
       nextStep();
     } catch {
       toast.error("Code PIN incorrect");
@@ -441,45 +512,93 @@ function CreateTransactionContent({
     }
   };
 
-  const handleConfirm = async () => {
-    setIsLoading(true);
-    try {
-      // Validation des données
-      if (!transactionData.type || !transactionData.amount) {
-        throw new Error("Données de transaction incomplètes");
-      }
+  const executeConfirm = async (allowDuplicate: boolean) => {
+    if (!transactionData.type || !transactionData.amount) {
+      throw new Error("Données de transaction incomplètes");
+    }
 
-      if (!completeData?.wallet?.id) {
-        throw new Error("Wallet non trouvé");
-      }
+    if (!completeData?.wallet?.id) {
+      throw new Error("Wallet non trouvé");
+    }
 
-      // Pour les dépôts/retraits, créer une requête
-      if (
-        transactionData.type === "DEPOSIT" ||
-        transactionData.type === "WITHDRAWAL"
-      ) {
-        const request = await createRequest({
+    if (transactionData.type === "DEPOSIT" || transactionData.type === "WITHDRAWAL") {
+      const request = await createRequest(
+        {
           userId: user!.id,
           type: transactionData.type,
           amount: transactionData.amount.toString(),
           paymentMethod: transactionData.metadata?.paymentMethod || "WALLET",
           paymentProvider: transactionData.metadata?.paymentProvider,
           paymentAccountId: transactionData.metadata?.paymentAccountId,
-        });
+        },
+        { allowDuplicate }
+      );
 
-        if (!request)
-          throw new Error("Erreur lors de la création de la requête");
+      if (!request) throw new Error("Erreur lors de la création de la requête");
+      setTransactionId(request.id);
+      toast.success("Demande créée ! Elle sera traitée par un administrateur.");
+      await refreshProfile();
+      nextStep();
+      return;
+    }
 
-        setTransactionId(request.id);
-        toast.success(
-          "Demande créée ! Elle sera traitée par un administrateur."
-        );
-        nextStep();
-        return;
+    if (transactionData.type === "GAME_ITEM_PURCHASE") {
+      if (!transactionData.targetId) throw new Error("Item non trouvé");
+      const gameAccount = transactionData.metadata?.gameAccount as string | undefined;
+      const encryptedPassword = transactionData.metadata?.encryptedPassword as string | undefined;
+      const additionalInfo = transactionData.metadata?.additionalInfo as string | undefined;
+      if (!gameAccount || !encryptedPassword) {
+        throw new Error("Veuillez renseigner les informations du compte de jeu");
       }
+      const quantity =
+        transactionData.entity?.price
+          ? Math.max(1, Math.round(transactionData.amount / (transactionData.entity?.price || 1)))
+          : 1;
+      const request = await createRequest(
+        {
+          userId: user!.id,
+          type: "GAME_ITEMS",
+          amount: transactionData.amount.toString(),
+          gameItemId: transactionData.targetId,
+          gameAccount,
+          encryptedPassword,
+          additionalInfo,
+          metadata: {
+            quantity,
+            totalGtc: transactionData.amount.toString(),
+          },
+        },
+        { allowDuplicate }
+      );
+      setTransactionId(request.id);
+      toast.success("Demande créée ! L’équipe va traiter votre achat.");
+      await refreshProfile();
+      nextStep();
+      return;
+    }
 
-      // Pour les autres transactions, créer directement
-      const transaction = await createTransaction({
+    if (transactionData.type === "PRODUCT_PURCHASE") {
+      if (!transactionData.targetId) throw new Error("Produit non trouvé");
+      const order = await createProductOrder(
+        {
+          productId: transactionData.targetId,
+          totalAmount: transactionData.amount,
+          buyerInstructions: transactionData.metadata?.buyerInstructions as string | undefined,
+        },
+        { allowDuplicate }
+      );
+      if (!order.success) {
+        throw new Error(order.error || "Erreur lors de la création de la commande");
+      }
+      setTransactionId(order.orderId || null);
+      toast.success("Commande créée ! Elle sera validée par la boutique.");
+      await refreshProfile();
+      nextStep();
+      return;
+    }
+
+    const transaction = await createTransaction(
+      {
         walletId: completeData.wallet.id,
         type: transactionData.type as any,
         amount: transactionData.amount.toString(),
@@ -492,43 +611,58 @@ function CreateTransactionContent({
           feesAmount: feesObj.amount,
           feesPercentage: feesObj.percentage,
           totalCalculated: feesObj.totalAmount,
-          ...(transactionData.type === "GAME_ITEM_PURCHASE" && transactionData.entity?.price
-            ? {
-              quantity: Math.max(
-                1,
-                Math.round(transactionData.amount / (transactionData.entity?.price || 1))
-              ),
-            }
-            : {}),
         },
-      });
+      },
+      { allowDuplicate }
+    );
 
-      setTransactionId(transaction.id);
+    setTransactionId(transaction.id);
 
-      // Lancer les confettis
-      await fireConfettiPreset("success");
+    await fireConfettiPreset("success");
 
-      // Générer le PDF
-      generateTransactionReceipt({
-        transactionId: transaction.id,
-        amount: transactionData.amount,
-        type: transactionData.type,
-        fees: feesObj.amount,
-        totalAmount: feesObj.totalAmount,
-        date: new Date(),
-        reference: `TX-${transaction.id.slice(-8)}`,
-        newBalance:
-          parseFloat(completeData.ledgerBalance || "0") - feesObj.totalAmount,
-        entityData: transactionData.entity,
-      });
+    generateEnhancedReceipt({
+      transactionId: transaction.id,
+      amount: transactionData.amount,
+      type: transactionData.type,
+      fees: feesObj.amount,
+      totalAmount: feesObj.totalAmount,
+      date: new Date(),
+      reference: `TX-${transaction.id.slice(-8)}`,
+      newBalance:
+        parseFloat(completeData.ledgerBalance || "0") - feesObj.totalAmount,
+      entityData: transactionData.entity,
+      metadata: transactionData.metadata,
+    });
 
-      toast.success("Transaction effectuée !");
-      nextStep();
+    toast.success("Transaction effectuée !");
+    await refreshProfile();
+    nextStep();
 
-      // Rediriger après 5 secondes
-      setTimeout(() => {
-        router.push("/transactions");
-      }, 5000);
+    setTimeout(() => {
+      router.push("/wallet/transactions");
+    }, 5000);
+  };
+
+  const handleConfirm = async () => {
+    setIsLoading(true);
+    try {
+      await executeConfirm(false);
+    } catch (error: any) {
+      if (error?.message?.includes("déjà en cours")) {
+        setDuplicateDialogOpen(true);
+      } else {
+        toast.error(error.message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDuplicateConfirm = async () => {
+    setDuplicateDialogOpen(false);
+    setIsLoading(true);
+    try {
+      await executeConfirm(true);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -618,6 +752,13 @@ function CreateTransactionContent({
                 ? !!completeData?.hasActiveSubscription
                 : false
             }
+            metadata={transactionData.metadata}
+            onMetadataChange={(data) =>
+              setTransactionData((prev) => ({
+                ...prev,
+                metadata: { ...prev.metadata, ...data },
+              }))
+            }
             onContinue={handleContinue}
             onBack={handleBack}
           />
@@ -628,6 +769,7 @@ function CreateTransactionContent({
           <TransactionRecipientSelector
             onSelect={handleRecipientSelect}
             onBack={handleBack}
+            initialWalletId={prefilledRecipientWalletId || undefined}
           />
         );
 
@@ -687,10 +829,12 @@ function CreateTransactionContent({
             }
             isRequest={
               transactionData.type === "DEPOSIT" ||
-              transactionData.type === "WITHDRAWAL"
+              transactionData.type === "WITHDRAWAL" ||
+              transactionData.type === "GAME_ITEM_PURCHASE" ||
+              transactionData.type === "PRODUCT_PURCHASE"
             }
             onReturnHome={() => router.push("/wallet")}
-            onViewHistory={() => router.push("/transactions")}
+            onViewHistory={() => router.push("/wallet/transactions")}
           />
         );
 
@@ -721,7 +865,7 @@ function CreateTransactionContent({
           </div>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-6">
           {config && !showScanner && (
             <TransactionStepper
               steps={steps}
@@ -735,6 +879,22 @@ function CreateTransactionContent({
           </div>
         </div>
       </div>
+      <AlertDialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transaction déjà en cours</AlertDialogTitle>
+            <AlertDialogDescription>
+              Une opération du même type est déjà en cours. Voulez-vous continuer quand même ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDuplicateConfirm}>
+              Continuer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

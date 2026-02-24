@@ -35,8 +35,10 @@ import {
   type QueryOptions,
 } from '@/types/api';
 import { db } from '@/lib/db';
+import { encryptData, decryptData } from '@/lib/encryption';
 import { executeTransaction, getOrCreatePlatformAccount } from '@/lib/ledger/ledger-utils';
 import { createTransaction } from './wallets';
+import { getCurrentUser } from '@/lib/auth/session';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -256,12 +258,30 @@ export async function getRequests(
  * Crée une nouvelle requête
  */
 export async function createRequest(
-  requestData: NewRequest
+  requestData: NewRequest,
+  options?: { allowDuplicate?: boolean }
 ): Promise<Request> {
   try {
     // Validation des données requises
     if (!requestData.userId || !requestData.type || !requestData.amount) {
       throw new Error('userId, type and amount are required');
+    }
+
+    if (!options?.allowDuplicate) {
+      const existing = await db
+        .select({ id: requests.id })
+        .from(requests)
+        .where(
+          and(
+            eq(requests.userId, requestData.userId),
+            eq(requests.type, requestData.type),
+            inArray(requests.status, ['PENDING', 'PROCESSING'])
+          )
+        )
+        .limit(1);
+      if (existing.length > 0) {
+        throw new Error('Une transaction du même type est déjà en cours');
+      }
     }
 
     // Vérification de l'utilisateur
@@ -312,10 +332,15 @@ export async function createRequest(
       }
     }
 
+    const encryptedPassword = requestData.encryptedPassword
+      ? encryptData(requestData.encryptedPassword)
+      : undefined;
+
     const result = await db
       .insert(requests)
       .values({
         ...requestData,
+        encryptedPassword: encryptedPassword || requestData.encryptedPassword,
         status: 'PENDING',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -597,6 +622,24 @@ export async function restoreRequest(
     }
     throw new Error('Failed to restore request');
   }
+}
+
+export async function getRequestCredentialsForAdmin(requestId: string) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") {
+    throw new Error("Accès refusé");
+  }
+  const request = await getRequestById(requestId);
+  if (!request) {
+    throw new Error("Request not found");
+  }
+  const decryptedPassword = request.encryptedPassword
+    ? decryptData(request.encryptedPassword)
+    : "";
+  return {
+    gameAccount: request.gameAccount || null,
+    password: decryptedPassword || null,
+  };
 }
 
 // ============================================================================

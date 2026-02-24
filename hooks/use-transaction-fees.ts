@@ -2,7 +2,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { calculateTransactionFees } from "@/actions/entities";
+import { getTransactionFees } from "@/actions/transactions";
 import { TransactionType } from "@/types/transaction-types";
 
 export interface UseTransactionFeesOptions {
@@ -35,7 +35,8 @@ export function useTransactionFees(
             if (!type || amount <= 0) {
                 return { fees: 0, total: amount };
             }
-            return calculateTransactionFees(type, amount);
+            const result = await getTransactionFees(type, amount);
+            return { fees: result.fees, total: result.totalAmount };
         },
         enabled: enabled && !!type && amount > 0,
         staleTime: staleTime,

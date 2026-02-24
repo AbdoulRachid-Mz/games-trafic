@@ -21,6 +21,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getEditionRegistrations, updateEditionRegistration, updateRegistrationPayment, getTournamentEditions } from "@/actions/tournaments";
 import { refundTransaction } from "@/actions/transactions";
+import { TournamentPayoutDialog } from "@/components/pages/tournaments/payments/payout-dialog";
 import {
   EditionRegistration,
   TournamentMember,
@@ -111,6 +112,7 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Transaction ID</TableHead>
                 {isPayingEdition && <TableHead className="text-right">Actions</TableHead>}
+                {isPayingEdition && <TableHead className="text-right">Virement</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,6 +201,19 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
                             </button>
                           </form>
                         </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
+                  {isPayingEdition && (
+                    <TableCell className="text-right">
+                      {payment.registration.member.userId && payment.status === "COMPLETED" ? (
+                        <TournamentPayoutDialog
+                          editionId={editionId}
+                          recipientUserId={payment.registration.member.userId}
+                          recipientName={payment.registration.member.displayName || "Joueur"}
+                        />
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}

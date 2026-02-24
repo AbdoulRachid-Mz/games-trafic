@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/auth-context";
 import { Typography } from "@/components/ui/typography";
@@ -78,6 +78,7 @@ export default function TransactionsPage() {
       loadStats();
     }
   }, [wallet?.id, filters]);
+
 
   const loadTransactions = async () => {
     setLoading(true);
@@ -186,6 +187,7 @@ export default function TransactionsPage() {
     toast.info("Export en cours de développement");
   };
 
+
   if (!wallet) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -221,6 +223,33 @@ export default function TransactionsPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => router.push("/wallet/transactions/create?type=TRANSFER")}
+            className="gap-2 items-center flex justify-center"
+          >
+            <ArrowUpRight className="h-4 w-4" />
+            <span className="hidden md:inline-block">Transférer</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/wallet/transactions/create?type=WITHDRAWAL")}
+            className="gap-2 items-center flex justify-center"
+          >
+            <CreditCard className="h-4 w-4" />
+            <span className="hidden md:inline-block">Retrait</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/wallet/transactions/create?type=DEPOSIT")}
+            className="gap-2 items-center flex justify-center"
+          >
+            <ArrowDownLeft className="h-4 w-4" />
+            <span className="hidden md:inline-block">Dépôt</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExport}
             className="gap-2 items-center flex justify-center"
           >
@@ -245,7 +274,7 @@ export default function TransactionsPage() {
             className="gap-2 items-center flex justify-center"
           >
             <Plus className="h-4 w-4" />
-            <span className="">Nouvelle transaction</span>
+            <span className="hidden md:inline-block">Nouvelle transaction</span>
           </Button>
         </div>
       </div>
@@ -579,6 +608,7 @@ export default function TransactionsPage() {
           </Tabs>
         </CardContent>
       </Card>
+
     </div>
   );
 }

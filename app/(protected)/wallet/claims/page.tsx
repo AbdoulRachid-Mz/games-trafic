@@ -58,12 +58,14 @@ export default function ClaimsPage() {
   }, []);
 
   const loadClaims = async () => {
+    if (!user?.id) return;
+
     try {
-      const claimsData = await getUserClaims(user?.id || "", {
+      const claimsData = await getUserClaims(user.id, {
         pagination: { page: 1, limit: 20 },
         filters: { isDeleted: false },
       });
-setClaims(claimsData.data as any);
+      setClaims(claimsData.data as any);
     } catch (error) {
       console.error("Error loading claims:", error);
     }
@@ -73,11 +75,17 @@ setClaims(claimsData.data as any);
     e.preventDefault();
     setIsSubmitting(true);
 
+    if (!user?.id) {
+      toast.error("Vous devez être connecté pour soumettre une réclamation");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // Appel direct de la fonction serveur createClaim
       const newClaim = await createClaim({
         ...formData,
-        userId: user?.id ?? "",
+        userId: user.id,
       });
 
       toast.success("Réclamation soumise avec succès");
@@ -101,7 +109,7 @@ setClaims(claimsData.data as any);
       setIsSubmitting(false);
     }
   };
-  
+
 
   const getStatusBadge = (status: string) => {
     switch (status) {

@@ -15,25 +15,29 @@ interface ReceiptData {
 export function generateTransactionReceipt(data: ReceiptData) {
   const doc = new jsPDF();
   
-  // En-tête
+  doc.setFillColor(99, 102, 241);
+  doc.rect(0, 0, 210, 28, 'F');
+
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
-  doc.text("GAMES TRAFICS", 105, 20, { align: "center" });
+  doc.text("GAMES TRAFICS", 105, 18, { align: "center" });
+  doc.setTextColor(0, 0, 0);
   doc.setFontSize(12);
-  doc.text("Reçu de transaction", 105, 30, { align: "center" });
+  doc.text("REÇU DE TRANSACTION", 105, 38, { align: "center" });
   
-  // Ligne de séparation
   doc.setLineWidth(0.5);
-  doc.line(20, 35, 190, 35);
+  doc.line(20, 42, 190, 42);
   
-  // Informations de la transaction
   doc.setFontSize(10);
-  let yPos = 45;
+  let yPos = 50;
   
   doc.text(`Référence: ${data.reference}`, 20, yPos);
   yPos += 8;
   doc.text(`Date: ${data.date.toLocaleString("fr-FR")}`, 20, yPos);
   yPos += 8;
   doc.text(`Type: ${getTransactionLabel(data.type)}`, 20, yPos);
+  yPos += 8;
+  doc.text("Adresse: Tahoua, Niger", 20, yPos);
   yPos += 8;
   
   if (data.entityData?.name) {
@@ -60,9 +64,8 @@ export function generateTransactionReceipt(data: ReceiptData) {
     }
   }
   
-  doc.text("", 20, yPos); // Espace
+  doc.text("", 20, yPos);
   
-  // Détails financiers
   yPos += 10;
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
@@ -78,19 +81,20 @@ export function generateTransactionReceipt(data: ReceiptData) {
   yPos += 7;
   doc.text(`Total: ${data.totalAmount.toFixed(2)} GTC`, 30, yPos);
   
-  yPos += 12;
-  // Retiré: affichage du nouveau solde sur le reçu
+  yPos += 7;
+  doc.text(`Net: ${(data.totalAmount - data.fees).toFixed(2)} GTC`, 30, yPos);
   
-  // Pied de page
+  yPos += 12;
+  doc.text(`Nouveau solde: ${data.newBalance.toFixed(2)} GTC`, 30, yPos);
+  
   doc.setLineWidth(0.5);
   doc.line(20, 250, 190, 250);
   
   doc.setFontSize(9);
-  doc.text("Merci pour votre confiance !", 105, 258, { align: "center" });
-  doc.text("support@gamestrafics.com", 105, 263, { align: "center" });
-  doc.text("Tahoua - Niger", 105, 268, { align: "center" });
+  doc.text("Support: support@gamestrafics.com | Tél: +227 00 00 00 00", 105, 258, { align: "center" });
+  doc.text("Tahoua - Niger", 105, 263, { align: "center" });
+  doc.text("© Games Trafics", 105, 268, { align: "center" });
   
-  // Enregistrer le PDF
   doc.save(`receipt-${data.reference}.pdf`);
 }
 

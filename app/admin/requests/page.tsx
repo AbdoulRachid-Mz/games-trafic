@@ -27,7 +27,9 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
-  MoreHorizontal
+  MoreHorizontal,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -50,6 +52,7 @@ import {
   getRequestStats,
   approveRequest,
   rejectRequest,
+  getRequestCredentialsForAdmin,
 } from "@/actions/requests";
 import { createNotification } from "@/actions/notifications";
 import { refundTransaction } from "@/actions/transactions";
@@ -67,6 +70,12 @@ export default function AdminRequestsPage() {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [requestCredentials, setRequestCredentials] = useState<{
+    gameAccount: string | null;
+    password: string | null;
+  } | null>(null);
+  const [isCredentialsLoading, setIsCredentialsLoading] = useState(false);
+  const [showGamePassword, setShowGamePassword] = useState(false);
 
   // Data states
   const [deposits, setDeposits] = useState<any[]>([]);
@@ -80,6 +89,25 @@ export default function AdminRequestsPage() {
   useEffect(() => {
     loadData();
   }, [statusFilter, searchQuery]);
+
+  useEffect(() => {
+    const loadCredentials = async () => {
+      if (!selectedRequest?.id || selectedRequest?.type !== "GAME_ITEMS") {
+        setRequestCredentials(null);
+        return;
+      }
+      setIsCredentialsLoading(true);
+      try {
+        const creds = await getRequestCredentialsForAdmin(selectedRequest.id);
+        setRequestCredentials(creds);
+      } catch {
+        setRequestCredentials(null);
+      } finally {
+        setIsCredentialsLoading(false);
+      }
+    };
+    loadCredentials();
+  }, [selectedRequest?.id, selectedRequest?.type]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -213,6 +241,7 @@ export default function AdminRequestsPage() {
   const openDetailsDialog = (request: any) => {
     setSelectedRequest(request);
     setShowDetailsDialog(true);
+    setShowGamePassword(false);
   };
 
   return (
@@ -595,7 +624,32 @@ export default function AdminRequestsPage() {
                   </div>
                   <div>
                     <Typography variant="caption1" theme="muted">Compte jeu</Typography>
-                    <div className="font-mono text-xs">{selectedRequest.gameAccount || '-'}</div>
+                    <div className="font-mono text-xs">
+                      {requestCredentials?.gameAccount || selectedRequest.gameAccount || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <Typography variant="caption1" theme="muted">Mot de passe</Typography>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs">
+                        {isCredentialsLoading
+                          ? "Chargement..."
+                          : showGamePassword
+                            ? requestCredentials?.password || "—"
+                            : requestCredentials?.password
+                              ? "••••••••••••"
+                              : "—"}
+                      </span>
+                      {requestCredentials?.password && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowGamePassword((prev) => !prev)}
+                        >
+                          {showGamePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

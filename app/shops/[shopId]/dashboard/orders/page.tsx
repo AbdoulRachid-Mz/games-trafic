@@ -40,7 +40,13 @@ type UiOrder = {
   productImage?: string;
   buyerId: string;
   amount: number;
-  status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  status:
+    | "PENDING"
+    | "ACCEPTED_BY_SHOP"
+    | "REJECTED_BY_SHOP"
+    | "REJECTED_BY_ADMIN"
+    | "COMPLETED"
+    | "CANCELLED";
   createdAt: Date;
 };
 
@@ -57,7 +63,7 @@ export default function ShopOrdersPage() {
 
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const { data: ordersData, isLoading, error } = useOrdersByShopId(shopId, {
-    status: ["COMPLETED", "CANCELLED", "REJECTED_BY_SHOP", "REJECTED_BY_ADMIN"],
+    status: ["PENDING", "ACCEPTED_BY_SHOP", "COMPLETED", "CANCELLED", "REJECTED_BY_SHOP", "REJECTED_BY_ADMIN"],
     limit: 50,
     page: 1,
   });
@@ -175,9 +181,11 @@ export default function ShopOrdersPage() {
               <SelectContent>
                 <SelectItem value="all">Tous</SelectItem>
                 <SelectItem value="PENDING">En attente</SelectItem>
-                <SelectItem value="ACCEPTED">Accepté</SelectItem>
-                <SelectItem value="REJECTED">Rejeté</SelectItem>
+                <SelectItem value="ACCEPTED_BY_SHOP">Accepté</SelectItem>
+                <SelectItem value="REJECTED_BY_SHOP">Rejeté</SelectItem>
                 <SelectItem value="CANCELLED">Annulé</SelectItem>
+                <SelectItem value="COMPLETED">Complété</SelectItem>
+                <SelectItem value="REJECTED_BY_ADMIN">Rejeté Admin</SelectItem>
               </SelectContent>
             </Select>
           </FilterBar>
@@ -268,4 +276,3 @@ export default function ShopOrdersPage() {
     </div>
   );
 }
-

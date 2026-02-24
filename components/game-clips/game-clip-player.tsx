@@ -14,6 +14,7 @@ import {
   Volume2,
   VolumeX,
   Heart,
+  Plus,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Typography } from "@/components/ui/typography";
@@ -26,16 +27,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useDoubleTap } from "@/hooks/use-double-tap";
 import { useLongPress } from "@/hooks/use-long-press";
+import { useRouter } from "next/navigation";
 
 interface GameClipPlayerProps {
   clip: GameClipWithRelations;
   isActive: boolean;
-  isMuted: boolean;
+  isMuted?: boolean;
   onMuteToggle?: () => void;
   onAutoNext?: () => void;
   onAutoPrev?: () => void;
   onCommentsToggle?: () => void;
   hasMore?: boolean;
+  isPaused?: boolean;
 }
 
 export function GameClipPlayer({
@@ -47,6 +50,7 @@ export function GameClipPlayer({
   onAutoPrev,
   onCommentsToggle,
   hasMore,
+  isPaused = false,
 }: GameClipPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,6 +63,7 @@ export function GameClipPlayer({
 
   const { shareClip, isSharing } = useGameClips();
   const { user } = useAuthContext();
+  const router = useRouter();
 
   const isVideo = !!clip.videoUrl;
   const hasImages = clip.images && clip.images.length > 0;
@@ -70,13 +75,9 @@ export function GameClipPlayer({
 
     if (isActive) {
       if (isVideo && videoRef.current) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.muted = isMuted;
-        const playPromise = videoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => setIsPlaying(false));
-        }
-        setIsPlaying(true);
+        // Video playback is now controlled by the isPaused useEffect
+        videoRef.current.currentTime = 0; // Reset video on activation
+        videoRef.current.muted = !!isMuted;
       } else if (!isVideo) {
         // Auto-advance for images/text
         setProgress(0);
@@ -99,6 +100,23 @@ export function GameClipPlayer({
 
     return () => clearTimeout(timer);
   }, [isActive, isMuted, isVideo, currentImageIndex, totalMediaItems, onAutoNext]);
+
+  // Control video playback based on isActive and isPaused
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      if (isActive && !isPaused) {
+        videoRef.current.muted = !!isMuted; // Ensure mute state is applied
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  }, [isActive, isPaused, isVideo, isMuted]);
+
 
   // Progress tracking for videos
   useEffect(() => {
@@ -160,7 +178,7 @@ export function GameClipPlayer({
     } else if (isVideo) {
       togglePlay(e);
     }
-  }, [hasImages, clip.images, currentImageIndex, onAutoNext, onAutoPrev, togglePlay]);
+  }, [hasImages, clip.images, currentImageIndex, onAutoNext, onAutoPrev, togglePlay, isVideo]);
 
   // Double tap to like
   const handleDoubleTap = useCallback(() => {
@@ -186,7 +204,7 @@ export function GameClipPlayer({
     e.stopPropagation();
     await shareContent({
       title: "Regardez ce clip sur Games Trafics",
-      text: clip.caption || `Clip de ${clip.author?.username}`,
+      text: clip.caption || `Clip de ${clip.author?.username} `,
       url: `${window.location.origin}/game-clips?activeClipId=${clip.id}`,
     });
     if (user && user.id !== clip.authorId) {
@@ -437,6 +455,26 @@ export function GameClipPlayer({
       >
         <div className="flex items-end justify-between">
           <div className="flex-1">
+            {/* Actions overlay - Right side */}
+            <div className="absolute right-4 bottom-24 flex flex-col items-center gap-6 z-30">
+              {/* Profile/Author */}
+              <div className="relative mb-2">
+                <Avatar className="h-12 w-12 border-2 border-white ring-2 ring-primary/20">
+                  <AvatarImage src={clip.author?.profileImage || ""} />
+                  <AvatarFallback className="bg-primary/20 text-primary">
+                    {clip.author?.username?.[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  onClick={() => router.push("/game-clips?create=true")}
+                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-white p-0.5 rounded-full hover:scale-110 transition-transform"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Like */}
+            </div>
             {/* Author */}
             <div className="flex items-center gap-3 mb-3">
               <Avatar className="h-10 w-10 border-2 border-primary/50">

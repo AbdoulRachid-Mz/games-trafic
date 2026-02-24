@@ -23,6 +23,12 @@ export const auth = betterAuth({
     },
     // usePlural: true,
   }),
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60 // Cache duration en secondes (5 minutes)
+    }
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
