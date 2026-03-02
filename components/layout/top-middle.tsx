@@ -10,6 +10,7 @@ import {
   X,
   Settings,
   LogOut,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   motion,
@@ -88,7 +89,8 @@ const TopMiddle = ({
   // User menu items
   const userMenuItems = [
     { label: "Mon Profil", href: "/profile", icon: User },
-    { label: "Paramètres", href: "/settings", icon: Settings },
+    { label: "Paramètres", href: "/profile/settings", icon: Settings },
+    { label: "Mon espace", href: "/dashboard", icon: LayoutDashboard },
     { label: "Déconnexion", action: signOut, icon: LogOut },
   ];
 

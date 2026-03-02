@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,14 @@ export function LoginForm({
   }>({});
   const lastMethod = authClient.getLastUsedLoginMethod();
   const router = useRouter();
+
+  useEffect(() => {
+	if (!PublicKeyCredential.isConditionalMediationAvailable ||
+		!PublicKeyCredential.isConditionalMediationAvailable()) {
+		return;
+	}
+	void authClient.signIn.passkey({ autoFill: true })
+}, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

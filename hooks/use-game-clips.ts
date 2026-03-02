@@ -29,10 +29,8 @@ const MOCK_CLIPS: Partial<GameClipWithRelations>[] = [
     game: { id: "gt", name: "Wallet" } as any,
     createdAt: new Date()
   }
-  // ... on peut en ajouter d'autres dynamiquement pour arriver à 20
 ];
 
-// @/hooks/use-game-clips.ts
 export function useGameClips(filters: ClipFilters = {}) {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
@@ -73,8 +71,13 @@ export function useGameClips(filters: ClipFilters = {}) {
 
   let clips = data?.pages.flatMap((page) => page.data) || [];
 
-  // S'assurer qu'il y a au moins 20 clips (en ajoutant des mocks si besoin)
-  if (!isLoading && !isFetchingNextPage && clips.length < 20 && clips.length > 0) {
+  // Ajouter des mocks uniquement si on demande plus de 20 clips ET qu'on a moins de 20 clips
+  // Ne pas ajouter de mocks pour la home page (limit < 20)
+  if (!isLoading && 
+      !isFetchingNextPage && 
+      clips.length < 20 && 
+      clips.length > 0 && 
+      (!filters.limit || filters.limit >= 20)) {
     const remaining = 20 - clips.length;
     const paddedMocks = Array.from({ length: remaining }).map((_, i) => ({
       ...MOCK_CLIPS[i % MOCK_CLIPS.length],

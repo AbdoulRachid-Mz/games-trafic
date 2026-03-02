@@ -149,6 +149,7 @@ export default function AdminLayout({
       title={pageTitle}
       description={pageDescription}
       showSidebarTrigger={true}
+      togglerComponent={true}
     />
   );
 

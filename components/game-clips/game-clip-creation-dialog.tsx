@@ -18,11 +18,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Loader2, Plus, Image, Video, PlusCircle } from "lucide-react";
+import { Loader2, Plus, Image as ImageIcon, Video, PlusCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGameClips } from "@/hooks/use-game-clips";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useSearchParams, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 export function GameClipCreationDialog() {
   const searchParams = useSearchParams();
@@ -81,14 +83,14 @@ export function GameClipCreationDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+      {/* <DialogTrigger asChild>
         <button className="flex flex-col items-center gap-2 group hover:scale-105 transition-all duration-300">
           <div className="h-14 w-14 rounded-full border-2 border-dashed border-primary/40 flex items-center justify-center bg-primary/5 group-hover:bg-primary/10 group-hover:border-primary/60 transition-all">
             <PlusCircle className="h-6 w-6 text-primary" />
           </div>
           <span className="text-[10px] uppercase font-bold tracking-widest text-primary/60 group-hover:text-primary transition-colors">Clip IT</span>
         </button>
-      </DialogTrigger>
+      </DialogTrigger> */}
 
       <DialogContent className="sm:max-w-[550px] rounded-3xl border-white/5 bg-background/95 backdrop-blur-xl shadow-2xl">
         <DialogHeader>
@@ -118,9 +120,10 @@ export function GameClipCreationDialog() {
                 <video src={videoUrl} controls className="w-full" />
               ) : (
                 <div className="grid grid-cols-3 gap-2 p-3">
-                  {imageUrls.map((img) => (
-                    <img
+                  {imageUrls.map((img, index) => (
+                    <Image
                       key={img}
+                      alt={`Preview ${index + 1}`}
                       src={img}
                       className="aspect-square object-cover rounded-xl border border-white/10"
                     />
@@ -165,7 +168,7 @@ export function GameClipCreationDialog() {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button size="icon" variant="ghost" className="hover:bg-purple-500/10 rounded-xl transition-colors">
-                    <Image className="h-5 w-5 text-purple-400" />
+                    <ImageIcon className="h-5 w-5 text-purple-400" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[320px] rounded-2xl shadow-2xl border-white/10 p-4">
@@ -211,5 +214,4 @@ const Typography = ({ children, variant, className }: any) => {
   return <div className={cn(classes[variant], className)}>{children}</div>;
 };
 
-import { X } from "lucide-react";import { cn } from "@/lib/utils";
 

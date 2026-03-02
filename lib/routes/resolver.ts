@@ -296,7 +296,7 @@ export function resolveRoute(
       requireAuth: routeConfig.requireAuth || false,
     },
     rightBar: {
-      enabled: routeConfig.rightBar === true && layout === "public",
+      enabled: routeConfig.rightBar === true,
       requireAuth: routeConfig.requireAuth || false,
     },
     footer: {

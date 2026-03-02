@@ -2,20 +2,20 @@
 "use server";
 
 import { z } from "zod";
-import { 
-  gameClips, 
-  users, 
-  shops, 
-  games, 
-  interactions, 
-  messages 
+import {
+  gameClips,
+  users,
+  shops,
+  games,
+  interactions,
+  messages
 } from "@/database/schema";
 import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { 
-  createGameClipSchema, 
-  updateGameClipSchema, 
-  gameClipFiltersSchema 
+import {
+  createGameClipSchema,
+  updateGameClipSchema,
+  gameClipFiltersSchema
 } from "@/validations/game-clips";
 
 // Types réutilisables
@@ -138,7 +138,7 @@ async function getShareCounts(entityIds: string[], entityType: string = "GAMECLI
 
 async function getCommentsCount(entityIds: string[], entityType: string = "GAMECLIP") {
   if (entityIds.length === 0) return {};
-  
+
   const commentsData = await db
     .select({
       entityId: messages.entityId,
@@ -153,7 +153,7 @@ async function getCommentsCount(entityIds: string[], entityType: string = "GAMEC
       )
     )
     .groupBy(messages.entityId);
-    
+
   const counts: Record<string, number> = {};
   for (const row of commentsData) {
     if (row.entityId) {
@@ -200,7 +200,7 @@ async function getUserInteractions(entityIds: string[], userId: string, entityTy
 export async function createGameClip({ data, userId }: CreateGameClipParams) {
   // Validate input
   // const validatedData = createGameClipSchema.parse(data);
-   const validatedData = data;
+  const validatedData = data;
 
   // Check user exists
   const [user] = await db
@@ -240,7 +240,7 @@ export async function createGameClip({ data, userId }: CreateGameClipParams) {
   const [todaysClipsCount] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(gameClips)
-    
+
 
   // Create clip
   const result = await db
@@ -340,15 +340,15 @@ export async function getGameClips({
     .orderBy(
       ...(validatedFilters.sortOrder === "desc"
         ? [desc(
-            validatedFilters.sortBy === "likes"
-              ? sql`(
+          validatedFilters.sortBy === "likes"
+            ? sql`(
                   SELECT COUNT(*)::int
                   FROM interactions
                   WHERE interactions.entity_id = ${gameClips.id}
                     AND interactions.entity_type = 'GAMECLIP'
                     AND interactions.type = 'LIKE'
                 )`
-              : validatedFilters.sortBy === "views"
+            : validatedFilters.sortBy === "views"
               ? sql`(
                   SELECT COUNT(*)::int
                   FROM interactions
@@ -357,17 +357,17 @@ export async function getGameClips({
                     AND interactions.type = 'VIEW'
                 )`
               : gameClips.createdAt
-          )]
+        )]
         : [asc(
-            validatedFilters.sortBy === "likes"
-              ? sql`(
+          validatedFilters.sortBy === "likes"
+            ? sql`(
                   SELECT COUNT(*)::int
                   FROM interactions
                   WHERE interactions.entity_id = ${gameClips.id}
                     AND interactions.entity_type = 'GAMECLIP'
                     AND interactions.type = 'LIKE'
                 )`
-              : validatedFilters.sortBy === "views"
+            : validatedFilters.sortBy === "views"
               ? sql`(
                   SELECT COUNT(*)::int
                   FROM interactions
@@ -376,7 +376,7 @@ export async function getGameClips({
                     AND interactions.type = 'VIEW'
                 )`
               : gameClips.createdAt
-          )]
+        )]
       )
     )
     .limit(validatedFilters.limit)
@@ -394,7 +394,7 @@ export async function getGameClips({
   const data = clips.map(item => {
     const counts = interactionCounts[item.clip.id] || { likes: 0, views: 0, bookmarks: 0 };
     const commentsCount = commentsCounts[item.clip.id] || 0;
-    
+
     return {
       ...item.clip,
       author: item.author,

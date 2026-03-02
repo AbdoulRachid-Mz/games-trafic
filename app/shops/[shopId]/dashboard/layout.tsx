@@ -192,6 +192,7 @@ export default function ShopDashboardLayout({
       title={pageTitle}
       description={pageDescription}
       showSidebarTrigger={true}
+      togglerComponent={false}
     />
   );
 

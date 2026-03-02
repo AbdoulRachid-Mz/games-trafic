@@ -15,7 +15,7 @@ export function QuickActions() {
       icon: Store,
       label: "Créer une Boutique",
       description: "Ouvrez votre boutique",
-      onClick: () => router.push("/dashboard/shops/create"),
+      onClick: () => router.push("/shops/create"),
       color: "from-blue-500 to-cyan-500",
     },
     {
@@ -29,14 +29,14 @@ export function QuickActions() {
       icon: CreditCard,
       label: "Recharger",
       description: "Ajoutez des fonds",
-      onClick: () => router.push("/wallet"),
+      onClick: () => router.push("/wallet/transactions/create?type=deposite"),
       color: "from-green-500 to-emerald-500",
     },
     {
       icon: Settings,
       label: "Paramètres",
       description: "Gérez votre compte",
-      onClick: () => router.push("/settings"),
+      onClick: () => router.push("/profile/settings"),
       color: "from-orange-500 to-red-500",
     },
   ];

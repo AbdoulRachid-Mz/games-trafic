@@ -31,18 +31,17 @@ function ChatConversationContent() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   const chatId = params.chatId as string;
-
-  // Validate chat ID
   const validation = validateChatId(chatId);
-  if (!validation.valid) {
-    toast.error(validation.error);
-    router.push("/chats");
-    return null;
-  }
-
   const parsed = parseChatId(chatId);
-  if (!parsed) {
-    router.push("/chats");
+
+  useEffect(() => {
+    if (!validation.valid || !parsed) {
+      toast.error(validation.error || "Invalid chat");
+      router.push("/chats");
+    }
+  }, [validation.valid, validation.error, parsed, router]);
+
+  if (!validation.valid || !parsed) {
     return null;
   }
 

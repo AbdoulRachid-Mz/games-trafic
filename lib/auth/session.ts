@@ -1,22 +1,18 @@
 // lib/auth/session.ts - MISE À JOUR
 import { auth } from "../auth";
-import { headers, cookies } from "next/headers";
+import { headers } from "next/headers";
 
 /**
  * Récupère la session côté serveur avec profil complet
  */
 export async function getServerSession() {
   try {
-    const cookieStore = await cookies();
     const session = await auth.api.getSession({
-      headers: {
-        cookie: cookieStore.toString(),
-      },
+      headers: await headers()
     });
-
     return session;
   } catch (error) {
-    console.error("Error getting server session:", error);
+    console.error("Erreur lors de la récupération de la session:", error);
     return null;
   }
 }

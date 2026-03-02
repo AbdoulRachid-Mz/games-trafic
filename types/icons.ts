@@ -22,4 +22,6 @@ export type IconKey =
   | "clips"
   | "transactions"
   | "history"
-  | "claims";
+  | "claims"
+  | "swords"
+  | "gamepad-2";

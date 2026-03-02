@@ -1,4 +1,4 @@
-// @/app/game-clips/page.tsx
+// @/app/game-clips/client-page.tsx
 "use client";
 
 import { useGameClips } from "@/hooks/use-game-clips";
@@ -10,7 +10,7 @@ import { GameClipCreationDialog } from "@/components/game-clips/game-clip-creati
 import { useScreenSize } from "@/hooks/use-screen";
 import { Typography } from "@/components/ui/typography";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Users, Heart, Share2, MessageCircle } from "lucide-react";
+import { Loader2, Heart, MessageCircle } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { InteractionButton } from "@/components/shared/interaction-button";
 import { CommentsSection } from "@/components/comments/comments-section";
@@ -27,10 +27,7 @@ export function ClientGameClipsContent() {
   const { isMobile, isDesktop } = useScreenSize();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [currentActiveId, setCurrentActiveId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"comments" | "likes" | "shares">("comments");
-
-  // Utiliser un ref pour éviter les mises à jour en boucle
-  const isInitialized = useRef(false);
+  const [activeTab, setActiveTab] = useState<"comments" | "likes">("comments");
 
   const {
     clips,
@@ -45,9 +42,9 @@ export function ClientGameClipsContent() {
     limit: 10,
   });
 
-  // Initialisation unique de l'ID actif
+  // Initialisation de l'ID actif
   useEffect(() => {
-    if (!isInitialized.current && clips.length > 0) {
+    if (clips.length > 0) {
       if (activeClipId) {
         const exists = clips.some(c => c.id === activeClipId);
         if (exists) {
@@ -55,18 +52,15 @@ export function ClientGameClipsContent() {
         } else {
           setCurrentActiveId(clips[0].id);
         }
-      } else {
+      } else if (!currentActiveId) {
         setCurrentActiveId(clips[0].id);
       }
-      isInitialized.current = true;
     }
-  }, [clips, activeClipId]);
+  }, [clips, activeClipId, currentActiveId]);
 
-  // Mise à jour de l'URL sans re-render infini
+  // Mise à jour de l'URL
   const handleClipChange = useCallback((clipId: string) => {
     setCurrentActiveId(clipId);
-
-    // Mettre à jour l'URL sans navigation complète
     const params = new URLSearchParams(searchParams.toString());
     params.set("activeClipId", clipId);
     router.replace(`/game-clips?${params.toString()}`, { scroll: false });
@@ -103,11 +97,11 @@ export function ClientGameClipsContent() {
 
       {/* DESKTOP SIDEBAR */}
       {isDesktop && currentClip && (
-        <div className="w-[420px] border-l border-white/5 bg-[#0a0a0b] flex flex-col animate-in slide-in-from-right duration-500">
+        <div className="w-[420px] border-l border-white/10 bg-black/95 backdrop-blur-xl flex flex-col animate-in slide-in-from-right duration-500">
           {/* Header avec infos auteur */}
-          <div className="p-6 border-b border-white/5 bg-black/20">
+          <div className="p-6 border-b border-white/10 bg-black/40">
             <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 border-2 border-primary/30">
+              <Avatar className="h-14 w-14 border-2 border-primary/30 ring-4 ring-primary/10">
                 <AvatarImage src={currentClip.author?.profileImage || ""} />
                 <AvatarFallback className="bg-primary/10 text-primary">
                   {currentClip.author?.username?.[0]?.toUpperCase() || "U"}
@@ -131,7 +125,7 @@ export function ClientGameClipsContent() {
 
             {/* Caption */}
             {currentClip.caption && (
-              <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+              <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
                 <Typography variant="body-sm" className="text-white/80 leading-relaxed">
                   {currentClip.caption}
                 </Typography>
@@ -141,7 +135,7 @@ export function ClientGameClipsContent() {
             {/* Game Tag */}
             {currentClip.game && (
               <div className="mt-4 flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                 </div>
                 <span className="text-sm font-bold text-primary uppercase tracking-wider">
@@ -152,11 +146,10 @@ export function ClientGameClipsContent() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-white/5">
+          <div className="flex border-b border-white/10 bg-black/20">
             {[
               { id: "comments", icon: MessageCircle, label: "Commentaires", count: currentClip.commentsCount },
               { id: "likes", icon: Heart, label: "J'aime", count: currentClip.likesCount },
-              // { id: "shares", icon: Share2, label: "Partages", count: currentClip.sharesCount || 0 },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -170,11 +163,11 @@ export function ClientGameClipsContent() {
               >
                 <div className="flex items-center justify-center gap-2">
                   <tab.icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
                   <span className="text-xs ml-1">({tab.count || 0})</span>
                 </div>
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]" />
                 )}
               </button>
             ))}
@@ -188,7 +181,6 @@ export function ClientGameClipsContent() {
                   <CommentsSection
                     entityId={currentClip.id}
                     entityType="GAMECLIP"
-                  // compact
                   />
                 )}
 
@@ -199,39 +191,31 @@ export function ClientGameClipsContent() {
                     interactionType="LIKE"
                   />
                 )}
-
-                {activeTab === "shares" && (
-                  <InteractionList
-                    entityId={currentClip.id}
-                    entityType="GAMECLIP"
-                    interactionType="SHARE"
-                  />
-                )}
               </div>
             </ScrollArea>
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t border-white/5 bg-black/20">
+          <div className="p-4 border-t border-white/10 bg-black/40 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <InteractionButton
                 type="like"
                 entityType="GAMECLIP"
                 entityId={currentClip.id}
                 withConfetti
-                className="bg-white/5 hover:bg-white/10 border-0"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-sm"
               />
               <InteractionButton
                 type="bookmark"
                 entityType="GAMECLIP"
                 entityId={currentClip.id}
-                className="bg-white/5 hover:bg-white/10 border-0"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-sm"
               />
               <InteractionButton
                 type="share"
                 entityType="GAMECLIP"
                 entityId={currentClip.id}
-                className="bg-white/5 hover:bg-white/10 border-0"
+                className="bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-sm"
               />
             </div>
           </div>
@@ -254,8 +238,13 @@ export function ClientGameClipsContent() {
 // skeleton
 export function ClientGameClipsContentSkeleton() {
   return (
-    <div className="h-full w-full bg-black/20 flex items-center justify-center">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    <div className="h-full w-full bg-gradient-to-b from-black/95 to-black/80 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <Typography variant="body-sm" className="text-white/50">
+          Chargement des clips...
+        </Typography>
+      </div>
     </div>
   );
 }

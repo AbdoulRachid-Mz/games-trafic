@@ -113,7 +113,7 @@ export const FloatingActionButton = ({
 
   useEffect(() => {
     setIsMounted(true);
-    
+
     // Animation d'entrée initiale
     const timer = setTimeout(() => {
       setIsInitialLoad(false);
@@ -134,7 +134,7 @@ export const FloatingActionButton = ({
       const currentScrollY = window.scrollY;
       const scrollingDown = currentScrollY > lastScrollY;
       const isAtTop = currentScrollY < 100;
-      
+
       // Masquer seulement si on descend et qu'on n'est pas en haut
       if (scrollingDown && !isAtTop && !showActions) {
         setFabVisible(false);
@@ -144,7 +144,7 @@ export const FloatingActionButton = ({
         setFabVisible(true);
         setDockVisible(true);
       }
-      
+
       setLastScrollY(currentScrollY);
 
       // Réafficher après un certain temps d'inactivité de scroll
@@ -155,7 +155,7 @@ export const FloatingActionButton = ({
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    
+
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (scrollTimeoutRef.current) {
@@ -263,20 +263,20 @@ export const FloatingActionButton = ({
       <AnimatePresence>
         {showNavLinks && filteredNavItems.length > 0 && dockVisible && (
           <motion.div
-            initial={{ 
-              y: isInitialLoad ? 100 : 0, 
-              opacity: isInitialLoad ? 0 : 1, 
-              scale: isInitialLoad ? 0.8 : 1 
+            initial={{
+              y: isInitialLoad ? 100 : 0,
+              opacity: isInitialLoad ? 0 : 1,
+              scale: isInitialLoad ? 0.8 : 1
             }}
-            animate={{ 
-              y: 0, 
-              opacity: 1, 
-              scale: 1 
+            animate={{
+              y: 0,
+              opacity: 1,
+              scale: 1
             }}
-            exit={{ 
-              y: 100, 
-              opacity: 0, 
-              scale: 0.8 
+            exit={{
+              y: 100,
+              opacity: 0,
+              scale: 0.8
             }}
             transition={{
               type: "spring",
@@ -323,7 +323,7 @@ export const FloatingActionButton = ({
                                 transition={{ duration: 0.3 }}
                               />
                             )}
-                            
+
                             <div className={cn(
                               "p-2 rounded-lg mb-1 transition-all duration-300",
                               isActiveRoute
@@ -332,7 +332,7 @@ export const FloatingActionButton = ({
                             )}>
                               <Icon className="h-5 w-5" />
                             </div>
-                            
+
                             <Typography
                               variant="caption2"
                               weight="medium"
@@ -345,7 +345,7 @@ export const FloatingActionButton = ({
                             >
                               {item.label}
                             </Typography>
-                            
+
                             {/* Effet de halo sur l'élément actif */}
                             {isActiveRoute && (
                               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-purple-600/5 -z-10" />
@@ -438,18 +438,18 @@ export const FloatingActionButton = ({
       <AnimatePresence>
         {fabVisible && (
           <motion.div
-            initial={{ 
-              x: isInitialLoad ? 100 : 0, 
+            initial={{
+              x: isInitialLoad ? 100 : 0,
               opacity: isInitialLoad ? 0 : 1,
               scale: isInitialLoad ? 0.8 : 1
             }}
-            animate={{ 
-              x: 0, 
+            animate={{
+              x: 0,
               opacity: 1,
               scale: 1
             }}
-            exit={{ 
-              x: 100, 
+            exit={{
+              x: 100,
               opacity: 0,
               scale: 0.8
             }}
@@ -477,7 +477,7 @@ export const FloatingActionButton = ({
                       "bg-gradient-to-br from-primary via-primary to-pink-600 hover:from-primary hover:via-purple-700 hover:to-pink-700",
                       "relative overflow-hidden group",
                       (showActions || isPressed) &&
-                        "ring-3 ring-primary/50 ring-offset-2 ring-offset-background",
+                      "ring-3 ring-primary/50 ring-offset-2 ring-offset-background",
                     )}
                   >
                     {/* Shine effect */}

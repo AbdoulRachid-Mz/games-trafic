@@ -13,7 +13,7 @@ import { Typography } from "@/components/ui/typography"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Bell, Sparkles, Menu } from "lucide-react"
+import { Bell, Sparkles, Menu, LayoutDashboard } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { useTheme } from "next-themes"
@@ -57,7 +57,7 @@ export function EnhancedDashboard({
               <SheetTitle className='hidden'>title</SheetTitle>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Menu className="h-4 w-4" />
+                  <LayoutDashboard className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-[280px] overflow-y-auto">
@@ -134,11 +134,12 @@ export function SidebarItem({
     switch (sidebarBgType) {
       case "gradient":
         return cn(
-          "group relative overflow-hidden transition-all duration-300 p-2 rounded-lg",
-          "hover:scale-105 hover:shadow-lg cursor-pointer",
+          "p-1.5 rounded-lg transition-all duration-300",
           isActive
-            ? "bg-white/20 shadow-lg text-white backdrop-blur-sm border-l-4 border-yellow-400"
-            : "hover:bg-white/10 text-white/80 hover:text-white"
+            ? "bg-yellow-400/20 text-yellow-500"
+            : isDark
+              ? "group-hover:bg-white/10 text-white/70 group-hover:text-white"
+              : "group-hover:bg-black/5 text-foreground/70 group-hover:text-foreground"
         )
       case "glass":
         return cn(
@@ -214,6 +215,11 @@ export function SidebarItem({
   const getTextColor = () => {
     switch (sidebarBgType) {
       case "gradient":
+        return isActive
+          ? "text-yellow-500"
+          : isDark
+            ? "text-white/80"
+            : "text-foreground/80"
       case "glass":
         return isActive ? "text-yellow-300" : "text-white/80"
       case "neuomorphic":
@@ -358,8 +364,7 @@ export function SidebarGroup({ label, children, className, sidebarBgType = "defa
   const getLabelColor = () => {
     switch (sidebarBgType) {
       case "gradient":
-      case "glass":
-        return "text-white/60"
+        return isDark ? "text-white/60" : "text-foreground/60"
       case "neuomorphic":
         return isDark ? "text-white/60" : "text-muted-foreground"
       case "solid":
@@ -418,7 +423,10 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-white"
+        return cn(
+          "bg-gradient-to-br from-bg-primary to-bg-secondary",
+          isDark ? "text-white" : "text-foreground"
+        )
       case "glass":
         return "glass border-b border-white/20 text-white"
       case "neuomorphic":
@@ -434,6 +442,7 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
   const getTextColor = () => {
     switch (sidebarBgType) {
       case "gradient":
+        return "text-yellow-500"
       case "glass":
         return "text-white"
       case "neuomorphic":
@@ -476,7 +485,7 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
                 variant="caption1"
                 className={cn(
                   (sidebarBgType === "gradient" || sidebarBgType === "glass")
-                    ? "text-white/70"
+                    ? isDark ? 'text-white/70' : "text-black"
                     : "text-muted-foreground"
                 )}
               >
@@ -488,7 +497,7 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
                 variant="caption1"
                 className={cn(
                   (sidebarBgType === "gradient" || sidebarBgType === "glass")
-                    ? "text-white/70"
+                    ? !isDark ? "text-gray-400" : "text-white/70"
                     : "text-muted-foreground"
                 )}
               >
@@ -533,7 +542,10 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-t from-slate-900/80 to-slate-900/50 border-t border-white/20 text-white"
+        return cn(
+          "bg-gradient-to-t from-bg-primary to-bg-secondary border-t",
+          isDark ? "text-white border-white/20" : "text-yellow-500 border-black/10"
+        )
       case "glass":
         return "glass border-t border-white/20 text-white"
       case "neuomorphic":
@@ -541,6 +553,7 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
       case "solid":
         return "bg-sidebar border-t text-foreground"
       case "default":
+        return "bg-primary text-white"
       default:
         return "bg-sidebar border-t text-foreground"
     }
@@ -549,6 +562,9 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
   const getContentStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
+        return isDark
+          ? "bg-white/10 border border-white/20"
+          : "bg-black/5 border border-black/10"
       case "glass":
         return "bg-white/10 backdrop-blur-sm border border-white/20"
       default:
@@ -559,6 +575,7 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
   const getTextColor = () => {
     switch (sidebarBgType) {
       case "gradient":
+        return isDark ? "text-white" : "text-yellow-500"
       case "glass":
         return "text-white"
       case "neuomorphic":
@@ -566,6 +583,7 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
       case "solid":
         return isDark ? "text-white" : "text-foreground"
       case "default":
+        return isDark ? "text-white" : "text-foreground"
       default:
         return "text-foreground"
     }
@@ -579,7 +597,7 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
           <AvatarFallback className={cn(
             "text-xs",
             (sidebarBgType === "gradient" || sidebarBgType === "glass")
-              ? "bg-white/20 text-white"
+              ? "bg-yellow-500 text-white"
               : ""
           )}>
             {user?.username?.charAt(0)?.toUpperCase() || "U"}
@@ -628,6 +646,7 @@ interface DashboardHeaderProps {
   onNotificationButtonClick?: () => void
   notificationCount?: number
   children?: React.ReactNode
+  togglerComponent?: boolean; 
 }
 
 export function DashboardHeader({
@@ -638,6 +657,7 @@ export function DashboardHeader({
   className,
   onNotificationButtonClick,
   notificationCount,
+  togglerComponent,
   children
 }: DashboardHeaderProps) {
   return (
@@ -646,7 +666,7 @@ export function DashboardHeader({
       className
     )}>
       <div className="flex items-center gap-4">
-        {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />}
+        {/* {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />} */}
         <div>
           <Typography variant="h5" weight="semibold">
             {title}
@@ -673,7 +693,8 @@ export function DashboardHeader({
             )}
           </Button>
         )}
-        <ThemeToggle />
+        {togglerComponent && <ThemeToggle />}
+        {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />}
       </div>
     </header>
   )
@@ -693,7 +714,10 @@ export function SidebarContainer({ children, sidebarBgType = "default", classNam
   const getBackgroundStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-br from-bg-primary to-bg-secondary text-white"
+        return cn(
+          "bg-gradient-to-br from-bg-primary to-bg-secondary",
+          isDark ? "text-white" : "text-foreground"
+        )
       case "glass":
         return "glass text-white border-r border-white/20"
       case "neuomorphic":

@@ -1,54 +1,47 @@
 // @/hooks/use-long-press.ts
-import { useRef, useCallback } from 'react';
+import { useCallback, useRef, useState } from "react";
 
-export function useLongPress(callback: () => void, threshold = 500) {
-  const timer = useRef<NodeJS.Timeout | undefined>(undefined);
-  const isLongPress = useRef(false);
+interface LongPressHandlers {
+  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseUp: (e: React.MouseEvent) => void;
+  onMouseLeave: (e: React.MouseEvent) => void;
+  onTouchStart: (e: React.TouchEvent) => void;
+  onTouchEnd: (e: React.TouchEvent) => void;
+  onTouchMove: (e: React.TouchEvent) => void;
+}
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    isLongPress.current = false;
-    timer.current = setTimeout(() => {
-      isLongPress.current = true;
-      callback();
+export function useLongPress(
+  onStart: () => void,  // Appelé quand le long press commence
+  onEnd: () => void,    // Appelé quand le long press se termine
+  threshold = 500       // Durée en ms pour déclencher le long press
+): LongPressHandlers {
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPressing, setIsPressing] = useState(false);
+
+  const start = useCallback(() => {
+    setIsPressing(true);
+    timerRef.current = setTimeout(() => {
+      onStart();
     }, threshold);
-  }, [callback, threshold]);
+  }, [onStart, threshold]);
 
-  const onMouseUp = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    clearTimeout(timer.current);
-  }, []);
-
-  const onMouseLeave = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    clearTimeout(timer.current);
-  }, []);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    isLongPress.current = false;
-    timer.current = setTimeout(() => {
-      isLongPress.current = true;
-      callback();
-    }, threshold);
-  }, [callback, threshold]);
-
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    clearTimeout(timer.current);
-  }, []);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    clearTimeout(timer.current);
-  }, []);
+  const clear = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (isPressing) {
+      onEnd();
+    }
+    setIsPressing(false);
+  }, [onEnd, isPressing]);
 
   return {
-    onMouseDown,
-    onMouseUp,
-    onMouseLeave,
-    onTouchStart,
-    onTouchEnd,
-    onTouchMove,
+    onMouseDown: start,
+    onMouseUp: clear,
+    onMouseLeave: clear,
+    onTouchStart: start,
+    onTouchEnd: clear,
+    onTouchMove: clear,
   };
 }
