@@ -98,7 +98,7 @@ export default function ProfilePage() {
         />
 
         <ProfileTabs
-          userId={profile.id}
+          profileUser={profile}
           isOwnProfile
           className="mt-6"
         />

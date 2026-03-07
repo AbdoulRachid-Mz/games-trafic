@@ -12,6 +12,7 @@ import { resolveRoute } from "@/lib/routes/resolver";
 import type { UserRoles } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
+import OnTapPopup from "../auth/on-tap-popup";
 
 // Loading Screen Premium
 function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
@@ -20,11 +21,11 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
       <div className="text-center space-y-8">
         <div className="relative">
           <motion.div
-            animate={{ 
+            animate={{
               rotate: 360,
               scale: [1, 1.1, 1]
             }}
-            transition={{ 
+            transition={{
               rotate: { duration: 2, repeat: Infinity, ease: "linear" },
               scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
             }}
@@ -33,7 +34,7 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
             <div className="absolute inset-0 rounded-full border-4 border-primary/10"></div>
             <div className="absolute inset-4 rounded-full border-4 border-primary border-t-transparent"></div>
             <div className="absolute inset-8 rounded-full border-4 border-primary/30 border-b-transparent"></div>
-            
+
             {/* Logo in center */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
@@ -45,7 +46,7 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
           </motion.div>
         </div>
         <div className="space-y-3">
-          <motion.h2 
+          <motion.h2
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -53,7 +54,7 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
           >
             {message}
           </motion.h2>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -62,9 +63,9 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
             Préparation de votre expérience gaming
           </motion.p>
         </div>
-        
+
         {/* Progress dots */}
-        <motion.div 
+        <motion.div
           className="flex items-center justify-center gap-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -74,11 +75,11 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
             <motion.div
               key={i}
               className="h-2 w-2 rounded-full bg-primary/30"
-              animate={{ 
+              animate={{
                 scale: [1, 1.5, 1],
                 opacity: [0.3, 1, 0.3]
               }}
-              transition={{ 
+              transition={{
                 duration: 1.5,
                 repeat: Infinity,
                 delay: i * 0.2
@@ -205,7 +206,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (maintenanceMode && !isAdmin && isInitialized) {
       const isPublicRoute = resolved && !resolved.requireAuth && !resolved.requireAdmin;
-      
+
       if (!isPublicRoute && pathname !== "/maintenance") {
         router.push("/maintenance");
       }
@@ -294,6 +295,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         breadcrumbItems={resolved?.topMiddle.breadcrumbs || []}
         floatingDockLinks={resolved?.floatingDock.links || []}
         shouldExcludeContainer={resolved?.layout !== "public"}
+        showOnTap={resolved?.showOnTap}
       >
         {children}
       </MainLayout>

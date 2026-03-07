@@ -24,10 +24,10 @@ interface ChangePasswordDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-export function ChangePasswordDialog({ 
-  children, 
-  open, 
-  onOpenChange 
+export function ChangePasswordDialog({
+  children,
+  open,
+  onOpenChange
 }: ChangePasswordDialogProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -72,13 +72,13 @@ export function ChangePasswordDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setLoading(true);
     try {
       const { error } = await authMethods.changePassword(currentPassword, newPassword);
-      
+
       if (error) {
         toast.error(error.message);
       } else {
@@ -113,11 +113,11 @@ export function ChangePasswordDialog({
   };
 
   const strength = getPasswordStrength(newPassword);
-  const strengthColor = 
+  const strengthColor =
     strength <= 25 ? "bg-red-500" :
-    strength <= 50 ? "bg-orange-500" :
-    strength <= 75 ? "bg-yellow-500" :
-    "bg-green-500";
+      strength <= 50 ? "bg-orange-500" :
+        strength <= 75 ? "bg-yellow-500" :
+          "bg-green-500";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

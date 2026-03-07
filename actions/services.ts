@@ -18,6 +18,10 @@ export async function getServiceById(
   options?: { populate?: string[] }
 ): Promise<Service | null> {
   try {
+    if (!id) {
+      throw new Error('Service ID is required');
+    }
+
     if (options?.populate?.includes('admin')) {
       const query = db.query.services.findFirst({
         where: (services, { eq }) => eq(services.id, id),

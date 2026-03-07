@@ -20,9 +20,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/contexts/auth-context";
+import { TournamentCard } from "@/components/cards/tournament-card";
 
 export default function TournamentsDashboardPage() {
   const { isSmallScreen, isMediumScreen } = useScreenSize();
+  const { user } = useAuthContext();
   const router = useRouter();
 
   const {
@@ -43,129 +46,19 @@ export default function TournamentsDashboardPage() {
     onRefresh,
   } = useEntityList<Tournament>({
     entityType: "tournaments",
+    defaultFilters: { creatorId: user?.id },
     defaultLimit: isSmallScreen ? 12 : isMediumScreen ? 15 : 20,
+    enabled: !!user?.id,
   });
 
-  const renderTournamentCard = (t: Tournament, index: number) => {
-    const status = (t as any).status || "UPCOMING";
-    const participants =
-      (t as any).totalParticipants ?? (t as any).currentParticipants ?? 0;
-    const maxParticipants = (t as any).maxParticipants || 100;
-    const progress = (participants / maxParticipants) * 100;
-
-    const statusConfig: Record<
-      string,
-      { label: string; color: string; icon: any }
-    > = {
-      UPCOMING: {
-        label: "À venir",
-        color: "bg-blue-500/10 text-blue-500",
-        icon: Calendar,
-      },
-      ONGOING: {
-        label: "En cours",
-        color: "bg-orange-500/10 text-orange-500",
-        icon: Swords,
-      },
-      COMPLETED: {
-        label: "Terminé",
-        color: "bg-green-500/10 text-green-500",
-        icon: Trophy,
-      },
-      CANCELLED: {
-        label: "Annulé",
-        color: "bg-red-500/10 text-red-500",
-        icon: Clock,
-      },
-    };
-
-    const config = statusConfig[status] || statusConfig.UPCOMING;
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: index * 0.05 }}
-        whileHover={{ scale: 1.02 }}
-        className="h-full"
-      >
-        <Card className="h-full border-2 hover:shadow-xl hover:shadow-primary/10 transition-all duration-300 group overflow-hidden bg-card/40">
-          {/* Status Header */}
-          <div
-            className={`p-1.5 text-center ${config.color} text-[10px] font-bold uppercase tracking-widest`}
-          >
-            {config.label}
-          </div>
-
-          <CardHeader className="p-5 flex flex-row items-start justify-between">
-            <div className="flex flex-col gap-1">
-              <CardTitle className="text-lg font-black line-clamp-1">
-                {t.name}
-              </CardTitle>
-              <Typography
-                variant="caption2"
-                theme="muted"
-                className="flex items-center gap-1 font-bold"
-              >
-                <TrendingUp className="h-3 w-3" />
-                NIVEAU REQUIS: GOLD
-              </Typography>
-            </div>
-            <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-              <Trophy className="h-5 w-5" />
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-5 pt-0 space-y-5">
-            <Typography
-              variant="body-sm"
-              theme="muted"
-              className="line-clamp-2 h-10 italic"
-            >
-              {t.description || "Préparez-vous pour la compétition ultime."}
-            </Typography>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold uppercase">
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  Remplissage
-                </span>
-                <span>
-                  {participants} / {maxParticipants}
-                </span>
-              </div>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 1, delay: 0.5 + index * 0.1 }}
-                  className="h-full bg-primary"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full font-bold h-9"
-                onClick={() => router.push(`/tournaments/${t.id}`)}
-              >
-                VOIR
-              </Button>
-              <Button
-                size="sm"
-                className="w-full font-bold h-9 shadow-lg shadow-primary/20"
-              >
-                REJOINDRE
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    );
-  };
+  const renderTournamentCard = (t: Tournament, index: number) => (
+    <TournamentCard
+        key={t.id}
+        tournament={t as any}
+        viewMode={viewMode === "grid" ? "grid" : "list"}
+        onView={() => router.push(`/tournaments/${t.id}`)}
+    />
+  );
 
   return (
     <div className="mx-auto p-2 space-y-6">

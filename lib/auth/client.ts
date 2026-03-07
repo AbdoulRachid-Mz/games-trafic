@@ -108,20 +108,6 @@ export const authMethods = {
 		return { data: res.data, error: null };
 	},
 
-	// Lister les passkeys de l'utilisateur
-	listPasskeys: async () => {
-		const res = await authClient.passkey.listUserPasskeys();
-
-		if (res.error) {
-			return {
-				data: null,
-				error: { message: getErrorMessage(res.error) }
-			};
-		}
-
-		return { data: res.data, error: null };
-	},
-
 	// Supprimer une passkey
 	deletePasskey: async (id: string) => {
 		const res = await authClient.passkey.deletePasskey({ id });
@@ -135,6 +121,42 @@ export const authMethods = {
 
 		return { data: res.data, error: null };
 	},
+
+		// on tap
+// Dans authMethods
+signInWithOneTap: async (options?: {
+	callbackURL?: string;
+	onRequest?: () => void;
+	onSuccess?: () => void;
+	onError?: (error: any) => void;
+}) => {
+	try {
+		// authClient.oneTap returns void, so we can't test it for truthiness
+		await authClient.oneTap({
+			callbackURL: options?.callbackURL || "/profile",
+			fetchOptions: {
+				onRequest: () => {
+					options?.onRequest?.();
+				},
+				onSuccess: () => {
+					options?.onSuccess?.();
+				},
+				onError: (ctx) => {
+					options?.onError?.(ctx.error);
+				}
+			}
+		});
+
+		// Since oneTap returns void, we assume success if no exception thrown
+		return { data: true, error: null };
+	} catch (error) {
+		return {
+			data: null,
+			error: { message: getErrorMessage(error) }
+		};
+	}
+},
+
 
 	// Connexion sociale
 	signInWithSocial: async (provider: "google" | "github") => {

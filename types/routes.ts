@@ -78,6 +78,9 @@ export interface ResolvedRoute {
   aiAssistant: {
     enabled: boolean;
   };
+
+  // Affichage
+  showOnTap: boolean;
   
   // Style
   styleGroup?: string;

@@ -8,6 +8,7 @@ import { anonymous } from "better-auth/plugins/anonymous";
 import { passkey } from "@better-auth/passkey";
 import { lastLoginMethod } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
+import { oneTap } from "better-auth/plugins"; // Ajouter cette ligne
 import { migrateAnonymousUserData } from "@/actions/users";
 
 export const auth = betterAuth({
@@ -207,6 +208,7 @@ export const auth = betterAuth({
       storeInDatabase: true,
     }),
     passkey(),
+    oneTap(),
   ],
 });
 

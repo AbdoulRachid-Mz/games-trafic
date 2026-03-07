@@ -73,7 +73,7 @@ export default function PublicProfilePage() {
         />
 
         <ProfileTabs
-          userId={profile.id}
+          profileUser={profile}
           isOwnProfile={isOwnProfile}
           className="mt-8"
         />

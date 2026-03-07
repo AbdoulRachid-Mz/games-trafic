@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   X,
   Bell,
@@ -12,164 +12,354 @@ import {
   Clock,
   TrendingUp,
   Settings,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/contexts/auth-context";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Typography } from "@/components/ui/typography";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  getUserNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+} from "@/actions/notifications";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface Notification {
+type NotificationItem = {
   id: string;
   title: string;
   message: string;
-  type: "message" | "purchase" | "tournament" | "promotion" | "system";
-  icon: React.ReactNode;
+  type: string;
   read: boolean;
-  createdAt: string;
-  linkUrl?: string;
-}
+  createdAt: Date;
+  linkUrl?: string | null;
+};
 
 interface RightBarProps {
   isRightOpen: boolean;
   onClose: () => void;
+  /** If true, renders as a fixed overlay (mobile). If false, renders inline. */
+  overlayMode?: boolean;
 }
 
-export function RightBar({ isRightOpen, onClose }: RightBarProps) {
+export function RightBar({ isRightOpen, onClose, overlayMode = true }: RightBarProps) {
   const { user, isAuthenticated } = useAuthContext();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [selectedNotifications, setSelectedNotifications] = useState<string[]>(
-    [],
-  );
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState("all");
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Mock notifications
-  useEffect(() => {
-    const mockNotifications: Notification[] = [
-      {
-        id: "1",
-        title: "Nouveau message",
-        message: "JohnDoe vous a envoyé un message concernant votre commande",
-        type: "message",
-        icon: <MessageSquare className="h-4 w-4" />,
-        read: false,
-        createdAt: new Date().toISOString(),
-        linkUrl: "/messages",
-      },
-      {
-        id: "2",
-        title: "Commande expédiée",
-        message: "Votre commande #12345 vient d'être expédiée",
-        type: "purchase",
-        icon: <ShoppingBag className="h-4 w-4" />,
-        read: true,
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        linkUrl: "/orders/12345",
-      },
-      {
-        id: "3",
-        title: "Tournoi à venir",
-        message: "Le tournoi 'Battle Royale' commence dans 2 heures",
-        type: "tournament",
-        icon: <Trophy className="h-4 w-4" />,
-        read: false,
-        createdAt: new Date(Date.now() - 7200000).toISOString(),
-        linkUrl: "/tournaments/battle-royale",
-      },
-      {
-        id: "4",
-        title: "Promotion spéciale",
-        message: "Réduction de 20% sur tous les produits gaming ce week-end",
-        type: "promotion",
-        icon: <TrendingUp className="h-4 w-4" />,
-        read: true,
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        linkUrl: "/promotions",
-      },
-      {
-        id: "5",
-        title: "Mise à jour système",
-        message: "Nouvelle fonctionnalité : système de trading amélioré",
-        type: "system",
-        icon: <Settings className="h-4 w-4" />,
-        read: false,
-        createdAt: new Date(Date.now() - 172800000).toISOString(),
-        linkUrl: "/whats-new",
-      },
-    ];
-
-    setNotifications(mockNotifications);
-  }, []);
-
-  // Filter notifications
-  const filteredNotifications = notifications.filter((notification) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "unread") return !notification.read;
-    return notification.type === activeTab;
-  });
-
-  // Count unread notifications
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  // Format time ago
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) return `${diffMins}m`;
-    if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}j`;
-    return date.toLocaleDateString();
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "MESSAGE":
+      case "message":
+        return <MessageSquare className="h-4 w-4 text-white" />;
+      case "ORDER":
+      case "purchase":
+        return <ShoppingBag className="h-4 w-4 text-white" />;
+      case "TOURNAMENT":
+      case "tournament":
+        return <Trophy className="h-4 w-4 text-white" />;
+      case "PROMOTION":
+      case "promotion":
+        return <TrendingUp className="h-4 w-4 text-white" />;
+      default:
+        return <Bell className="h-4 w-4 text-white" />;
+    }
   };
 
-  // Get type color
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case "message":
+    switch (type?.toUpperCase()) {
+      case "MESSAGE":
         return "bg-blue-500";
-      case "purchase":
+      case "ORDER":
         return "bg-green-500";
-      case "tournament":
+      case "TOURNAMENT":
         return "bg-amber-500";
-      case "promotion":
+      case "PROMOTION":
         return "bg-purple-500";
-      case "system":
-        return "bg-gray-500";
       default:
         return "bg-primary";
     }
   };
 
-  // Mark as read
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
+  const loadNotifications = useCallback(async () => {
+    if (!user?.id || !isAuthenticated) return;
+    setIsLoading(true);
+    try {
+      const result = await getUserNotifications(user.id, {
+        page: 1,
+        limit: 30,
+        unreadOnly: false,
+      });
+      setNotifications(
+        result.notifications.map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          type: n.type || "system",
+          read: n.read || false,
+          createdAt: new Date(n.createdAt as any),
+          linkUrl: n.linkUrl,
+        }))
+      );
+    } catch {
+      // Silently fail — keep existing state
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, isAuthenticated]);
+
+  useEffect(() => {
+    if (isRightOpen) {
+      loadNotifications();
+    }
+  }, [isRightOpen, loadNotifications]);
+
+  const filteredNotifications = notifications.filter((n) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "unread") return !n.read;
+    return n.type?.toUpperCase() === activeTab.toUpperCase();
+  });
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const formatTimeAgo = (date: Date) => {
+    const diffMs = Date.now() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return "maintenant";
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays < 7) return `${diffDays}j`;
+    return date.toLocaleDateString("fr-FR");
   };
 
-  // Mark all as read
-  const markAllAsRead = () => {
+  const handleMarkAsRead = async (id: string) => {
+    if (!user?.id) return;
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    await markNotificationAsRead(id, user.id).catch(() => null);
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!user?.id) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    await markAllNotificationsAsRead(user.id).catch(() => null);
   };
 
-  // Delete selected
-  const deleteSelected = () => {
-    setNotifications((prev) =>
-      prev.filter((n) => !selectedNotifications.includes(n.id)),
+  const handleDelete = async (id: string) => {
+    if (!user?.id) return;
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    await deleteNotification(id, user.id).catch(() => null);
+  };
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between p-5 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-purple-600 shadow-lg">
+            <Bell className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <Typography variant="h5" weight="bold">
+              Notifications
+            </Typography>
+            {unreadCount > 0 && (
+              <Typography variant="body-sm" theme="muted">
+                {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
+              </Typography>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={loadNotifications}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            title="Actualiser"
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          </Button>
+          {overlayMode && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-8 w-8 rounded-full hover:bg-primary/10"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-4 pt-3 overflow-x-auto">
+        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-4 w-full bg-muted/50 p-1 rounded-lg">
+            <TabsTrigger value="all" className="rounded-md text-xs">Toutes</TabsTrigger>
+            <TabsTrigger value="unread" className="rounded-md text-xs">Non lues</TabsTrigger>
+            <TabsTrigger value="MESSAGE" className="rounded-md text-xs">Messages</TabsTrigger>
+            <TabsTrigger value="ORDER" className="rounded-md text-xs">Achats</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 rounded-full gap-1.5 text-xs"
+          onClick={handleMarkAllRead}
+        >
+          <Check className="h-3 w-3" />
+          Tout lire
+        </Button>
+        <Typography variant="caption2" theme="muted">
+          {filteredNotifications.length} notification{filteredNotifications.length !== 1 ? "s" : ""}
+        </Typography>
+      </div>
+
+      {/* List */}
+      <ScrollArea className="flex-1">
+        <div className="p-3 space-y-2">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-xl border border-border/30 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            ))
+          ) : filteredNotifications.length > 0 ? (
+            filteredNotifications.map((notification, index) => (
+              <motion.div
+                key={notification.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03 }}
+              >
+                <div
+                  className={cn(
+                    "group relative p-3 rounded-xl border transition-all duration-200 cursor-pointer",
+                    "hover:shadow-md",
+                    notification.read
+                      ? "border-border/30 bg-background/50"
+                      : "border-primary/20 bg-primary/5"
+                  )}
+                  onClick={() => handleMarkAsRead(notification.id)}
+                >
+                  {/* Unread indicator */}
+                  {!notification.read && (
+                    <div className="absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+
+                  <div className="flex items-start gap-3 pl-1">
+                    <div className={cn("flex-shrink-0 p-2 rounded-lg", getTypeColor(notification.type))}>
+                      {getTypeIcon(notification.type)}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <Typography
+                          variant="body-sm"
+                          weight="semibold"
+                          className={cn(!notification.read && "text-primary", "line-clamp-1")}
+                        >
+                          {notification.title}
+                        </Typography>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Typography variant="caption2" theme="muted">
+                            {formatTimeAgo(notification.createdAt)}
+                          </Typography>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(notification.id); }}
+                            title="Supprimer"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <Typography variant="body-sm" theme="muted" className="mt-0.5 line-clamp-2 text-xs">
+                        {notification.message}
+                      </Typography>
+                      {notification.linkUrl && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto text-primary gap-1 mt-1 text-xs"
+                          asChild
+                        >
+                          <Link href={notification.linkUrl} onClick={(e) => e.stopPropagation()}>
+                            Voir les détails →
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center h-48 text-center p-4">
+              <div className="p-4 rounded-full bg-muted/50 mb-3">
+                <Bell className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <Typography variant="h6" weight="medium" className="mb-1">
+                Aucune notification
+              </Typography>
+              <Typography variant="body-sm" theme="muted">
+                Vous êtes à jour !
+              </Typography>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-border/50">
+        <Button variant="ghost" size="sm" asChild className="w-full rounded-full justify-start gap-2">
+          <Link href="/dashboard/notifications">
+            <Bell className="h-4 w-4" />
+            Voir toutes les notifications
+          </Link>
+        </Button>
+        <Separator className="my-2" />
+        <Button variant="ghost" size="sm" asChild className="w-full rounded-full justify-start gap-2">
+          <Link href="/settings/notifications">
+            <Settings className="h-4 w-4" />
+            Paramètres notifications
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+
+  // ── Non-overlay mode (permanent panel on desktop) ──
+  if (!overlayMode) {
+    return (
+      <div
+        className={cn(
+          "w-80 bg-background/95 backdrop-blur-lg border-l border-border/50 flex flex-col h-full",
+          !isRightOpen && "hidden"
+        )}
+      >
+        {sidebarContent}
+      </div>
     );
-    setSelectedNotifications([]);
-  };
+  }
 
+  // ── Overlay mode (mobile slide-over) ──
   return (
     <AnimatePresence>
       {isRightOpen && (
@@ -183,291 +373,15 @@ export function RightBar({ isRightOpen, onClose }: RightBarProps) {
             onClick={onClose}
           />
 
-          {/* Sidebar */}
+          {/* Sidebar panel */}
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 30,
-            }}
-            className={cn(
-              "fixed inset-y-0 right-0 w-full sm:w-96 bg-background/95 backdrop-blur-lg border-l border-border/50 shadow-2xl z-50",
-              "flex flex-col",
-            )}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed inset-y-0 right-0 w-full sm:w-96 bg-background/95 backdrop-blur-lg border-l border-border/50 shadow-2xl z-50 flex flex-col"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-border/50">
-              <div className="flex items-center gap-3">
-                <motion.div
-                  whileHover={{ rotate: 15 }}
-                  className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-purple-600 shadow-lg"
-                >
-                  <Bell className="h-5 w-5 text-white" />
-                </motion.div>
-                <div>
-                  <Typography variant="h4" weight="bold">
-                    Notifications
-                  </Typography>
-                  {unreadCount > 0 && (
-                    <Typography variant="body-sm" theme="muted">
-                      {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
-                    </Typography>
-                  )}
-                </div>
-              </div>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="rounded-full hover:bg-primary/10"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </motion.div>
-            </div>
-
-            {/* Tabs */}
-            <div className="px-6 pt-4">
-              <Tabs
-                defaultValue="all"
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full"
-              >
-                <TabsList className="grid grid-cols-5 w-full bg-muted/50 p-1 rounded-lg">
-                  <TabsTrigger value="all" className="rounded-md text-xs">
-                    Toutes
-                  </TabsTrigger>
-                  <TabsTrigger value="unread" className="rounded-md text-xs">
-                    Non lues
-                  </TabsTrigger>
-                  <TabsTrigger value="message" className="rounded-md text-xs">
-                    Messages
-                  </TabsTrigger>
-                  <TabsTrigger value="purchase" className="rounded-md text-xs">
-                    Achats
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="tournament"
-                    className="rounded-md text-xs"
-                  >
-                    Tournois
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-full gap-1.5"
-                    onClick={markAllAsRead}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    Tout lire
-                  </Button>
-                </motion.div>
-                {selectedNotifications.length > 0 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="h-8 rounded-full gap-1.5"
-                      onClick={deleteSelected}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Supprimer
-                    </Button>
-                  </motion.div>
-                )}
-              </div>
-              <Typography variant="caption2" theme="muted">
-                {filteredNotifications.length} notifications
-              </Typography>
-            </div>
-
-            {/* Notifications List */}
-            <ScrollArea className="flex-1">
-              <div className="p-4 space-y-3">
-                <AnimatePresence mode="popLayout">
-                  {filteredNotifications.length > 0 ? (
-                    filteredNotifications.map((notification, index) => (
-                      <motion.div
-                        key={notification.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ delay: index * 0.05 }}
-                        layout
-                      >
-                        <div
-                          className={cn(
-                            "group relative p-4 rounded-2xl border transition-all duration-200",
-                            "hover:shadow-lg cursor-pointer bg-background/50",
-                            notification.read
-                              ? "border-border/30"
-                              : "border-primary/20 bg-primary/5",
-                          )}
-                          onClick={() => markAsRead(notification.id)}
-                        >
-                          {/* Unread indicator */}
-                          {!notification.read && (
-                            <motion.div
-                              layoutId="unreadIndicator"
-                              className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-primary"
-                            />
-                          )}
-
-                          <div className="flex items-start gap-3">
-                            {/* Icon */}
-                            <div
-                              className={cn(
-                                "flex-shrink-0 p-2.5 rounded-xl",
-                                getTypeColor(notification.type),
-                              )}
-                            >
-                              {notification.icon}
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <Typography
-                                  variant="body-sm"
-                                  weight="semibold"
-                                  className={cn(
-                                    !notification.read && "text-primary",
-                                  )}
-                                >
-                                  {notification.title}
-                                </Typography>
-                                <Typography
-                                  variant="caption2"
-                                  theme="muted"
-                                  className="flex items-center gap-1"
-                                >
-                                  <Clock className="h-3 w-3" />
-                                  {formatTimeAgo(notification.createdAt)}
-                                </Typography>
-                              </div>
-                              <Typography
-                                variant="body-sm"
-                                theme="muted"
-                                className="mt-1 line-clamp-2"
-                              >
-                                {notification.message}
-                              </Typography>
-                              {notification.linkUrl && (
-                                <motion.div
-                                  whileHover={{ x: 5 }}
-                                  className="mt-2"
-                                >
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-0 h-auto text-primary gap-1.5"
-                                    asChild
-                                  >
-                                    <Link href={notification.linkUrl}>
-                                      Voir les détails
-                                      <svg
-                                        className="h-3.5 w-3.5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M14 5l7 7m0 0l-7 7m7-7H3"
-                                        />
-                                      </svg>
-                                    </Link>
-                                  </Button>
-                                </motion.div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex flex-col items-center justify-center h-60 text-center p-4"
-                    >
-                      <div className="p-4 rounded-full bg-muted/50 mb-4">
-                        <Bell className="h-10 w-10 text-muted-foreground" />
-                      </div>
-                      <Typography variant="h4" weight="medium" className="mb-2">
-                        Aucune notification
-                      </Typography>
-                      <Typography
-                        variant="body-sm"
-                        theme="muted"
-                        className="max-w-sm"
-                      >
-                        Vous n'avez aucune notification pour le moment. Revenez
-                        plus tard !
-                      </Typography>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </ScrollArea>
-
-            {/* Footer */}
-            <div className="p-6 border-t border-border/50">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="rounded-full"
-                  >
-                    <Link href="/notifications">
-                      Voir toutes les notifications
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full gap-1.5"
-                  >
-                    <Settings className="h-3.5 w-3.5" />
-                    Paramètres
-                  </Button>
-                </div>
-                <Separator />
-                <div className="text-center">
-                  <Typography variant="caption2" theme="muted">
-                    © {new Date().getFullYear()} GT-V2 Gaming Hub
-                  </Typography>
-                  <Typography variant="caption2" theme="muted" className="mt-1">
-                    Tous droits réservés
-                  </Typography>
-                </div>
-              </div>
-            </div>
+            {sidebarContent}
           </motion.div>
         </>
       )}

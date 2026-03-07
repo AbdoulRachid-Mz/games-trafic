@@ -16,10 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
-import { AdvancedUpload } from "@/components/ui/advanced-upload";
+import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
 import { Badge } from "@/components/ui/badge";
-import { Package, ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Package, ArrowLeft, ArrowRight, CheckCircle2, Shield, Lock } from "lucide-react";
 import { createProduct } from "@/actions/products";
+import { encryptData } from "@/lib/encryption";
 
 type ProductFormData = {
   name: string;
@@ -28,6 +29,8 @@ type ProductFormData = {
   description: string;
   featuredImage: string;
   images: string[];
+  accountLogin: string;
+  accountPassword: string;
 };
 
 const initialData: ProductFormData = {
@@ -37,6 +40,8 @@ const initialData: ProductFormData = {
   description: "",
   featuredImage: "",
   images: [],
+  accountLogin: "",
+  accountPassword: "",
 };
 
 export default function CreateProductPage() {
@@ -53,7 +58,7 @@ export default function CreateProductPage() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const nextStep = () => setStep((s) => Math.min(s + 1, 3));
+  const nextStep = () => setStep((s) => Math.min(s + 1, 4));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
   const handleSubmit = async () => {
@@ -64,14 +69,22 @@ export default function CreateProductPage() {
     setIsSubmitting(true);
     try {
       const shopId = params.shopId as string;
+      
+      // Chiffrer le mot de passe s'il est fourni
+      const encryptedPassword = formData.accountPassword 
+        ? encryptData(formData.accountPassword) 
+        : undefined;
+
       const product = await createProduct({
         shopId,
         name: formData.name,
         price: formData.price,
         currency: formData.currency,
         description: formData.description,
-        featuredImage: formData.featuredImage,
+        featuredImage: formData.featuredImage || (formData.images.length > 0 ? formData.images[0] : ""),
         images: formData.images.filter(Boolean),
+        accountLogin: formData.accountLogin || undefined,
+        encryptedPassword,
         isActive: true,
         isVisible: true,
       } as any);
@@ -97,7 +110,7 @@ export default function CreateProductPage() {
 
       <Card className="border-border/50 shadow-xl overflow-hidden min-h-[400px] flex flex-col">
         <CardHeader className="pb-0">
-          <CardTitle className="text-base">Étape {step} sur 3</CardTitle>
+          <CardTitle className="text-base">Étape {step} sur 4</CardTitle>
         </CardHeader>
         <CardContent className="p-6 flex-1">
           <AnimatePresence mode="wait">
@@ -119,36 +132,26 @@ export default function CreateProductPage() {
                       Médias du produit
                     </Typography>
                     <Typography variant="body-sm" theme="muted">
-                      Ajoutez une image principale et une galerie
+                      Ajoutez les images de votre produit (max 3)
                     </Typography>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Image principale</Label>
-                      <AdvancedUpload
-                        value={formData.featuredImage}
-                        onChange={(url) => updateField("featuredImage", url)}
-                        maxSizeMB={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Galerie (3 images max)</Label>
-                      <div className="grid grid-cols-3 gap-4">
-                        {[...Array(3)].map((_, i) => (
-                          <AdvancedUpload
-                            key={i}
-                            value={formData.images[i] || ""}
-                            onChange={(url) => {
-                              const next = [...formData.images];
-                              next[i] = url;
-                              updateField("images", next);
-                            }}
-                            maxSizeMB={3}
-                            className="aspect-square"
-                          />
-                        ))}
-                      </div>
-                    </div>
+                  <div className="space-y-4">
+                    <Label>Galerie d'images</Label>
+                    <AdvancedMultiUpload
+                      value={formData.images}
+                      onChange={(urls) => {
+                        updateField("images", urls);
+                        if (urls.length > 0 && !formData.featuredImage) {
+                          updateField("featuredImage", urls[0]);
+                        }
+                      }}
+                      maxImages={3}
+                      maxSizeMB={5}
+                      className="min-h-[200px]"
+                    />
+                    <Typography variant="caption1" theme="muted">
+                      La première image sera utilisée comme image principale.
+                    </Typography>
                   </div>
                 </div>
               )}
@@ -212,6 +215,51 @@ export default function CreateProductPage() {
               {step === 3 && (
                 <div className="space-y-6">
                   <div className="text-center mb-2">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                      <Shield className="h-8 w-8 text-primary" />
+                    </div>
+                    <Typography variant="h2" weight="bold">
+                      Accès au compte
+                    </Typography>
+                    <Typography variant="body-sm" theme="muted">
+                      Informations de connexion (facultatif mais recommandé pour les comptes)
+                    </Typography>
+                  </div>
+                  
+                  <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex gap-3 items-start mb-6">
+                    <Lock className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <Typography variant="caption1" className="text-amber-800">
+                      Ces informations seront <strong>chiffrées</strong> et uniquement visibles par l'acheteur après la confirmation de la vente.
+                    </Typography>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="accountLogin">Nom d'utilisateur / Email</Label>
+                      <Input
+                        id="accountLogin"
+                        placeholder="Ex: player_one@gmail.com"
+                        value={formData.accountLogin}
+                        onChange={(e) => updateField("accountLogin", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountPassword">Mot de passe</Label>
+                      <Input
+                        id="accountPassword"
+                        type="password"
+                        placeholder="••••••••"
+                        value={formData.accountPassword}
+                        onChange={(e) => updateField("accountPassword", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="space-y-6">
+                  <div className="text-center mb-2">
                     <Typography variant="h2" weight="bold">
                       Aperçu
                     </Typography>
@@ -219,15 +267,9 @@ export default function CreateProductPage() {
                       Vérifiez avant confirmation
                     </Typography>
                   </div>
-                  <div className="relative rounded-xl overflow-hidden border">
+                  <div className="relative rounded-xl overflow-hidden border bg-card">
                     <div className="h-40 bg-gradient-to-r from-primary/20 to-primary/10 relative">
-                      {formData.featuredImage ? (
-                        <img
-                          src={formData.featuredImage}
-                          alt="Produit"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : formData.images[0] ? (
+                      {formData.images.length > 0 ? (
                         <img
                           src={formData.images[0]}
                           alt="Produit"
@@ -240,32 +282,40 @@ export default function CreateProductPage() {
                       )}
                     </div>
                     <div className="p-6">
-                      <Typography variant="h3" weight="bold" className="mb-2">
-                        {formData.name || "Nouveau produit"}
-                      </Typography>
+                      <div className="flex justify-between items-start mb-2">
+                        <Typography variant="h3" weight="bold">
+                          {formData.name || "Nouveau produit"}
+                        </Typography>
+                        <Typography
+                          variant="h4"
+                          weight="bold"
+                          className="text-primary font-mono"
+                        >
+                          {formData.price || "0.00"} {formData.currency}
+                        </Typography>
+                      </div>
+                      
                       {formData.description && (
                         <Typography
                           variant="body-base"
                           theme="muted"
-                          className="mb-4"
+                          className="mb-4 line-clamp-2"
                         >
                           {formData.description}
                         </Typography>
                       )}
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-2">
-                          <Badge variant="secondary">{formData.currency}</Badge>
-                          <Badge variant="outline">
-                            {formData.images.filter(Boolean).length} image(s)
+                      
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Badge variant="secondary" className="gap-1">
+                          <Package className="h-3 w-3" />
+                          {formData.images.length} image(s)
+                        </Badge>
+                        {formData.accountLogin && (
+                          <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200 gap-1">
+                            <Shield className="h-3 w-3" />
+                            Accès inclus
                           </Badge>
-                        </div>
-                        <Typography
-                          variant="body-lg"
-                          weight="bold"
-                          className="text-primary"
-                        >
-                          {formData.price || "0.00"} {formData.currency}
-                        </Typography>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -284,7 +334,7 @@ export default function CreateProductPage() {
             <ArrowLeft className="h-4 w-4" />
             Retour
           </Button>
-          {step < 3 ? (
+          {step < 4 ? (
             <Button
               onClick={nextStep}
               disabled={

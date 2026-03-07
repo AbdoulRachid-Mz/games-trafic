@@ -36,6 +36,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useUserProfile } from "@/hooks/use-profile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useTheme } from "next-themes";
+import { AlignLeftIcon } from "../icons/align-left";
 
 interface TopMiddleProps {
   onToggleSidebar: () => void;
@@ -66,6 +68,8 @@ const TopMiddle = ({
   const { scrollY } = useScroll();
   const { user, isAuthenticated, isAdmin, isVip, signOut } = useAuthContext();
   const { data: completeData } = useUserProfile();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const headerRef = useRef<HTMLDivElement>(null);
 
@@ -103,10 +107,10 @@ const TopMiddle = ({
         y: isVisible ? 0 : -150,
         backdropFilter: isScrolled ? "blur(10px)" : "blur(0px)",
       }}
-      transition={{ 
-        type: "spring", 
-        stiffness: 500, 
-        damping: 30 
+      transition={{
+        type: "spring",
+        stiffness: 500,
+        damping: 30
       }}
     >
       {/* Main Top Bar */}
@@ -138,7 +142,7 @@ const TopMiddle = ({
                 className="rounded-full hover:bg-primary/10"
                 onClick={onToggleSidebar}
               >
-                <Menu className="h-5 w-5" />
+                <AlignLeftIcon size={24} className="h-5 w-5" />
               </Button>
             </motion.div>
           )}
@@ -146,19 +150,19 @@ const TopMiddle = ({
           <Link href="/" className="flex items-center gap-3 group">
             <motion.div
               whileHover={{ rotate: 5, scale: 1.05 }}
-              className="relative w-10 h-10"
+              className="relative w-14 h-14"
             >
               <Image
-                src="/images/icons/logo/game_logo.png"
-                alt="logo"
+                src={`/images/icons/app/gt-${!isDark ? "primary" : "gold"}.png`}
+                alt="app-logo"
                 fill
                 className="object-contain drop-shadow-lg"
                 priority
               />
             </motion.div>
-            <span className="text-xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              GT-V2
-            </span>
+            {/* <span className="text-xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              GT
+            </span> */}
             {isVip && (
               <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 gap-1">
                 <Sparkles className="h-3 w-3" />
@@ -175,7 +179,7 @@ const TopMiddle = ({
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <div 
+            <div
               className="relative group"
               onClick={() => setIsSearchOpen(true)}
             >
@@ -256,8 +260,8 @@ const TopMiddle = ({
                     </Button>
                   </motion.div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  align="end" 
+                <DropdownMenuContent
+                  align="end"
                   className="w-56 mt-2 rounded-xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-lg"
                 >
                   <div className="px-4 py-3 border-b border-border/50">
@@ -283,7 +287,7 @@ const TopMiddle = ({
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
                     >
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         className="px-3 py-2.5 cursor-pointer hover:bg-primary/10"
                         onClick={item.action ? item.action : undefined}
                         asChild={!item.action}

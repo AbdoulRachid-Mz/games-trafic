@@ -13,6 +13,7 @@ import { AIAssistant } from "../shared/chatbot-assistant";
 import type { NavItem, FabAction } from "@/types/routes";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { QrTransaction } from "@/components/transactions/qr-transaction";
+import OnTapPopup from "../auth/on-tap-popup";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -30,6 +31,7 @@ interface MainLayoutProps {
   breadcrumbItems?: Array<{ name: string; path: string }>;
   floatingDockLinks?: NavItem[];
   shouldExcludeContainer?: boolean;
+  showOnTap?: boolean;
 }
 
 export function MainLayout({
@@ -45,6 +47,7 @@ export function MainLayout({
   maintenanceMode = false,
   hideTopMiddleOnScroll = false,
   showAIAssistant = true,
+  showOnTap = false,
   breadcrumbItems = [],
   floatingDockLinks = [],
   shouldExcludeContainer = false,
@@ -52,18 +55,21 @@ export function MainLayout({
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
-  // console.log("shouldExcludeContainer:", breadcrumbs);
 
   const topPadding =
-  topMiddle && !shouldExcludeContainer && breadcrumbs
-    ? "pt-20"
-    : "pt-10";
+    topMiddle && !shouldExcludeContainer && breadcrumbs
+      ? "pt-20"
+      : "pt-10";
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);
   const closeRight = useCallback(() => setRightOpen(false), []);
 
   return (
     <div className="relative min-h-screen bg-background">
+
+      {/* Show on tap popup */}
+      {showOnTap && <OnTapPopup />}
+
       {/* Top bar */}
       {(topMiddle && !shouldExcludeContainer) && (
         <TopMiddle
@@ -107,35 +113,35 @@ export function MainLayout({
 
       {/* MAIN CONTENT */}
 
-<main className={cn("min-h-screen", topPadding)}>
-  <Suspense
-    fallback={
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
-      </div>
-    }
-  >
-    <div
-      className={cn(
-        "mx-auto px-3 lg:px-4",
-        shouldExcludeContainer ? "py-4" : "py-2"
-      )}
-    >
-      {maintenanceMode ? (
-        <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-          <h2 className="mb-2 text-2xl font-bold">Mode maintenance</h2>
-          <p className="text-muted-foreground">
-            Veuillez réessayer plus tard.
-          </p>
-        </div>
-      ) : (
-        children
-      )}
-    </div>
-  </Suspense>
+      <main className={cn("min-h-screen", topPadding)}>
+        <Suspense
+          fallback={
+            <div className="flex min-h-[60vh] items-center justify-center">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+            </div>
+          }
+        >
+          <div
+            className={cn(
+              "mx-auto px-3 lg:px-4",
+              shouldExcludeContainer ? "py-4" : "py-2"
+            )}
+          >
+            {maintenanceMode ? (
+              <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+                <h2 className="mb-2 text-2xl font-bold">Mode maintenance</h2>
+                <p className="text-muted-foreground">
+                  Veuillez réessayer plus tard.
+                </p>
+              </div>
+            ) : (
+              children
+            )}
+          </div>
+        </Suspense>
 
-  {footer && !shouldExcludeContainer && <Footer />}
-</main>
+        {footer && !shouldExcludeContainer && <Footer />}
+      </main>
 
 
       {/* Floating Action Button avec dock */}

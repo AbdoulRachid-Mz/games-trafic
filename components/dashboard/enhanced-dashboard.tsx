@@ -1,7 +1,7 @@
 // components/shared/enhanced-dashboard.tsx
 "use client"
 
-import React from "react"
+import React, { createContext, useContext } from "react"
 import { cn } from "@/lib/utils"
 import {
   SidebarProvider,
@@ -21,6 +21,9 @@ import { motion } from "framer-motion"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useScreenSize } from "@/hooks/use-screen"
 import { ThemeToggle } from "../layout/ThemeToggle"
+
+// Mobile sheet close context — allows SidebarItem to close the mobile Sheet when clicked
+const MobileSheetContext = createContext<(() => void) | null>(null);
 
 interface EnhancedDashboardProps {
   children: React.ReactNode
@@ -61,7 +64,9 @@ export function EnhancedDashboard({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-[280px] overflow-y-auto">
-                {sidebar}
+                <MobileSheetContext.Provider value={() => setIsMobileOpen(false)}>
+                  {sidebar}
+                </MobileSheetContext.Provider>
               </SheetContent>
             </Sheet>
             <Typography variant="h6" weight="semibold">
@@ -232,10 +237,15 @@ export function SidebarItem({
     }
   }
 
+  const closeMobileSheet = useContext(MobileSheetContext);
+
   const content = (
     <div
       className={getItemStyles()}
-      onClick={onClick}
+      onClick={() => {
+        if (onClick) onClick();
+        if (closeMobileSheet) closeMobileSheet();
+      }}
     >
       <div className="flex items-center gap-3 w-full">
         <div className={getIconStyles()}>
@@ -646,7 +656,7 @@ interface DashboardHeaderProps {
   onNotificationButtonClick?: () => void
   notificationCount?: number
   children?: React.ReactNode
-  togglerComponent?: boolean; 
+  togglerComponent?: boolean;
 }
 
 export function DashboardHeader({

@@ -45,7 +45,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         <SidebarGroup label="Général" sidebarBgType="gradient">
           <SidebarItem title="Overview" icon={Sparkles} url="/dashboard" isActive={isActive("/dashboard", true)} sidebarBgType="gradient" />
           <SidebarItem title="Boutiques" icon={Store} url="/dashboard/shops" isActive={isActive("/dashboard/shops", false)} sidebarBgType="gradient" />
-          <SidebarItem title="Produits" icon={ShoppingBag} url="/dashboard/marketplace" isActive={isActive("/dashboard/marketplace", false)} sidebarBgType="gradient" />
+          <SidebarItem title="Produits" icon={ShoppingBag} url="/dashboard/products" isActive={isActive("/dashboard/products", false)} sidebarBgType="gradient" />
           <SidebarItem title="Tournois" icon={Trophy} url="/dashboard/tournaments" isActive={isActive("/dashboard/tournaments", false)} sidebarBgType="gradient" />
         </SidebarGroup>
 

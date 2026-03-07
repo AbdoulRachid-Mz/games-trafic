@@ -20,6 +20,8 @@ import {
   Bell,
   Users,
   Shield,
+  Video,
+  Gamepad2,
 } from "lucide-react";
 
 // Mapper les icônes
@@ -37,6 +39,8 @@ const ICON_MAP: Record<string, any> = {
   notifications: Bell,
   communities: Users,
   admin: Shield,
+  games: Gamepad2,
+  gameClips: Video,
 };
 
 // Calcule la profondeur d'une route (nombre de segments)
@@ -215,7 +219,12 @@ function determineLayout(
 ): ResolvedRoute["layout"] {
   if (routeConfig.excludeLayout) {
     // Pages d'authentification
-    if (pathname.includes("/sign-") || pathname.includes("/auth/")) {
+    if (
+      pathname.includes("/sign-") ||
+      pathname.includes("/auth/") ||
+      pathname.includes("/password") ||
+      pathname.includes("/verify-email")
+    ) {
       return "none";
     }
     // Maintenance
@@ -234,7 +243,7 @@ function determineLayout(
     if (
       pathname.startsWith("/profile") ||
       pathname.startsWith("/wallet") ||
-      pathname.startsWith("/chat") ||
+      pathname.startsWith("/chats") ||
       pathname.startsWith("/messages")
     ) {
       return "none";
@@ -259,6 +268,9 @@ export function resolveRoute(
 
   // 2. Vérifier l'accès
   const accessCheck = canAccessRouteOriginal(normalizedPath, userRoles);
+
+  //3. showOnTap
+  const showOnTap =  true;
 
   // 3. Déterminer le layout
   const layout = determineLayout(routeConfig, normalizedPath);
@@ -317,6 +329,7 @@ export function resolveRoute(
       actions: fabActions,
     },
     activeFabActionId: routeConfig.activeFabActionId,
+    showOnTap,
     aiAssistant: {
       enabled: routeConfig.showAIAssistant !== false && layout === "public",
     },

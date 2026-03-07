@@ -28,7 +28,8 @@ export interface RouteConfig {
   menuOrder?: number;
   hideTopMiddleOnScroll?: boolean; // Nouveau: cacher top-middle au scroll
   hideFloatingActions?: boolean; // Nouveau: cacher FAB
-  dockLinks?: DockLinkConfig[]
+  dockLinks?: DockLinkConfig[];
+  showOnTap?: boolean;
 }
 
 export interface FABAction {
@@ -107,15 +108,16 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   // ROUTES SANS LAYOUT (PRIORITÉ MAX)
   // =============================================
   {
-    path: ["/sign-in", "/sign-up", "/auth/**"],
+    path: ["/sign-in", "/sign-up", "/forgot-password", "/reset-password", "error", "/auth/**"],
     name: "Authentification",
     excludeLayout: true,
     requireAuth: false,
     styleGroup: "auth",
     guestOnly: true,
+    showOnTap: false,
   },
   {
-    path: ["/welcome", "/onboarding", "/test"],
+    path: ["/welcome", "/onboarding", "/test", "callback"],
     name: "Onboarding",
     excludeLayout: true,
     styleGroup: "onboarding",
@@ -125,11 +127,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     breadcrumbs: false,
     guestOnly: true,
+    showOnTap: false,
   },
   {
     path: "/maintenance",
     name: "Maintenance",
     excludeLayout: true,
+    showOnTap: false,
   },
   {
     path: ["/docs", "/docs/**"],
@@ -144,6 +148,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     requireAuth: true,
     requireAdmin: true,
     styleGroup: "admin",
+    showOnTap: false,
   },
 
   // =============================================
@@ -180,6 +185,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     floatingActions: true,
     showAIAssistant: false,
     styleGroup: "dashboard",
+    showOnTap: false,
   },
   {
     path: [
@@ -216,6 +222,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     floatingActions: true,
     showAIAssistant: false,
     styleGroup: "dashboard",
+    showOnTap: false,
   },
   // edition
   {
@@ -232,6 +239,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     floatingActions: true,
     showAIAssistant: false,
     styleGroup: "dashboard",
+    showOnTap: false,
   },
   {
     path: ["/shops/[shopId]/dashboard", "/shops/[shopId]/dashboard/**"],
@@ -246,7 +254,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     floatingActions: true,
     showAIAssistant: false,
-    styleGroup: "dashboard",
+    styleGroup: "dashboard",  
+    showOnTap: false,
   },
   {
     path: ["/marketplace/[productId]/dashboard", "/marketplace/[productId]/dashboard/**"],
@@ -261,7 +270,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     floatingActions: true,
     showAIAssistant: false,
-    styleGroup: "dashboard",
+    styleGroup: "dashboard",  
+    showOnTap: false,
   },
 
   // =============================================
@@ -280,7 +290,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     floatingActions: true,
     showAIAssistant: false,
-    styleGroup: "profile",
+    styleGroup: "profile",  
+    showOnTap: false,
   },
   {
     path: ["/wallet", "/wallet/**"],
@@ -340,28 +351,32 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     name: "Transactions",
     // excludeLayout: true,
     styleGroup: "wallet",
-    footer: false
+    footer: false,
+    showOnTap: false,
   },
   {
     path: "/wallet/transactions/create",
     name: "Nouveau Transfert",
     // excludeLayout: true,
     styleGroup: "wallet",
-    footer: false
+    footer: false,
+    showOnTap: false,
   },
   {
     path: "/wallet/transactions/claims",
     name: "Reclamations",
     // excludeLayout: true,
     styleGroup: "wallet",
-    footer: false
+    footer: false,
+    showOnTap: false,
   },
   {
     path: "/wallet/transactions/history",
     name: "Transaction Historiques",
     // excludeLayout: true,
     styleGroup: "wallet",
-    footer: false
+    footer: false,
+    showOnTap: false,
   },
   {
     path: ["/chats", "/chats/**"],
@@ -375,6 +390,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     requireAuth: true,
     styleGroup: "chat",
+    showOnTap: false,
     dockLinks: [
       {
         href: "/",
@@ -489,6 +505,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     menuOrder: 1,
     showAIAssistant: true,
     hideTopMiddleOnScroll: true,
+    showOnTap: true,
   },
 
   // =============================================
@@ -550,6 +567,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     menu: true,
     menuOrder: 2,
     hideTopMiddleOnScroll: false,
+    showOnTap: true,
   },
 
   // =============================================
@@ -562,6 +580,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     footer: true,
     topMiddle: true,
     floatingActions: true,
+    showOnTap: true,
     fabActions: [
       {
         id: "goto-market",
@@ -690,6 +709,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     menu: true,
     menuOrder: 5,
+    showOnTap: true,
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
@@ -713,6 +733,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     menu: true,
     menuOrder: 6,
+    showOnTap: true,
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
@@ -736,6 +757,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     requireAuth: true,
     hideFloatingActions: true,
+    showOnTap: false,
   },
   {
     path: "/tournaments/create",
@@ -748,10 +770,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     requireAuth: true,
     hideFloatingActions: true,
+    showOnTap: false,
   },
 
   // =============================================
   // AUTRES ROUTES (blogs, services, guides, etc.)
+  // =============================================
+  // BLOGS
   // =============================================
   {
     path: ["/blogs", "/blogs/**"],
@@ -763,6 +788,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     menu: false,
+    showOnTap: true,
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
@@ -781,6 +807,20 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     menu: false,
+    showOnTap: true,
+    dockLinks: defaultDockLinks,
+  },
+   {
+    path: ["/services/[id]"],
+    name: "Detail-service",
+    breadcrumbs: true,
+    footer: true,
+    topMiddle: true,
+    leftBar: true,
+    rightBar: false,
+    navigationLinks: true,
+    menu: false,
+    showOnTap: true,
     dockLinks: defaultDockLinks,
   },
   {
@@ -793,6 +833,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     menu: false,
+    showOnTap: true,
+    dockLinks: defaultDockLinks,
   },
 
   // =============================================
@@ -846,6 +888,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: false,
     floatingActions: false,
+    showOnTap: true,
     // dockLinks: [
     //   { href: "/", label: "Accueil", icon: "home", requireAuth: false },
     //   {
@@ -878,6 +921,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     floatingActions: true,
     dockLinks: defaultDockLinks,
     hideTopMiddleOnScroll: true,
+    showOnTap: true,
   },
 
   // =============================================

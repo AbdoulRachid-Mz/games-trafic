@@ -14,6 +14,7 @@ import { DisableSWInDev } from "@/components/pwa/disable-sw-in-dev";
 import { Toaster } from "sonner";
 import { getAppUrlEnv } from "@/utils/app-url";
 import { ExplanationManager } from "@/components/onboarding/explanation-manager";
+import OnTapPopup from "@/components/auth/on-tap-popup";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -53,6 +54,7 @@ export default function RootLayout({
       >
         <Toaster />
         {/* <TooltipProvider> */}
+        {/* <OnTapPopup /> */}
         <DisableSWInDev />
         <QueryProvider>
           <ThemeProvider
@@ -66,6 +68,7 @@ export default function RootLayout({
                 <TrackingProviders>
                   <ExplanationManager />
                   <AppProvider>
+                    {/* <OnTapPopup /> */}
                     <AppShell>{children}</AppShell>
                   </AppProvider>
                 </TrackingProviders>

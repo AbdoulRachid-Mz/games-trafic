@@ -1976,6 +1976,8 @@ export const blogs = pgTable('blogs', {
   isDeleted: boolean('is_deleted').default(false),
   authorId: text('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
+  //metadata
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => [
@@ -2111,6 +2113,94 @@ export const appSettings = pgTable('app_settings', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+// database/schema/api-keys.ts
+export const apiKeys = pgTable('api_keys', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  
+  userId: text('user_id').notNull().references(() => users.id),
+  
+  // Clé (hashée)
+  hash: text('hash').unique().notNull(),
+  keyPrefix: text('key_prefix').notNull(), // gt_user_, gt_app_, etc.
+  
+  // Métadonnées
+  name: text('name'),
+  type: text('type').notNull(), // USER, APPLICATION, SERVICE
+  applicationName: text('application_name'),
+  
+  // Permissions
+  permissions: text('permissions').array().default([]),
+  
+  // Sécurité
+  allowedIps: text('allowed_ips').array().default([]),
+  allowedOrigins: text('allowed_origins').array().default([]),
+  
+  // Stats
+  lastUsedAt: timestamp('last_used_at'),
+  lastUsedIp: text('last_used_ip'),
+  requestCount: integer('request_count').default(0),
+  
+  // Expiration
+  expiresAt: timestamp('expires_at'),
+  
+  // Statut
+  status: text('status').default('ACTIVE'), // ACTIVE, REVOKED, EXPIRED
+  
+  // Révocation
+  revokedAt: timestamp('revoked_at'),
+  revokedReason: text('revoked_reason'),
+  revokedBy: text('revoked_by').references(() => users.id),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => [
+  index('api_keys_user_idx').on(table.userId),
+  index('api_keys_hash_idx').on(table.hash),
+  index('api_keys_status_idx').on(table.status),
+]);
+
+// database/schema/api-logs.ts (simplifié)
+export const apiLogs = pgTable('api_logs', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  
+  userId: text('user_id').references(() => users.id),
+  apiKeyId: text('api_key_id').references(() => apiKeys.id),
+  
+  method: text('method').notNull(),
+  path: text('path').notNull(),
+  query: jsonb('query'),
+  statusCode: integer('status_code').notNull(),
+  
+  ip: text('ip'),
+  userAgent: text('user_agent'),
+  duration: integer('duration'), // ms
+  
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => [
+  index('api_logs_user_idx').on(table.userId),
+  index('api_logs_api_key_idx').on(table.apiKeyId),
+  index('api_logs_path_idx').on(table.path),
+  index('api_logs_created_at_idx').on(table.createdAt),
+]);
+
+
+export const apiRateLimits = pgTable('api_rate_limits', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  
+  identifier: text('identifier').notNull(), // ip:xxx ou apikey:xxx
+  windowKey: text('window_key').notNull(), // Pour le grouping par fenêtre
+  
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => [
+  index('rate_limits_identifier_idx').on(table.identifier),
+  index('rate_limits_expires_idx').on(table.expiresAt),
+]);
 
 // ============================================================================
 // RELATIONS DRIZZLE COMPLÈTES

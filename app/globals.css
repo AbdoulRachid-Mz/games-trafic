@@ -48,7 +48,7 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-:root {
+/* :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.13 0.028 261.692);
   --card: oklch(1 0 0);
@@ -81,9 +81,64 @@
   --sidebar-accent-foreground: oklch(0.97 0.014 254.604);
   --sidebar-border: oklch(0.928 0.006 264.531);
   --sidebar-ring: oklch(0.707 0.022 261.325);
+} */
+
+:root {
+  --background: oklch(0.99 0.005 280);
+  --foreground: oklch(0.18 0.03 265);
+
+  --card: oklch(0.99 0.005 280);
+  --card-foreground: oklch(0.18 0.03 265);
+
+  --popover: oklch(0.99 0.005 280);
+  --popover-foreground: oklch(0.18 0.03 265);
+
+  /* PRIMARY (violet) */
+  --primary: oklch(0.55 0.25 280);
+  --primary-foreground: oklch(0.98 0.01 270);
+
+  /* SECONDARY (gold) */
+  --secondary: oklch(0.85 0.16 90);
+  --secondary-foreground: oklch(0.22 0.04 90);
+
+  --muted: oklch(0.96 0.01 280);
+  --muted-foreground: oklch(0.55 0.03 265);
+
+  --accent: oklch(0.85 0.16 90);
+  --accent-foreground: oklch(0.22 0.04 90);
+
+  --destructive: oklch(0.6 0.25 30);
+
+  --border: oklch(0.9 0.01 270);
+  --input: oklch(0.9 0.01 270);
+  --ring: oklch(0.55 0.25 280);
+
+  /* radius */
+  --radius: 0.45rem;
+
+  /* charts (violet variations) */
+  --chart-1: oklch(0.75 0.18 275);
+  --chart-2: oklch(0.65 0.22 280);
+  --chart-3: oklch(0.58 0.25 285);
+  --chart-4: oklch(0.50 0.23 290);
+  --chart-5: oklch(0.45 0.21 295);
+
+  /* sidebar */
+  --sidebar: oklch(0.98 0.005 280);
+  --sidebar-foreground: oklch(0.18 0.03 265);
+
+  --sidebar-primary: oklch(0.55 0.25 280);
+  --sidebar-primary-foreground: oklch(0.98 0.01 270);
+
+  --sidebar-accent: oklch(0.85 0.16 90);
+  --sidebar-accent-foreground: oklch(0.22 0.04 90);
+
+  --sidebar-border: oklch(0.9 0.01 270);
+  --sidebar-ring: oklch(0.55 0.25 280);
 }
 
-.dark {
+
+/* .dark {
   --background: oklch(0.13 0.028 261.692);
   --foreground: oklch(0.985 0.002 247.839);
   --card: oklch(0.21 0.034 264.665);
@@ -115,7 +170,53 @@
   --sidebar-accent-foreground: oklch(0.97 0.014 254.604);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+} */
+
+.dark {
+  --background: oklch(0.16 0.03 270);
+  --foreground: oklch(0.96 0.01 260);
+
+  --card: oklch(0.20 0.04 270);
+  --card-foreground: oklch(0.96 0.01 260);
+
+  --popover: oklch(0.20 0.04 270);
+  --popover-foreground: oklch(0.96 0.01 260);
+
+  /* violet glow */
+  --primary: oklch(0.62 0.26 280);
+  --primary-foreground: oklch(0.98 0.01 260);
+
+  /* gold accent */
+  --secondary: oklch(0.78 0.18 90);
+  --secondary-foreground: oklch(0.18 0.03 90);
+
+  --muted: oklch(0.26 0.03 270);
+  --muted-foreground: oklch(0.7 0.02 270);
+
+  --accent: oklch(0.78 0.18 90);
+  --accent-foreground: oklch(0.18 0.03 90);
+
+  --destructive: oklch(0.70 0.20 25);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.26 280);
+  
+  --radius: 0.45rem;
+
+  --sidebar: oklch(0.20 0.04 270);
+  --sidebar-foreground: oklch(0.96 0.01 260);
+
+  --sidebar-primary: oklch(0.62 0.26 280);
+  --sidebar-primary-foreground: oklch(0.98 0.01 260);
+
+  --sidebar-accent: oklch(0.78 0.18 90);
+  --sidebar-accent-foreground: oklch(0.18 0.03 90);
+
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.26 280);
 }
+
 
 @layer base {
   * {
@@ -125,6 +226,57 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+/* bg chat */
+.bg-gt-hero {
+  background: radial-gradient(
+      circle at 20% 20%,
+      rgba(124,58,237,0.4),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgba(245,197,66,0.35),
+      transparent 40%
+    ),
+    linear-gradient(
+      135deg,
+      #0f0a1f,
+      #1a103d,
+      #2b1363
+    );
+}
+
+/* Card glow */
+.bg-gt-market {
+  background: linear-gradient(
+    135deg,
+    #7C3AED,
+    #4C1D95,
+    #D4A017
+  );
+}
+
+/* Glow violet (hover) */
+.glow-primary:hover {
+  box-shadow:
+    0 0 10px rgba(124,58,237,0.6),
+    0 0 30px rgba(124,58,237,0.4);
+}
+
+/* Gold highlight */
+.gold-highlight {
+  background: linear-gradient(
+    90deg,
+    #FCD34D,
+    #F5C542,
+    #D4A017
+  );
+}
+
+
+
 
 /* Styles pour les animations 3D */
 .preserve-3d {

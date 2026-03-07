@@ -148,7 +148,7 @@ const defaultMenuItems: MenuItem[] = [
   {
     id: "notifications",
     label: "Notifications",
-    link: "/notifications",
+    link: "/dashboard/notifications",
     icon: Bell,
     group: "social",
     badge: true,

@@ -55,9 +55,11 @@ import {
   Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ProfileTabs } from "./profile-tabs";
+import { ProfileTabs } from "@/components/pages/profile/new/profile-tabs";
+import { PasskeyRecommendation } from "../passkey-recommendation";
 import { QRCodeDisplay } from "@/components/shared/qr-code-2";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 interface UserProfileProps {
   userId?: string;
@@ -81,6 +83,7 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
     refreshUser,
     loading: authLoading,
   } = useAuthContext();
+  const router = useRouter();
 
   const { data: completeData, loading: profileLoading } =
     useUserProfile(isAuthenticated);
@@ -92,10 +95,8 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
   const [showStatsDrawer, setShowStatsDrawer] = useState(false);
 
   // Utiliser les données réelles du contexte
-  // Note: If userId is provided (viewing another user), we should ideally fetch that user.
-  // But legacy code used 'completeData' (current user).
-  // We keep legacy behavior for now for "My Profile" view.
-  const profileUser = completeData || currentUser;
+  // Casting to any to avoid type errors with hasPasskey which is added by getProfile
+  const profileUser = (completeData || currentUser) as any;
   const loading = authLoading || (isAuthenticated && profileLoading);
 
   if (!profileUser && !loading) {
@@ -289,7 +290,7 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
                   <AvatarFallback>
                     {profileUser.fullName
                       ?.split(" ")
-                      .map((n) => n[0])
+                      .map((n: string) => n[0])
                       .join("") ||
                       profileUser.username?.charAt(0).toUpperCase()}
                   </AvatarFallback>
@@ -425,11 +426,18 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
 
                       <Button
                         variant="outline"
-                        onClick={() => setShowQrDrawer(true)}
+                        onClick={() => {
+                            if (profileUser.hasPasskey) {
+                                router.push("/settings/security");
+                            } else {
+                                // Logic to add passkey
+                                console.log("Lancement création passkey");
+                            }
+                        }}
                         className="flex items-center gap-2"
                       >
                         <QrCode className="w-4 h-4" />
-                        QR Code
+                        {profileUser.hasPasskey ? "Gérer Passkey" : "Ajouter Passkey"}
                       </Button>
                     </>
                   )}
@@ -511,7 +519,7 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
 
               {/* Badges des types de compte */}
               <div className="flex flex-wrap gap-2">
-                {profileUser.accountTypes?.map((type) => (
+                {profileUser.accountTypes?.map((type: string) => (
                   <Badge key={type} variant="outline" className="capitalize">
                     {type.toLowerCase().replace("_", " ")}
                   </Badge>
@@ -527,64 +535,15 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
 
       {/* Contenu principal */}
       <div className="container mx-auto px-4 max-md:px-2 max-md:py-2 py-8">
-        {/* Statistiques */}
-        {/* <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
-              <div className="space-y-1">
-                <Typography variant="h4" weight="bold">
-                  {userStats.posts}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Publications
-                </Typography>
-              </div>
-              <div className="space-y-1">
-                <Typography variant="h4" weight="bold">
-                  {userStats.followers}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Abonnés
-                </Typography>
-              </div>
-              <div className="space-y-1">
-                <Typography variant="h4" weight="bold">
-                  {userStats.following}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Abonnements
-                </Typography>
-              </div>
-              <div className="space-y-1">
-                <Typography variant="h4" weight="bold">
-                  {userStats.tournaments}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Tournois
-                </Typography>
-              </div>
-              <div className="space-y-1">
-                <Typography variant="h4" weight="bold">
-                  {userStats.shops}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Boutiques
-                </Typography>
-              </div>
-              <div className="space-y-1">
-                <Typography variant="h4" weight="bold">
-                  {userStats.products}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Produits
-                </Typography>
-              </div>
+        {/* Passkey Recommendation */}
+        {!profileUser.hasPasskey && isOwnProfile && (
+            <div className="mb-6">
+                 <PasskeyRecommendation />
             </div>
-          </CardContent>
-        </Card> */}
+        )}
 
         {/* Onglets personnalisés */}
-        <ProfileTabs profileUser={profileUser} isOwnProfile={isOwnProfile} />
+        <ProfileTabs profileUser={profileUser} isOwnProfile={isOwnProfile} onUpdate={async () => { await refreshUser(); }} />
       </div>
 
       {/* Drawer QR Code */}

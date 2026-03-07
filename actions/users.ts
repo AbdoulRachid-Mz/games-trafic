@@ -28,6 +28,7 @@ import {
   groupMembers,
   announcementReads,
   financialAccounts,
+  passkey,
 } from "@/database/schema";
 import { getAccountBalance } from "@/lib/ledger/ledger-utils";
 import {
@@ -108,6 +109,7 @@ export interface UserWithAllRelations extends User {
   hasProducts?: boolean;
   hasTournaments?: boolean;
   hasActiveSubscription?: boolean;
+  hasPasskey?: boolean;
   ledgerBalance?: string;
 }
 
@@ -158,7 +160,7 @@ export async function getProfile(
     // Si minimal est demandé, on ne charge AUCUNE relation lourde
     if (mode === "minimal") {
       // Pour minimal, on ne récupère que les infos de base + existence de wallet/vip
-      const [wallet, vip] = await Promise.all([
+      const [wallet, vip, pk] = await Promise.all([
         db
           .select({ id: userWallets.id, financialAccountId: userWallets.financialAccountId, cardNumberHash: userWallets.cardNumberHash })
           .from(userWallets)
@@ -183,6 +185,12 @@ export async function getProfile(
           )
           .limit(1)
           .then((res) => res[0]),
+        db
+          .select({ id: passkey.id })
+          .from(passkey)
+          .where(eq(passkey.userId, userId))
+          .limit(1)
+          .then((res) => res[0]),
       ]);
 
       let ledgerBalance = "0";
@@ -195,6 +203,7 @@ export async function getProfile(
         ...user,
         hasWallet: !!wallet,
         hasActiveSubscription: !!vip,
+        hasPasskey: !!pk,
         wallet: wallet as any,
         vipSubscription: vip as any,
         ledgerBalance,
@@ -592,9 +601,16 @@ export async function getProfile(
     });
 
     // Calculer les flags de statut
+    const [pk] = await db
+      .select({ id: passkey.id })
+      .from(passkey)
+      .where(eq(passkey.userId, userId))
+      .limit(1);
+
     const userFlags = {
       hasWallet: !!relationData.wallet,
       hasActiveSubscription: !!relationData.vipSubscription,
+      hasPasskey: !!pk,
       hasShops: false,
       hasProducts: false,
       hasTournaments: false,

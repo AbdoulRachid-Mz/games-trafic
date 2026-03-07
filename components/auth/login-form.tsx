@@ -45,12 +45,12 @@ export function LoginForm({
   const router = useRouter();
 
   useEffect(() => {
-	if (!PublicKeyCredential.isConditionalMediationAvailable ||
-		!PublicKeyCredential.isConditionalMediationAvailable()) {
-		return;
-	}
-	void authClient.signIn.passkey({ autoFill: true })
-}, [])
+    if (!PublicKeyCredential.isConditionalMediationAvailable ||
+      !PublicKeyCredential.isConditionalMediationAvailable()) {
+      return;
+    }
+    void authClient.signIn.passkey({ autoFill: true })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +99,7 @@ export function LoginForm({
     await authClient.signIn.social(
       {
         provider,
-        callbackURL: "/dashboard",
+        callbackURL: "/profile",
         errorCallbackURL: "/error",
       },
       {

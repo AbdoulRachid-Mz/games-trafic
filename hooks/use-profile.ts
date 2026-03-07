@@ -6,6 +6,7 @@ import { useAuthContext } from "@/contexts/auth-context";
 
 // Reuse the type or import it if I move it
 export interface CompleteUserData extends UserWithAllRelations {
+  hasPasskey?: boolean;
   stats: {
     shopsCount: number;
     tournamentsCount: number;

@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -51,14 +52,23 @@ export default function Footer() {
           {/* Brand Info */}
           <div className="space-y-6">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="p-2 rounded-lg bg-primary text-primary-foreground group-hover:scale-110 transition-transform">
-                <Gamepad2 className="w-6 h-6" />
+              <div className="p-2 relative rounded-lg group-hover:scale-110 transition-transform">
+                {/* <Gamepad2 className="w-6 h-6" /> */}
+                {/* image logo */}
+                  <Image
+                  src="/images/icons/app/gt-gold.png"
+                  alt="Gamers Trafics"
+                  width={60}
+                  height={60}
+                  fill={true}
+                  className="w-full aspect-square" 
+                />
               </div>
-              <span className="text-xl font-bold tracking-tighter uppercase">
+              {/* <span className="text-xl font-bold tracking-tighter uppercase">
                 Gamers Trafics
-              </span>
+              </span> */}
             </Link>
-            <p className="text-sm text-secondary/80 leading-relaxed">
+            <p className="text-sm text-white/80 leading-relaxed">
               L'infrastructure gaming complète pour connecter, compétiter et
               monétiser votre passion. Rejoignez l'élite du gaming francophone.
             </p>
@@ -78,7 +88,7 @@ export default function Footer() {
           {/* Links */}
           {footerLinks.map((section, idx) => (
             <div key={idx}>
-              <h3 className="font-bold mb-6 uppercase tracking-wider text-xs text-primary">
+              <h3 className="font-bold mb-6 uppercase tracking-wider text-xs text-white">
                 {section.title}
               </h3>
               <ul className="space-y-4">
@@ -86,7 +96,7 @@ export default function Footer() {
                   <li key={lIdx}>
                     <Link
                       href={link.href}
-                      className="text-sm text-secondary hover:text-primary transition-colors flex items-center gap-1 group"
+                      className="text-sm text-white/80 hover:text-white transition-colors flex items-center gap-1 group"
                     >
                       <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
                       {link.name}

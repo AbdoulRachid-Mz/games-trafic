@@ -215,7 +215,7 @@ export function AutoSyncField<T = string>({
 
                 {/* Actions */}
                 <AnimatePresence>
-                    {isEditing && mode === "manual" && (
+                    {isEditing && mode === "manual" && internalValue !== value && (
                         <motion.div
                             initial={{ opacity: 0, x: 10 }}
                             animate={{ opacity: 1, x: 0 }}

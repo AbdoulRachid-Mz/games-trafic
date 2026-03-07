@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { InteractionButton } from "@/components/shared/interaction-button";
-import { Settings, Key, Edit3, UserPlus, Check } from "lucide-react";
+import { Settings, Key, Edit3, UserPlus, Check, FingerprintPattern } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FingerprintIcon } from "@/components/icons/fingerprint";
 
 interface ProfileActionsProps {
   userId: string;
@@ -67,7 +68,7 @@ export function ProfileActions({
                 disabled={isAddingPasskey}
                 className="relative"
               >
-                <Key className="h-4 w-4" />
+                <FingerprintIcon size={16} />
                 {profileCompletion > 50 && (
                   <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
                 )}
