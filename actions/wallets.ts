@@ -169,7 +169,7 @@ export async function getWalletRevenues(walletId: string): Promise<number> {
 
 
 /**
- * Liste les wallets avec pagination
+ * Liste les wallets avec pagination et population optionnelle
  */
 export async function getUserWallets(
   query: ListQuery<UserWalletFilters> = {}
@@ -181,14 +181,28 @@ export async function getUserWallets(
     // Construction des conditions
     const conditions = buildWalletConditions(filters, options);
 
-    // Requête pour les données
-    const walletsData = await db
-      .select()
-      .from(userWallets)
-      .where(conditions)
-      .limit(pagination.limit)
-      .offset(offset)
-      .orderBy(getWalletSort(options));
+    // Requête pour les données avec relations si demandées
+    let walletsData;
+    if (options.populate && options.populate.length > 0) {
+      walletsData = await db.query.userWallets.findMany({
+        where: conditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: getWalletSort(options),
+        with: {
+          user: options.populate.includes('user') ? true : undefined,
+          financialAccount: options.populate.includes('financialAccount') ? true : undefined,
+        },
+      });
+    } else {
+      walletsData = await db
+        .select()
+        .from(userWallets)
+        .where(conditions)
+        .limit(pagination.limit)
+        .offset(offset)
+        .orderBy(getWalletSort(options));
+    }
 
     // Count total
     const totalResult = await db
@@ -266,6 +280,7 @@ export async function createUserWallet(
         .returning();
 
       // 2️⃣ Créer le wallet lié au financial_account
+      const requireVerification = process.env.NEXT_PUBLIC_REQUIRE_WALLET_VERIFICATION === 'true';
       const [newWallet] = await tx
         .insert(userWallets)
         .values({
@@ -276,7 +291,7 @@ export async function createUserWallet(
           isActive: true,
           isLocked: false,
           failedAttempts: 0,
-          verificationStatus: 'PENDING',
+          verificationStatus: requireVerification ? 'PENDING' : 'VERIFIED',
           createdAt: new Date(),
           updatedAt: new Date(),
         })

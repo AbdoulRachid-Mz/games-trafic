@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useAuthContext } from "@/contexts/auth-context";
-// import { ProfileHeader } from "@/components/profile/profile-header";
-// import { ProfileTabs } from "@/components/profile/profile-tabs";
 import { motion } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -22,7 +22,10 @@ export default function TournamentDashboardEditionsPage() {
           <CardTitle>Liste des éditions</CardTitle>
         </CardHeader>
         <CardContent>
-          <EditionsInfiniteList tournamentId={params.tournamentId as string} />
+          <EditionsInfiniteList 
+            tournamentId={params.tournamentId as string} 
+            isDashboard={true}
+          />
         </CardContent>
       </Card>
     </div>

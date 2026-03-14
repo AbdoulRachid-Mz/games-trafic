@@ -627,8 +627,14 @@ export function EntityList<T>({
         </div>
       </div>
 
-      {/* Statistiques */}
-      {showStats && renderStats && renderStats()}
+      {/* Statistiques avec défilement horizontal sur mobile */}
+      {showStats && renderStats && (
+        <div className="relative group">
+          <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+            {renderStats()}
+          </div>
+        </div>
+      )}
 
       {/* Barre de recherche et filtres */}
       <Card className="p-3">

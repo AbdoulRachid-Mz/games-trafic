@@ -19,7 +19,14 @@ import {
   TypeDistributionBarChart,
 } from "@/components/admin/admin-charts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getGlobalStats } from "@/actions/stats";
+import {
+  getGlobalStats,
+  getUserStats,
+  getShopStats,
+  getProductStats as getProductStatsDetailed,
+  getTournamentStats,
+  getTransactionStats,
+} from "@/actions/stats";
 import { getOrderStats } from "@/actions/orders";
 import { getProductStats } from "@/actions/products";
 import { getRequestStats } from "@/actions/requests";
@@ -50,7 +57,16 @@ import {
   FileQuestion,
   Store,
   Megaphone,
+  CheckCircle,
+  ShieldCheck,
+  Globe,
+  DollarSign,
+  PieChart as PieChartIcon,
+  Calendar,
+  Clock,
+  Coins,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
   DropdownMenu,
@@ -69,6 +85,12 @@ export default function AdminOverviewPage() {
   const [orderStats, setOrderStats] = useState<any>(null);
   const [productStats, setProductStats] = useState<any>(null);
   const [requestStats, setRequestStats] = useState<any>(null);
+  const [detailedStats, setDetailedStats] = useState<any>({
+    users: null,
+    commerce: null,
+    finances: null,
+    tournaments: null,
+  });
 
   useEffect(() => {
     loadStats();
@@ -86,10 +108,36 @@ export default function AdminOverviewPage() {
       setOrderStats(orders);
       setProductStats(products);
       setRequestStats(requests);
+
+      // Charger les stats détaillées en arrière-plan ou selon l'onglet
+      loadDetailedStats();
     } catch (error) {
       console.error("Error loading stats:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadDetailedStats = async () => {
+    try {
+      const [uRoles, uGrowth, sGrowth, pStatus, tStatus, txTypes, txGrowth] = await Promise.all([
+        getUserStats({ statId: "roles" }),
+        getUserStats({ statId: "growth", group_by: "month" }),
+        getShopStats({ statId: "growth", group_by: "month" }),
+        getProductStatsDetailed({ statId: "status" }),
+        getTournamentStats({ statId: "status" }),
+        getTransactionStats({ statId: "types" }),
+        getTransactionStats({ statId: "growth", group_by: "month" }),
+      ]);
+
+      setDetailedStats({
+        users: { roles: uRoles.data, growth: uGrowth.data },
+        commerce: { shopGrowth: sGrowth.data, productStatus: pStatus.data },
+        tournaments: { status: tStatus.data },
+        finances: { types: txTypes.data, growth: txGrowth.data },
+      });
+    } catch (error) {
+      console.error("Error loading detailed stats:", error);
     }
   };
 
@@ -112,7 +160,7 @@ export default function AdminOverviewPage() {
     { value: "users", label: "Utilisateurs", icon: Users },
     { value: "commerce", label: "Commerce", icon: ShoppingBag },
     { value: "finances", label: "Finances", icon: Wallet },
-    { value: "tournaments", label: "Tournois", icon: Trophy },
+    { value: "tournaments", label: "Tournois et Editions", icon: Trophy },
     { value: "partners", label: "Partenaires", icon: Handshake },
     { value: "services", label: "Services", icon: Wrench },
     { value: "blogs", label: "Blogs", icon: FileText },
@@ -192,33 +240,320 @@ export default function AdminOverviewPage() {
           )}
         </div>
 
+        {/* Tab: Utilisateurs */}
+        <TabsContent value="users" className="space-y-6">
+          <div className="relative group">
+            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              <StatCard
+                title="Total"
+                value={stats?.total_users || 0}
+                icon={Users}
+                description="Inscrits sur la plateforme"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Actifs"
+                value={stats?.active_users || 0}
+                icon={Activity}
+                description="Comptes activés"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Vérifiés"
+                value={stats?.verified_users || 0}
+                icon={ShieldCheck}
+                description="Email vérifié"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="VIP"
+                value={stats?.vip_users || 0}
+                icon={Award}
+                description="Abonnements actifs"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Croissance des utilisateurs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UsersGrowthChart
+                  data={detailedStats.users?.growth?.map((g: any) => ({
+                    name: new Date(g.period).toLocaleDateString('fr-FR', { month: 'short' }),
+                    "Utilisateurs": g.count
+                  })) || []}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Distribution des rôles</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TypeDistributionBarChart
+                  data={detailedStats.users?.roles?.map((r: any) => ({
+                    type: r.role,
+                    count: r.count
+                  })) || []}
+                  dataKey="count"
+                  label="Rôles"
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Tab: Commerce */}
+        <TabsContent value="commerce" className="space-y-6">
+          <div className="relative group">
+            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              <StatCard
+                title="Boutiques"
+                value={stats?.total_shops || 0}
+                icon={Store}
+                description={`${stats?.active_shops || 0} actives`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Produits"
+                value={stats?.total_products || 0}
+                icon={Package}
+                description={`${stats?.active_products || 0} en ligne`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Vendus"
+                value={stats?.sold_products || 0}
+                icon={CheckCircle}
+                description="Items transférés"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Commandes"
+                value={stats?.total_orders || 0}
+                icon={ShoppingCart}
+                description="Volume total"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Nouvelles boutiques</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <UsersGrowthChart
+                  data={detailedStats.commerce?.shopGrowth?.map((g: any) => ({
+                    name: new Date(g.period).toLocaleDateString('fr-FR', { month: 'short' }),
+                    "Utilisateurs": g.count // Réutilise le chart de croissance
+                  })) || []}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Statut des produits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StatusDistributionChart
+                  data={detailedStats.commerce?.productStatus?.map((s: any) => ({
+                    name: s.status,
+                    value: s.count
+                  })) || []}
+                  config={{
+                    active: { label: "Actif", color: "hsl(var(--chart-1))" },
+                    inactive: { label: "Inactif", color: "hsl(var(--chart-2))" },
+                    draft: { label: "Brouillon", color: "hsl(var(--chart-3))" },
+                    sold: { label: "Vendu", color: "hsl(var(--chart-4))" },
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Tab: Finances (Wallets) */}
+        <TabsContent value="finances" className="space-y-6">
+          <div className="relative group">
+            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              <StatCard
+                title="Solde Global"
+                value={formatCurrency(stats?.total_wallet_balance || 0, "GTC")}
+                icon={Wallet}
+                description="Total dans les wallets"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Transactions"
+                value={stats?.total_transactions || 0}
+                icon={Activity}
+                description="Nombre total d'opérations"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Volume"
+                value={formatCurrency(stats?.total_transaction_volume || 0, "GTC")}
+                icon={TrendingUp}
+                description="Volume d'échange total"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Moyenne / Tx"
+                value={formatCurrency(detailedStats.finances?.summary?.avg_amount || 0, "GTC")}
+                icon={DollarSign}
+                description="Montant moyen"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Évolution des transactions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FinanceEvolutionChart
+                  data={detailedStats.finances?.growth?.map((g: any) => ({
+                    name: new Date(g.period).toLocaleDateString('fr-FR', { month: 'short' }),
+                    revenue: g.total_amount,
+                    expenses: g.total_fees
+                  })) || []}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Types de transactions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TypeDistributionBarChart
+                  data={detailedStats.finances?.types?.map((t: any) => ({
+                    type: t.type,
+                    count: t.count
+                  })) || []}
+                  dataKey="count"
+                  label="Types"
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Tab: Tournois */}
+        <TabsContent value="tournaments" className="space-y-6">
+          <div className="relative group">
+            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              <StatCard
+                title="Tournois"
+                value={stats?.total_tournaments || 0}
+                icon={Trophy}
+                description={`${stats?.active_tournaments || 0} actifs`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Éditions"
+                value={stats?.total_editions || 0}
+                icon={Calendar}
+                description="Total des événements"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Matchs"
+                value={stats?.total_matches || 0}
+                icon={Sword}
+                description="Disputés sur la plateforme"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Cashprize Total"
+                value={formatCurrency(stats?.total_prize_pool || 0, "GTC")}
+                icon={Coins}
+                description="Distribué aux gagnants"
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Statut des tournois</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TournamentStatsChart
+                  data={detailedStats.tournaments?.status?.map((s: any) => ({
+                    name: s.status,
+                    count: s.count
+                  })) || []}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+              <CardHeader>
+                <CardTitle>Répartition par plateforme</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StatusDistributionChart
+                  data={stats?.tournaments_by_platform || [
+                    { name: "PC", value: 45 },
+                    { name: "Console", value: 30 },
+                    { name: "Mobile", value: 25 },
+                  ]}
+                  config={{
+                    PC: { label: "PC", color: "hsl(var(--chart-1))" },
+                    Console: { label: "Console", color: "hsl(var(--chart-2))" },
+                    Mobile: { label: "Mobile", color: "hsl(var(--chart-3))" },
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         {/* Tab: Général */}
         <TabsContent value="general" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard
-              title="Utilisateurs"
-              value={stats?.total_users || 0}
-              icon={Users}
-              description={`${stats?.active_users || 0} actifs • ${stats?.vip_users || 0} VIP`}
-            />
-            <StatCard
-              title="Boutiques"
-              value={stats?.total_shops || 0}
-              icon={ShoppingBag}
-              description={`${stats?.active_shops || 0} actives`}
-            />
-            <StatCard
-              title="Produits"
-              value={stats?.total_products || 0}
-              icon={Package}
-              description={`${stats?.active_products || 0} actifs • ${stats?.sold_products || 0} vendus`}
-            />
-            <StatCard
-              title="Commandes"
-              value={stats?.orders || 0}
-              icon={ShoppingCart}
-              description={`${orderStats?.completed || 0} complétées • ${orderStats?.cancelled || 0} annulées`}
-            />
+          <div className="relative group">
+            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              <StatCard
+                title="Utilisateurs"
+                value={stats?.total_users || 0}
+                icon={Users}
+                description={`${stats?.active_users || 0} actifs • ${stats?.vip_users || 0} VIP`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Boutiques"
+                value={stats?.total_shops || 0}
+                icon={ShoppingBag}
+                description={`${stats?.active_shops || 0} actives`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Produits"
+                value={stats?.total_products || 0}
+                icon={Package}
+                description={`${stats?.active_products || 0} actifs • ${stats?.sold_products || 0} vendus`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+              <StatCard
+                title="Commandes"
+                value={stats?.orders || 0}
+                icon={ShoppingCart}
+                description={`${orderStats?.completed || 0} complétées • ${orderStats?.cancelled || 0} annulées`}
+                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -248,10 +583,10 @@ export default function AdminOverviewPage() {
                     { name: "Users", count: stats?.total_users || 0 },
                     { name: "Shops", count: stats?.total_shops || 0 },
                     { name: "Products", count: stats?.total_products || 0 },
-                    { name: "Orders", count: stats?.total_orders || 0 },
+                    { name: "Posts", count: stats?.total_posts || 0 },
                   ]}
                   dataKey="count"
-                  label="Totaux"
+                  label="Activité Globale"
                 />
               </CardContent>
             </Card>
@@ -302,6 +637,7 @@ export default function AdminOverviewPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
         {/* Tab: Partenaires */}
         <TabsContent value="partners" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

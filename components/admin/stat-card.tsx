@@ -18,6 +18,7 @@ interface StatCardProps {
   };
   className?: string;
   iconClassName?: string;
+  color?: string;
 }
 
 export function StatCard({
@@ -28,6 +29,7 @@ export function StatCard({
   trend,
   className,
   iconClassName,
+  color,
 }: StatCardProps) {
   const isPositiveTrend = trend && trend.value >= 0;
 
@@ -40,6 +42,7 @@ export function StatCard({
       <Card
         className={cn(
           "overflow-hidden bg-card/40 p-3 backdrop-blur-xl border-border/50",
+          color,
           className
         )}
       >

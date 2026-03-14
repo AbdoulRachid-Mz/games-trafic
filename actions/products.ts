@@ -58,19 +58,41 @@ export async function getProducts(
 
     const whereConditions = buildProductWhereConditions(filters, options);
 
-    const productsQuery = db
-      .select()
-      .from(products)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Product;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      productsQuery.orderBy(sortOrder(products[sortField]));
+    let productsData;
+    if (options.populate && options.populate.length > 0) {
+      productsData = await db.query.products.findMany({
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (products, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((products as any)[sortField]) : asc((products as any)[sortField])];
+          }
+          return [desc(products.createdAt)];
+        },
+        with: {
+          shop: options.populate.includes('shop') ? true : undefined,
+          user: options.populate.includes('user') ? true : undefined,
+          category: options.populate.includes('category') ? true : undefined,
+        }
+      });
     } else {
-      productsQuery.orderBy(desc(products.createdAt));
+      const productsQuery = db
+        .select()
+        .from(products)
+        .where(whereConditions)
+        .limit(pagination.limit)
+        .offset(offset);
+
+      if (options.sortBy) {
+        const sortField = options.sortBy as keyof Product;
+        const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+        productsQuery.orderBy(sortOrder(products[sortField]));
+      } else {
+        productsQuery.orderBy(desc(products.createdAt));
+      }
+      productsData = await productsQuery;
     }
 
     const countQuery = db
@@ -78,16 +100,12 @@ export async function getProducts(
       .from(products)
       .where(whereConditions);
 
-    const [productsData, totalResult] = await Promise.all([
-      productsQuery,
-      countQuery
-    ]);
-
+    const totalResult = await countQuery;
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: productsData,
+      data: productsData as any,
       pagination: {
         page: pagination.page,
         limit: pagination.limit,

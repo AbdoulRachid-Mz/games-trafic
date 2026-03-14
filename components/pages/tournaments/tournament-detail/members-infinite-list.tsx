@@ -5,16 +5,26 @@ import { useEffect, useState } from "react";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { MemberCard } from "@/components/cards/member-card";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { LayoutGrid, List, Search } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
+import { toast } from "sonner";
+import { updateTournamentMemberRole, deleteTournamentMember } from "@/actions/tournaments";
 
 interface MembersInfiniteListProps {
   tournamentId: string;
+  isDashboard?: boolean;
+  onUpdate?: () => void;
 }
 
 export function MembersInfiniteList({
   tournamentId,
+  isDashboard = false,
+  onUpdate,
 }: MembersInfiniteListProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
 
   const {
     data,
@@ -23,11 +33,13 @@ export function MembersInfiniteList({
     isFetchingNextPage,
     isLoading,
     isError,
+    refetch,
   } = useInfiniteQuery({
-    queryKey: ["tournament-members", tournamentId],
+    queryKey: ["tournament-members", tournamentId, debouncedSearch],
     queryFn: async ({ pageParam = 1 }) => {
+      const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : "";
       const res = await fetch(
-        `/api/tournaments/${tournamentId}/members?page=${pageParam}&limit=12&sortBy=joinedAt&sortOrder=desc`,
+        `/api/tournaments/${tournamentId}/members?page=${pageParam}&limit=12&sortBy=joinedAt&sortOrder=desc${searchParam}`,
         { cache: "no-store" }
       );
       return res.json();
@@ -49,12 +61,40 @@ export function MembersInfiniteList({
     }
   }, [isIntersecting, hasNextPage, fetchNextPage]);
 
+  const handleUpdateRole = async (memberId: string, currentRole: string) => {
+    try {
+      const newRole = currentRole === "CO_ORGANIZER" ? "PARTICIPANT" : "CO_ORGANIZER";
+      const isCoOrganizer = newRole === "CO_ORGANIZER";
+      await updateTournamentMemberRole(memberId, newRole, isCoOrganizer);
+      toast.success("Rôle mis à jour avec succès");
+      refetch();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour du rôle");
+    }
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    if (!confirm("Voulez-vous vraiment retirer ce membre ?")) return;
+    try {
+      await deleteTournamentMember(memberId);
+      toast.success("Membre retiré avec succès");
+      refetch();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      toast.error("Erreur lors du retrait du membre");
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-24 bg-muted/50 rounded-xl animate-pulse" />
-        ))}
+      <div className="space-y-4">
+        <div className="h-10 w-full bg-muted/50 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-48 bg-muted/50 rounded-xl animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -67,56 +107,80 @@ export function MembersInfiniteList({
 
   const all = data?.pages.flatMap((p: any) => p.data) || [];
 
-  if (all.length === 0) {
-    return (
-      <div className="text-muted-foreground">Aucun membre pour ce tournoi.</div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-end gap-2">
-        <Button
-          variant={viewMode === "grid" ? "default" : "outline"}
-          size="icon"
-          onClick={() => setViewMode("grid")}
-          className="h-8 w-8"
-        >
-          <LayoutGrid className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={viewMode === "list" ? "default" : "outline"}
-          size="icon"
-          onClick={() => setViewMode("list")}
-          className="h-8 w-8"
-        >
-          <List className="h-4 w-4" />
-        </Button>
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher un membre..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex justify-end gap-2 shrink-0">
+          <Button
+            variant={viewMode === "grid" ? "default" : "outline"}
+            size="icon"
+            onClick={() => setViewMode("grid")}
+            className="h-8 w-8"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "outline"}
+            size="icon"
+            onClick={() => setViewMode("list")}
+            className="h-8 w-8"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      <div
-        className={
-          viewMode === "grid"
-            ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"
-            : "flex flex-col gap-2"
-        }
-      >
-        {all.map((m: any) => {
-          // Normalize member data for the card
-          const memberData = {
-            ...m,
-            user: {
-              username: m.displayName || m.gameTag,
-              avatar: m.avatar,
-              ...m.user,
-            },
-          };
+      {all.length === 0 ? (
+        <div className="text-center py-12 border rounded-xl bg-muted/20">
+          <p className="text-muted-foreground">Aucun membre trouvé pour ce tournoi.</p>
+        </div>
+      ) : (
+        <div
+          className={
+            viewMode === "grid"
+              ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"
+              : "flex flex-col gap-2"
+          }
+        >
+          {all.map((m: any) => {
+            const memberData = {
+              ...m,
+              user: {
+                username: m.displayName || m.gameTag,
+                avatar: m.avatar,
+                ...m.user,
+              },
+            };
 
-          return (
-            <MemberCard key={m.id} member={memberData} viewMode={viewMode} />
-          );
-        })}
-      </div>
+            return (
+              <MemberCard
+                key={m.id}
+                member={memberData}
+                viewMode={viewMode}
+                userDisplay={isDashboard ? "organizer" : "member"}
+                actions={
+                  isDashboard
+                    ? {
+                        onToggleCoOrganizer: (id) => handleUpdateRole(id, m.role),
+                        onDelete: (id) => handleDeleteMember(id),
+                        onViewProfile: (id) => window.open(`/profile/${m.user?.username}`, "_blank"),
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
+        </div>
+      )}
       <div ref={ref} className="flex justify-center py-6 h-16">
         {isFetchingNextPage && (
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />

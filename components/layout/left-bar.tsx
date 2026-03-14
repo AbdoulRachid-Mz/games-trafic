@@ -121,7 +121,7 @@ const defaultMenuItems: MenuItem[] = [
   {
     id: "blog",
     label: "Blog",
-    link: "/blog",
+    link: "/blogs",
     icon: MessageSquare,
     group: "application",
     requiresAuth: true,

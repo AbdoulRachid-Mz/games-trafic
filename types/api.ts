@@ -602,6 +602,7 @@ export interface TournamentMemberFilters extends BaseFilters {
   displayName?: string;
   gameTag?: string;
   clubName?: string;
+  search?: string;
   isVerified?: boolean;
   verificationLevel?: string | string[];
   isActive?: boolean;

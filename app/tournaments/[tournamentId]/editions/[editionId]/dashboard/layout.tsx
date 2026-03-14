@@ -3,6 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getTournamentEditionWithRelations } from "@/actions/editions";
+import { isUserTournamentOrganizer } from "@/actions/tournaments";
+import { useRouter } from "next/navigation";
+import { useAuthContext } from "@/contexts/auth-context";
+import { toast } from "sonner";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import {
   EnhancedDashboard,
   SidebarHeader,
@@ -38,14 +43,39 @@ export default function EditionDashboardLayout({
   children: React.ReactNode;
 }) {
   const params = useParams();
+  const router = useRouter();
   const tournamentId = params.tournamentId as string;
   const editionId = params.editionId as string;
   const [edition, setEdition] = useState<any>(null);
+  const [isOrganizer, setIsOrganizer] = useState<boolean | null>(null);
+  const { user, loading: authLoading } = useAuthContext();
   const { isActive } = useActiveRoute();
 
   useEffect(() => {
-    getTournamentEditionWithRelations(editionId).then(setEdition);
-  }, [editionId]);
+    if (!authLoading && !user) {
+      router.push("/auth/login");
+      return;
+    }
+
+    if (user) {
+      getTournamentEditionWithRelations(editionId).then(setEdition);
+      isUserTournamentOrganizer(tournamentId, user.id).then((result) => {
+        setIsOrganizer(result);
+        if (result === false) {
+          toast.error("Vous n'avez pas accès à ce tableau de bord");
+          router.push(`/tournaments/${tournamentId}/editions/${editionId}`);
+        }
+      });
+    }
+  }, [tournamentId, editionId, user, authLoading, router]);
+
+  if (authLoading || !edition || isOrganizer === null) {
+    return <PageSkeleton type="dashboard" />;
+  }
+
+  if (isOrganizer === false) {
+    return null;
+  }
 
   const navData = [
     {

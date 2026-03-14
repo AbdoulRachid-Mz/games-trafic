@@ -39,6 +39,7 @@ import { getWalletTransactions as getWalletTransactionsAction } from "@/actions/
 import type { WalletTransaction } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import router from "next/router";
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -131,6 +132,13 @@ export default function TransactionsPage() {
       console.error("Error loading stats:", error);
     }
   };
+
+  // filtered transactions income
+  const filteredIncomeTransactions = transactions.filter((t: any) => t.type === "DEPOSIT" || t.type === "TRANSFER");
+  // filtered transactions expense
+  const filteredExpenseTransactions = transactions.filter((t: any) => t.type === "WITHDRAWAL" || t.type === "REFUND");
+  // filtered transactions pending
+  const filteredPendingTransactions = transactions.filter((t: any) => t.status === "PENDING");
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -605,10 +613,252 @@ export default function TransactionsPage() {
                 })
               )}
             </TabsContent>
+
+            {/* TabsContent for income transactions */}
+            <TabsContent value="income" className="space-y-3">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))
+              ) : filteredIncomeTransactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <Typography variant="body-lg" theme="muted">
+                    Aucune transaction reçue trouvée
+                  </Typography>
+                  <Typography variant="body-sm" theme="muted" className="mt-2">
+                    Commencez par recevoir de l'argent
+                  </Typography>
+                  <Button
+                    onClick={() => router.push("/wallet/transactions/create")}
+                    className="mt-4"
+                  >
+                    Créer une transaction
+                  </Button>
+                </div>
+              ) : (
+                filteredIncomeTransactions.map((transaction, index) => {
+                  const Icon = getTypeIcon(transaction.type);
+
+                  return (
+                    <motion.div
+                      key={transaction.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="hover:shadow-md transition-shadow p-3">
+                        <CardContent className="p-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-green-100">
+                                <Icon className="h-5 w-5 text-green-600" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Typography variant="body-sm" weight="semibold">
+                                    {getTypeLabel(transaction.type)}
+                                  </Typography>
+                                  {getStatusBadge(transaction.status || "")}
+                                </div>
+                                <Typography variant="caption2" theme="muted">
+                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
+                                </Typography>
+                                {transaction.description && (
+                                  <Typography variant="caption2" theme="muted" className="mt-1">
+                                    {transaction.description}
+                                  </Typography>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Typography variant="body-lg" weight="bold" className="text-green-600">
+                                +{parseFloat(transaction.amount)?.toFixed(2)} GTC
+                              </Typography>
+                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
+                                <Typography variant="caption2" theme="muted">
+                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
+                                </Typography>
+                              )}
+                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
+                                {transaction.id.slice(-8)}
+                              </Typography>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })
+              )}
+            </TabsContent>
+
+            {/* TabsContent for expense transactions */}
+            <TabsContent value="expense" className="space-y-3">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))
+              ) : filteredExpenseTransactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <Typography variant="body-lg" theme="muted">
+                    Aucune transaction émise trouvée
+                  </Typography>
+                  <Typography variant="body-sm" theme="muted" className="mt-2">
+                    Commencez par émettre de l'argent
+                  </Typography>
+                  <Button
+                    onClick={() => router.push("/wallet/transactions/create")}
+                    className="mt-4"
+                  >
+                    Créer une transaction
+                  </Button>
+                </div>
+              ) : (
+                filteredExpenseTransactions.map((transaction, index) => {
+                  const Icon = getTypeIcon(transaction.type);
+
+                  return (
+                    <motion.div
+                      key={transaction.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="hover:shadow-md transition-shadow p-3">
+                        <CardContent className="p-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-red-100">
+                                <Icon className="h-5 w-5 text-red-600" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Typography variant="body-sm" weight="semibold">
+                                    {getTypeLabel(transaction.type)}
+                                  </Typography>
+                                  {getStatusBadge(transaction.status || "")}
+                                </div>
+                                <Typography variant="caption2" theme="muted">
+                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
+                                </Typography>
+                                {transaction.description && (
+                                  <Typography variant="caption2" theme="muted" className="mt-1">
+                                    {transaction.description}
+                                  </Typography>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Typography variant="body-lg" weight="bold" className="text-red-600">
+                                -{parseFloat(transaction.amount)?.toFixed(2)} GTC
+                              </Typography>
+                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
+                                <Typography variant="caption2" theme="muted">
+                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
+                                </Typography>
+                              )}
+                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
+                                {transaction.id.slice(-8)}
+                              </Typography>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })
+              )}
+            </TabsContent>
+
+            {/* TabsContent for pending transactions */}
+            <TabsContent value="pending" className="space-y-3">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))
+              ) : filteredPendingTransactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <Typography variant="body-lg" theme="muted">
+                    Aucune transaction en attente trouvée
+                  </Typography>
+                  <Typography variant="body-sm" theme="muted" className="mt-2">
+                    Commencez par émettre de l'argent
+                  </Typography>
+                  <Button
+                    onClick={() => router.push("/wallet/transactions/create")}
+                    className="mt-4"
+                  >
+                    Créer une transaction
+                  </Button>
+                </div>
+              ) : (
+                filteredPendingTransactions.map((transaction, index) => {
+                  const Icon = getTypeIcon(transaction.type);
+
+                  return (
+                    <motion.div
+                      key={transaction.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="hover:shadow-md transition-shadow p-3">
+                        <CardContent className="p-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-yellow-100">
+                                <Icon className="h-5 w-5 text-yellow-600" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Typography variant="body-sm" weight="semibold">
+                                    {getTypeLabel(transaction.type)}
+                                  </Typography>
+                                  {getStatusBadge(transaction.status || "")}
+                                </div>
+                                <Typography variant="caption2" theme="muted">
+                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
+                                </Typography>
+                                {transaction.description && (
+                                  <Typography variant="caption2" theme="muted" className="mt-1">
+                                    {transaction.description}
+                                  </Typography>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Typography variant="body-lg" weight="bold" className="text-yellow-600">
+                                {transaction.type === "DEPOSIT" ||
+                                  (transaction.type === "TRANSFER" && transaction.toUserId === user?.id)
+                                  ? "+"
+                                  : "-"}
+                                {parseFloat(transaction.amount)?.toFixed(2)} GTC
+                              </Typography>
+                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
+                                <Typography variant="caption2" theme="muted">
+                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
+                                </Typography>
+                              )}
+                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
+                                {transaction.id.slice(-8)}
+                              </Typography>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })
+              )}
+            </TabsContent>
+
           </Tabs>
         </CardContent>
       </Card>
-
     </div>
   );
 }
+

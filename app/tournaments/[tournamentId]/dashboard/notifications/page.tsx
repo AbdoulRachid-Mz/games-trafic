@@ -25,10 +25,12 @@ import {
   ShoppingBag,
   Trophy,
   Info,
+  CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { markAllNotificationsAsRead } from "@/actions/notifications";
 
 export default function TournamentNotificationsPage() {
   const params = useParams();
@@ -36,6 +38,21 @@ export default function TournamentNotificationsPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+
+
+  const handleMarkAllAsRead = () => {
+    if (notifications.filter(n => !n.read).length === 0) return;
+    
+    startTransition(async () => {
+      try {
+        await markAllNotificationsAsRead(user!.id);
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+        toast.success("Toutes les notifications ont été marquées comme lues");
+      } catch (error) {
+        toast.error("Erreur lors de l'opération");
+      }
+    });
+  };
 
   useEffect(() => {
     if (user?.id) {
@@ -94,16 +111,31 @@ export default function TournamentNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Notifications</h2>
           <p className="text-muted-foreground text-sm">
             Activités récentes du tournoi
           </p>
         </div>
-        <Badge variant="secondary" className="gap-2">
-          {notifications.filter((n) => !n.read).length} non lues
-        </Badge>
+        <div className="flex items-center gap-3">
+          {notifications.some(n => !n.read) && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={handleMarkAllAsRead}
+              disabled={isPending}
+            >
+              <CheckSquare className="h-4 w-4" />
+              Tout marquer comme lu
+            </Button>
+          )}
+          <Badge variant="secondary" className="gap-2 py-1.5 px-3">
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            {notifications.filter((n) => !n.read).length} non lues
+          </Badge>
+        </div>
       </div>
 
       <Card>

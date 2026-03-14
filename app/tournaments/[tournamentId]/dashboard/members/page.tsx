@@ -27,6 +27,16 @@ import {
 import { toast } from "sonner";
 import { addTournamentMember } from "@/actions/tournaments";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
 export default function TournamentDashboardMembersPage() {
   const params = useParams();
   const router = useRouter();
@@ -40,6 +50,10 @@ export default function TournamentDashboardMembersPage() {
 
   const [isCoOrganizer, setIsCoOrganizer] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Dialog states
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [isGuestDialogOpen, setIsGuestDialogOpen] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -73,6 +87,7 @@ export default function TournamentDashboardMembersPage() {
 
         setSearch("");
         setUsers([]);
+        setIsUserDialogOpen(false);
         toast.success("Membre ajouté avec succès");
         router.refresh(); // Refresh list
       } catch (error: any) {
@@ -98,6 +113,7 @@ export default function TournamentDashboardMembersPage() {
         setGuestName("");
         setGuestEmail("");
         setGuestPhone("");
+        setIsGuestDialogOpen(false);
         toast.success("Invité ajouté avec succès");
         router.refresh(); // Refresh list
       } catch (error: any) {
@@ -115,158 +131,174 @@ export default function TournamentDashboardMembersPage() {
             Gestion des participants et du staff
           </p>
         </div>
-        <Badge variant="outline" className="gap-2 px-3 py-1">
-          <Users className="h-4 w-4" />
-          <span className="hidden sm:inline">Total Membres</span>
-        </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="h-full">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users2 className="h-5 w-5 text-primary" />
+        {/* Dialog for adding users */}
+        <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="gap-2 h-auto py-3 px-4">
+              <Users2 className="h-4 w-4" />
               Ajouter un utilisateur
-            </CardTitle>
-            <CardDescription>
-              Rechercher un utilisateur existant sur la plateforme
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Username ou Email"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  variant={isCoOrganizer ? "secondary" : "outline"}
-                  onClick={() => setIsCoOrganizer((v) => !v)}
-                  className="gap-2 shrink-0"
-                  size="icon"
-                  title={
-                    isCoOrganizer
-                      ? "Rôle: Co-organisateur"
-                      : "Rôle: Participant"
-                  }
-                >
-                  <ShieldCheck
-                    className={`h-4 w-4 ${
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Ajouter un utilisateur</DialogTitle>
+              <DialogDescription>
+                Rechercher un utilisateur existant sur la plateforme
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Username ou Email"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant={isCoOrganizer ? "secondary" : "outline"}
+                    onClick={() => setIsCoOrganizer((v) => !v)}
+                    className="gap-2 shrink-0"
+                    size="icon"
+                    title={
                       isCoOrganizer
+                        ? "Rôle: Co-organisateur"
+                        : "Rôle: Participant"
+                    }
+                  >
+                    <ShieldCheck
+                      className={`h-4 w-4 ${isCoOrganizer
                         ? "text-primary fill-primary/20"
                         : "text-muted-foreground"
-                    }`}
-                  />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2 min-h-[100px] border rounded-md p-2 bg-muted/20">
-              {users.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between p-2 rounded hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold shrink-0">
-                      {u.username?.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div className="truncate">
-                      <div className="font-medium text-sm truncate">
-                        @{u.username}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {u.fullName}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="gap-2 h-8"
-                    onClick={() => handleAddUser(u.username)}
-                  >
-                    <UserPlus className="h-4 w-4" />
+                        }`}
+                    />
                   </Button>
                 </div>
-              ))}
-              {search && users.length === 0 && (
-                <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
-                  Aucun utilisateur trouvé
-                </div>
-              )}
-              {!search && (
-                <div className="flex items-center justify-center h-20 text-muted-foreground text-sm italic">
-                  Commencez à taper pour rechercher...
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="h-full">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Ajouter un invité
-            </CardTitle>
-            <CardDescription>
-              Créer un membre temporaire (Guest)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nom affiché (Requis)</Label>
-              <Input
-                placeholder="Nom du guest"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">
-                  Email (Optionnel)
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder="email@example.com"
-                    value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
-                  />
-                </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">
-                  Téléphone (Optionnel)
-                </Label>
-                <div className="relative">
-                  <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder="+1234567890"
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                  />
-                </div>
+
+              <div className="space-y-2 min-h-[100px] max-h-[200px] overflow-y-auto border rounded-md p-2 bg-muted/20">
+                {users.map((u) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center justify-between p-2 rounded hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold shrink-0">
+                        {u.username?.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="truncate">
+                        <div className="font-medium text-sm truncate">
+                          @{u.username}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {u.fullName}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-2 h-8"
+                      onClick={() => handleAddUser(u.username)}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {search && users.length === 0 && (
+                  <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
+                    Aucun utilisateur trouvé
+                  </div>
+                )}
+                {!search && (
+                  <div className="flex items-center justify-center h-20 text-muted-foreground text-sm italic">
+                    Commencez à taper pour rechercher...
+                  </div>
+                )}
               </div>
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                Annuler
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-            <Button
-              onClick={handleAddGuest}
-              disabled={isPending || !guestName.trim()}
-              className="w-full gap-2 mt-2"
-            >
+        {/* Dialog for adding guests */}
+        <Dialog open={isGuestDialogOpen} onOpenChange={setIsGuestDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="gap-2 h-auto py-3 px-4">
               <UserPlus className="h-4 w-4" />
-              Ajouter l'invité
+              Ajouter un invité
             </Button>
-          </CardContent>
-        </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Ajouter un invité</DialogTitle>
+              <DialogDescription>
+                Créer un membre temporaire (Guest)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nom affiché (Requis)</Label>
+                <Input
+                  placeholder="Nom du guest"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Email (Optionnel)
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      placeholder="email@example.com"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Téléphone (Optionnel)
+                  </Label>
+                  <div className="relative">
+                    <Phone className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      placeholder="+1234567890"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsGuestDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button
+                onClick={handleAddGuest}
+                disabled={isPending || !guestName.trim()}
+                className="gap-2"
+              >
+                <UserPlus className="h-4 w-4" />
+                Ajouter l'invité
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -274,8 +306,10 @@ export default function TournamentDashboardMembersPage() {
           <CardTitle>Liste des membres</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Passing a key to force re-render on updates if needed, though router.refresh should handle it */}
-          <MembersInfiniteList tournamentId={params.tournamentId as string} />
+          <MembersInfiniteList
+            tournamentId={params.tournamentId as string}
+            isDashboard={true}
+          />
         </CardContent>
       </Card>
     </div>

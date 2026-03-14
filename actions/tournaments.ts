@@ -86,11 +86,34 @@ import {
 } from "@/types/api";
 
 import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 
 // ============================================================================
 // QUERIES - Lecture des données
 // ============================================================================
-
+/**
+ * Récupère les tournois avec leurs éditions
+ */
+export async function getTournamentsWithEditions(
+  limit: number = 100,
+  sortBy: keyof Tournament = "createdAt",
+  sortOrder: "asc" | "desc" = "desc"
+): Promise<Tournament[]> {
+  try {
+    const order = sortOrder === "desc" ? desc : asc;
+    const result = await db.query.tournaments.findMany({
+      limit,
+      orderBy: order(tournaments[sortBy]),
+      with: {
+        editions: true,
+      },
+    });
+    return result;
+  } catch (error) {
+    console.error("Error getting tournaments with editions:", error);
+    throw new Error("Failed to fetch tournaments with editions");
+  }
+}
 /**
  * Récupère un tournoi par son ID avec relations optionnelles
  */
@@ -230,29 +253,80 @@ export async function getTournaments(
 }
 
 /**
- * Récupère les tournois avec leurs éditions
+ * Vérifie si un utilisateur est organisateur ou co-organisateur d'un tournoi
  */
-export async function getTournamentsWithEditions(
-  limit: number = 100,
-  sortBy: keyof Tournament = "createdAt",
-  sortOrder: "asc" | "desc" = "desc"
-): Promise<Tournament[]> {
+export async function isUserTournamentOrganizer(
+  tournamentId: string,
+  userId: string
+): Promise<boolean> {
   try {
-    const order = sortOrder === "desc" ? desc : asc;
-    const result = await db.query.tournaments.findMany({
-      limit,
-      orderBy: order(tournaments[sortBy]),
-      with: {
-        editions: true,
-      },
+    // 1. Vérifier si c'est le propriétaire
+    const tournament = await db.query.tournaments.findFirst({
+      where: (tournaments, { eq }) => eq(tournaments.id, tournamentId),
+      columns: { organizerId: true },
     });
-    return result;
+
+    if (tournament?.organizerId === userId) return true;
+
+    // 2. Vérifier si c'est un co-organisateur dans les membres
+    const member = await db.query.tournamentMembers.findFirst({
+      where: (tournamentMembers, { and, eq, or }) =>
+        and(
+          eq(tournamentMembers.tournamentId, tournamentId),
+          eq(tournamentMembers.userId, userId),
+          or(
+            eq(tournamentMembers.role, "ORGANIZER"),
+            eq(tournamentMembers.role, "CO_ORGANIZER"),
+            eq(tournamentMembers.isCoOrganizer, true)
+          )
+        ),
+    });
+
+    return !!member;
   } catch (error) {
-    console.error("Error getting tournaments with editions:", error);
-    throw new Error("Failed to fetch tournaments with editions");
+    console.error("Error checking tournament organizer status:", error);
+    return false;
   }
 }
 
+/**
+ * Met à jour le rôle d'un membre du tournoi
+ */
+export async function updateTournamentMemberRole(
+  memberId: string,
+  role: string,
+  isCoOrganizer: boolean
+) {
+  try {
+    await db
+      .update(tournamentMembers)
+      .set({
+        role,
+        isCoOrganizer,
+        updatedAt: new Date(),
+      })
+      .where(eq(tournamentMembers.id, memberId));
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating member role:", error);
+    throw new Error("Erreur lors de la mise à jour du rôle");
+  }
+}
+
+/**
+ * Supprime un membre du tournoi
+ */
+export async function deleteTournamentMember(memberId: string) {
+  try {
+    await db
+      .delete(tournamentMembers)
+      .where(eq(tournamentMembers.id, memberId));
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting member:", error);
+    throw new Error("Failed to delete tournament member");
+  }
+}
 /**
  * Liste les éditions avec pagination, filtres et options
  */
@@ -1819,6 +1893,8 @@ export async function updateEditionRegistration(
     if (result.length === 0) {
       throw new Error("Edition registration not found");
     }
+
+    revalidatePath(`/tournaments/[tournamentId]/editions/[editionId]/dashboard/participants`, 'page');
     return result[0];
   } catch (error) {
     console.error("Error updating edition registration:", error);
@@ -2681,6 +2757,16 @@ function buildTournamentMemberWhereConditions(
   if (filters.lastActiveTo) {
     conditions.push(
       lte(tournamentMembers.lastActive, new Date(filters.lastActiveTo))
+    );
+  }
+
+  if (filters.search) {
+    conditions.push(
+      or(
+        ilike(tournamentMembers.displayName, `%${filters.search}%`),
+        ilike(tournamentMembers.gameTag, `%${filters.search}%`),
+        ilike(tournamentMembers.contactEmail, `%${filters.search}%`)
+      )
     );
   }
 

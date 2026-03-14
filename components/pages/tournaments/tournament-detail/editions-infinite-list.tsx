@@ -9,11 +9,33 @@ import { Calendar, Trophy } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+import { EditionCard } from "@/components/pages/tournaments/editions/edition-card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Filter } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+
 interface EditionsInfiniteListProps {
   tournamentId: string;
+  isDashboard?: boolean;
 }
 
-export function EditionsInfiniteList({ tournamentId }: EditionsInfiniteListProps) {
+import { deleteTournamentEdition } from "@/actions/tournaments";
+import { toast } from "sonner";
+
+export function EditionsInfiniteList({
+  tournamentId,
+  isDashboard = false,
+}: EditionsInfiniteListProps) {
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
   const {
     data,
     fetchNextPage,
@@ -21,11 +43,13 @@ export function EditionsInfiniteList({ tournamentId }: EditionsInfiniteListProps
     isFetchingNextPage,
     isLoading,
     isError,
+    refetch,
   } = useInfiniteQuery({
-    queryKey: ["tournament-editions", tournamentId],
+    queryKey: ["tournament-editions", tournamentId, statusFilter],
     queryFn: async ({ pageParam = 1 }) => {
+      const statusParam = statusFilter !== "ALL" ? `&status=${statusFilter}` : "";
       const res = await fetch(
-        `/api/tournaments/${tournamentId}/editions?page=${pageParam}&limit=10&sortBy=startDate&sortOrder=desc`,
+        `/api/tournaments/${tournamentId}/editions?page=${pageParam}&limit=10&sortBy=startDate&sortOrder=desc${statusParam}`,
         { cache: "no-store" }
       );
       return res.json();
@@ -38,6 +62,17 @@ export function EditionsInfiniteList({ tournamentId }: EditionsInfiniteListProps
     },
     initialPageParam: 1,
   });
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette édition ?")) return;
+    try {
+      await deleteTournamentEdition(id);
+      toast.success("Édition supprimée");
+      refetch();
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
+    }
+  };
 
   const { ref, isIntersecting } = useIntersectionObserver({ threshold: 0.5 });
 
@@ -63,41 +98,59 @@ export function EditionsInfiniteList({ tournamentId }: EditionsInfiniteListProps
 
   const all = data?.pages.flatMap((p: any) => p.data) || [];
 
-  if (all.length === 0) {
-    return <div className="text-muted-foreground">Aucune édition disponible.</div>;
-  }
-
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {all.map((ed: any) => (
-          <Card key={ed.id} className="border-border/50">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">{ed.name || `Édition ${ed.editionNumber}`}</CardTitle>
-              <Badge variant="outline">{ed.status}</Badge>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  {ed.startDate
-                    ? format(new Date(ed.startDate), "d MMM yyyy", { locale: fr })
-                    : "Date non définie"}
-                </span>
+                <Filter className="h-4 w-4" />
+                <SelectValue placeholder="Statut" />
               </div>
-              <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-yellow-500" />
-                <span className="font-medium">{ed.prizePool || "0"} GTC</span>
-              </div>
-              <div className="text-muted-foreground">
-                Participants: {ed.currentParticipants || 0}/{ed.maxParticipants || "-"}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous les statuts</SelectItem>
+              <SelectItem value="UPCOMING">À venir</SelectItem>
+              <SelectItem value="LIVE">En cours</SelectItem>
+              <SelectItem value="COMPLETED">Terminé</SelectItem>
+              <SelectItem value="CANCELLED">Annulé</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isDashboard && (
+          <Button asChild className="w-full sm:w-auto gap-2">
+            <Link href={`/tournaments/${tournamentId}/dashboard/editions/create`}>
+              <Plus className="h-4 w-4" />
+              Créer une édition
+            </Link>
+          </Button>
+        )}
       </div>
+
+      {all.length === 0 ? (
+        <div className="text-center py-12 border rounded-xl bg-muted/20">
+          <p className="text-muted-foreground">Aucune édition trouvée.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {all.map((ed: any) => (
+            <EditionCard
+              key={ed.id}
+              edition={ed}
+              tournamentId={tournamentId}
+              isDashboard={isDashboard}
+              onDelete={handleDelete}
+              className="h-full"
+            />
+          ))}
+        </div>
+      )}
       <div ref={ref} className="flex justify-center py-6 h-16">
-        {isFetchingNextPage && <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
+        {isFetchingNextPage && (
+          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        )}
       </div>
     </div>
   );

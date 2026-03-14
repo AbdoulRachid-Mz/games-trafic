@@ -119,7 +119,7 @@ export default function AdminRequestsPage() {
         statuses: statusFilter === "all" ? [] : [statusFilter as any],
       } as any;
 
-      const [dep, wit, items] = await Promise.all([
+      const [dep, wit, items, ref] = await Promise.all([
         getRequests({
           pagination: { page: 1, limit: 50 },
           filters: { ...baseFilters, types: ["DEPOSIT"] },
@@ -135,6 +135,11 @@ export default function AdminRequestsPage() {
           filters: { ...baseFilters, types: ["GAME_ITEMS"] },
           options: { sortBy: "createdAt", sortOrder: "desc" },
         }),
+        getRequests({
+          pagination: { page: 1, limit: 50 },
+          filters: { ...baseFilters, types: ["REFUND", "CLAIM"] as any },
+          options: { sortBy: "createdAt", sortOrder: "desc" },
+        }),
       ]);
 
       const q = searchQuery.toLowerCase();
@@ -142,12 +147,13 @@ export default function AdminRequestsPage() {
         !q ||
         r.id.toLowerCase().includes(q) ||
         (r.paymentMethod?.toLowerCase().includes(q)) ||
-        (r.paymentProvider?.toLowerCase().includes(q));
+        (r.paymentProvider?.toLowerCase().includes(q)) ||
+        (r.user?.username?.toLowerCase().includes(q));
 
       setDeposits(dep.data.filter(filterSearch));
       setWithdrawals(wit.data.filter(filterSearch));
       setGameItems(items.data.filter(filterSearch));
-      setClaims([]);
+      setClaims(ref.data.filter(filterSearch));
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Erreur lors du chargement des données");
@@ -244,6 +250,113 @@ export default function AdminRequestsPage() {
     setShowGamePassword(false);
   };
 
+  const renderRequestTable = (requestsData: any[], title: string) => (
+    <Card className="bg-card/40 backdrop-blur-xl border-border/50">
+      <CardHeader>
+        <CardTitle>{title} ({requestsData.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Utilisateur</TableHead>
+                <TableHead>Montant</TableHead>
+                <TableHead>Détails</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Statut</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={7}>
+                      <Skeleton className="h-8 w-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : requestsData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    Aucune demande trouvée
+                  </TableCell>
+                </TableRow>
+              ) : (
+                requestsData.map((request) => (
+                  <TableRow key={request.id}>
+                    <TableCell className="font-mono text-xs">
+                      {request.id.substring(0, 8)}...
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{request.user?.username || "Inconnu"}</span>
+                        <span className="text-[10px] text-muted-foreground">{request.userId.substring(0, 8)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-semibold">
+                      {request.amount} GTC
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs">
+                        {request.type === "GAME_ITEMS" ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-primary">{request.gameItem?.name || "Item"}</span>
+                            <span>Qté: {request.quantity}</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span>{request.paymentMethod}</span>
+                            <span className="text-[10px] text-muted-foreground">{request.paymentProvider}</span>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {format(new Date(request.createdAt), "dd MMM HH:mm", { locale: fr })}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={request.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {request.status === "PENDING" && (
+                            <>
+                              <DropdownMenuItem onClick={() => openApproveDialog(request)}>
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                Approuver
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openRejectDialog(request)}>
+                                <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                                Rejeter
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => openDetailsDialog(request)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Détails
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -285,177 +398,65 @@ export default function AdminRequestsPage() {
           </FilterBar>
         </CardContent>
       </Card>
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard
-          title="Dépôts en Attente"
-          value={stats?.pending || 0}
-          icon={TrendingDown}
-          description="À traiter"
-        />
-        <StatCard
-          title="Retraits en Attente"
-          value={stats?.pending || 0}
-          icon={TrendingUp}
-          description="À traiter"
-        />
-        <StatCard
-          title="Demandes Items"
-          value={gameItems.length}
-          icon={Package}
-          description="En attente"
-        />
-        <StatCard
-          title="Réclamations"
-          value={claims.length}
-          icon={AlertCircle}
-          description="À résoudre"
-        />
+
+      {/* Statistiques avec carousel mobile */}
+      <div className="relative group">
+        <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+          <StatCard
+            title="Total Demandes"
+            value={stats?.total || 0}
+            icon={AlertCircle}
+            color="blue"
+            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
+          />
+          <StatCard
+            title="En attente"
+            value={stats?.pending || 0}
+            icon={Clock}
+            color="yellow"
+            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
+          />
+          <StatCard
+            title="Complétées"
+            value={stats?.completed || 0}
+            icon={CheckCircle}
+            color="green"
+            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
+          />
+          <StatCard
+            title="Montant Total"
+            value={`${Number(stats?.totalAmount || 0).toLocaleString()} GTC`}
+            icon={Wallet}
+            color="purple"
+            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
+          />
+        </div>
       </div>
 
       {/* Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className="space-y-6"
+        className="space-y-4"
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:w-[600px]">
           <TabsTrigger value="deposits">Dépôts</TabsTrigger>
           <TabsTrigger value="withdrawals">Retraits</TabsTrigger>
-          <TabsTrigger value="gameItems">Items de Jeu</TabsTrigger>
-          <TabsTrigger value="claims">Réclamations</TabsTrigger>
+          <TabsTrigger value="items">Items de Jeu</TabsTrigger>
+          <TabsTrigger value="refunds">Remboursements</TabsTrigger>
         </TabsList>
 
-        {/* Tab: Dépôts */}
-        <TabsContent value="deposits" className="space-y-6">
-          <Card className="bg-card/40 backdrop-blur-xl border-border/50">
-            <CardHeader>
-              <CardTitle>Demandes de Dépôt ({deposits.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Utilisateur</TableHead>
-                      <TableHead>Montant</TableHead>
-                      <TableHead>Méthode</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell colSpan={7}>
-                            <Skeleton className="h-8 w-full" />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : deposits.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
-                          Aucune demande de dépôt en attente
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      deposits.map((request) => (
-                        <TableRow key={request.id}>
-                          <TableCell className="font-mono text-xs">
-                            {request.id.substring(0, 8)}...
-                          </TableCell>
-                          <TableCell>
-                            {request.user?.username || "Inconnu"}
-                          </TableCell>
-                          <TableCell className="font-semibold">
-                            {request.amount} GTC
-                          </TableCell>
-                          <TableCell>{request.paymentMethod}</TableCell>
-                          <TableCell>
-                            {format(
-                              new Date(request.createdAt),
-                              "dd MMM yyyy",
-                              {
-                                locale: fr,
-                              },
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={request.status} />
-                          </TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openApproveDialog(request)}>
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Approuver
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openRejectDialog(request)}>
-                                  <XCircle className="h-4 w-4 mr-2" />
-                                  Rejeter
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openDetailsDialog(request)}>
-                                  Détails
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="deposits">
+          {renderRequestTable(deposits, "Demandes de Dépôt")}
         </TabsContent>
-
-        {/* Other tabs would follow similar pattern */}
         <TabsContent value="withdrawals">
-          <Card>
-            <CardHeader>
-              <CardTitle>Retraits en attente</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Typography variant="body-sm" theme="muted">
-                Aucune demande de retrait en attente
-              </Typography>
-            </CardContent>
-          </Card>
+          {renderRequestTable(withdrawals, "Demandes de Retrait")}
         </TabsContent>
-
-        <TabsContent value="gameItems">
-          <Card>
-            <CardHeader>
-              <CardTitle>Demandes d'items</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Typography variant="body-sm" theme="muted">
-                Aucune demande d'item en attente
-              </Typography>
-            </CardContent>
-          </Card>
+        <TabsContent value="items">
+          {renderRequestTable(gameItems, "Demandes d'Items de Jeu")}
         </TabsContent>
-
-        <TabsContent value="claims">
-          <Card>
-            <CardHeader>
-              <CardTitle>Réclamations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Typography variant="body-sm" theme="muted">
-                Aucune réclamation en attente
-              </Typography>
-            </CardContent>
-          </Card>
+        <TabsContent value="refunds">
+          {renderRequestTable(claims, "Demandes de Remboursement")}
         </TabsContent>
       </Tabs>
 

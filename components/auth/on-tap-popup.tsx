@@ -5,44 +5,47 @@ import { useTheme } from "next-themes";
 import { useEffect, useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { XIcon } from "../icons/x";
+import { useNetworkStatus } from "@/hooks/network-status";
+import { useAuthContext } from "@/contexts/auth-context";
 // import { XIcon } from "../icons/x";
 
 export default function OnTapPopup() {
   const { resolvedTheme } = useTheme();
-  const { data: session } = authClient.useSession();
+  const { user: session } = useAuthContext();
   const buttonRef = useRef<HTMLDivElement>(null);
+  const { isOnline } = useNetworkStatus();
 
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-
+  
   // Prevent hydration mismatch (next-themes fix)
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
+  
   // Load visibility from sessionStorage
   useEffect(() => {
-    if (!isMounted) return;
-
+    if (!isMounted || !isOnline) return;
+    
     const stored = sessionStorage.getItem("onTapPopupVisible");
     if (stored !== null) {
       setIsVisible(JSON.parse(stored));
     }
-
-  }, [isMounted]);
-
+    
+  }, [isMounted, isOnline]);
+  
   // Persist visibility
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted || !isOnline) return;
     sessionStorage.setItem("onTapPopupVisible", JSON.stringify(isVisible));
-  }, [isVisible, isMounted]);
-
+  }, [isVisible, isMounted, isOnline]);
+  
   // Initialize One Tap
   useEffect(() => {
-    if (!isMounted) return;
-    if (session?.user) return;
-
+    if (!isMounted || !isOnline) return;
+    if (session) return;
+    
     const initOneTap = async () => {
       setIsLoading(true);
       try {
@@ -69,23 +72,21 @@ export default function OnTapPopup() {
 
     initOneTap();
 
-  }, [resolvedTheme, session, isMounted]);
+  }, [resolvedTheme, session, isMounted, isOnline]);
 
   // Do not render if logged in or not mounted
-  if (!isMounted || session?.user) return null;
+  if (!isMounted || session || !isOnline) return null;
 
   return (
     <div
-      className={`fixed top-20 right-3 z-100 w-[260px] rounded-lg border border-primary bg-background shadow-lg transition-transform duration-300 ${isVisible ? "" : ""
+      className={`fixed top-20 right-3 z-100 w-[260px] rounded-lg border border-primary bg-background shadow-lg transition-transform duration-300 ${isVisible ? "" : "hidden"
         }`}
     >
       <div className="relative">
 
         {/* Close button */}
-        <button
-          onClick={() => setIsVisible(false)}
-          className="absolute top-2 right-2 z-10 text-primary hover:opacity-70"
-        > <XIcon size={16} /> </button>
+        <XIcon size={16} className="absolute top-2 right-2 z-10 text-primary hover:opacity-70" onClick={() => setIsVisible(false)} /> 
+          
 
         {/* Loader overlay */}
         {isLoading && (

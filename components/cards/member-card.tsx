@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MoreHorizontal, Shield, User, Trophy, Mail } from "lucide-react";
+import { MoreHorizontal, Shield, User, Trophy, Mail, ShieldCheck, ShieldAlert } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TournamentMemberWithRelations } from "@/database/schema";
+import { cn } from "@/lib/utils";
 
 interface MemberCardProps {
   member: TournamentMemberWithRelations;
@@ -22,6 +23,7 @@ interface MemberCardProps {
     onEdit?: (id: string) => void;
     onDelete?: (id: string) => void;
     onViewProfile?: (id: string) => void;
+    onToggleCoOrganizer?: (id: string) => void;
   };
 }
 
@@ -95,6 +97,27 @@ export function MemberCard({
         </div>
 
         <div className="flex items-center gap-4">
+          {userDisplay === "organizer" && member.userId && !isMe && (
+            <Button
+              variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
+              size="sm"
+              className={cn(
+                "gap-2 h-8",
+                role === "CO_ORGANIZER" ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20" : ""
+              )}
+              onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+            >
+              {role === "CO_ORGANIZER" ? (
+                <ShieldCheck className="h-4 w-4" />
+              ) : (
+                <Shield className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">
+                {role === "CO_ORGANIZER" ? "Co-organisateur" : "Nommer Co-organisateur"}
+              </span>
+            </Button>
+          )}
+
           {member.team && (
             <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
               <span className="w-2 h-2 rounded-full bg-primary/50" />
@@ -118,11 +141,12 @@ export function MemberCard({
                     Voir le profil
                   </DropdownMenuItem>
                 )}
-                {actions?.onEdit && (
-                  <DropdownMenuItem onClick={() => actions.onEdit!(member.id)}>
-                    Modifier le rôle
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem
+                  onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+                  disabled={!member.userId || isMe}
+                >
+                  {role === "CO_ORGANIZER" ? "Retirer co-organisateur" : "Nommer co-organisateur"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {actions?.onDelete && (
                   <DropdownMenuItem
@@ -164,8 +188,11 @@ export function MemberCard({
                 >
                   Voir le profil
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => actions?.onEdit?.(member.id)}>
-                  Modifier
+                <DropdownMenuItem
+                  onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+                  disabled={!member.userId || isMe}
+                >
+                  {role === "CO_ORGANIZER" ? "Retirer co-organisateur" : "Nommer co-organisateur"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -231,6 +258,25 @@ export function MemberCard({
           >
             Voir le profil
           </Button>
+
+          {userDisplay === "organizer" && member.userId && !isMe && (
+            <Button
+              variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
+              size="sm"
+              className={cn(
+                "w-full font-bold h-9",
+                role === "CO_ORGANIZER" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : ""
+              )}
+              onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+            >
+              {role === "CO_ORGANIZER" ? (
+                <ShieldCheck className="h-4 w-4 mr-2" />
+              ) : (
+                <Shield className="h-4 w-4 mr-2" />
+              )}
+              {role === "CO_ORGANIZER" ? "Co-organisateur" : "Nommer Co-organisateur"}
+            </Button>
+          )}
 
           {member.team && (
             <Button

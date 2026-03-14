@@ -96,6 +96,14 @@ export const authMethods = {
 		const res = await authClient.passkey.addPasskey({
 			name: name || "Ma passkey",
 			authenticatorAttachment,
+			fetchOptions: {
+				onSuccess: () => {
+					console.log("Passkey ajoutée avec succès");
+				},
+				onError: (ctx) => {
+					console.log("Passkey ajout échoué", ctx.error);
+				}
+			}
 		});
 
 		if (res.error) {

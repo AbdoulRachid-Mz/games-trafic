@@ -10,7 +10,8 @@ import { Typography } from "@/components/ui/typography";
 import { ArrowRight, CheckCircle, Star, Shield, Zap, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Service } from "@/database/schema";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
+// import { useRouter } from "next/router";
 
 // Types simplifiés
 type ViewMode = "grid" | "list" | "compact";

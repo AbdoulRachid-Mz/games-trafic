@@ -1,4 +1,3 @@
-// app/tournaments/[tournamentId]/dashboard/layout.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -8,7 +7,9 @@ import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import { getTournamentNavData } from "@/constants/tournament-constants";
-import { getTournamentById } from "@/actions/tournaments";
+import { getTournamentById, isUserTournamentOrganizer } from "@/actions/tournaments";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   EnhancedDashboard,
   SidebarHeader,
@@ -24,17 +25,37 @@ export default function TournamentDashboardLayout({
   children: React.ReactNode;
 }) {
   const params = useParams();
+  const router = useRouter();
   const tournamentId = params.tournamentId as string;
   const [tournament, setTournament] = useState<any>(null);
-  const { user, loading } = useAuthContext();
-  const { isActive } = useActiveRoute();
+  const [isOrganizer, setIsOrganizer] = useState<boolean | null>(null);
+  const { user, loading: authLoading } = useAuthContext();
+  const { isActive, getActiveTitle } = useActiveRoute();
 
   useEffect(() => {
-    getTournamentById(tournamentId).then(setTournament);
-  }, [tournamentId]);
+    if (!authLoading && !user) {
+      router.push("/sign-in");
+      return;
+    }
 
-  if (loading || !tournament) {
+    if (user) {
+      getTournamentById(tournamentId).then(setTournament);
+      isUserTournamentOrganizer(tournamentId, user.id).then((result) => {
+        setIsOrganizer(result);
+        if (result === false) {
+          toast.error("Vous n'avez pas accès à ce tableau de bord");
+          router.push(`/tournaments/${tournamentId}`);
+        }
+      });
+    }
+  }, [tournamentId, user, authLoading, router]);
+
+  if (authLoading || !tournament || isOrganizer === null) {
     return <PageSkeleton type="dashboard" />;
+  }
+
+  if (isOrganizer === false) {
+    return null;
   }
 
   // Obtenir les données de navigation
@@ -49,13 +70,10 @@ export default function TournamentDashboardLayout({
     ...navData.settingsItems,
   ];
 
-  // Trouver l'item actif pour le titre du header
-  const activeItem = allItems.find(
-    (item) => item.url && isActive(item.url, false)
-  );
-  const pageTitle = activeItem?.title || tournament?.name || "Tournoi";
-  const pageDescription =
-    activeItem?.description || `Tableau de bord du tournoi`;
+  // Utiliser le hook pour détecter l'item actif
+  const activeTitle = getActiveTitle(allItems);
+  const pageTitle = activeTitle || tournament?.name || "Tournoi";
+  const pageDescription = `Tableau de bord du tournoi`;
 
   const TournamentSidebar = (
     <div className="flex flex-col h-full bg-gradient-to-br from-blue-900 to-purple-900 text-white">

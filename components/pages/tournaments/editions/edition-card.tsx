@@ -13,6 +13,9 @@ import {
   MapPin,
   Clock,
   ArrowUpRight,
+  Edit,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -23,11 +26,20 @@ import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import type { TournamentEdition } from "@/database/schema";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface EditionCardProps {
   edition: TournamentEdition;
   tournamentId?: string;
   onView?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  isDashboard?: boolean;
   className?: string;
 }
 
@@ -58,6 +70,9 @@ export function EditionCard({
   edition,
   tournamentId,
   onView,
+  onEdit,
+  onDelete,
+  isDashboard,
   className,
 }: EditionCardProps) {
   const router = useRouter();
@@ -79,20 +94,11 @@ export function EditionCard({
       className={cn("group h-full", className)}
     >
       <Card
-        className="h-full overflow-hidden border-border/50 bg-card hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300"
-        onClick={handleNavigate}
+        className="h-full overflow-hidden border-border/50 bg-card hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300 relative"
       >
         {/* Banner with Status */}
-        <div className="relative h-32 overflow-hidden">
-          {/* {edition.bannerImage ? (
-            <Image
-              src={edition.bannerImage}
-              alt={edition.name || `Édition #${edition.editionNumber}`}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-110"
-            />
-          ) : (
-          )} */}
+        <div className="relative h-32 overflow-hidden" onClick={handleNavigate}>
+          {/* ... existing banner content ... */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/5 to-purple-500/20 flex items-center justify-center">
             <Trophy className="w-10 h-10 text-primary/40" />
           </div>
@@ -111,7 +117,34 @@ export function EditionCard({
           </div>
         </div>
 
-        <CardContent className="p-4 flex flex-col h-[calc(100%-8rem)]">
+        {isDashboard && (
+          <div className="absolute top-2 right-2 z-20">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 bg-black/40 text-white hover:bg-black/60 backdrop-blur-md">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}/dashboard/settings`)}>
+                  <Edit className="h-4 w-4 mr-2" /> Modifier
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}/dashboard`)}>
+                  <ChevronRight className="h-4 w-4 mr-2" /> Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-destructive" 
+                  onClick={() => onDelete?.(edition.id)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
+        <CardContent className="p-4 flex flex-col h-[calc(100%-8rem)]" onClick={handleNavigate}>
+          {/* ... existing content ... */}
           <div className="flex-1 space-y-4">
             <div>
               <Typography variant="h5" weight="bold" className="line-clamp-1 mb-1 group-hover:text-primary transition-colors">

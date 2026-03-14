@@ -16,6 +16,7 @@ import {
   Clock,
   Ban,
   ArrowLeft,
+  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,10 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
     router,
   ]);
 
+  const handleRefreshStatus = () => {
+    router.refresh();
+  };
+
   // États de chargement
   if (loading || (!walletCheckComplete && isAuthenticated)) {
     return (
@@ -117,12 +122,12 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
   }
 
   if (walletStatus?.is_locked) {
-    return <WalletLockedScreen walletStatus={walletStatus} />;
+    return <WalletLockedScreen walletStatus={walletStatus} onRefresh={handleRefreshStatus} />;
   }
 
   if (walletStatus?.is_active === false) {
     // Explicite false check
-    return <WalletInactiveScreen walletStatus={walletStatus} />;
+    return <WalletInactiveScreen walletStatus={walletStatus} onRefresh={handleRefreshStatus} />;
   }
 
   if (
@@ -132,7 +137,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
     if (pathname === "/wallet/verification") {
       return children;
     }
-    return <WalletVerificationScreen walletStatus={walletStatus} />;
+    return <WalletVerificationScreen walletStatus={walletStatus} onRefresh={handleRefreshStatus} />;
   }
 
   // Tout est bon, afficher le layout normal
@@ -263,13 +268,18 @@ function WalletCreationScreen({ user }: { user: any }) {
 }
 
 // Écran wallet verrouillé
-function WalletLockedScreen({ walletStatus }: { walletStatus: any }) {
+function WalletLockedScreen({ walletStatus, onRefresh }: { walletStatus: any; onRefresh?: () => void }) {
   const router = useRouter();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full border-destructive/20 border-2">
         <CardContent className="p-4 text-center space-y-4">
+          <div className="flex justify-end">
+            <Button variant="ghost" size="icon" onClick={onRefresh} title="Rafraîchir">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="w-20 h-20 mx-auto rounded-full bg-destructive/10 flex items-center justify-center mb-4">
             <Lock className="h-10 w-10 text-destructive" />
           </div>
@@ -329,13 +339,18 @@ function WalletLockedScreen({ walletStatus }: { walletStatus: any }) {
 }
 
 // Écran wallet inactif
-function WalletInactiveScreen({ walletStatus }: { walletStatus: any }) {
+function WalletInactiveScreen({ walletStatus, onRefresh }: { walletStatus: any; onRefresh?: () => void }) {
   const router = useRouter();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardContent className="p-4 text-center space-y-4">
+          <div className="flex justify-end">
+            <Button variant="ghost" size="icon" onClick={onRefresh} title="Rafraîchir">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="w-20 h-20 mx-auto rounded-full bg-yellow-100 flex items-center justify-center mb-4">
             <Clock className="h-10 w-10 text-yellow-600" />
           </div>
@@ -385,13 +400,18 @@ function WalletInactiveScreen({ walletStatus }: { walletStatus: any }) {
 }
 
 // Écran vérification wallet
-function WalletVerificationScreen({ walletStatus }: { walletStatus: any }) {
+function WalletVerificationScreen({ walletStatus, onRefresh }: { walletStatus: any; onRefresh?: () => void }) {
   const router = useRouter();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardContent className="p-4 text-center space-y-4">
+          <div className="flex justify-end">
+            <Button variant="ghost" size="icon" onClick={onRefresh} title="Rafraîchir">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 flex items-center justify-center mb-4">
             <Shield className="h-10 w-10 text-blue-600" />
           </div>

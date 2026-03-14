@@ -501,8 +501,8 @@ export function TournamentPageContent() {
                     {isMember
                       ? "Déjà membre"
                       : pendingRequest
-                      ? "En attente"
-                      : "Rejoindre"}
+                        ? "En attente"
+                        : "Rejoindre"}
                   </Button>
                   <InteractionButton
                     type="follow"
@@ -1335,7 +1335,7 @@ export function TournamentPageContent() {
                 <Typography variant="h3" weight="bold">
                   Tournois similaires
                 </Typography>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {similarTournaments.map((t) => (
                     <TournamentCard key={t.id} tournament={t} />
                   ))}

@@ -208,6 +208,7 @@ function CreateWalletLegacy() {
             onClick: () => {
               setDialogOpen(false);
               if (dialogError) return;
+              router.refresh(); // Rafraîchir pour mettre à jour le statut du wallet
               router.push("/wallet");
             },
             primary: true,
@@ -366,11 +367,17 @@ export default function CreateWalletPage() {
           }
           confetti={dialogError ? "none" : "celebration"}
           primaryAction={{
-            label: dialogError ? "Réessayer" : "completer le wallet",
+            label: dialogError ? "Réessayer" : "Completer le wallet",
             onClick: () => {
               setDialogOpen(false);
               if (dialogError) return;
-              router.push("/wallet/verification");
+              router.refresh(); // Rafraîchir pour mettre à jour le statut du wallet
+              const requireVerification = process.env.NEXT_PUBLIC_REQUIRE_WALLET_VERIFICATION === 'true';
+              if (requireVerification) {
+                router.push("/wallet/verification");
+              } else {
+                router.push("/wallet");
+              }
             },
             primary: true,
           }}
@@ -613,8 +620,13 @@ export default function CreateWalletPage() {
 
         // Redirection après succès
         setTimeout(() => {
-          router.push("/wallet/dashboard?welcome=true");
-          // router.push("/wallet/dashboard?welcome=true");
+          router.refresh(); // Rafraîchir pour mettre à jour le statut du wallet
+          const requireVerification = process.env.NEXT_PUBLIC_REQUIRE_WALLET_VERIFICATION === 'true';
+          if (requireVerification) {
+            router.push("/wallet/verification");
+          } else {
+            router.push("/wallet");
+          }
         }, 2000);
       } else {
         throw new Error(result.error || "Erreur lors de la création");

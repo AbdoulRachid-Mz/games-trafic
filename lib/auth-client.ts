@@ -12,10 +12,14 @@ export const authClient = createAuthClient({
     lastLoginMethodClient(),
     passkeyClient(),
     oneTapClient({
-      clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!, // Votre Google Client ID
+      clientId: process.env.GOOGLE_CLIENT_ID!, // Votre Google Client ID
       autoSelect: false,
       cancelOnTapOutside: true,
       context: "signin",
+      promptOptions: {
+				baseDelay: 1000, // Base delay in ms (default: 1000)
+				maxAttempts: 5 // Maximum number of attempts before triggering onPromptNotification (default: 5)
+			}
     })
   ]
 })

@@ -59,7 +59,7 @@ export function MainLayout({
   const topPadding =
     topMiddle && !shouldExcludeContainer && breadcrumbs
       ? "pt-20"
-      : "pt-10";
+      : "";
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);
   const closeRight = useCallback(() => setRightOpen(false), []);

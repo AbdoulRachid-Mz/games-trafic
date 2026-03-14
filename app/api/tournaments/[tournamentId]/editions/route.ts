@@ -2,18 +2,22 @@ import { NextRequest } from "next/server";
 import { type TournamentEditionFilters } from "@/types/api";
 import { getTournamentEditions } from "@/actions/tournaments";
 
-export async function GET(req: NextRequest, { params }: { params: Promise<
-  { tournamentId: string }> }) {
+export async function GET(req: NextRequest, { params }: {
+  params: Promise<
+    { tournamentId: string }>
+}) {
   const { searchParams } = new URL(req.url);
   const page = Number(searchParams.get("page") ?? "1");
   const limit = Number(searchParams.get("limit") ?? "20");
   const sortBy = searchParams.get("sortBy") ?? "startDate";
   const sortOrder = (searchParams.get("sortOrder") ?? "desc") as "asc" | "desc";
+  const status = searchParams.get("status");
 
-  const {tournamentId} =  await params
+  const { tournamentId } = await params;
   const filters: TournamentEditionFilters = {
     tournamentId: tournamentId,
     isDeleted: false,
+    statuses: status ? (status.split(",") as any[]) : undefined,
   };
 
   const result = await getTournamentEditions({

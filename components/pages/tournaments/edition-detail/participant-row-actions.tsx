@@ -2,10 +2,19 @@
 
 import React, { useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Trash2, CheckCircle, XCircle, CreditCard, UserCheck, MoreHorizontal, UserX } from "lucide-react";
 import { deleteEditionRegistrationAction } from "@/actions/editions";
 import { updateEditionRegistration } from "@/actions/tournaments";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ParticipantRowActionsProps {
     registrationId: string;
@@ -69,49 +78,72 @@ export function ParticipantRowActions({
     };
 
     return (
-        <div className="flex items-center justify-end gap-1">
-            <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={handleToggleCheckin}
-                disabled={isPending}
-            >
-                {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : checkedIn ? "Undo" : "Check-in"}
-            </Button>
-            <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={handleToggleFeePaid}
-                disabled={isPending}
-            >
-                {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : feePaid ? "Impayé" : "Payé"}
-            </Button>
-
-            {status !== "ELIMINATED" && (
+        <div className="flex items-center justify-end gap-2">
+            <div className="hidden lg:flex items-center gap-1.5">
                 <Button
-                    variant="ghost"
+                    variant={checkedIn ? "secondary" : "outline"}
                     size="sm"
-                    className="h-7 w-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                    onClick={() => handleSetStatus("ELIMINATED")}
+                    className={cn(
+                        "h-8 gap-1.5",
+                        checkedIn ? "bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20" : ""
+                    )}
+                    onClick={handleToggleCheckin}
                     disabled={isPending}
-                    title="Éliminer"
                 >
-                    <XCircle className="h-3.5 w-3.5" />
+                    {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                    {checkedIn ? "Checked" : "Check-in"}
                 </Button>
-            )}
 
-            <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50"
-                onClick={handleDelete}
-                disabled={isPending}
-                title="Supprimer"
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+                <Button
+                    variant={feePaid ? "secondary" : "outline"}
+                    size="sm"
+                    className={cn(
+                        "h-8 gap-1.5",
+                        feePaid ? "bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20" : ""
+                    )}
+                    onClick={handleToggleFeePaid}
+                    disabled={isPending}
+                >
+                    {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />}
+                    {feePaid ? "Payé" : "Payer"}
+                </Button>
+            </div>
+
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isPending}>
+                        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel>Actions Participant</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleToggleCheckin}>
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        {checkedIn ? "Annuler Check-in" : "Confirmer Check-in"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleToggleFeePaid}>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        {feePaid ? "Marquer impayé" : "Marquer payé"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleSetStatus(status === "PARTICIPATED" ? "REGISTERED" : "PARTICIPATED")}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {status === "PARTICIPATED" ? "Rendre Inscrit" : "Rendre Participant"}
+                    </DropdownMenuItem>
+                    {status !== "ELIMINATED" && (
+                        <DropdownMenuItem className="text-amber-600" onClick={() => handleSetStatus("ELIMINATED")}>
+                            <UserX className="h-4 w-4 mr-2" />
+                            Éliminer
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Retirer de l'édition
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
     );
 }

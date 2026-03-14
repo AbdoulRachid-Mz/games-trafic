@@ -236,6 +236,136 @@ export async function getUsers(params: EntityQueryParams = {}) {
 }
 
 /**
+ * Fonction optimisée pour récupérer des wallets
+ */
+// @/actions/entities.ts
+export async function getWallets(params: EntityQueryParams = {}) {
+  const walletTable = schema.userWallets;
+  const userTable = schema.users;
+  const financialTable = schema.financialAccounts;
+  const conditions: any[] = [];
+
+  // Filtres spécifiques aux wallets
+  if (params.userId) {
+    conditions.push(eq(walletTable.userId, params.userId));
+  }
+
+  if (params.financialAccountId) {
+    conditions.push(eq(walletTable.financialAccountId, params.financialAccountId));
+  }
+
+  if (params.cardNumberHash) {
+    conditions.push(eq(walletTable.cardNumberHash, params.cardNumberHash));
+  }
+
+  if (params.verificationStatus) {
+    conditions.push(eq(walletTable.verificationStatus, params.verificationStatus));
+  }
+
+  if (params.isActive !== undefined) {
+    conditions.push(eq(walletTable.isActive, params.isActive));
+  }
+
+  if (params.isLocked !== undefined) {
+    conditions.push(eq(walletTable.isLocked, params.isLocked));
+  }
+
+  if (params.search) {
+    // Recherche dans les champs texte pertinents
+    conditions.push(
+      or(
+        like(walletTable.identityDocumentType, `%${params.search}%`),
+        like(walletTable.identityDocumentUrl, `%${params.search}%`)
+      )!
+    );
+  }
+
+  // Filtres de base
+  if (params.isDeleted !== undefined) {
+    conditions.push(eq(walletTable.isDeleted, params.isDeleted));
+  } else {
+    // Par défaut, exclure les éléments supprimés
+    conditions.push(eq(walletTable.isDeleted, false));
+  }
+
+  // Pagination
+  const page = params.page || 1;
+  const limit = params.limit || 20;
+  const offset = (page - 1) * limit;
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // Compter le total
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(walletTable)
+    .where(whereClause);
+
+  // Construire l'ordre de tri
+  const orderBy = buildOrderBy(walletTable, params.sortBy, params.sortOrder);
+
+  // Récupérer les données avec les relations
+  let query = db
+    .select({
+      id: walletTable.id,
+      userId: walletTable.userId,
+      financialAccountId: walletTable.financialAccountId,
+      cardNumberHash: walletTable.cardNumberHash,
+      pinHash: walletTable.pinHash,
+      isActive: walletTable.isActive,
+      isLocked: walletTable.isLocked,
+      isDeleted: walletTable.isDeleted,
+      failedAttempts: walletTable.failedAttempts,
+      lastFailedAttempt: walletTable.lastFailedAttempt,
+      identityDocumentType: walletTable.identityDocumentType,
+      identityDocumentUrl: walletTable.identityDocumentUrl,
+      verificationStatus: walletTable.verificationStatus,
+      verifiedAt: walletTable.verifiedAt,
+      createdAt: walletTable.createdAt,
+      updatedAt: walletTable.updatedAt,
+      user: {
+        id: userTable.id,
+        email: userTable.email,
+        username: userTable.username,
+        fullName: userTable.fullName,
+        profileImage: userTable.profileImage,
+      },
+      financialAccount: {
+        id: financialTable.id,
+        ownerUserId: financialTable.ownerUserId,
+        type: financialTable.type,
+        currency: financialTable.currency,
+        isActive: financialTable.isActive,
+        isLocked: financialTable.isLocked,
+      },
+    })
+    .from(walletTable)
+    .where(whereClause)
+    .leftJoin(userTable, eq(walletTable.userId, userTable.id))
+    .leftJoin(financialTable, eq(walletTable.financialAccountId, financialTable.id));
+
+  if (orderBy) {
+    query = query.orderBy(orderBy) as any;
+  }
+
+  const data = await query.limit(limit).offset(offset);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total: Number(total),
+      totalPages: Math.ceil(Number(total) / limit),
+      hasNext: page < Math.ceil(Number(total) / limit),
+      hasPrev: page > 1,
+    },
+  };
+}
+
+
+
+/**
  * Fonction optimisée pour récupérer des shops
  */
 export async function getShops(params: EntityQueryParams = {}) {

@@ -58,10 +58,10 @@ export default function Footer() {
                   <Image
                   src="/images/icons/app/gt-gold.png"
                   alt="Gamers Trafics"
-                  width={60}
-                  height={60}
-                  fill={true}
-                  className="w-full aspect-square" 
+                  width={100}
+                  height={100}
+                  // fill={true}
+                  className="w-24 h-24 aspect-square" 
                 />
               </div>
               {/* <span className="text-xl font-bold tracking-tighter uppercase">

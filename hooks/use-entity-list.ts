@@ -44,7 +44,8 @@ export type EntityType =
   | "claims"
   | "subscriptions"
   | "game-clips"
-  | "partners";
+  | "partners"
+  | "userWallets";
 
 export interface UseEntityListProps<T> {
   entityType: EntityType;
