@@ -78,7 +78,7 @@ export function FollowersList({ userId, currentUserId }: FollowersListProps) {
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
                     <AvatarImage
-                      src={follower.image || ""}
+                      src={follower.profileImage || ""}
                       alt={follower.username + " avatar"}
                     />
                     <AvatarFallback>

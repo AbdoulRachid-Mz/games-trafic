@@ -148,8 +148,8 @@ export function ClientGameClipsContent() {
           {/* Tabs */}
           <div className="flex border-b border-white/10 bg-black/20">
             {[
-              { id: "comments", icon: MessageCircle, label: "Commentaires", count: currentClip.commentsCount },
-              { id: "likes", icon: Heart, label: "J'aime", count: currentClip.likesCount },
+              { id: "comments", icon: MessageCircle, label: "Commentaires", count: currentClip.stats?.commentsCount || 0 },
+              { id: "likes", icon: Heart, label: "J'aime", count: currentClip.stats?.likesCount || 0 },
             ].map((tab) => (
               <button
                 key={tab.id}

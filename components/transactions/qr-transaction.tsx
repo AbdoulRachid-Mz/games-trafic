@@ -24,10 +24,11 @@ export function QrTransaction() {
       const params = new URLSearchParams();
       params.set("type", decoded.t);
       params.set("entityId", decoded.id);
+      params.set("image", decoded.i || "")
       if (typeof decoded.a === "number") {
         params.set("amount", decoded.a.toString());
       }
-      router.push(`/wallet/transactions/create?${params.toString()}`);
+      // router.push(`/wallet/transactions/create?${params.toString()}`);
     } catch {
       toast.error("QR invalide");
     }

@@ -7,11 +7,17 @@ import {
   shops,
   userWallets,
 } from '@/database/schema';
-import { and, eq, inArray, sql, SQL } from 'drizzle-orm';
-import { OrderFilters, OrderStats, OrderStatus } from '@/types/api';
+import { and, count, eq, inArray, sql, SQL } from 'drizzle-orm';
+import { OrderFilters, OrderStats, OrderStatus, PaginationResponse } from '@/types/api';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
 import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from '@/lib/ledger/ledger-utils';
+import {
+  type OrderCard, type UserMini, type ShopMini,
+  USER_MINI_COLUMNS, SHOP_MINI_COLUMNS, ORDER_CARD_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
+import { cacheLife, cacheTag } from 'next/cache';
 
 /**
  * Creates a new product order and reserves the product.
@@ -319,10 +325,20 @@ export async function getOrdersByShopId(
       return conds.length > 1 ? and(...conds) : conds[0];
     };
 
-    const [data, [{ total }]] = await Promise.all([
+    const [data, totalResult] = await Promise.all([
       db.query.orders.findMany({
         where: whereClause,
-        with: { product: true, buyer: true },
+        with: {
+          product: {
+            columns: {
+              id: true,
+              name: true,
+              featuredImage: true,
+              price: true,
+            }
+          },
+          buyer: { columns: USER_MINI_COLUMNS },
+        },
         orderBy: (orders, { desc }) => [desc(orders.createdAt)],
         limit,
         offset,
@@ -332,6 +348,7 @@ export async function getOrdersByShopId(
         .from(orders)
         .where(whereClause(orders, { eq, and, inArray })),
     ]);
+    const total = totalResult[0]?.total || 0;
 
     return {
       data,
@@ -353,48 +370,56 @@ export async function getOrdersByShopId(
 /**
  * Récupère les commandes avec filtres (Admin/General)
  */
-export async function getOrders(filters: OrderFilters = {}) {
+export async function getOrders(
+  filters: OrderFilters = {}
+): Promise<PaginationResponse<OrderCard>> {
+  'use cache';
+  cacheTag('orders');
+  cacheLife('minutes');
   try {
-    // Note: This is a simplified version. A full version should map Filter interface to SQL.
     const results = await db.query.orders.findMany({
+      columns: ORDER_CARD_COLUMNS,
       where: (orders, { eq, and, inArray }) => {
-        const conds: SQL[] = [];
-        if (filters.shopId) conds.push(eq(orders.shopId, filters.shopId));
-        if (filters.buyerId) conds.push(eq(orders.buyerId, filters.buyerId));
-
-        // Handle single status
+        const conds: any[] = [];
         if (filters.status) {
-          conds.push(eq(orders.status, filters.status as any));
+          const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+          conds.push(inArray(orders.status, statuses));
         }
-
-        // Handle statuses array
-        if (filters.statuses && filters.statuses.length > 0) {
-          conds.push(inArray(orders.status, filters.statuses as any[]));
-        }
-
-        return conds.length ? and(...conds) : undefined;
+        if (filters.buyerId) conds.push(eq(orders.buyerId, filters.buyerId));
+        if (filters.shopId) conds.push(eq(orders.shopId, filters.shopId));
+        return and(...conds);
       },
       with: {
-        shop: true,
-        buyer: true,
-        product: true,
+        buyer: { columns: USER_MINI_COLUMNS },
+        shop: { columns: SHOP_MINI_COLUMNS },
+        product: {
+          columns: {
+            id: true,
+            name: true,
+            featuredImage: true,
+            price: true,
+          }
+        },
       },
       orderBy: (orders, { desc }) => [desc(orders.createdAt)],
-      limit: (filters as any).limit || 50,
+      limit: filters.limit || PAGINATION_DEFAULTS.FEED,
+      offset: filters.page ? (filters.page - 1) * (filters.limit || PAGINATION_DEFAULTS.FEED) : 0,
     });
 
-    // Wrap in standard response format if needed, or just return array
-    // Based on types/api.ts, we usually return PaginationResponse. 
-    // Adapting to PaginationResponse:
+    const totalResult = await db.select({ count: count() }).from(orders);
+    const total = totalResult[0]?.count || 0;
+    const limit = filters.limit || PAGINATION_DEFAULTS.FEED;
+    const totalPages = Math.ceil(total / limit);
+
     return {
-      data: results,
+      data: results as OrderCard[],
       pagination: {
-        page: 1,
-        limit: filters.limit || 50,
-        total: results.length, // Approximation
-        totalPages: 1,
-        hasNext: false,
-        hasPrev: false
+        page: filters.page || 1,
+        limit,
+        total,
+        totalPages,
+        hasNext: (filters.page || 1) < totalPages,
+        hasPrev: (filters.page || 1) > 1
       }
     };
   } catch (error) {
@@ -586,10 +611,20 @@ export async function getOrdersByBuyerId(
       return conds.length > 1 ? and(...conds) : conds[0];
     };
 
-    const [data, [{ total }]] = await Promise.all([
+    const [data, totalResult] = await Promise.all([
       db.query.orders.findMany({
         where: whereClause,
-        with: { shop: true, product: true },
+        with: {
+          shop: { columns: SHOP_MINI_COLUMNS },
+          product: {
+            columns: {
+              id: true,
+              name: true,
+              featuredImage: true,
+              price: true,
+            }
+          }
+        },
         orderBy: (orders, { desc }) => [desc(orders.createdAt)],
         limit,
         offset,
@@ -599,6 +634,7 @@ export async function getOrdersByBuyerId(
         .from(orders)
         .where(whereClause(orders, { eq, and, inArray })),
     ]);
+    const total = totalResult[0]?.total || 0;
 
     return {
       data,
@@ -625,9 +661,21 @@ export async function getOrderById(orderId: string) {
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, orderId),
       with: {
-        shop: true,
-        buyer: true,
-        product: true,
+        shop: { columns: SHOP_MINI_COLUMNS },
+        buyer: { columns: USER_MINI_COLUMNS },
+        product: {
+          columns: {
+            id: true,
+            name: true,
+            featuredImage: true,
+            price: true,
+            description: true,
+            images: true,
+            game: true,
+            platform: true,
+            status: true,
+          }
+        },
       },
     });
 

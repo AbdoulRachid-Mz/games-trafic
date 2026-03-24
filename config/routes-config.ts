@@ -142,6 +142,18 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     styleGroup: "docs",
   },
   {
+    path: ["/docs", "/docs/guides", "/docs/guides/**"],
+    name: "Documentation - Guides",
+    excludeLayout: true,
+    styleGroup: "docs",
+  },
+  {
+    path: ["/docs", "/docs/legal", "/docs/legal/**"],
+    name: "Documentation - Terms",
+    excludeLayout: true,
+    styleGroup: "docs",
+  },
+  {
     path: ["/admin", "/admin/**"],
     name: "Admin",
     excludeLayout: true,

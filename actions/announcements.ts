@@ -33,6 +33,13 @@ import {
   type QueryOptions,
 } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type AnnouncementCard, type UserMini,
+  ANNOUNCEMENT_CARD_COLUMNS, USER_MINI_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -45,16 +52,19 @@ export async function getAnnouncementById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<Announcement | null> {
+  'use cache';
+  cacheTag(`announcement-${id}`, 'announcements');
+  cacheLife('minutes');
   try {
     if (options?.populate && options.populate.length > 0) {
-      const query = db.query.announcements.findFirst({
+      const result = await db.query.announcements.findFirst({
         where: (announcements, { eq }) => eq(announcements.id, id),
         with: {
-          author: options.populate.includes('author') ? true : undefined,
+          author: options.populate.includes('author') ? { columns: USER_MINI_COLUMNS } : undefined,
           reads: options.populate.includes('reads') ? true : undefined,
         },
       });
-      return (await query) ?? null;
+      return result ? result as unknown as Announcement : null;
     }
 
     const result = await db
@@ -75,10 +85,13 @@ export async function getAnnouncementById(
  */
 export async function getAnnouncements(
   query: ListQuery<AnnouncementFilters> = {}
-): Promise<PaginationResponse<Announcement>> {
+): Promise<PaginationResponse<AnnouncementCard>> {
+  'use cache';
+  cacheTag('announcements');
+  cacheLife('minutes');
   try {
     const {
-      pagination = { page: 1, limit: 20 },
+      pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED },
       filters = {},
       options = {},
     } = query;
@@ -88,35 +101,24 @@ export async function getAnnouncements(
     // Construction des conditions WHERE
     const whereConditions = buildAnnouncementWhereConditions(filters, options);
 
-    // Requête pour les données
-    const announcementsQuery = db
-      .select()
-      .from(announcements)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    // Application du tri
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Announcement;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      announcementsQuery.orderBy(sortOrder(announcements[sortField]));
-    } else {
-      announcementsQuery.orderBy(
-        desc(announcements.isPinned),
-        desc(announcements.createdAt)
-      );
-    }
-
-    // Requête pour le count total
-    const countQuery = db
-      .select({ count: count() })
-      .from(announcements)
-      .where(whereConditions);
-
     const [announcementsData, totalResult] = await Promise.all([
-      announcementsQuery,
-      countQuery,
+      db.query.announcements.findMany({
+        columns: ANNOUNCEMENT_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (announcements, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((announcements as any)[sortField]) : asc((announcements as any)[sortField])];
+          }
+          return [desc(announcements.isPinned), desc(announcements.createdAt)];
+        },
+        with: options.populate?.includes('author')
+          ? { author: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(announcements).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
@@ -143,6 +145,9 @@ export async function getAnnouncements(
  * Récupère les statistiques des annonces
  */
 export async function getAnnouncementStats(filters?: AnnouncementFilters) {
+  'use cache';
+  cacheTag('announcements', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildAnnouncementWhereConditions(filters || {});
 
@@ -320,6 +325,7 @@ export async function createAnnouncement(
       })
       .returning();
 
+    revalidateTag('announcements', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating announcement:', error);
@@ -353,6 +359,8 @@ export async function updateAnnouncement(
       .where(eq(announcements.id, id))
       .returning();
 
+    revalidateTag('announcements', 'max');
+    revalidateTag(`announcement-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating announcement:', error);
@@ -387,6 +395,8 @@ export async function deleteAnnouncement(id: string): Promise<Announcement> {
       .delete(announcementReads)
       .where(eq(announcementReads.announcementId, id));
 
+    revalidateTag('announcements', 'max');
+    revalidateTag(`announcement-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting announcement:', error);
@@ -416,6 +426,8 @@ export async function restoreAnnouncement(id: string): Promise<Announcement> {
       throw new Error('Announcement not found');
     }
 
+    revalidateTag('announcements', 'max');
+    revalidateTag(`announcement-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring announcement:', error);

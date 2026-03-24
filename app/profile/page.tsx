@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PasskeyRecommendation } from "@/components/auth/passkey-recommendation";
-import { useEntityInteractionCounts } from "@/hooks/use-interactions";
+import { useEntityInteractionCounts, useInteractionStats } from "@/hooks/use-interactions";
 import { ProfileHeader } from "@/components/pages/profile/new/profile-header";
 import { ProfileTabs } from "@/components/pages/profile/new/profile-tabs";
 
@@ -16,11 +16,16 @@ export default function ProfilePage() {
     mode: "full",
   });
   const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
+  const [activeTab, setActiveTab] = useState("about");
 
   const { data: counts } = useEntityInteractionCounts(
     profile?.id || "",
     "USER"
   );
+  
+  const { data: stats } = useInteractionStats({
+    userId: profile?.id || ""
+  });
 
   // Calculer le pourcentage de complétion du profil
   const calculateProfileCompletion = () => {
@@ -29,7 +34,7 @@ export default function ProfilePage() {
     const fields = [
       profile.fullName,
       profile.bio,
-      profile.image || profile.profileImage,
+      profile.image || profile.profileImage || `/images/icons/avatar/man.png`,
       profile.coverImage || "/images/default-cover.jpg",
       profile.website,
       profile.socialMedia && Array.isArray(profile.socialMedia) && profile.socialMedia.length > 0,
@@ -83,8 +88,9 @@ export default function ProfilePage() {
           isOwnProfile
           profileCompletion={profileCompletion}
           followersCount={counts?.FOLLOW || 0}
-          followingCount={0} // À implémenter
+          followingCount={stats?.follows || 0}
           postsCount={profile.posts?.length || 0}
+          onTabChange={setActiveTab}
           onUpdateCover={async (url) => {
             // Logique de mise à jour
             await refresh();
@@ -98,6 +104,8 @@ export default function ProfilePage() {
         <ProfileTabs
           profileUser={profile}
           isOwnProfile
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           className="mt-6"
         />
 

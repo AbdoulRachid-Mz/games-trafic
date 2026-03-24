@@ -215,7 +215,6 @@ export default function AdminWalletsPage() {
                                 </Avatar>
                                 <div>
                                     <div className="font-medium">@{wallet.user?.username}</div>
-                                    <div className="text-xs text-muted-foreground">{wallet.user?.email}</div>
                                 </div>
                             </div>
                         </td>
@@ -259,7 +258,6 @@ export default function AdminWalletsPage() {
                                     </Avatar>
                                     <div>
                                         <div className="font-bold">@{wallet.user?.username ?? "N/A"}</div>
-                                        <div className="text-xs text-muted-foreground">{wallet.user?.email}</div>
                                     </div>
                                 </div>
                                 <WalletActions
@@ -310,7 +308,6 @@ export default function AdminWalletsPage() {
                                             <div>
                                                 <div className="font-bold text-lg">@{selectedWallet.user?.username}</div>
                                                 <div className="text-sm text-muted-foreground">{selectedWallet.user?.fullName ?? "N/A"}</div>
-                                                <div className="text-sm text-muted-foreground">{selectedWallet.user?.email}</div>
                                             </div>
                                         </div>
                                     </div>

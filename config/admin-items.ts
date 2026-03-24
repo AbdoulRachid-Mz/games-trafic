@@ -33,6 +33,7 @@ import {
   BookOpen,
   LifeBuoy,
   AlertCircle,
+  Image,
 } from "lucide-react";
 
 // ============================================================================
@@ -327,6 +328,15 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/categories",
     icon: Tag,
     description: "Catégories et tags",
+    requiredLevel: 'B',
+  },
+  // médias
+  {
+    id: "media",
+    label: "Médias",
+    path: "/admin/media",
+    icon: Image,
+    description: "Gestion des médias",
     requiredLevel: 'B',
   },
 

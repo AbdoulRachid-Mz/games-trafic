@@ -6,8 +6,6 @@ import { ServiceCard } from "@/components/cards/service-card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
-//revalidate
-export const revalidate = 60;
 
 export default async function ServicesPage() {
   const result = await getServices({

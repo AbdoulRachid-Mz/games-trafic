@@ -118,7 +118,7 @@ export default async function BlogDetailPage({
             <CardContent className="p-8">
               <div className="flex items-start gap-6">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={blog.author.image || ""} />
+                  <AvatarImage src={blog.author.profileImage || ""} />
                   <AvatarFallback className="text-2xl">
                     <User className="h-10 w-10" />
                   </AvatarFallback>

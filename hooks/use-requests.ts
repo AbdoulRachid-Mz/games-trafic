@@ -9,13 +9,14 @@ import {
   getUserRequests,
   getRequestStats,
   createRequest,
+  getRequests,
 } from "@/actions/requests";
 import {
   type RequestFilters,
   type ListQuery,
   type PaginationResponse,
 } from "@/types/api";
-import { type Request, type NewRequest } from "@/database/schema";
+import { type Request, type NewRequest, type RequestWithRelations } from "@/database/schema";
 
 // Query keys factory for consistent caching
 const requestKeys = {
@@ -23,6 +24,9 @@ const requestKeys = {
   lists: () => [...requestKeys.all, "list"] as const,
   list: (filters: RequestFilters | undefined) =>
     [...requestKeys.lists(), filters] as const,
+  adminLists: () => [...requestKeys.all, "admin-list"] as const,
+  adminList: (filters: RequestFilters | undefined) =>
+    [...requestKeys.adminLists(), filters] as const,
   details: () => [...requestKeys.all, "detail"] as const,
   detail: (id: string) => [...requestKeys.details(), id] as const,
   stats: () => [...requestKeys.all, "stats"] as const,
@@ -34,6 +38,21 @@ const requestKeys = {
 // ============================================================================
 // HOOKS - Lectures optimisées
 // ============================================================================
+
+/**
+ * Hook pour récupérer les requêtes paginées (Admin)
+ */
+export function useRequests(
+  query: ListQuery<RequestFilters> = {},
+  options?: { enabled?: boolean },
+) {
+  return useQuery<PaginationResponse<RequestWithRelations>, Error>({
+    queryKey: requestKeys.adminList(query.filters),
+    queryFn: () => getRequests(query),
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled: options?.enabled !== false,
+  });
+}
 
 /**
  * Hook pour récupérer une requête par son ID avec cache et invalidation automatique
@@ -60,7 +79,7 @@ export function useUserRequests(
   query: ListQuery<RequestFilters> = {},
   options?: { keepPreviousData?: boolean },
 ) {
-  return useQuery<PaginationResponse<Request>, Error>({
+  return useQuery<PaginationResponse<RequestWithRelations>, Error>({
     queryKey: requestKeys.list({ ...query.filters, userId }),
     queryFn: () => getUserRequests(userId, query),
     staleTime: 1000 * 60 * 3, // 3 minutes
@@ -101,11 +120,11 @@ export function useInfiniteUserRequests(
   filters?: RequestFilters,
   limit = 20,
 ) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<PaginationResponse<RequestWithRelations>>({
     queryKey: requestKeys.infinite(),
     queryFn: ({ pageParam = 1 }) =>
       getUserRequests(userId, {
-        pagination: { page: pageParam, limit },
+        pagination: { page: pageParam as number, limit },
         filters,
       }),
     getNextPageParam: (lastPage) =>

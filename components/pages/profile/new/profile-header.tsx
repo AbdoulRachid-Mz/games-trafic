@@ -18,6 +18,7 @@ interface ProfileHeaderProps {
   followingCount?: number;
   postsCount?: number;
   className?: string;
+  onTabChange?: (tab: string) => void;
   onUpdateCover?: (url: string) => Promise<void>;
   onUpdateAvatar?: (url: string) => Promise<void>;
   onUpdateInfo?: (data: Partial<UserWithAllRelations>) => Promise<void>;
@@ -31,6 +32,7 @@ export function ProfileHeader({
   followingCount = 0,
   postsCount = 0,
   className,
+  onTabChange,
   onUpdateCover,
   onUpdateAvatar,
   onUpdateInfo,
@@ -91,6 +93,7 @@ export function ProfileHeader({
           className="mt-6"
           userId={user.id}
           isOwnProfile={isOwnProfile}
+          onTabChange={onTabChange}
         />
       </div>
     </motion.div>

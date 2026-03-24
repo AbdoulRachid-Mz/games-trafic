@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertCircle,
   CheckCircle,
@@ -29,7 +30,8 @@ import {
   TrendingDown,
   MoreHorizontal,
   Eye,
-  EyeOff
+  EyeOff,
+  Gamepad2
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -48,8 +50,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  getRequests,
-  getRequestStats,
+  useRequests,
+  useRequestStats,
+} from "@/hooks/use-requests";
+import {
   approveRequest,
   rejectRequest,
   getRequestCredentialsForAdmin,
@@ -58,13 +62,15 @@ import { createNotification } from "@/actions/notifications";
 import { refundTransaction } from "@/actions/transactions";
 import { useAuthContext } from "@/contexts/auth-context";
 import { Label } from "@/components/ui/label";
+import { RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function AdminRequestsPage() {
   const { user: auth } = useAuthContext();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("deposits");
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [actionReason, setActionReason] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -77,18 +83,49 @@ export default function AdminRequestsPage() {
   const [isCredentialsLoading, setIsCredentialsLoading] = useState(false);
   const [showGamePassword, setShowGamePassword] = useState(false);
 
-  // Data states
-  const [deposits, setDeposits] = useState<any[]>([]);
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [gameItems, setGameItems] = useState<any[]>([]);
-  const [claims, setClaims] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("PENDING");
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    loadData();
-  }, [statusFilter, searchQuery]);
+  // Stats Hook
+  const { data: stats, isLoading: isStatsLoading, refetch: refetchStats } = useRequestStats();
+
+  // Requests Hooks
+  const baseFilters = {
+    statuses: statusFilter === "all" ? [] : [statusFilter as any],
+  } as any;
+
+  const { data: depositsData, isLoading: isDepositsLoading, refetch: refetchDeposits } = useRequests({
+    filters: { ...baseFilters, types: ["DEPOSIT"] },
+    options: { sortBy: "createdAt", sortOrder: "desc" },
+  });
+
+  const { data: withdrawalsData, isLoading: isWithdrawalsLoading, refetch: refetchWithdrawals } = useRequests({
+    filters: { ...baseFilters, types: ["WITHDRAWAL"] },
+    options: { sortBy: "createdAt", sortOrder: "desc" },
+  });
+
+  const { data: gameItemsData, isLoading: isGameItemsLoading, refetch: refetchGameItems } = useRequests({
+    filters: { ...baseFilters, types: ["GAME_ITEMS"] },
+    options: { sortBy: "createdAt", sortOrder: "desc" },
+  });
+
+  const { data: claimsData, isLoading: isClaimsLoading, refetch: refetchClaims } = useRequests({
+    filters: { ...baseFilters, types: ["OTHER"] as any },
+    options: { sortBy: "createdAt", sortOrder: "desc" },
+  });
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchStats(),
+      refetchDeposits(),
+      refetchWithdrawals(),
+      refetchGameItems(),
+      refetchClaims(),
+    ]);
+    toast.success("Données actualisées");
+  };
+
+  const isLoading = isStatsLoading || isDepositsLoading || isWithdrawalsLoading || isGameItemsLoading || isClaimsLoading;
 
   useEffect(() => {
     const loadCredentials = async () => {
@@ -109,67 +146,25 @@ export default function AdminRequestsPage() {
     loadCredentials();
   }, [selectedRequest?.id, selectedRequest?.type]);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const statsData = await getRequestStats();
-      setStats(statsData);
+  const q = searchQuery.toLowerCase();
+  const filterSearch = (r: any) =>
+    !q ||
+    r.id.toLowerCase().includes(q) ||
+    (r.paymentMethod?.toLowerCase().includes(q)) ||
+    (r.paymentProvider?.toLowerCase().includes(q)) ||
+    (r.user?.username?.toLowerCase().includes(q)) ||
+    (r.user?.fullName?.toLowerCase().includes(q));
 
-      const baseFilters = {
-        statuses: statusFilter === "all" ? [] : [statusFilter as any],
-      } as any;
-
-      const [dep, wit, items, ref] = await Promise.all([
-        getRequests({
-          pagination: { page: 1, limit: 50 },
-          filters: { ...baseFilters, types: ["DEPOSIT"] },
-          options: { sortBy: "createdAt", sortOrder: "desc" },
-        }),
-        getRequests({
-          pagination: { page: 1, limit: 50 },
-          filters: { ...baseFilters, types: ["WITHDRAWAL"] },
-          options: { sortBy: "createdAt", sortOrder: "desc" },
-        }),
-        getRequests({
-          pagination: { page: 1, limit: 50 },
-          filters: { ...baseFilters, types: ["GAME_ITEMS"] },
-          options: { sortBy: "createdAt", sortOrder: "desc" },
-        }),
-        getRequests({
-          pagination: { page: 1, limit: 50 },
-          filters: { ...baseFilters, types: ["REFUND", "CLAIM"] as any },
-          options: { sortBy: "createdAt", sortOrder: "desc" },
-        }),
-      ]);
-
-      const q = searchQuery.toLowerCase();
-      const filterSearch = (r: any) =>
-        !q ||
-        r.id.toLowerCase().includes(q) ||
-        (r.paymentMethod?.toLowerCase().includes(q)) ||
-        (r.paymentProvider?.toLowerCase().includes(q)) ||
-        (r.user?.username?.toLowerCase().includes(q));
-
-      setDeposits(dep.data.filter(filterSearch));
-      setWithdrawals(wit.data.filter(filterSearch));
-      setGameItems(items.data.filter(filterSearch));
-      setClaims(ref.data.filter(filterSearch));
-    } catch (error) {
-      console.error("Error loading data:", error);
-      toast.error("Erreur lors du chargement des données");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const deposits = (depositsData?.data || []).filter(filterSearch);
+  const withdrawals = (withdrawalsData?.data || []).filter(filterSearch);
+  const gameItems = (gameItemsData?.data || []).filter(filterSearch);
+  const claims = (claimsData?.data || []).filter(filterSearch);
 
   const handleApprove = async () => {
     if (!selectedRequest || !auth?.id) return;
 
     setIsApproving(true);
     try {
-      const shouldCreateTx =
-        selectedRequest.type === "DEPOSIT" ||
-        selectedRequest.type === "WITHDRAWAL";
       await approveRequest(selectedRequest.id, auth?.id);
       await createNotification({
         userId: selectedRequest.userId,
@@ -181,13 +176,13 @@ export default function AdminRequestsPage() {
               ? "Votre retrait a été approuvé."
               : "Votre demande d’items a été approuvée.",
         type: "REQUEST_APPROVED",
-        linkUrl: "/app/(protected)/wallet/transactions",
+        linkUrl: "/wallet/transactions",
       });
 
       toast.success("Demande approuvée avec succès");
       setShowApproveDialog(false);
       setSelectedRequest(null);
-      loadData();
+      handleRefresh();
     } catch (error) {
       console.error("Error approving request:", error);
       toast.error("Erreur lors de l'approbation");
@@ -218,14 +213,14 @@ export default function AdminRequestsPage() {
         title: "Demande rejetée",
         message: "Votre demande a été rejetée. Détails dans l’historique.",
         type: "REQUEST_REJECTED",
-        linkUrl: "/app/(protected)/wallet/transactions",
+        linkUrl: "/wallet/transactions",
       });
 
       toast.success("Demande rejetée");
       setShowRejectDialog(false);
       setSelectedRequest(null);
       setActionReason("");
-      loadData();
+      handleRefresh();
     } catch (error) {
       console.error("Error rejecting request:", error);
       toast.error("Erreur lors du rejet");
@@ -260,12 +255,11 @@ export default function AdminRequestsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
                 <TableHead>Utilisateur</TableHead>
-                <TableHead>Montant</TableHead>
                 <TableHead>Détails</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Montant</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -273,77 +267,93 @@ export default function AdminRequestsPage() {
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={6}>
                       <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : requestsData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     Aucune demande trouvée
                   </TableCell>
                 </TableRow>
               ) : (
                 requestsData.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell className="font-mono text-xs">
-                      {request.id.substring(0, 8)}...
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={request.user?.image || ""} />
+                          <AvatarFallback>
+                            {request.user?.username?.[0]?.toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">
+                            {request.user?.fullName || request.user?.username || "Inconnu"}
+                          </span>
+                          <span className="text-xs text-muted-foreground font-mono">
+                            ID: {request.userId.slice(0, 8)}...
+                          </span>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">{request.user?.username || "Inconnu"}</span>
-                        <span className="text-[10px] text-muted-foreground">{request.userId.substring(0, 8)}</span>
+                        <span className="text-sm font-medium">
+                          {request.type === "GAME_ITEMS" && request.gameItem
+                            ? request.gameItem.name
+                            : request.paymentMethod || "N/A"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {request.type === "GAME_ITEMS"
+                            ? `Qté: ${request.quantity || 1}`
+                            : request.paymentProvider || "N/A"}
+                        </span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold">
-                      {request.amount} GTC
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-xs">
-                        {request.type === "GAME_ITEMS" ? (
-                          <div className="flex flex-col">
-                            <span className="font-medium text-primary">{request.gameItem?.name || "Item"}</span>
-                            <span>Qté: {request.quantity}</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col">
-                            <span>{request.paymentMethod}</span>
-                            <span className="text-[10px] text-muted-foreground">{request.paymentProvider}</span>
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {format(new Date(request.createdAt), "dd MMM HH:mm", { locale: fr })}
+                    <TableCell className="font-semibold text-sm">
+                      {request.amount} {request.currency || "GTC"}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={request.status} />
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format(new Date(request.createdAt), "dd/MM/yyyy HH:mm", {
+                        locale: fr,
+                      })}
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {request.status === "PENDING" && (
-                            <>
-                              <DropdownMenuItem onClick={() => openApproveDialog(request)}>
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                                Approuver
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openRejectDialog(request)}>
-                                <XCircle className="h-4 w-4 mr-2 text-red-600" />
-                                Rejeter
-                              </DropdownMenuItem>
-                            </>
-                          )}
                           <DropdownMenuItem onClick={() => openDetailsDialog(request)}>
                             <Eye className="h-4 w-4 mr-2" />
                             Détails
                           </DropdownMenuItem>
+                          {request.status === "PENDING" && (
+                            <>
+                              <DropdownMenuItem
+                                className="text-green-600"
+                                onClick={() => openApproveDialog(request)}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approuver
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => openRejectDialog(request)}
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Rejeter
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -360,13 +370,42 @@ export default function AdminRequestsPage() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div>
-        <Typography variant="h1" weight="bold" className="mb-2">
-          Demandes
-        </Typography>
-        <Typography variant="body-base" theme="muted">
-          Gestion des dépôts, retraits, items de jeu et réclamations
-        </Typography>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <Typography variant="h1" weight="bold" className="mb-2">
+            Demandes & Transactions
+          </Typography>
+          <Typography variant="body-base" theme="muted">
+            Gérez les dépôts, retraits et achats d'items
+          </Typography>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            <RefreshCw className={isLoading ? "h-4 w-4 mr-2 animate-spin" : "h-4 w-4 mr-2"} />
+            Actualiser
+          </Button>
+          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border">
+            <Button
+              variant={statusFilter === "PENDING" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("PENDING")}
+            >
+              En attente
+            </Button>
+            <Button
+              variant={statusFilter === "all" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setStatusFilter("all")}
+            >
+              Tout
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50">
@@ -401,7 +440,7 @@ export default function AdminRequestsPage() {
 
       {/* Statistiques avec carousel mobile */}
       <div className="relative group">
-        <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+        <div className="flex overflow-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
           <StatCard
             title="Total Demandes"
             value={stats?.total || 0}
@@ -557,41 +596,86 @@ export default function AdminRequestsPage() {
             <DialogTitle>Détails de la demande</DialogTitle>
           </DialogHeader>
           {selectedRequest && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Typography variant="caption1" theme="muted">Type</Typography>
-                  <div className="font-medium">{selectedRequest.type}</div>
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Statut</Typography>
-                  <StatusBadge status={selectedRequest.status} />
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Montant</Typography>
-                  <div className="font-semibold">{selectedRequest.amount} {selectedRequest.currency || 'GTC'}</div>
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Méthode</Typography>
-                  <div>{selectedRequest.paymentMethod || '-'}</div>
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Fournisseur</Typography>
-                  <div>{selectedRequest.paymentProvider || '-'}</div>
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Référence</Typography>
-                  <div className="font-mono text-xs">{selectedRequest.paymentReference || '-'}</div>
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Compte paiement</Typography>
-                  <div className="font-mono text-xs">{selectedRequest.paymentAccountId || '-'}</div>
-                </div>
-                <div>
-                  <Typography variant="caption1" theme="muted">Code confirmation</Typography>
-                  <div className="font-mono text-xs">{selectedRequest.paymentConfirmationCode || '-'}</div>
+            <div className="space-y-6">
+              {/* Informations Utilisateur */}
+              <div className="space-y-4">
+                <h4 className="font-semibold border-b pb-2">Utilisateur</h4>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={selectedRequest.user?.image || ""} />
+                    <AvatarFallback>
+                      {selectedRequest.user?.username?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      {selectedRequest.user?.fullName || selectedRequest.user?.username}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {selectedRequest.user?.email}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Détails de la demande */}
+              <div className="space-y-4">
+                <h4 className="font-semibold border-b pb-2">Détails</h4>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <span className="text-muted-foreground">Type:</span>
+                  <span className="font-medium capitalize">
+                    {selectedRequest.type.toLowerCase()}
+                  </span>
+                  <span className="text-muted-foreground">Montant:</span>
+                  <span className="font-bold text-primary">
+                    {selectedRequest.amount} {selectedRequest.currency || 'GTC'}
+                  </span>
+                  {selectedRequest.totalGtc && (
+                    <>
+                      <span className="text-muted-foreground">Total GTC:</span>
+                      <span className="font-bold text-purple-600">
+                        {selectedRequest.totalGtc} GTC
+                      </span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground">Méthode:</span>
+                  <span className="font-medium">
+                    {selectedRequest.paymentMethod || "N/A"}
+                  </span>
+                  <span className="text-muted-foreground">Fournisseur:</span>
+                  <span className="font-medium">
+                    {selectedRequest.paymentProvider || "N/A"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Détails spécifiques (Game Items) */}
+              {selectedRequest.type === "GAME_ITEMS" && selectedRequest.gameItem && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold border-b pb-2">Élément demandé</h4>
+                  <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border">
+                    <div className="h-12 w-12 rounded bg-muted flex items-center justify-center overflow-hidden">
+                      {selectedRequest.gameItem.image ? (
+                        <img
+                          src={selectedRequest.gameItem.image}
+                          alt={selectedRequest.gameItem.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Gamepad2 className="h-6 w-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {selectedRequest.gameItem.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Quantité: {selectedRequest.quantity || 1}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {selectedRequest.paymentImage && (
                 <div>

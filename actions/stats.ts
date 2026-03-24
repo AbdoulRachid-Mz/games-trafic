@@ -56,6 +56,7 @@ import {
   not,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { cacheTag, cacheLife } from 'next/cache';
 
 // ============================================================================
 // TYPES
@@ -273,6 +274,9 @@ function buildWhereConditions(filters: StatsFilters, table: any) {
 export async function getGlobalStats(
   filters: StatsFilters = {},
 ): Promise<GlobalStats> {
+  'use cache';
+  cacheTag('stats');
+  cacheLife('minutes');
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

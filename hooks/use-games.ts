@@ -39,7 +39,10 @@ import {
   GameItemFilters,
   GameItemRequestFilters,
   ListQuery,
+  PaginationResponse,
 } from "@/types/api";
+import { type GameCard } from "@/types/view-models";
+import { type InfiniteData } from "@tanstack/react-query";
 
 // ==========================
 // Query Keys Factory
@@ -82,7 +85,7 @@ export function useGameById(id: string) {
     queryKey: gameKeys.detail(id),
     queryFn: () => getGameById(id),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -91,12 +94,18 @@ export function useGameByName(name: string) {
     queryKey: [...gameKeys.details(), "byName", name],
     queryFn: () => getGameByName(name),
     enabled: !!name,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
 export function useGames(query: ListQuery<GameFilters> = {}) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    PaginationResponse<GameCard>,
+    Error,
+    InfiniteData<PaginationResponse<GameCard>>,
+    readonly unknown[],
+    number
+  >({
     queryKey: gameKeys.list(query),
     queryFn: ({ pageParam = query.pagination?.page ?? 1 }) =>
       getGames({
@@ -109,10 +118,8 @@ export function useGames(query: ListQuery<GameFilters> = {}) {
       }),
     getNextPageParam: (lastPage) =>
       lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
-    getPreviousPageParam: (firstPage) =>
-      firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: query.pagination?.page ?? 1,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -120,7 +127,7 @@ export function useGameStats(filters?: GameFilters) {
   return useQuery({
     queryKey: gameKeys.statsWithFilters(filters),
     queryFn: () => getGameStats(filters),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -132,7 +139,7 @@ export function useGameItemById(id: string) {
     queryKey: gameKeys.items.detail(id),
     queryFn: () => getGameItemById(id),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -157,7 +164,7 @@ export function useGameItemsByGameId(
       firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: query.pagination?.page ?? 1,
     enabled: !!gameId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
@@ -178,7 +185,7 @@ export function useGameItems(query: ListQuery<GameItemFilters> = {}) {
     getPreviousPageParam: (firstPage) =>
       firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: query.pagination?.page ?? 1,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 }
 

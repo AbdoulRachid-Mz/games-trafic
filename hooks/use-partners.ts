@@ -15,7 +15,7 @@ import type {
   CreatePartnerInput,
   UpdatePartnerInput,
 } from "@/validations/partners";
-import type { Partner } from "@/database/schema";
+import { type PartnerCard } from "@/types/view-models";
 import { toast } from "sonner";
 
 // Hook to fetch partners with filters
@@ -27,7 +27,7 @@ export function usePartners(filters?: PartnerFilters) {
       if (!result.success) {
         throw new Error(result.error);
       }
-      return { partners: result.data || [], total: result.total || 0 };
+      return { partners: (result.data as PartnerCard[]) || [], total: result.total || 0 };
     },
   });
 }
@@ -56,7 +56,7 @@ export function useFeaturedPartners() {
       if (!result.success) {
         throw new Error(result.error);
       }
-      return result.data || [];
+      return (result.data as PartnerCard[]) || [];
     },
   });
 }
@@ -80,8 +80,8 @@ export function useCreatePartner() {
       return result.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["partners"] });
-      toast.success("Partner created successfully");
+      queryClient.invalidateQueries({ queryKey: ["partners"] }); 
+      toast.success("Partenaire créé avec succès");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to create partner");
@@ -112,7 +112,7 @@ export function useUpdatePartner() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["partners"] });
       queryClient.invalidateQueries({ queryKey: ["partner", variables.id] });
-      toast.success("Partner updated successfully");
+      toast.success("Partenaire mis à jour avec succès");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to update partner");
@@ -134,7 +134,7 @@ export function useDeletePartner() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["partners"] });
-      toast.success("Partner deleted successfully");
+      toast.success("Partenaire supprimé avec succès");
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to delete partner");

@@ -346,6 +346,10 @@ export default function SignInPage() {
               <div className="hidden md:block relative bg-gradient-to-br from-primary to-purple-600 p-10">
                 <div className="absolute inset-0 bg-black/20" />
                 <div className="relative h-full flex flex-col justify-end text-white">
+                  {/* logo */}
+                  <div className="w-full h-full flex items-center justify-center relative">
+                    <Image src="/images/icons/app/gt-gold.png" alt="logo" fill className="object-contain" />
+                  </div>
                   <h2 className="text-2xl font-bold mb-2">Bienvenue sur GamesTrafics</h2>
                   <p className="text-white/80 text-sm">
                     La plateforme de gaming qui connecte les passionnés

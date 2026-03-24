@@ -87,6 +87,13 @@ import {
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type TournamentCard, type TournamentStats,
+  TOURNAMENT_CARD_COLUMNS, USER_MINI_COLUMNS, EDITION_SUMMARY_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -95,17 +102,22 @@ import { revalidatePath } from "next/cache";
  * Récupère les tournois avec leurs éditions
  */
 export async function getTournamentsWithEditions(
-  limit: number = 100,
+  limit: number = PAGINATION_DEFAULTS.FEED,
   sortBy: keyof Tournament = "createdAt",
   sortOrder: "asc" | "desc" = "desc"
 ): Promise<Tournament[]> {
+  'use cache';
+  cacheTag('tournaments');
+  cacheLife('minutes');
   try {
     const order = sortOrder === "desc" ? desc : asc;
     const result = await db.query.tournaments.findMany({
       limit,
       orderBy: order(tournaments[sortBy]),
       with: {
-        editions: true,
+        editions: {
+          columns: EDITION_SUMMARY_COLUMNS,
+        },
       },
     });
     return result;
@@ -121,20 +133,24 @@ export async function getTournamentById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<TournamentWithRelations | null> {
+  'use cache';
+  cacheTag(`tournament-${id}`, 'tournaments');
+  cacheLife('minutes');
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournaments.findFirst({
         where: (tournaments, { eq }) => eq(tournaments.id, id),
         with: {
-          organizer: options.populate.includes("organizer") ? true : undefined,
+          organizer: options.populate.includes("organizer") ? { columns: USER_MINI_COLUMNS } : undefined,
           members: options.populate.includes("members") ? true : undefined,
-          editions: options.populate.includes("editions") ? true : undefined,
+          editions: options.populate.includes("editions") ? {
+            columns: EDITION_SUMMARY_COLUMNS,
+          } : undefined,
           theme: options.populate.includes("theme") ? {} : undefined,
         },
       });
       const result = await query;
       if (!result) return null;
-      // Ensure theme is undefined when not populated or null to match TournamentWithRelations
       const { theme, ...rest } = result;
       return {
         ...rest,
@@ -162,6 +178,9 @@ export async function getTournamentEditionById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<TournamentEditionWithRelations | null> {
+  'use cache';
+  cacheTag(`tournament-edition-${id}`, 'tournaments');
+  cacheLife('minutes');
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournamentEditions.findFirst({
@@ -197,46 +216,44 @@ export async function getTournamentEditionById(
 export async function getTournaments(
   query: ListQuery<TournamentFilters> = {}
 ): Promise<PaginationResponse<Tournament>> {
+  'use cache';
+  cacheTag('tournaments');
+  cacheLife('minutes');
   try {
     const {
-      pagination = { page: 1, limit: 50 },
+      pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED },
       filters = {},
       options = {},
     } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
-    const whereConditions = buildTournamentWhereConditions(filters, options);
-
-    const tournamentsQuery = db
-      .select()
-      .from(tournaments)
-      .where(await whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Tournament;
-      const sortOrder = options.sortOrder === "desc" ? desc : asc;
-      tournamentsQuery.orderBy(sortOrder(tournaments[sortField]));
-    } else {
-      tournamentsQuery.orderBy(desc(tournaments.createdAt));
-    }
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(tournaments)
-      .where(await whereConditions);
+    const whereConditions = await buildTournamentWhereConditions(filters, options);
 
     const [tournamentsData, totalResult] = await Promise.all([
-      tournamentsQuery,
-      countQuery,
+      db.query.tournaments.findMany({
+        columns: TOURNAMENT_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (tournaments, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((tournaments as any)[sortField]) : asc((tournaments as any)[sortField])];
+          }
+          return [desc(tournaments.createdAt)];
+        },
+      }),
+      db
+        .select({ count: count() })
+        .from(tournaments)
+        .where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: tournamentsData,
+      data: tournamentsData as Tournament[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -333,6 +350,9 @@ export async function deleteTournamentMember(memberId: string) {
 export async function getTournamentEditions(
   query: ListQuery<TournamentEditionFilters> = {}
 ): Promise<PaginationResponse<TournamentEdition>> {
+  'use cache';
+  cacheTag('tournaments');
+  cacheLife('minutes');
   try {
     const {
       pagination = { page: 1, limit: 50 },
@@ -394,7 +414,10 @@ export async function getTournamentEditions(
 /**
  * Récupère les statistiques des tournois
  */
-export async function getTournamentStats(filters?: TournamentFilters) {
+export async function getTournamentStats(filters?: TournamentFilters): Promise<TournamentStats> {
+  'use cache';
+  cacheTag('tournaments', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildTournamentWhereConditions(filters || {});
 
@@ -603,6 +626,7 @@ export async function createTournament(
       })
       .returning();
 
+    revalidateTag('tournaments', 'max');
     return result[0];
   } catch (error) {
     console.error("Error creating tournament:", error);
@@ -705,6 +729,8 @@ export async function updateTournament(
       .where(eq(tournaments.id, id))
       .returning();
 
+    revalidateTag('tournaments', 'max');
+    revalidateTag(`tournament-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error("Error updating tournament:", error);
@@ -737,6 +763,8 @@ export async function updateTournamentEdition(
       .where(eq(tournamentEditions.id, id))
       .returning();
 
+    revalidateTag('tournaments', 'max');
+    revalidateTag(`tournament-edition-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error("Error updating tournament edition:", error);
@@ -765,6 +793,8 @@ export async function deleteTournament(id: string): Promise<Tournament> {
     if (result.length === 0) {
       throw new Error("Tournament not found");
     }
+    revalidateTag('tournaments', 'max');
+    revalidateTag(`tournament-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error("Error deleting tournament:", error);
@@ -795,6 +825,8 @@ export async function deleteTournamentEdition(
     if (result.length === 0) {
       throw new Error("Tournament edition not found");
     }
+    revalidateTag('tournaments', 'max');
+    revalidateTag(`tournament-edition-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error("Error deleting tournament edition:", error);

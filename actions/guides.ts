@@ -1,9 +1,11 @@
 'use server';
 
-import { guides, guideSteps, type Guide, type NewGuide, type GuideStep, type NewGuideStep, users } from '@/database/schema';
+import { guides, guideSteps, type Guide, type NewGuide, type GuideStep, type NewGuideStep, users, GuideWithRelations } from '@/database/schema';
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull, exists } from 'drizzle-orm';
 import { type GuideFilters, type GuideStepFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -15,7 +17,10 @@ import { db } from '@/lib/db';
 export async function getGuideById(
   id: string,
   options?: { populate?: string[] }
-): Promise<Guide | null> {
+): Promise<GuideWithRelations | null> {
+  'use cache';
+  cacheTag(`guide-${id}`, 'guides');
+  cacheLife('hours');
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.guides.findFirst({
@@ -45,6 +50,9 @@ export async function getGuideById(
  * Récupère une étape de guide par son ID
  */
 export async function getGuideStepById(id: string): Promise<GuideStep | null> {
+  'use cache';
+  cacheTag(`guide-step-${id}`, 'guides');
+  cacheLife('hours');
   try {
     const result = await db
       .select()
@@ -65,6 +73,9 @@ export async function getGuideStepById(id: string): Promise<GuideStep | null> {
 export async function getGuides(
   query: ListQuery<GuideFilters> = {}
 ): Promise<PaginationResponse<Guide>> {
+  'use cache';
+  cacheTag('guides');
+  cacheLife('hours');
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -123,6 +134,9 @@ export async function getGuideSteps(
   guideId: string,
   query: ListQuery<GuideStepFilters> = {}
 ): Promise<PaginationResponse<GuideStep>> {
+  'use cache';
+  cacheTag('guides', `guide-steps-${guideId}`);
+  cacheLife('hours');
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -174,6 +188,9 @@ export async function getGuideSteps(
  * Récupère les statistiques des guides
  */
 export async function getGuideStats(filters?: GuideFilters) {
+  'use cache';
+  cacheTag('guides', 'stats');
+  cacheLife('hours');
   try {
     const whereConditions = buildGuideWhereConditions(filters || {});
 
@@ -203,6 +220,31 @@ export async function getGuideStats(filters?: GuideFilters) {
 // ============================================================================
 
 /**
+ * Vérifie si un titre de guide existe déjà (pour l'unicité)
+ */
+export async function checkGuideTitleExists(
+  title: string,
+  excludeId?: string
+): Promise<boolean> {
+  try {
+    const conditions = [eq(guides.title, title), eq(guides.isDeleted, false)];
+    if (excludeId) {
+      conditions.push(sql`${guides.id} != ${excludeId}`);
+    }
+
+    const result = await db
+      .select({ count: count() })
+      .from(guides)
+      .where(and(...conditions));
+
+    return (result[0]?.count ?? 0) > 0;
+  } catch (error) {
+    console.error("Error checking guide title existence:", error);
+    return false;
+  }
+}
+
+/**
  * Crée un nouveau guide
  */
 export async function createGuide(guideData: NewGuide): Promise<Guide> {
@@ -220,6 +262,7 @@ export async function createGuide(guideData: NewGuide): Promise<Guide> {
       })
       .returning();
 
+    revalidateTag('guides', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating guide:', error);
@@ -252,6 +295,8 @@ export async function updateGuide(
       .where(eq(guides.id, id))
       .returning();
 
+    revalidateTag('guides', 'max');
+    revalidateTag(`guide-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating guide:', error);
@@ -281,6 +326,8 @@ export async function deleteGuide(id: string): Promise<Guide> {
       throw new Error('Guide not found');
     }
 
+    revalidateTag('guides', 'max');
+    revalidateTag(`guide-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting guide:', error);
@@ -310,6 +357,8 @@ export async function restoreGuide(id: string): Promise<Guide> {
       throw new Error('Guide not found');
     }
 
+    revalidateTag('guides', 'max');
+    revalidateTag(`guide-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring guide:', error);
@@ -338,6 +387,7 @@ export async function createGuideStep(stepData: NewGuideStep): Promise<GuideStep
       })
       .returning();
 
+    revalidateTag('guides', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating guide step:', error);
@@ -370,6 +420,8 @@ export async function updateGuideStep(
       .where(eq(guideSteps.id, id))
       .returning();
 
+    revalidateTag('guides', 'max');
+    revalidateTag(`guide-step-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating guide step:', error);
@@ -394,6 +446,7 @@ export async function deleteGuideStep(id: string): Promise<GuideStep> {
       throw new Error('Guide step not found');
     }
 
+    revalidateTag('guides', 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting guide step:', error);

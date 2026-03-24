@@ -6,6 +6,7 @@ import { Typography } from "@/components/ui/typography";
 import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface StatCardProps {
   title: string;
@@ -32,6 +33,7 @@ export function StatCard({
   color,
 }: StatCardProps) {
   const isPositiveTrend = trend && trend.value >= 0;
+  const { isMobile } = useScreenSize();
 
   return (
     <motion.div
@@ -46,33 +48,40 @@ export function StatCard({
           className
         )}
       >
-        <CardContent className="p-3">
+        <CardContent className={cn("p-3", isMobile && "p-2")}>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <Typography
-                variant="caption1"
+                variant={isMobile ? "caption2" : "caption1"}
                 theme="muted"
                 className="uppercase tracking-wider font-bold"
               >
                 {title}
               </Typography>
-              <Typography variant="h2" weight="extrabold" className="mt-2 mb-1">
+              <Typography
+                variant={isMobile ? "h4" : "h2"}
+                weight="extrabold"
+                className={cn("mt-2 mb-1", isMobile && "mt-1 mb-0")}
+              >
                 {value}
               </Typography>
               {description && (
-                <Typography variant="caption2" theme="muted">
+                <Typography
+                  variant={isMobile ? "caption3" : "caption2"}
+                  theme="muted"
+                >
                   {description}
                 </Typography>
               )}
               {trend && (
-                <div className="flex items-center gap-1 mt-2">
+                <div className={cn("flex items-center gap-1 mt-2", isMobile && "mt-1")}>
                   {isPositiveTrend ? (
-                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <TrendingUp className={cn("h-4 w-4 text-green-600", isMobile && "h-3 w-3")} />
                   ) : (
-                    <TrendingDown className="h-4 w-4 text-red-600" />
+                    <TrendingDown className={cn("h-4 w-4 text-red-600", isMobile && "h-3 w-3")} />
                   )}
                   <Typography
-                    variant="caption1"
+                    variant={isMobile ? "caption2" : "caption1"}
                     weight="semibold"
                     className={cn(
                       isPositiveTrend ? "text-green-600" : "text-red-600"
@@ -81,14 +90,23 @@ export function StatCard({
                     {isPositiveTrend ? "+" : ""}
                     {trend.value}%
                   </Typography>
-                  <Typography variant="caption2" theme="muted">
+                  <Typography
+                    variant={isMobile ? "caption3" : "caption2"}
+                    theme="muted"
+                  >
                     {trend.label}
                   </Typography>
                 </div>
               )}
             </div>
-            <div className={cn("p-3 rounded-xl bg-primary/10", iconClassName)}>
-              <Icon className="h-6 w-6 text-primary" />
+            <div
+              className={cn(
+                "p-3 rounded-xl bg-primary/10",
+                iconClassName,
+                isMobile && "p-2"
+              )}
+            >
+              <Icon className={cn("h-6 w-6 text-primary", isMobile && "h-5 w-5")} />
             </div>
           </div>
         </CardContent>

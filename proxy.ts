@@ -39,7 +39,17 @@ export async function proxy(request: NextRequest) {
       resolved.redirectTo ||
       `/sign-in?redirect=${encodeURIComponent(pathname)}`;
 
+    // Éviter une boucle de redirection infinie
+    if (redirectTo === pathname) {
+      return NextResponse.next();
+    }
+
     return NextResponse.redirect(new URL(redirectTo, request.url));
+  }
+
+  // 4️⃣ Gestion des routes guestOnly (ex: /sign-in quand déjà connecté)
+  if (resolved.redirectTo && resolved.redirectTo !== pathname) {
+    return NextResponse.redirect(new URL(resolved.redirectTo, request.url));
   }
 
   return NextResponse.next();

@@ -60,6 +60,7 @@ import {
 
 import { db } from "@/lib/db";
 import { AuthService } from "@/lib/auth/service";
+import { PAGINATION_DEFAULTS, USER_MINI_COLUMNS } from "@/types/view-models";
 // ============================================================================
 // QUERIES - Lecture des données
 // ============================================================================
@@ -769,7 +770,7 @@ export async function getUsers(
 ): Promise<PaginationResponse<User>> {
   try {
     const {
-      pagination = { page: 1, limit: 50 },
+      pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED },
       filters = {},
       options = {},
     } = query;

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type UseQueryResult, type InfiniteData } from '@tanstack/react-query';
 import {
   getAnnouncementById,
   getAnnouncements,
@@ -9,7 +9,8 @@ import {
   deleteAnnouncement,
 } from '@/actions/announcements';
 import type { AnnouncementFilters, ListQuery, PaginationResponse } from '@/types/api';
-import type { Announcement, NewAnnouncement } from '@/database/schema';
+import type { NewAnnouncement } from '@/database/schema';
+import { type AnnouncementCard } from '@/types/view-models';
 
 
 /**
@@ -81,7 +82,7 @@ export function useAnnouncement(id: string, options?: { populate?: string[] }) {
     queryKey: announcementKeys.detail(id),
     queryFn: () => getAnnouncementById(id, options),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -89,11 +90,11 @@ export function useAnnouncement(id: string, options?: { populate?: string[] }) {
  * Hook to fetch paginated announcements with filters
  * @param query - List query with filters, pagination, and options
  */
-export function useAnnouncements(query: ListQuery<AnnouncementFilters> = {}) {
+export function useAnnouncements(query: ListQuery<AnnouncementFilters> = {}): UseQueryResult<PaginationResponse<AnnouncementCard>, Error> {
   return useQuery({
     queryKey: announcementKeys.list(query.filters || {}),
     queryFn: () => getAnnouncements(query),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
     placeholderData: (previousData) => previousData,
   });
 }
@@ -104,7 +105,13 @@ export function useAnnouncements(query: ListQuery<AnnouncementFilters> = {}) {
  * @param limit - Items per page
  */
 export function useInfiniteAnnouncements(filters: AnnouncementFilters = {}, limit = 20) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    PaginationResponse<AnnouncementCard>,
+    Error,
+    InfiniteData<PaginationResponse<AnnouncementCard>, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: announcementKeys.infinite(filters),
     queryFn: ({ pageParam = 1 }) => getAnnouncements({ pagination: { page: pageParam, limit }, filters }),
     getNextPageParam: (lastPage) => {
@@ -114,7 +121,7 @@ export function useInfiniteAnnouncements(filters: AnnouncementFilters = {}, limi
       return undefined;
     },
     initialPageParam: 1,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 /**
@@ -139,7 +146,7 @@ export function useHasUserReadAnnouncement(userId: string, announcementId: strin
     queryKey: announcementKeys.read(userId, announcementId),
     queryFn: () => hasUserReadAnnouncement(userId, announcementId),
     enabled: !!userId && !!announcementId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -153,7 +160,7 @@ export function usePrefetchAnnouncement(id: string) {
     queryClient.prefetchQuery({
       queryKey: announcementKeys.detail(id),
       queryFn: () => getAnnouncementById(id),
-      staleTime: 5 * 60 * 1000,
+      staleTime: 10 * 60 * 1000,
     });
   };
 }

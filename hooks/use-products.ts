@@ -14,8 +14,10 @@ import {
   markProductAsSold,
   incrementProductViewCount,
 } from "@/actions/products";
-import type { ProductFilters, ListQuery } from "@/types/api";
+import type { ProductFilters, ListQuery, PaginationResponse } from "@/types/api";
+import { type ProductCard } from "@/types/view-models";
 import { toast } from "sonner";
+import { type InfiniteData } from "@tanstack/react-query";
 
 // Clés de requête
 export const productKeys = {
@@ -32,7 +34,13 @@ export const productKeys = {
 
 // Hook pour la liste des produits (infinie)
 export function useProducts(query: ListQuery<ProductFilters> = {}) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    { products: ProductCard[]; pagination: PaginationResponse<ProductCard>["pagination"] },
+    Error,
+    InfiniteData<{ products: ProductCard[]; pagination: PaginationResponse<ProductCard>["pagination"] }, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: productKeys.list(query.filters),
     queryFn: async ({ pageParam = 1 }) => {
       const res = await getProducts({
@@ -52,6 +60,7 @@ export function useProducts(query: ListQuery<ProductFilters> = {}) {
       return lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined;
     },
     initialPageParam: 1,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -61,25 +70,27 @@ export function useProduct(id: string, options?: { populate?: string[] }) {
     queryKey: productKeys.detail(id),
     queryFn: () => getProductById(id, options),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
 // Hook pour les produits d'une boutique
 export function useProductsByShopId(shopId: string, query: ListQuery<ProductFilters> = {}) {
-  return useQuery({
+  return useQuery<PaginationResponse<ProductCard>, Error>({
     queryKey: [...productKeys.shop(shopId), query],
     queryFn: () => getProductsByShopId(shopId, query),
     enabled: !!shopId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
 // Hook pour les produits d'une catégorie
 export function useProductsByCategoryId(categoryId: string, query: ListQuery<ProductFilters> = {}) {
-  return useQuery({
+  return useQuery<PaginationResponse<ProductCard>, Error>({
     queryKey: [...productKeys.category(categoryId), query],
     queryFn: () => getProductsByCategoryId(categoryId, query),
     enabled: !!categoryId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -161,6 +172,7 @@ export function useProductStats(filters?: ProductFilters) {
   return useQuery({
     queryKey: productKeys.stats(filters),
     queryFn: () => getProductStats(filters),
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 

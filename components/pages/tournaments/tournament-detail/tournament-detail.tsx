@@ -247,7 +247,7 @@ export function TournamentDetail({ tournament, similar = [] }: TournamentDetailP
               <CardContent>
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={tournament.organizer?.image || undefined} />
+                    <AvatarImage src={tournament.organizer?.profileImage || undefined} />
                     <AvatarFallback>{tournament.organizer?.username?.[0] || "O"}</AvatarFallback>
                   </Avatar>
                   <div>

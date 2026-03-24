@@ -4,6 +4,13 @@ import { posts, type Post, type NewPost, interactions, messages, users } from '@
 import { eq, and, or, like, ilike, desc, asc, sql, count, isNull, gte, lte, inArray, isNotNull, lt } from 'drizzle-orm';
 import { type PostFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type PostCard, type UserMini,
+  POST_CARD_COLUMNS, USER_MINI_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -16,17 +23,20 @@ export async function getPostById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<Post | null> {
+  'use cache';
+  cacheTag(`post-${id}`, 'posts');
+  cacheLife('minutes');
   try {
     if (options?.populate && options.populate.length > 0) {
-      const query = db.query.posts.findFirst({
+      const result = await db.query.posts.findFirst({
         where: (posts, { eq }) => eq(posts.id, id),
         with: {
-          author: options.populate.includes('author') ? true : undefined,
+          author: options.populate.includes('author') ? { columns: USER_MINI_COLUMNS } : undefined,
           interactions: options.populate.includes('interactions') ? true : undefined,
           messages: options.populate.includes('messages') ? true : undefined,
         }
       });
-      return (await query) ?? null;
+      return result ? result as unknown as Post : null;
     }
 
     const result = await db
@@ -47,36 +57,34 @@ export async function getPostById(
  */
 export async function getPosts(
   query: ListQuery<PostFilters> = {}
-): Promise<PaginationResponse<Post>> {
+): Promise<PaginationResponse<PostCard>> {
+  'use cache';
+  cacheTag('posts');
+  cacheLife('minutes');
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildPostWhereConditions(filters, options);
 
-    const postsQuery = db
-      .select()
-      .from(posts)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Post;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      postsQuery.orderBy(sortOrder(posts[sortField]));
-    } else {
-      postsQuery.orderBy(desc(posts.createdAt));
-    }
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(posts)
-      .where(whereConditions);
-
     const [postsData, totalResult] = await Promise.all([
-      postsQuery,
-      countQuery
+      db.query.posts.findMany({
+        columns: POST_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (posts, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((posts as any)[sortField]) : asc((posts as any)[sortField])];
+          }
+          return [desc(posts.createdAt)];
+        },
+        with: options.populate?.includes('author')
+          ? { author: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(posts).where(whereConditions)
     ]);
 
     const total = totalResult[0]?.count || 0;
@@ -105,9 +113,9 @@ export async function getPosts(
 export async function getPostsByUserId(
   userId: string,
   query: ListQuery<PostFilters> = {}
-): Promise<PaginationResponse<Post>> {
+): Promise<PaginationResponse<PostCard>> {
   try {
-    const { pagination = { page: 1, limit: 20 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = and(
@@ -115,22 +123,18 @@ export async function getPostsByUserId(
       buildPostWhereConditions(filters, options)
     );
 
-    const postsQuery = db
-      .select()
-      .from(posts)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset)
-      .orderBy(desc(posts.createdAt));
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(posts)
-      .where(whereConditions);
-
     const [postsData, totalResult] = await Promise.all([
-      postsQuery,
-      countQuery
+      db.query.posts.findMany({
+        columns: POST_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (posts, { desc }) => [desc(posts.createdAt)],
+        with: options.populate?.includes('author')
+          ? { author: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(posts).where(whereConditions)
     ]);
 
     const total = totalResult[0]?.count || 0;
@@ -158,9 +162,9 @@ export async function getPostsByUserId(
  */
 export async function getActiveStories(
   query: ListQuery<PostFilters> = {}
-): Promise<PaginationResponse<Post>> {
+): Promise<PaginationResponse<PostCard>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = and(
@@ -174,22 +178,18 @@ export async function getActiveStories(
       buildPostWhereConditions(filters, options)
     );
 
-    const storiesQuery = db
-      .select()
-      .from(posts)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset)
-      .orderBy(desc(posts.createdAt));
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(posts)
-      .where(whereConditions);
-
     const [storiesData, totalResult] = await Promise.all([
-      storiesQuery,
-      countQuery
+      db.query.posts.findMany({
+        columns: POST_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (posts, { desc }) => [desc(posts.createdAt)],
+        with: options.populate?.includes('author')
+          ? { author: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(posts).where(whereConditions)
     ]);
 
     const total = totalResult[0]?.count || 0;
@@ -216,6 +216,9 @@ export async function getActiveStories(
  * Récupère les statistiques des posts
  */
 export async function getPostStats(filters?: PostFilters) {
+  'use cache';
+  cacheTag('posts', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildPostWhereConditions(filters || {});
 
@@ -290,6 +293,7 @@ export async function createPost(postData: NewPost): Promise<Post> {
       })
       .returning();
 
+    revalidateTag('posts', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating post:', error);
@@ -328,6 +332,8 @@ export async function updatePost(
       .where(eq(posts.id, id))
       .returning();
 
+    revalidateTag('posts', 'max');
+    revalidateTag(`post-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating post:', error);
@@ -357,6 +363,8 @@ export async function deletePost(id: string): Promise<Post> {
       throw new Error('Post not found');
     }
 
+    revalidateTag('posts', 'max');
+    revalidateTag(`post-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting post:', error);
@@ -386,6 +394,8 @@ export async function restorePost(id: string): Promise<Post> {
       throw new Error('Post not found');
     }
 
+    revalidateTag('posts', 'max');
+    revalidateTag(`post-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring post:', error);
@@ -415,6 +425,8 @@ export async function togglePostStatus(id: string): Promise<Post> {
       .where(eq(posts.id, id))
       .returning();
 
+    revalidateTag('posts', 'max');
+    revalidateTag(`post-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error toggling post status:', error);

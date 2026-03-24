@@ -150,6 +150,7 @@ export interface TransactionData {
     buyerInstructions?: string;
     sellerInstructions?: string;
     originalAmount?: number;
+    image?: string;
   };
 }
 

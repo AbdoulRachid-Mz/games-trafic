@@ -16,7 +16,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import { shareContent } from "@/lib/share";
-import { GameClipWithRelations } from "@/types/game-clips";
+import { GameClipCard } from "@/types/view-models";
 import { useGameClips } from "@/hooks/use-game-clips";
 import { useAuthContext } from "@/contexts/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,7 +27,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "../ui/button";
 
 interface GameClipPlayerProps {
-  clip: GameClipWithRelations;
+  clip: GameClipCard;
   isActive: boolean;
   isMuted?: boolean;
   onMuteToggle?: () => void;
@@ -501,7 +501,7 @@ export function GameClipPlayer({
             className="bg-black/60 backdrop-blur-xl rounded-full text-white p-4 hover:bg-black/80 h-14 w-14 border-2 border-white/20 shadow-2xl hover:scale-110 transition-all"
           />
           <span className="text-xs font-bold text-white bg-black/60 backdrop-blur-xl px-2 py-1 rounded-full border border-white/20">
-            {clip.likesCount}
+            {clip.stats?.likesCount || 0}
           </span>
         </div>
 
@@ -517,7 +517,7 @@ export function GameClipPlayer({
             <MessageCircle className="h-5 w-5" />
           </button>
           <span className="text-xs font-bold text-white bg-black/60 backdrop-blur-xl px-2 py-1 rounded-full border border-white/20">
-            {clip.commentsCount}
+            {clip.stats?.commentsCount || 0}
           </span>
         </div>
 

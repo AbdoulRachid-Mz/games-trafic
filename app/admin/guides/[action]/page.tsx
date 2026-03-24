@@ -10,13 +10,13 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  Image as ImageIcon,
-  Link,
   Save,
   X,
   ChevronUp,
   ChevronDown,
   Copy,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -51,97 +51,84 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { useGuides, useCreateGuide, useUpdateGuide } from "@/hooks/use-guides";
+import {
+  useGuideById,
+  useCreateGuide,
+  useUpdateGuide,
+} from "@/hooks/use-guides";
+import { useCategoriesByEntityType } from "@/hooks/use-categories";
+import { checkGuideTitleExists } from "@/actions/guides";
 import { useAuthContext } from "@/contexts/auth-context";
 import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
-import { SuccessDialog, ErrorDialog } from "@/components/shared/result-dialog";
 import {
-  GuideStep,
+  Guide,
   GuideWithRelations,
   NewGuide,
   NewGuideStep,
 } from "@/database/schema";
 
-// Predefined categories matching entityTypeEnum values
-const GUIDE_CATEGORIES = [
-  { value: "getting-started", label: "Premiers pas" },
-  { value: "shops", label: "Boutiques" },
-  { value: "tournaments", label: "Tournois" },
-  { value: "wallet", label: "Portefeuille" },
-  { value: "products", label: "Produits" },
-  { value: "security", label: "Sécurité" },
-  { value: "vip", label: "Programme VIP" },
-  { value: "community", label: "Communauté" },
-  { value: "technical", label: "Support technique" },
-] as const;
+// ============================================================================
+// Types et schémas
+// ============================================================================
 
-// Form schema and types
 const guideFormSchema = z.object({
-  title: z.string().min(1).max(200),
-  category: z.string().min(1),
+  title: z.string().min(1, "Le titre est requis").max(200, "Titre trop long"),
+  category: z.string().min(1, "La catégorie est requise"),
   description: z.string().optional(),
-
-  images: z.array(z.string()),           // ⬅️ REQUIRED
+  images: z.array(z.string()),
   isActive: z.boolean(),
-  isDeleted: z.boolean(),
-  viewCount: z.number(),
-  adminId: z.string().optional(),
-
   steps: z.array(
     z.object({
       id: z.string().optional(),
       order: z.number().min(1),
-      title: z.string().min(1),
-      content: z.string().min(1),
-      images: z.array(z.string()),        // ⬅️ REQUIRED
+      title: z.string().min(1, "Le titre de l'étape est requis"),
+      content: z.string().min(1, "Le contenu de l'étape est requis"),
+      images: z.array(z.string()),
     })
-  ).min(1),
+  ).min(1, "Au moins une étape est requise"),
 });
 
-
 type GuideFormData = z.infer<typeof guideFormSchema>;
+
+// ============================================================================
+// Composant principal
+// ============================================================================
 
 export default function GuideFormPage() {
   const router = useRouter();
   const params = useParams();
   const action = params.action as "create" | "edit";
   const guideId = params.id as string | undefined;
+  const { user } = useAuthContext();
 
   const isEdit = action === "edit" && guideId;
   const [activeTab, setActiveTab] = useState("info");
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showError, setShowError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const { user } = useAuthContext();
+  const [titleExists, setTitleExists] = useState(false);
 
-  // Fetch guide in edit mode
-  const { data: guideData, isLoading: isLoadingGuide } = useGuides(
-    isEdit
-      ? {
-          filters: { id: guideId },
-          options: { includeDeleted: false },
-        }
-      : undefined
+  // Fetch guide data
+  const { data: guide, isLoading: isLoadingGuide } = useGuideById(
+    guideId || ""
   );
-
-  const guide = guideData?.data?.[0] as GuideWithRelations | undefined;
 
   // Mutations
   const createGuide = useCreateGuide();
   const updateGuide = useUpdateGuide();
 
+  // Fetch categories
+  const { data: guideCategories = [] } = useCategoriesByEntityType("GUIDE");
+
   // Form initialization
   const {
-    control,
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
     getValues,
     reset,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, isValid },
   } = useForm<GuideFormData>({
     resolver: zodResolver(guideFormSchema),
     defaultValues: {
@@ -150,16 +137,7 @@ export default function GuideFormPage() {
       description: "",
       images: [],
       isActive: true,
-      isDeleted: false,
-      viewCount: 0,
-      steps: [
-        {
-          order: 1,
-          title: "",
-          content: "",
-          images: [],
-        },
-      ],
+      steps: [{ order: 1, title: "", content: "", images: [] }],
     },
   });
 
@@ -178,148 +156,188 @@ export default function GuideFormPage() {
         description: guide.description ?? "",
         images: guide.images ?? [],
         isActive: guide.isActive ?? true,
-        isDeleted: guide.isDeleted ?? false,
-        viewCount: guide.viewCount ?? 0,
-        steps:
-          guide.steps?.map((step: GuideStep, index: number) => ({
-            id: step.id,
-            order: step.order ?? index + 1,
-            title: step.title,
-            content: step.content,
-            images: step.images ?? [],
-          })) ?? [],
+        steps: (guide.steps ?? []).map((step: any, index: number) => ({
+          id: step.id,
+          order: step.order ?? index + 1,
+          title: step.title,
+          content: step.content,
+          images: step.images ?? [],
+        })),
       });
     }
   }, [isEdit, guide, reset]);
 
-  // Ajouter une étape
+  // Check title uniqueness on change
+  const currentTitle = watch("title");
+  useEffect(() => {
+    const checkTitle = async () => {
+      if (currentTitle && currentTitle.length > 2) {
+        const exists = await checkGuideTitleExists(currentTitle, guideId);
+        setTitleExists(exists);
+      } else {
+        setTitleExists(false);
+      }
+    };
+    const timeout = setTimeout(checkTitle, 500);
+    return () => clearTimeout(timeout);
+  }, [currentTitle, guideId]);
+
+  // Step management
   const addStep = () => {
-    const lastOrder =
-      fields.length > 0 ? Math.max(...fields.map((f) => f.order)) : 0;
-    append({
-      order: lastOrder + 1,
-      title: "",
-      content: "",
-      images: [],
-    });
+    const lastOrder = fields.length > 0 ? Math.max(...fields.map((f) => f.order)) : 0;
+    append({ order: lastOrder + 1, title: "", content: "", images: [] });
+    toast.success(`Étape ${fields.length + 1} ajoutée`);
   };
 
-  // Dupliquer une étape
   const duplicateStep = (index: number) => {
     const step = getValues(`steps.${index}`);
-    const lastOrder =
-      fields.length > 0 ? Math.max(...fields.map((f) => f.order)) : 0;
+    const newOrder = fields.length + 1;
     append({
       ...step,
-      order: lastOrder + 1,
+      order: newOrder,
       title: `${step.title} (copie)`,
     });
+    toast.success("Étape dupliquée");
   };
 
-  // Monter/descendre une étape
   const moveStep = (index: number, direction: "up" | "down") => {
     if (direction === "up" && index > 0) {
       move(index, index - 1);
-      // Mettre à jour les ordres
-      fields.forEach((field, i) => {
-        update(i, { ...field, order: i + 1 });
-      });
     } else if (direction === "down" && index < fields.length - 1) {
       move(index, index + 1);
-      // Mettre à jour les ordres
-      fields.forEach((field, i) => {
-        update(i, { ...field, order: i + 1 });
-      });
     }
+    // Reorder steps
+    fields.forEach((_, i) => {
+      update(i, { ...getValues(`steps.${i}`), order: i + 1 });
+    });
   };
 
-  // Soumission du formulaire
+  const removeStep = (index: number) => {
+    if (fields.length <= 1) {
+      toast.error("Il doit y avoir au moins une étape");
+      return;
+    }
+    remove(index);
+    // Reorder remaining steps
+    fields.forEach((_, i) => {
+      if (i !== index) {
+        update(i, { ...getValues(`steps.${i}`), order: i + 1 });
+      }
+    });
+    toast.success("Étape supprimée");
+  };
+
+  // Form submission
   const onSubmit: SubmitHandler<GuideFormData> = async (data) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      toast.error("Vous devez être connecté");
+      return;
+    }
 
-    const payload = {
-      ...data,
-      adminId: user.id,
-      steps: data.steps.map((s, i) => ({
-        ...s,
-        order: i + 1,
-      })),
-    };
+    if (titleExists) {
+      toast.error("Un guide avec ce titre existe déjà");
+      return;
+    }
 
-    if (isEdit && guideId) {
-      await updateGuide.mutateAsync({ id: guideId, data: payload });
-    } else {
-      await createGuide.mutateAsync(payload);
+    // Check for duplicate step titles
+    const stepTitles = data.steps.map((s) => s.title.trim().toLowerCase());
+    const hasDuplicateTitles = stepTitles.some(
+      (title, index) => stepTitles.indexOf(title) !== index
+    );
+    if (hasDuplicateTitles) {
+      toast.error("Les titres des étapes doivent être uniques");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        ...data,
+        adminId: user.id,
+        steps: data.steps.map((s, i) => ({
+          ...s,
+          order: i + 1,
+        })),
+      };
+
+      if (isEdit && guideId) {
+        await updateGuide.mutateAsync({ id: guideId, data: payload });
+        toast.success("Guide mis à jour avec succès");
+      } else {
+        await createGuide.mutateAsync(payload);
+        toast.success("Guide créé avec succès");
+      }
+
+      setTimeout(() => {
+        router.push("/admin/guides");
+      }, 1500);
+    } catch (error) {
+      console.error("Error saving guide:", error);
+      toast.error("Erreur lors de l'enregistrement du guide");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Prévisualisation
+  // Preview renderer
   const renderPreview = () => {
-    const formData = watch();
+    const data = watch();
     return (
-      <div className="space-y-6">
-        {/* En-tête du guide */}
-        <div className="border rounded-lg p-6 bg-gradient-to-r from-primary/5 to-primary/10">
-          <Typography variant="h1" weight="bold" className="mb-2">
-            {formData.title || "Sans titre"}
-          </Typography>
-          <div className="flex items-center gap-2 mb-4">
-            <Badge>{formData.category || "Non catégorisé"}</Badge>
-            <Badge variant={formData.isActive ? "default" : "secondary"}>
-              {formData.isActive ? "Actif" : "Inactif"}
+      <div className="space-y-8 max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="border rounded-xl p-8 bg-gradient-to-r from-primary/5 to-primary/10">
+          <h1 className="text-3xl font-bold mb-2">{data.title || "Sans titre"}</h1>
+          <div className="flex flex-wrap gap-2 mb-4">
+            <Badge variant="secondary">{data.category}</Badge>
+            <Badge variant={data.isActive ? "default" : "secondary"}>
+              {data.isActive ? "Actif" : "Inactif"}
             </Badge>
           </div>
-          {formData.description && (
-            <Typography variant="lead">{formData.description}</Typography>
+          {data.description && (
+            <p className="text-muted-foreground">{data.description}</p>
           )}
         </div>
 
-        {/* Images du guide */}
-        {formData.images && formData.images.length > 0 && (
-          <div className="grid grid-cols-2 gap-4">
-            {formData.images.map((image, index) => (
-              <div key={index} className="relative">
-                <img
-                  src={image}
-                  alt={`Image ${index + 1}`}
-                  className="rounded-lg w-full h-48 object-cover"
-                />
-              </div>
+        {/* Guide Images */}
+        {data.images && data.images.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {data.images.map((image, idx) => (
+              <img
+                key={idx}
+                src={image}
+                alt={`Image ${idx + 1}`}
+                className="rounded-lg w-full h-40 object-cover border"
+              />
             ))}
           </div>
         )}
 
-        {/* Étapes */}
+        {/* Steps */}
         <div className="space-y-6">
-          {formData.steps.map((step, index) => (
-            <Card key={index} className="relative">
+          {data.steps.map((step, idx) => (
+            <Card key={idx} className="relative">
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline">Étape {index + 1}</Badge>
-                      <CardTitle>{step.title || "Sans titre"}</CardTitle>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="rounded-full">
+                    Étape {idx + 1}
+                  </Badge>
+                  <CardTitle className="text-xl">{step.title || "Sans titre"}</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent>
-                <Typography
-                  variant="body-base"
-                  className="whitespace-pre-wrap mb-4"
-                >
-                  {step.content}
-                </Typography>
-
-                {/* Images de l'étape */}
+              <CardContent className="space-y-4">
+                <div className="prose prose-gray dark:prose-invert max-w-none">
+                  {step.content.split("\n").map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </div>
                 {step.images && step.images.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    {step.images.map((image, imgIndex) => (
+                  <div className="grid grid-cols-2 gap-3">
+                    {step.images.map((img, imgIdx) => (
                       <img
-                        key={imgIndex}
-                        src={image}
-                        alt={`Image étape ${index + 1}`}
-                        className="rounded-lg w-full h-32 object-cover"
+                        key={imgIdx}
+                        src={img}
+                        alt={`Étape ${idx + 1} - ${imgIdx + 1}`}
+                        className="rounded-lg w-full h-32 object-cover border"
                       />
                     ))}
                   </div>
@@ -332,132 +350,132 @@ export default function GuideFormPage() {
     );
   };
 
+  // Loading state
   if (isLoadingGuide && isEdit) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center py-12">
-          <Typography variant="h3">Chargement du guide...</Typography>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <Typography variant="body-base">Chargement du guide...</Typography>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* En-tête */}
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="mb-2"
-          >
+          <Button variant="ghost" onClick={() => router.back()} className="mb-2">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Retour
           </Button>
-          <Typography variant="h1" weight="bold">
+          <h1 className="text-3xl font-bold">
             {isEdit ? "Modifier le guide" : "Créer un nouveau guide"}
-          </Typography>
-          <Typography variant="lead" theme="muted">
+          </h1>
+          <p className="text-muted-foreground">
             {isEdit
               ? "Modifiez les informations du guide et ses étapes"
-              : "Créez un guide complet avec plusieurs étapes"}
-          </Typography>
+              : "Créez un guide complet avec plusieurs étapes pour aider les utilisateurs"}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             onClick={() => setPreviewMode(!previewMode)}
+            className="gap-2"
           >
             {previewMode ? (
               <>
-                <EyeOff className="h-4 w-4 mr-2" />
+                <EyeOff className="h-4 w-4" />
                 Éditer
               </>
             ) : (
               <>
-                <Eye className="h-4 w-4 mr-2" />
+                <Eye className="h-4 w-4" />
                 Prévisualiser
               </>
             )}
           </Button>
           <Button
             onClick={handleSubmit(onSubmit)}
-            disabled={saving || !!(isEdit && !isDirty)}
+            disabled={saving || titleExists || (isEdit && !isDirty) || !isValid}
+            className="gap-2"
           >
-            <Save className="h-4 w-4 mr-2" />
+            <Save className="h-4 w-4" />
             {saving ? "Enregistrement..." : "Enregistrer"}
           </Button>
         </div>
       </div>
 
-      {/* Mode prévisualisation */}
+      {/* Preview Mode */}
       {previewMode ? (
         renderPreview()
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Formulaire principal */}
+          {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2">
-                <TabsTrigger value="info">Informations</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="info">Informations générales</TabsTrigger>
                 <TabsTrigger value="steps">
                   Étapes ({fields.length})
                 </TabsTrigger>
               </TabsList>
 
-              {/* Informations du guide */}
-              <TabsContent value="info" className="space-y-6">
+              {/* Info Tab */}
+              <TabsContent value="info" className="space-y-6 mt-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Informations générales</CardTitle>
+                    <CardTitle>Informations du guide</CardTitle>
                     <CardDescription>
                       Définissez le titre, la catégorie et la description
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Titre */}
+                  <CardContent className="space-y-5">
+                    {/* Title */}
                     <div className="space-y-2">
                       <Label htmlFor="title">Titre *</Label>
-                      <Input
-                        id="title"
-                        placeholder="Ex: Comment créer une boutique"
-                        {...register("title")}
-                        className={errors.title ? "border-destructive" : ""}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="title"
+                          placeholder="Ex: Comment créer une boutique sur Games Trafic"
+                          {...register("title")}
+                          className={errors.title ? "border-destructive" : ""}
+                        />
+                        {titleExists && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <AlertCircle className="h-5 w-5 text-destructive" />
+                          </div>
+                        )}
+                      </div>
+                      {titleExists && (
+                        <p className="text-sm text-destructive">
+                          Un guide avec ce titre existe déjà
+                        </p>
+                      )}
                       {errors.title && (
-                        <Typography variant="caption1" theme="danger">
-                          {errors.title.message}
-                        </Typography>
+                        <p className="text-sm text-destructive">{errors.title.message}</p>
                       )}
                     </div>
 
-                    {/* Catégorie */}
+                    {/* Category */}
                     <div className="space-y-2">
                       <Label htmlFor="category">Catégorie *</Label>
                       <Controller
                         control={control}
                         name="category"
                         render={({ field }) => (
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger
-                              className={
-                                errors.category ? "border-destructive" : ""
-                              }
-                            >
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className={errors.category ? "border-destructive" : ""}>
                               <SelectValue placeholder="Sélectionnez une catégorie" />
                             </SelectTrigger>
                             <SelectContent>
-                              {GUIDE_CATEGORIES.map((category) => (
-                                <SelectItem
-                                  key={category.value}
-                                  value={category.value}
-                                >
-                                  {category.label}
+                              {guideCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.slug}>
+                                  {cat.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -465,9 +483,7 @@ export default function GuideFormPage() {
                         )}
                       />
                       {errors.category && (
-                        <Typography variant="caption1" theme="danger">
-                          {errors.category.message}
-                        </Typography>
+                        <p className="text-sm text-destructive">{errors.category.message}</p>
                       )}
                     </div>
 
@@ -476,45 +492,46 @@ export default function GuideFormPage() {
                       <Label htmlFor="description">Description</Label>
                       <Textarea
                         id="description"
-                        placeholder="Description détaillée du guide..."
-                        rows={4}
+                        placeholder="Décrivez brièvement ce guide..."
+                        rows={3}
                         {...register("description")}
                       />
                     </div>
 
-                    {/* Images du guide */}
-                    <div className="space-y-4">
+                    {/* Images */}
+                    <div className="space-y-2">
                       <Label>Images du guide</Label>
                       <Controller
                         control={control}
                         name="images"
                         render={({ field }) => (
                           <AdvancedMultiUpload
-                            value={field.value ?? []}
+                            value={field.value}
                             onChange={field.onChange}
                             uploadPath="guides/main"
                             disabled={saving}
+                            maxImages={5}
                           />
                         )}
                       />
                     </div>
 
-                    {/* Statut */}
+                    {/* Status */}
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <Label htmlFor="isActive" className="font-medium">
                           Guide actif
                         </Label>
-                        <Typography variant="caption1" theme="muted">
+                        <p className="text-sm text-muted-foreground">
                           Le guide sera visible par les utilisateurs
-                        </Typography>
+                        </p>
                       </div>
                       <Controller
                         control={control}
                         name="isActive"
                         render={({ field }) => (
                           <Switch
-                            checked={field.value ?? false}
+                            checked={field.value}
                             onCheckedChange={field.onChange}
                           />
                         )}
@@ -524,8 +541,8 @@ export default function GuideFormPage() {
                 </Card>
               </TabsContent>
 
-              {/* Étapes du guide */}
-              <TabsContent value="steps" className="space-y-6">
+              {/* Steps Tab */}
+              <TabsContent value="steps" className="space-y-6 mt-6">
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-center">
@@ -535,12 +552,7 @@ export default function GuideFormPage() {
                           Organisez les étapes dans l'ordre logique
                         </CardDescription>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addStep}
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={addStep}>
                         <Plus className="h-4 w-4 mr-2" />
                         Ajouter une étape
                       </Button>
@@ -554,15 +566,14 @@ export default function GuideFormPage() {
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20 }}
-                          className="mb-6"
+                          className="mb-6 last:mb-0"
                         >
-                          <Card className="relative">
-                            {/* En-tête de l'étape */}
+                          <Card className="border-2 hover:border-primary/30 transition-colors">
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Badge variant="outline">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <Badge variant="outline" className="rounded-full">
                                       Étape {index + 1}
                                     </Badge>
                                     <div className="flex gap-1">
@@ -572,7 +583,7 @@ export default function GuideFormPage() {
                                         size="icon"
                                         onClick={() => moveStep(index, "up")}
                                         disabled={index === 0}
-                                        className="h-6 w-6"
+                                        className="h-7 w-7"
                                       >
                                         <ChevronUp className="h-3 w-3" />
                                       </Button>
@@ -582,7 +593,7 @@ export default function GuideFormPage() {
                                         size="icon"
                                         onClick={() => moveStep(index, "down")}
                                         disabled={index === fields.length - 1}
-                                        className="h-6 w-6"
+                                        className="h-7 w-7"
                                       >
                                         <ChevronDown className="h-3 w-3" />
                                       </Button>
@@ -591,76 +602,65 @@ export default function GuideFormPage() {
                                   <Input
                                     placeholder="Titre de l'étape"
                                     {...register(`steps.${index}.title`)}
-                                    className={
-                                      errors.steps?.[index]?.title
-                                        ? "border-destructive"
-                                        : ""
-                                    }
+                                    className={errors.steps?.[index]?.title ? "border-destructive" : ""}
                                   />
                                   {errors.steps?.[index]?.title && (
-                                    <Typography
-                                      variant="caption1"
-                                      theme="danger"
-                                    >
+                                    <p className="text-sm text-destructive mt-1">
                                       {errors.steps[index].title.message}
-                                    </Typography>
+                                    </p>
                                   )}
                                 </div>
-                                <div className="flex gap-1 ml-2">
+                                <div className="flex gap-1 ml-3">
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => duplicateStep(index)}
                                     className="h-8 w-8"
+                                    title="Dupliquer"
                                   >
                                     <Copy className="h-3 w-3" />
                                   </Button>
-                                  {fields.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => remove(index)}
-                                      className="h-8 w-8 text-destructive hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeStep(index)}
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
                                 </div>
                               </div>
                             </CardHeader>
 
                             <CardContent className="space-y-4">
-                              {/* Contenu de l'étape */}
+                              {/* Content */}
                               <div className="space-y-2">
-                                <Label>Contenu</Label>
+                                <Label>Contenu *</Label>
                                 <Textarea
                                   placeholder="Décrivez cette étape en détail..."
-                                  rows={6}
+                                  rows={5}
                                   {...register(`steps.${index}.content`)}
-                                  className={
-                                    errors.steps?.[index]?.content
-                                      ? "border-destructive"
-                                      : ""
-                                  }
+                                  className={errors.steps?.[index]?.content ? "border-destructive" : ""}
                                 />
                                 {errors.steps?.[index]?.content && (
-                                  <Typography variant="caption1" theme="danger">
+                                  <p className="text-sm text-destructive">
                                     {errors.steps[index].content.message}
-                                  </Typography>
+                                  </p>
                                 )}
                               </div>
 
-                              {/* Images de l'étape */}
-                              <div className="space-y-4">
+                              {/* Step Images */}
+                              <div className="space-y-2">
                                 <Label>Images de l'étape (optionnel)</Label>
                                 <Controller
                                   control={control}
                                   name={`steps.${index}.images`}
                                   render={({ field }) => (
                                     <AdvancedMultiUpload
-                                      value={field.value ?? []}
+                                      value={field.value}
                                       onChange={field.onChange}
                                       uploadPath={`guides/steps/${index}`}
                                       disabled={saving}
@@ -675,216 +675,158 @@ export default function GuideFormPage() {
                       ))}
                     </AnimatePresence>
 
-                    {/* Bouton ajouter étape en bas */}
-                    <div className="mt-6 pt-6 border-t">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={addStep}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Ajouter une nouvelle étape
-                      </Button>
-                    </div>
+                    {fields.length === 0 && (
+                      <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                        <p className="text-muted-foreground mb-4">Aucune étape</p>
+                        <Button type="button" variant="outline" onClick={addStep}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ajouter une étape
+                        </Button>
+                      </div>
+                    )}
+
+                    {fields.length > 0 && (
+                      <div className="mt-6 pt-4 border-t">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={addStep}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Ajouter une nouvelle étape
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
             </Tabs>
           </div>
 
-          {/* Panneau latéral - Aperçu & Stats */}
+          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Aperçu rapide */}
+            {/* Quick Preview */}
             <Card>
               <CardHeader>
                 <CardTitle>Aperçu rapide</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Titre</Label>
-                  <Typography
-                    variant="body-base"
-                    className="font-medium truncate"
-                  >
-                    {watch("title") || "Sans titre"}
-                  </Typography>
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">
+                    Titre
+                  </Label>
+                  <p className="font-medium line-clamp-2">
+                    {watch("title") || "—"}
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Catégorie</Label>
-                  <Badge>
-                    {GUIDE_CATEGORIES.find((c) => c.value === watch("category"))
-                      ?.label || "Non catégorisé"}
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">
+                    Catégorie
+                  </Label>
+                  <Badge variant="secondary" className="mt-1">
+                    {guideCategories.find(c => c.slug === watch("category"))?.name || "—"}
                   </Badge>
                 </div>
-                <div className="space-y-2">
-                  <Label>Nombre d'étapes</Label>
-                  <Typography variant="body-base" weight="bold">
-                    {fields.length} étape{fields.length > 1 ? "s" : ""}
-                  </Typography>
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">
+                    Étapes
+                  </Label>
+                  <p className="text-2xl font-bold">{fields.length}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Statut</Label>
-                  <Badge variant={watch("isActive") ? "default" : "secondary"}>
-                    {watch("isActive") ? "Actif" : "Inactif"}
-                  </Badge>
+                <Separator />
+                <div>
+                  <Label className="text-muted-foreground text-xs uppercase tracking-wider">
+                    Statut
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    {watch("isActive") ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span>Actif</span>
+                      </>
+                    ) : (
+                      <>
+                        <X className="h-4 w-4 text-muted-foreground" />
+                        <span>Inactif</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Conseils */}
+            {/* Tips */}
             <Card>
               <CardHeader>
-                <CardTitle>Conseils</CardTitle>
+                <CardTitle>💡 Conseils</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-start gap-2">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <Typography variant="body-sm">
-                    <strong>Titres clairs :</strong> Commencez par des verbes
-                    d'action
-                  </Typography>
+                <div className="flex gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
+                  <p className="text-sm"><strong>Titres clairs :</strong> Utilisez des verbes d'action</p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <Typography variant="body-sm">
-                    <strong>Étapes courtes :</strong> Une idée par étape pour
-                    plus de clarté
-                  </Typography>
+                <div className="flex gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
+                  <p className="text-sm"><strong>Étapes courtes :</strong> Une idée par étape</p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <Typography variant="body-sm">
-                    <strong>Images :</strong> Ajoutez des captures d'écran pour
-                    illustrer
-                  </Typography>
+                <div className="flex gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
+                  <p className="text-sm"><strong>Images :</strong> Ajoutez des captures d'écran</p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <Typography variant="body-sm">
-                    <strong>Ordre logique :</strong> Organisez les étapes du
-                    plus simple au plus complexe
-                  </Typography>
+                <div className="flex gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
+                  <p className="text-sm"><strong>Ordre logique :</strong> Du simple au complexe</p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Statut du formulaire */}
+            {/* Validation Status */}
             <Card>
               <CardHeader>
-                <CardTitle>Statut</CardTitle>
+                <CardTitle>✅ Validation</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Typography variant="body-sm">Formulaire modifié</Typography>
-                  <Badge variant={isDirty ? "default" : "secondary"}>
-                    {isDirty ? "Oui" : "Non"}
+                <div className="flex justify-between">
+                  <span className="text-sm">Titre valide</span>
+                  <Badge variant={!titleExists && watch("title") ? "default" : "secondary"}>
+                    {!titleExists && watch("title") ? "OK" : "En attente"}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Typography variant="body-sm">Étapes complètes</Typography>
-                  <Badge
-                    variant={
-                      fields.every((f) => f.title && f.content)
-                        ? "default"
-                        : "secondary"
-                    }
-                  >
-                    {fields.filter((f) => f.title && f.content).length}/
-                    {fields.length}
+                <div className="flex justify-between">
+                  <span className="text-sm">Catégorie</span>
+                  <Badge variant={watch("category") ? "default" : "secondary"}>
+                    {watch("category") ? "OK" : "Requis"}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Typography variant="body-sm">Images</Typography>
-                  <Badge variant="outline">
-                    {watch("images")?.length || 0}
+                <div className="flex justify-between">
+                  <span className="text-sm">Étapes complètes</span>
+                  <Badge variant={fields.every(f => f.title && f.content) ? "default" : "secondary"}>
+                    {fields.filter(f => f.title && f.content).length}/{fields.length}
                   </Badge>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions rapides */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    const data = getValues();
-                    console.log("Données du formulaire:", data);
-                    toast.info("Données loguées dans la console");
-                  }}
-                >
-                  <Link className="h-4 w-4 mr-2" />
-                  Voir les données
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setPreviewMode(true)}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Prévisualiser
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-destructive hover:text-destructive"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Voulez-vous vraiment annuler les modifications ?"
-                      )
-                    ) {
-                      reset();
-                    }
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Annuler les modifications
-                </Button>
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="text-sm">Prêt à publier</span>
+                  <Badge variant={isValid && !titleExists && watch("title") ? "default" : "secondary"}>
+                    {isValid && !titleExists && watch("title") ? "Oui" : "Non"}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
       )}
 
-      {/* Alertes d'erreurs */}
+      {/* Global Errors Alert */}
       {(Object.keys(errors).length > 0 || errors.steps?.length) && (
         <Alert variant="destructive" className="mt-6">
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Il y a des erreurs dans le formulaire. Veuillez les corriger avant
-            de soumettre.
+            Des erreurs sont présentes dans le formulaire. Veuillez les corriger avant de soumettre.
           </AlertDescription>
         </Alert>
       )}
-
-      <SuccessDialog
-        open={showSuccess}
-        onOpenChange={setShowSuccess}
-        title={isEdit ? "Guide mis à jour" : "Guide créé"}
-        description={
-          isEdit
-            ? "Le guide a été mis à jour avec succès."
-            : "Le nouveau guide a été créé avec succès."
-        }
-        actions={[
-          {
-            label: "Retour à la liste",
-            onClick: () => router.push("/admin/guides"),
-          },
-        ]}
-      />
-      {/* Dialogs de résultat */}
-
-      <ErrorDialog
-        open={showError}
-        onOpenChange={setShowError}
-        title="Erreur"
-        description={errorMessage}
-      />
     </div>
   );
 }

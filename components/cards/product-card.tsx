@@ -25,21 +25,18 @@ import {
   CheckCircle,
 } from "lucide-react";
 import type { Product, ProductWithRelations } from "@/database/schema";
+import { type ProductCard as ProductCardType } from "@/types/view-models";
 
 // Types
 type ViewMode = "grid" | "list" | "compact";
 type GameCategory = "action" | "rpg" | "sports" | "strategy" | "mobile" | "other";
 
 interface ProductCardProps {
-  product: Product & {
-    category?: {
-      name: string;
-      slug: string;
-    };
+  product: ProductCardType & {
+    description?: string | null;
     stats?: {
-      views: number;
-      likes: number;
-      purchases: number;
+      likes?: number;
+      purchases?: number;
     };
   };
   viewMode?: ViewMode;

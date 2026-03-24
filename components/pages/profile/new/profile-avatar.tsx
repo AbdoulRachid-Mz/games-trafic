@@ -70,7 +70,7 @@ export function ProfileAvatar({
         onClick={() => !isOwnProfile && setShowViewer(true)}
       >
         <Avatar className="w-full h-full">
-          <AvatarImage src={src || "/images/default-avatar.jpg"} alt={username} />
+          <AvatarImage src={src || "/images/icons/avatar/man.png"} alt={username} />
           <AvatarFallback className="text-2xl">
             <User className="w-1/2 h-1/2" />
           </AvatarFallback>

@@ -4,6 +4,8 @@ import { appSettings, type AppSettings, type NewAppSettings } from '@/database/s
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import type { AppSettingsUpdate } from '@/config/app-config';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -13,6 +15,9 @@ import type { AppSettingsUpdate } from '@/config/app-config';
  * Récupère la configuration actuelle (singleton)
  */
 export async function getAppSettings(): Promise<NewAppSettings | null> {
+  'use cache';
+  cacheTag('app-settings');
+  cacheLife('hours');
   try {
     const rows = await db.select().from(appSettings).limit(1);
     return rows[0] ?? null;
@@ -126,6 +131,7 @@ export async function updateAppSettings(
       .set(updateData)
       .returning();
     
+    revalidateTag('app-settings', 'max');
     return updated;
   } catch (error) {
     console.error('Error updating app settings:', error);
@@ -148,6 +154,7 @@ export async function setAppSettingValue<K extends keyof NewAppSettings>(
       .returning();
     
     if (!updated) throw new Error('App settings not found');
+    revalidateTag('app-settings', 'max');
     return updated;
   } catch (error) {
     console.error(`Error setting ${String(key)}:`, error);

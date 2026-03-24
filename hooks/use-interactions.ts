@@ -14,11 +14,7 @@ import {
   getInteractionStats,
   checkInteractionExists,
   getEntityInteractionsWithRelations,
-//   type Interaction,
-//   type NewInteraction,
-//   type InteractionFilters,
-//   type ListQuery,
-//   type PaginationResponse,
+  getInteractionsWithRelations,
 } from '@/actions/interactions';
 import { toast } from 'sonner';
 import { InteractionFilters, ListQuery, PaginationResponse } from '@/types/api';
@@ -56,6 +52,18 @@ export function useInteractions(query: ListQuery<InteractionFilters> = {}) {
     queryFn: () => getInteractions(query),
     placeholderData: keepPreviousData => keepPreviousData,
     // keepPreviousData: true,
+  });
+}
+
+/** Hook pour lister les interactions avec pagination/filtres et relations */
+export function useInteractionsWithRelations(
+  filters?: InteractionFilters,
+  pagination?: { page: number; limit: number },
+  options?: QueryOptions
+) {
+  return useQuery({
+    queryKey: ['interactions-with-relations', filters, pagination, options],
+    queryFn: () => getInteractionsWithRelations(filters, pagination, options),
   });
 }
 

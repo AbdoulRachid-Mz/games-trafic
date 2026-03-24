@@ -7,10 +7,5 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getCurrentUser();
-  if (!session?.id) {
-    redirect("/offline");
-  }
-
   return <>{children}</>;
 }

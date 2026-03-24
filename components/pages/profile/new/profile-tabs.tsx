@@ -16,12 +16,13 @@ import {
     Loader2,
     User as UserIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { ProfileInfo } from "./profile-info";
 import type { UserWithAllRelations } from "@/actions/users";
-import { useEntityInteractionsWithRelations } from "@/hooks/use-interactions";
+import { useInteractionsWithRelations } from "@/hooks/use-interactions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Typography } from "@/components/ui/typography";
 import { InteractionButton } from "@/components/shared/interaction-button";
@@ -32,11 +33,23 @@ interface ProfileTabsProps {
     profileUser: any;
     isOwnProfile?: boolean;
     className?: string;
+    activeTab?: string;
+    onTabChange?: (tab: string) => void;
     onUpdate?: (data: Partial<UserWithAllRelations>) => Promise<void>;
 }
 
-export function ProfileTabs({ profileUser, isOwnProfile, className, onUpdate }: ProfileTabsProps) {
-    const [activeTab, setActiveTab] = useState("about");
+export function ProfileTabs({
+    profileUser,
+    isOwnProfile,
+    className,
+    activeTab: externalActiveTab,
+    onTabChange: externalOnTabChange,
+    onUpdate
+}: ProfileTabsProps) {
+    const [internalActiveTab, setInternalActiveTab] = useState("about");
+
+    const activeTab = externalActiveTab || internalActiveTab;
+    const setActiveTab = externalOnTabChange || setInternalActiveTab;
 
     const tabs = [
         { id: "about", label: "À propos", icon: Info },
@@ -81,18 +94,18 @@ export function ProfileTabs({ profileUser, isOwnProfile, className, onUpdate }: 
                     </TabsContent>
 
                     <TabsContent value="followers" className="mt-0">
-                        <PeopleList 
-                            userId={profileUser.id} 
-                            type="FOLLOWERS" 
-                            isOwnProfile={isOwnProfile} 
+                        <PeopleList
+                            userId={profileUser.id}
+                            type="FOLLOWERS"
+                            isOwnProfile={isOwnProfile}
                         />
                     </TabsContent>
 
                     <TabsContent value="following" className="mt-0">
-                        <PeopleList 
-                            userId={profileUser.id} 
-                            type="FOLLOWING" 
-                            isOwnProfile={isOwnProfile} 
+                        <PeopleList
+                            userId={profileUser.id}
+                            type="FOLLOWING"
+                            isOwnProfile={isOwnProfile}
                         />
                     </TabsContent>
 
@@ -122,28 +135,45 @@ export function ProfileTabs({ profileUser, isOwnProfile, className, onUpdate }: 
 // Composant réutilisable pour les listes de personnes (Abonnés/Abonnements)
 function PeopleList({ userId, type, isOwnProfile }: { userId: string; type: "FOLLOWERS" | "FOLLOWING"; isOwnProfile?: boolean }) {
     const [search, setSearch] = useState("");
-    
-    // Pour FOLLOWERS, on veut ceux qui nous suivent (targetId = userId)
-    // Pour FOLLOWING, on veut ceux qu'on suit (userId = userId)
-    const interactionOptions = type === "FOLLOWERS" 
-        ? { types: ["FOLLOW"] as any } // Les interactions pointant VERS l'utilisateur
-        : { types: ["FOLLOW"] as any }; // Les interactions DE l'utilisateur
-        
-    // Note: useEntityInteractionsWithRelations a besoin d'être configuré correctement selon le type
-    // On suppose ici qu'il renvoie les relations appropriées.
-    const { data: people = [], isLoading } = useEntityInteractionsWithRelations(
-        userId,
-        "USER",
-        interactionOptions,
-        { page: 1, limit: 50 },
+    const [page, setPage] = useState(1);
+    const limit = 20;
+
+    // Pour FOLLOWERS: entityId = profileUserId, entityType = "USER", type = "FOLLOW"
+    // Pour FOLLOWING: userId = profileUserId, entityType = "USER", type = "FOLLOW"
+    const filters = type === "FOLLOWERS"
+        ? { entityId: userId, entityType: "USER" as any, types: ["FOLLOW"] as any }
+        : { userId: userId, entityType: "USER" as any, types: ["FOLLOW"] as any };
+
+    const { data: response, isLoading, isFetching } = useInteractionsWithRelations(
+        filters,
+        { page, limit },
         { populate: ["user"] }
     );
 
-    const filteredPeople = people.filter((p) => {
-        const targetUser = p.user;
-        return targetUser?.username?.toLowerCase().includes(search.toLowerCase()) ||
-               targetUser?.fullName?.toLowerCase().includes(search.toLowerCase());
+    const [allPeople, setAllPeople] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (response?.data && Array.isArray(response.data)) {
+            if (page === 1) {
+                setAllPeople(response.data);
+            } else {
+                setAllPeople(prev => [...prev, ...response.data]);
+            }
+        }
+    }, [response, page]);
+
+    const filteredPeople = allPeople.filter((interaction) => {
+        // Pour FOLLOWERS: l'abonné est interaction.user
+        // Pour FOLLOWING: la personne suivie est interaction.targetUser
+        const person = type === "FOLLOWERS" ? interaction.user : interaction.targetUser;
+
+        if (!person) return false;
+
+        return person.username?.toLowerCase().includes(search.toLowerCase()) ||
+            person.fullName?.toLowerCase().includes(search.toLowerCase());
     });
+
+    const hasMore = response?.pagination?.hasNext;
 
     return (
         <div className="space-y-6">
@@ -152,12 +182,15 @@ function PeopleList({ userId, type, isOwnProfile }: { userId: string; type: "FOL
                 <Input
                     placeholder={`Rechercher parmi les ${type === "FOLLOWERS" ? "abonnés" : "abonnements"}...`}
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1); // Reset page on search
+                    }}
                     className="pl-10"
                 />
             </div>
 
-            {isLoading ? (
+            {isLoading && page === 1 ? (
                 <div className="flex items-center justify-center py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
@@ -169,47 +202,63 @@ function PeopleList({ userId, type, isOwnProfile }: { userId: string; type: "FOL
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredPeople.map((interaction, index) => {
-                        const person = interaction.user;
-                        if (!person) return null;
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredPeople.map((interaction, index) => {
+                            const person = type === "FOLLOWERS" ? interaction.user : interaction.targetUser;
+                            if (!person) return null;
 
-                        return (
-                            <motion.div
-                                key={interaction.id}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: index * 0.05 }}
-                                className="flex items-center justify-between p-4 rounded-xl border bg-card hover:shadow-md transition-all"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                                        <AvatarImage src={person.profileImage || ""} />
-                                        <AvatarFallback>
-                                            <UserIcon className="h-6 w-6" />
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col">
-                                        <Typography variant="body-base" weight="bold">
-                                            {person.fullName || person.username}
-                                        </Typography>
-                                        <Typography variant="body-sm" theme="muted">
-                                            @{person.username}
-                                        </Typography>
+                            return (
+                                <motion.div
+                                    key={`${interaction.id}-${index}`}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: (index % limit) * 0.05 }}
+                                    className="flex items-center justify-between p-4 rounded-xl border bg-card hover:shadow-md transition-all"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+                                            <AvatarImage src={person.profileImage || ""} />
+                                            <AvatarFallback>
+                                                <UserIcon className="h-6 w-6" />
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col">
+                                            <Typography variant="body-base" weight="bold">
+                                                {person.fullName || person.username}
+                                            </Typography>
+                                            <Typography variant="body-sm" theme="muted">
+                                                @{person.username}
+                                            </Typography>
+                                        </div>
                                     </div>
-                                </div>
-                                <InteractionButton
-                                    type="follow"
-                                    entityType="USER"
-                                    entityId={person.id}
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-full px-4"
-                                />
-                            </motion.div>
-                        );
-                    })}
-                </div>
+                                    <InteractionButton
+                                        type="follow"
+                                        entityType="USER"
+                                        entityId={person.id}
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-full px-4"
+                                    />
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+
+                    {hasMore && (
+                        <div className="flex justify-center mt-8">
+                            <Button
+                                variant="outline"
+                                onClick={() => setPage(prev => prev + 1)}
+                                disabled={isFetching}
+                                className="gap-2"
+                            >
+                                {isFetching && <Loader2 className="h-4 w-4 animate-spin" />}
+                                Charger plus
+                            </Button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

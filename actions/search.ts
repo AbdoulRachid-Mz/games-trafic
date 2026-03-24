@@ -11,6 +11,7 @@ import {
 import { db } from '@/lib/db';
 import { ilike, or, and, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { cacheTag, cacheLife } from 'next/cache';
 
 // Types pour les résultats de recherche
 export interface SearchResult<T = any> {
@@ -361,6 +362,9 @@ export async function getSearchTrends(
   limit: number = 10,
   days: number = 7
 ): Promise<Array<{ query: string; count: number }>> {
+  'use cache';
+  cacheTag('search');
+  cacheLife('minutes');
   try {
     const dateFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     

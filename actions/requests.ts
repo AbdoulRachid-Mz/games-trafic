@@ -10,6 +10,7 @@ import {
   type WalletTransaction,
   userWallets,
   NewWalletTransaction,
+  type RequestWithRelations,
 } from '@/database/schema';
 import {
   eq,
@@ -43,6 +44,8 @@ import { getCurrentUser } from '@/lib/auth/session';
 // ============================================================================
 // QUERIES - Lecture des données
 // ============================================================================
+//type requests
+export type RequestType = 'DEPOSIT' | 'WITHDRAWAL' | 'GAME_ITEMS' | 'OTHER';
 
 /**
  * Récupère une requête par son ID avec relations optionnelles
@@ -50,7 +53,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 export async function getRequestById(
   id: string,
   options?: { populate?: string[] }
-): Promise<Request | null> {
+): Promise<RequestWithRelations | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.requests.findFirst({
@@ -62,7 +65,7 @@ export async function getRequestById(
           processedBy: options.populate.includes('processedBy') ? true : undefined,
         },
       });
-      return (await query) ?? null;
+      return (await query) as RequestWithRelations ?? null;
     }
 
     const result = await db
@@ -71,7 +74,7 @@ export async function getRequestById(
       .where(eq(requests.id, id))
       .limit(1);
 
-    return result[0] || null;
+    return (result[0] as RequestWithRelations) || null;
   } catch (error) {
     console.error('Error getting request by ID:', error);
     throw new Error('Failed to fetch request');
@@ -84,7 +87,7 @@ export async function getRequestById(
 export async function getUserRequests(
   userId: string,
   query: ListQuery<RequestFilters> = {}
-): Promise<PaginationResponse<Request>> {
+): Promise<PaginationResponse<RequestWithRelations>> {
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -95,22 +98,25 @@ export async function getUserRequests(
       options
     );
 
-    // Requête pour les données
-    const requestsQuery = db
-      .select()
-      .from(requests)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    // Application du tri
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Request;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      requestsQuery.orderBy(sortOrder(requests[sortField]));
-    } else {
-      requestsQuery.orderBy(desc(requests.createdAt));
-    }
+    // Requête pour les données avec relations
+    const requestsData = await db.query.requests.findMany({
+      where: whereConditions,
+      limit: pagination.limit,
+      offset: offset,
+      orderBy: (requests, { desc, asc }) => [
+        options.sortBy
+          ? options.sortOrder === "asc"
+            ? asc((requests as any)[options.sortBy])
+            : desc((requests as any)[options.sortBy])
+          : desc(requests.createdAt),
+      ],
+      with: {
+        user: true,
+        gameItem: true,
+        transaction: true,
+        processedBy: true,
+      },
+    });
 
     // Requête pour le count total
     const countQuery = db
@@ -118,16 +124,13 @@ export async function getUserRequests(
       .from(requests)
       .where(whereConditions);
 
-    const [requestsData, totalResult] = await Promise.all([
-      requestsQuery,
-      countQuery,
-    ]);
+    const [totalResult] = await Promise.all([countQuery]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: requestsData,
+      data: requestsData as RequestWithRelations[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -202,39 +205,43 @@ export async function getRequestStats(filters?: RequestFilters) {
  */
 export async function getRequests(
   query: ListQuery<RequestFilters> = {}
-): Promise<PaginationResponse<Request>> {
+): Promise<PaginationResponse<RequestWithRelations>> {
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildRequestWhereConditions(filters, options);
 
-    const dataQuery = db
-      .select()
-      .from(requests)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Request;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      dataQuery.orderBy(sortOrder(requests[sortField]));
-    } else {
-      dataQuery.orderBy(desc(requests.createdAt));
-    }
+    const data = await db.query.requests.findMany({
+      where: whereConditions,
+      limit: pagination.limit,
+      offset: offset,
+      orderBy: (requests, { desc, asc }) => [
+        options.sortBy
+          ? options.sortOrder === "asc"
+            ? asc((requests as any)[options.sortBy])
+            : desc((requests as any)[options.sortBy])
+          : desc(requests.createdAt),
+      ],
+      with: {
+        user: true,
+        gameItem: true,
+        transaction: true,
+        processedBy: true,
+      },
+    });
 
     const countQuery = db
       .select({ count: count() })
       .from(requests)
       .where(whereConditions);
 
-    const [data, totalResult] = await Promise.all([dataQuery, countQuery]);
+    const [totalResult] = await Promise.all([countQuery]);
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data,
+      data: data as RequestWithRelations[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -458,13 +465,19 @@ export async function approveRequest(
     // 💸 WITHDRAWAL
     // ====================================================
     else if (request.type === "WITHDRAWAL") {
-      const escrow = await getOrCreatePlatformAccount(
-        tx,
-        "PLATFORM_ESCROW"
-      );
+      const escrow = await getOrCreatePlatformAccount(tx, "PLATFORM_ESCROW");
 
       fromAccountId = wallet.financialAccountId;
       toAccountId = escrow.id;
+    }
+    // ====================================================
+    // 🎮 GAME ITEMS (Purchase)
+    // ====================================================
+    else if (request.type === "GAME_ITEMS") {
+      const platformFees = await getOrCreatePlatformAccount(tx, "PLATFORM_FEES");
+
+      fromAccountId = wallet.financialAccountId;
+      toAccountId = platformFees.id;
     } else {
       throw new Error("Unsupported request type");
     }
@@ -474,7 +487,7 @@ export async function approveRequest(
       fromAccountId,
       toAccountId,
       amount: Number(request.amount),
-      type: request.type,
+      type: request.type as ("PURCHASE" | "VIP_SUBSCRIPTION" | "GAME_ITEM_PURCHASE" | "THEME_PURCHASE" | "DEPOSIT" | "WITHDRAWAL" | "REFUND" | "TRANSFER" | "ORDER_PURCHASE" | "TOURNAMENT_PARTICIPATION" | "BONUS"),
       description: `Approved ${request.type} request ${request.id}`,
       metadata: {
         requestId: request.id,

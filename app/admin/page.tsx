@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +66,10 @@ import {
   Calendar,
   Clock,
   Coins,
+  Layers,
+  Settings,
+  Crown,
+  HardDrive,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -95,6 +100,8 @@ export default function AdminOverviewPage() {
   useEffect(() => {
     loadStats();
   }, []);
+
+  const router = useRouter();
 
   const loadStats = async () => {
     try {
@@ -177,6 +184,11 @@ export default function AdminOverviewPage() {
     { value: "requests", label: "Requêtes", icon: FileQuestion },
     { value: "shops", label: "Boutiques", icon: Store },
     { value: "announcements", label: "Annonces", icon: Megaphone },
+    { value: "vip", label: "VIP", icon: Crown },
+    { value: "groups", label: "Groupes", icon: Users },
+    { value: "media", label: "Média", icon: HardDrive },
+    { value: "categories", label: "Catégories", icon: Layers },
+    { value: "settings", label: "Configuration", icon: Settings },
   ];
 
   // Déterminer combien de tabs afficher
@@ -184,6 +196,21 @@ export default function AdminOverviewPage() {
     screenSize.width >= 1024 ? 8 : screenSize.width >= 768 ? 4 : 2;
   const visibleTabs = allTabs.slice(0, visibleCount);
   const dropdownTabs = allTabs.slice(visibleCount);
+
+  // Redirection pour les nouveaux onglets
+  useEffect(() => {
+    if (activeTab === "categories") {
+      router.push("/admin/categories");
+    } else if (activeTab === "settings") {
+      router.push("/admin/settings");
+    } else if (activeTab === "vip") {
+      router.push("/admin/vip");
+    } else if (activeTab === "groups") {
+      router.push("/admin/groups");
+    } else if (activeTab === "media") {
+      router.push("/admin/media");
+    }
+  }, [activeTab]);
 
   return (
     <div className="space-y-6 p-4">

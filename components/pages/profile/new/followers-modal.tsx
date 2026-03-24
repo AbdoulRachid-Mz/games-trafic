@@ -100,7 +100,7 @@ export function FollowersModal({
                                             )}
                                         >
                                             <Avatar className="h-10 w-10">
-                                                <AvatarImage src={follower.image || ""} />
+                                                <AvatarImage src={follower.profileImage || ""} />
                                                 <AvatarFallback>
                                                     <User className="h-5 w-5" />
                                                 </AvatarFallback>

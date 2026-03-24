@@ -49,7 +49,7 @@ export function useGuideById(id: string, options?: { populate?: string[] }) {
     queryKey: guideKeys.detail(id),
     queryFn: () => getGuideById(id, options),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000, // 5 min
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -60,7 +60,7 @@ export function useGuides(query: ListQuery<GuideFilters> = {}) {
   return useQuery({
     queryKey: guideKeys.list(query.filters || {}),
     queryFn: () => getGuides(query),
-    staleTime: 3 * 60 * 1000, // 3 min
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -75,7 +75,7 @@ export function useInfiniteGuides(filters: GuideFilters = {}) {
     getNextPageParam: (lastPage) =>
       lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
     initialPageParam: 1,
-    staleTime: 3 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
   });
 }
 
@@ -90,7 +90,7 @@ export function useGuideSteps(
     queryKey: guideKeys.steps(guideId),
     queryFn: () => getGuideSteps(guideId, query),
     enabled: !!guideId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
   });
 }
 

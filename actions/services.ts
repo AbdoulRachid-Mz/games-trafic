@@ -5,6 +5,13 @@ import { services, type Service, type NewService } from '@/database/schema';
 import { eq, and, like, ilike, desc, asc, count, sql } from 'drizzle-orm';
 import { type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type ServiceCard, type UserMini,
+  SERVICE_CARD_COLUMNS, USER_MINI_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -17,17 +24,22 @@ export async function getServiceById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<Service | null> {
+  'use cache';
+  cacheTag(`service-${id}`, 'services');
+  cacheLife('minutes');
   try {
     if (!id) {
       throw new Error('Service ID is required');
     }
 
     if (options?.populate?.includes('admin')) {
-      const query = db.query.services.findFirst({
+      const result = await db.query.services.findFirst({
         where: (services, { eq }) => eq(services.id, id),
-        with: { admin: true },
+        with: {
+          admin: { columns: USER_MINI_COLUMNS }
+        },
       });
-      return (await query) ?? null;
+      return result ? result as unknown as Service : null;
     }
 
     const result = await db
@@ -48,34 +60,35 @@ export async function getServiceById(
  */
 export async function getServices(
   query: ListQuery<ServiceFilters> = {}
-): Promise<PaginationResponse<Service>> {
+): Promise<PaginationResponse<ServiceCard>> {
+  'use cache';
+  cacheTag('services');
+  cacheLife('minutes');
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildServiceWhereConditions(filters, options);
 
-    const servicesQuery = db
-      .select()
-      .from(services)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Service;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      servicesQuery.orderBy(sortOrder(services[sortField]));
-    } else {
-      servicesQuery.orderBy(desc(services.createdAt));
-    }
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(services)
-      .where(whereConditions);
-
-    const [servicesData, totalResult] = await Promise.all([servicesQuery, countQuery]);
+    const [servicesData, totalResult] = await Promise.all([
+      db.query.services.findMany({
+        columns: SERVICE_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (services, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((services as any)[sortField]) : asc((services as any)[sortField])];
+          }
+          return [desc(services.createdAt)];
+        },
+        with: options.populate?.includes('admin')
+          ? { admin: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(services).where(whereConditions),
+    ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
@@ -101,6 +114,9 @@ export async function getServices(
  * Récupère les statistiques des services
  */
 export async function getServiceStats(filters?: ServiceFilters) {
+  'use cache';
+  cacheTag('services', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildServiceWhereConditions(filters || {});
 
@@ -149,6 +165,7 @@ export async function createService(serviceData: NewService): Promise<Service> {
       })
       .returning();
 
+    revalidateTag('services', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating service:', error);
@@ -181,6 +198,8 @@ export async function updateService(
       .where(eq(services.id, id))
       .returning();
 
+    revalidateTag('services', 'max');
+    revalidateTag(`service-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating service:', error);
@@ -210,6 +229,8 @@ export async function deleteService(id: string): Promise<Service> {
       throw new Error('Service not found');
     }
 
+    revalidateTag('services', 'max');
+    revalidateTag(`service-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting service:', error);
@@ -239,6 +260,8 @@ export async function restoreService(id: string): Promise<Service> {
       throw new Error('Service not found');
     }
 
+    revalidateTag('services', 'max');
+    revalidateTag(`service-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring service:', error);
@@ -267,6 +290,8 @@ export async function toggleServiceActive(id: string, isActive: boolean): Promis
       throw new Error('Service not found');
     }
 
+    revalidateTag('services', 'max');
+    revalidateTag(`service-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error toggling service active status:', error);

@@ -1,11 +1,18 @@
 'use server';
 
-import { products, type Product, type NewProduct, shops, orders, interactions, categories, users, ProductWithRelations } from '@/database/schema';
+import { products, type Product, type NewProduct, shops, orders, interactions, categories, users, type ProductWithRelations } from '@/database/schema';
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull } from 'drizzle-orm';
 import { type ProductFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
 import { encryptData, decryptData } from '@/lib/encryption';
 import { getCurrentUser } from '@/lib/auth/session';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type ProductCard, type ProductDetail, type ProductStats, type ProductContext,
+  USER_MINI_COLUMNS, SHOP_MINI_COLUMNS, CATEGORY_MINI_COLUMNS,
+  PRODUCT_CARD_COLUMNS, PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -17,29 +24,37 @@ import { getCurrentUser } from '@/lib/auth/session';
 export async function getProductById(
   id: string,
   options?: { populate?: string[] }
-): Promise<ProductWithRelations | null> {
+): Promise<ProductDetail | null> {
+  'use cache';
+  cacheTag(`product-${id}`, 'products');
+  cacheLife('minutes');
   try {
-    if (options?.populate && options.populate.length > 0) {
-      const query = db.query.products.findFirst({
-        where: (products, { eq }) => eq(products.id, id),
-        with: {
-          shop: options.populate.includes('shop') ? true : undefined,
-          user: options.populate.includes('user') ? true : undefined,
-          category: options.populate.includes('category') ? true : undefined,
-          orders: options.populate.includes('orders') ? true : undefined,
-        }
-      });
-      const result = await query;
-      return result ? result as ProductWithRelations : null;
-    }
+    // Get product with relations
+    const result = await db.query.products.findFirst({
+      where: (products, { eq }) => eq(products.id, id),
+      with: {
+        shop: options?.populate?.includes('shop') ? { columns: SHOP_MINI_COLUMNS } : undefined,
+        user: options?.populate?.includes('user') ? { columns: USER_MINI_COLUMNS } : undefined,
+        category: options?.populate?.includes('category') ? { columns: CATEGORY_MINI_COLUMNS } : undefined,
+      }
+    });
 
-    const result = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, id))
-      .limit(1);
+    if (!result) return null;
 
-    return result[0] ? result[0] as ProductWithRelations : null;
+    // Get stats
+    const [orderCount, likeCount] = await Promise.all([
+      db.select({ count: count() }).from(orders).where(eq(orders.productId, id)),
+      db.select({ count: count() }).from(interactions).where(and(eq(interactions.entityId, id), eq(interactions.entityType, 'PRODUCT'), eq(interactions.type, 'LIKE'))),
+    ]);
+
+    return {
+      ...(result as unknown as ProductDetail),
+      stats: {
+        viewCount: result.viewCount || 0,
+        orderCount: orderCount[0]?.count || 0,
+        likeCount: likeCount[0]?.count || 0,
+      }
+    };
   } catch (error) {
     console.error('Error getting product by ID:', error);
     throw new Error('Failed to fetch product');
@@ -51,9 +66,12 @@ export async function getProductById(
  */
 export async function getProducts(
   query: ListQuery<ProductFilters> = {}
-): Promise<PaginationResponse<ProductWithRelations>> {
+): Promise<PaginationResponse<ProductCard>> {
+  'use cache';
+  cacheTag('products');
+  cacheLife('minutes');
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildProductWhereConditions(filters, options);
@@ -61,6 +79,7 @@ export async function getProducts(
     let productsData;
     if (options.populate && options.populate.length > 0) {
       productsData = await db.query.products.findMany({
+        columns: PRODUCT_CARD_COLUMNS,
         where: whereConditions,
         limit: pagination.limit,
         offset: offset,
@@ -72,40 +91,38 @@ export async function getProducts(
           return [desc(products.createdAt)];
         },
         with: {
-          shop: options.populate.includes('shop') ? true : undefined,
-          user: options.populate.includes('user') ? true : undefined,
-          category: options.populate.includes('category') ? true : undefined,
+          shop: options.populate.includes('shop') ? { columns: SHOP_MINI_COLUMNS } : undefined,
+          user: options.populate.includes('user') ? { columns: USER_MINI_COLUMNS } : undefined,
+          category: options.populate.includes('category') ? { columns: CATEGORY_MINI_COLUMNS } : undefined,
         }
       });
     } else {
-      const productsQuery = db
-        .select()
-        .from(products)
-        .where(whereConditions)
-        .limit(pagination.limit)
-        .offset(offset);
-
-      if (options.sortBy) {
-        const sortField = options.sortBy as keyof Product;
-        const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-        productsQuery.orderBy(sortOrder(products[sortField]));
-      } else {
-        productsQuery.orderBy(desc(products.createdAt));
-      }
+      const productsQuery = db.query.products.findMany({
+        columns: PRODUCT_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (products, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((products as any)[sortField]) : asc((products as any)[sortField])];
+          }
+          return [desc(products.createdAt)];
+        },
+      });
       productsData = await productsQuery;
     }
 
-    const countQuery = db
+    const totalResult = await db
       .select({ count: count() })
       .from(products)
       .where(whereConditions);
 
-    const totalResult = await countQuery;
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: productsData as any,
+      data: productsData as ProductCard[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -127,17 +144,15 @@ export async function getProducts(
 export async function getProductsByShopId(
   shopId: string,
   query: ListQuery<ProductFilters> = {}
-): Promise<PaginationResponse<Product>> {
+): Promise<PaginationResponse<ProductCard>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     
-    const shopProducts = await getProducts({
+    return await getProducts({
       pagination,
       filters: { ...filters, shopId },
       options
     });
-
-    return shopProducts;
   } catch (error) {
     console.error('Error getting products by shop ID:', error);
     throw new Error('Failed to fetch shop products');
@@ -150,17 +165,15 @@ export async function getProductsByShopId(
 export async function getProductsByCategoryId(
   categoryId: string,
   query: ListQuery<ProductFilters> = {}
-): Promise<PaginationResponse<Product>> {
+): Promise<PaginationResponse<ProductCard>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     
-    const categoryProducts = await getProducts({
+    return await getProducts({
       pagination,
       filters: { ...filters, categoryId },
       options
     });
-
-    return categoryProducts;
   } catch (error) {
     console.error('Error getting products by category ID:', error);
     throw new Error('Failed to fetch category products');
@@ -173,17 +186,15 @@ export async function getProductsByCategoryId(
 export async function getProductsByUserId(
   userId: string,
   query: ListQuery<ProductFilters> = {}
-): Promise<PaginationResponse<Product>> {
+): Promise<PaginationResponse<ProductCard>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     
-    const userProducts = await getProducts({
+    return await getProducts({
       pagination,
       filters: { ...filters, userId },
       options
     });
-
-    return userProducts;
   } catch (error) {
     console.error('Error getting products by user ID:', error);
     throw new Error('Failed to fetch user products');
@@ -193,7 +204,10 @@ export async function getProductsByUserId(
 /**
  * Récupère les statistiques des produits
  */
-export async function getProductStats(filters?: ProductFilters) {
+export async function getProductStats(filters?: ProductFilters): Promise<ProductStats> {
+  'use cache';
+  cacheTag('products', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildProductWhereConditions(filters || {});
 
@@ -215,7 +229,7 @@ export async function getProductStats(filters?: ProductFilters) {
         .where(whereConditions)
     ]);
 
-    const stats = {
+    return {
       total: totalResult[0]?.count ?? 0,
       active: activeResult[0]?.count ?? 0,
       featured: featuredResult[0]?.count ?? 0,
@@ -223,11 +237,45 @@ export async function getProductStats(filters?: ProductFilters) {
       reserved: reservedResult[0]?.count ?? 0,
       averagePrice: avgPriceResult[0]?.avgPrice ?? 0
     };
-
-    return stats;
   } catch (error) {
     console.error('Error getting product stats:', error);
     throw new Error('Failed to fetch product statistics');
+  }
+}
+
+/**
+ * Récupère le contexte complet d'un produit (détail + stats + produits similaires)
+ */
+export async function getProductContext(id: string): Promise<ProductContext | null> {
+  'use cache';
+  cacheTag(`product-${id}`, 'products');
+  cacheLife('minutes');
+  try {
+    const product = await getProductById(id, { populate: ['shop', 'user', 'category'] });
+    if (!product) return null;
+
+    const [stats, relatedRes] = await Promise.all([
+      getProductStats(product.shopId ? { shopId: product.shopId } : undefined),
+      product.categoryId
+        ? getProducts({
+            filters: {
+              categoryId: product.categoryId,
+              status: ['NON_VENDU', 'RESERVE'],
+            },
+            pagination: { limit: PAGINATION_DEFAULTS.RELATED, page: 1 },
+            options: { sortBy: 'viewCount', sortOrder: 'desc' }
+          })
+        : Promise.resolve({ data: [] as ProductCard[], pagination: { page: 1, limit: 6, total: 0, totalPages: 0, hasNext: false, hasPrev: false } }),
+    ]);
+
+    return {
+      product,
+      stats,
+      related: relatedRes.data.filter(p => p.id !== id),
+    };
+  } catch (error) {
+    console.error('Error getting product context:', error);
+    throw new Error('Failed to fetch product context');
   }
 }
 
@@ -268,6 +316,7 @@ export async function createProduct(productData: NewProduct): Promise<Product> {
     // Mise à jour du compteur de produits de la boutique
     await updateShopProductCount(productData.shopId);
 
+    revalidateTag('products', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating product:', error);
@@ -307,6 +356,8 @@ export async function updateProduct(
       await updateShopProductCount(productData.shopId);
     }
 
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating product:', error);
@@ -340,6 +391,8 @@ export async function deleteProduct(id: string): Promise<Product> {
     // Mise à jour du compteur de produits de la boutique
     await updateShopProductCount(product.shopId);
 
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting product:', error);
@@ -372,6 +425,8 @@ export async function restoreProduct(id: string): Promise<Product> {
     // Mise à jour du compteur de produits de la boutique
     await updateShopProductCount(result[0].shopId);
 
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring product:', error);
@@ -403,6 +458,8 @@ export async function updateProductStatus(
       throw new Error('Product not found');
     }
 
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating product status:', error);
@@ -436,6 +493,8 @@ export async function markProductAsSold(
       throw new Error('Product not found');
     }
 
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error marking product as sold:', error);
@@ -464,6 +523,8 @@ export async function incrementProductViewCount(id: string): Promise<Product> {
       throw new Error('Product not found');
     }
 
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error incrementing product view count:', error);
@@ -490,6 +551,8 @@ export async function setProductCredentials(
     if (result.length === 0) {
       throw new Error('Product not found');
     }
+    revalidateTag('products', 'max');
+    revalidateTag(`product-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error setting product credentials:', error);

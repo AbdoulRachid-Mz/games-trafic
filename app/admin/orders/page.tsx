@@ -110,7 +110,7 @@ export default function AdminOrdersPage() {
 
       const enriched: UiOrder[] = [];
       for (const o of result.data) {
-        let productName = o.productId;
+        let productName = o.product?.name || o.product?.id || "Unknown";
         let productImage: string | undefined;
         let game: string | null | undefined;
         let platform: string | null | undefined;
@@ -118,29 +118,31 @@ export default function AdminOrdersPage() {
         let accountDetails: UiOrder["accountDetails"] = {};
 
         try {
-          const p = await getProductById(o.productId);
-          if (p) {
-            productName = p.name;
-            productImage = (p as any).featuredImage || undefined;
-            game = p.game;
-            platform = p.platform;
-            accountLogin = p.accountLogin || null;
-            accountDetails = {
-              level: p.accountLevel || null,
-              rank: p.accountRank || null,
-            };
+          if (o.product?.id) {
+            const p = await getProductById(o.product.id);
+            if (p) {
+              productName = p.name;
+              productImage = (p as any).featuredImage || undefined;
+              game = p.game;
+              platform = p.platform;
+              accountLogin = p.accountLogin || null;
+              accountDetails = {
+                level: p.accountLevel || null,
+                rank: p.accountRank || null,
+              };
+            }
           }
         } catch { }
 
         enriched.push({
           id: o.id,
-          productId: o.productId,
+          productId: o.product?.id || "",
           productName,
           productImage,
           game,
           platform,
-          buyerId: o.buyerId,
-          shopId: o.shopId,
+          buyerId: o.buyer?.id || "",
+          shopId: o.shop?.id || "",
           amount: Number(o.price || 0),
           status: o.status as UiOrder["status"],
           createdAt: o.createdAt as Date,
@@ -148,9 +150,9 @@ export default function AdminOrdersPage() {
           accountPasswordMasked: accountLogin ? "••••••••••••" : null,
           accountDetails,
           shopName: o.shop?.name || undefined,
-          shopOwner: o.shop?.ownerId || undefined,
+          shopOwner: o.shop?.id || undefined,
           buyerName: o.buyer?.username || undefined,
-          buyerEmail: o.buyer?.email || undefined,
+          buyerEmail: undefined,
         });
       }
 

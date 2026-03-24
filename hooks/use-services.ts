@@ -1,170 +1,207 @@
-// import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-// import { getServiceById, getServices, getServiceStats, createService, updateService, deleteService } from '@/actions/services';
-// import { type Service, type NewService } from '@/database/schema';
-// import { type ListQuery, type PaginationResponse } from '@/types/api';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+  type UseQueryOptions,
+  type UseMutationOptions,
+  type UseInfiniteQueryOptions,
+  type InfiniteData,
+  type UseInfiniteQueryResult,
+} from "@tanstack/react-query";
+import {
+  getServiceById,
+  getServices,
+  getServiceStats,
+  createService,
+  updateService,
+  deleteService,
+} from "@/actions/services";
+import { type ListQuery, type PaginationResponse, type QueryOptions, type ServiceFilters } from '@/types/api';
+import { NewService, Service } from "@/database/schema";
+import {
+  type ServiceCard, type UserMini,
+} from "@/types/view-models";
 
-// // Query keys factory
-// const serviceKeys = {
-//   all: ['services'] as const,
-//   lists: () => [...serviceKeys.all, 'list'] as const,
-//   list: (filters: any) => [...serviceKeys.lists(), filters] as const,
-//   details: () => [...serviceKeys.all, 'detail'] as const,
-//   detail: (id: string) => [...serviceKeys.details(), id] as const,
-//   stats: () => [...serviceKeys.all, 'stats'] as const,
-//   stat: (filters: any) => [...serviceKeys.stats(), filters] as const,
-//   infinite: () => [...serviceKeys.all, 'infinite'] as const,
-// };
+// ============================================================================
+// QUERY KEYS FACTORY
+// ============================================================================
+const serviceKeys = {
+  all: ["services"] as const,
+  lists: () => [...serviceKeys.all, "list"] as const,
+  list: (filters: ServiceFilters | undefined) =>
+    [...serviceKeys.lists(), { filters }] as const,
+  details: () => [...serviceKeys.all, "detail"] as const,
+  detail: (id: string | undefined) =>
+    id
+      ? ([...serviceKeys.details(), id] as const)
+      : ([...serviceKeys.details(), "undefined"] as const),
+  stats: (filters?: ServiceFilters) =>
+    [...serviceKeys.all, "stats", filters] as const,
+};
 
-// // ============================================================================
-// // QUERIES
-// // ============================================================================
+// ============================================================================
+// QUERIES
+// ============================================================================
 
-// /**
-//  * Hook to fetch a single service by ID
-//  */
-// export function useService(id: string, options?: { populate?: string[] }) {
-//   return useQuery({
-//     queryKey: serviceKeys.detail(id),
-//     queryFn: () => getServiceById(id, options),
-//     enabled: !!id,
-//     staleTime: 5 * 60 * 1000, // 5 minutes
-//   });
-// }
+/**
+ * Hook to fetch a single service by ID
+ */
+export function useService(
+  id: string | undefined,
+  options?: { populate?: string[] },
+  queryOpts?: Omit<
+    UseQueryOptions<Awaited<ReturnType<typeof getServiceById>>, Error>,
+    "queryKey" | "queryFn"
+  >
+) {
+  return useQuery({
+    queryKey: serviceKeys.detail(id),
+    queryFn: () => (id ? getServiceById(id, options) : null),
+    enabled: !!id,
+    staleTime: 10 * 60 * 1000,
+    ...queryOpts,
+  });
+}
 
-// /**
-//  * Hook to fetch paginated services with filters
-//  */
-// export function useServices(query: ListQuery<any> = {}) {
-//   return useQuery({
-//     queryKey: serviceKeys.list(query),
-//     queryFn: () => getServices(query),
-//     staleTime: 5 * 60 * 1000,
-//     keepPreviousData: true,
-//   });
-// }
+/**
+ * Hook to fetch paginated services with filters
+ */
+export function useServices(
+  query: ListQuery<ServiceFilters> = {},
+  queryOpts?: Omit<
+    UseQueryOptions<PaginationResponse<ServiceCard>, Error>,
+    "queryKey" | "queryFn"
+  >
+) {
+  return useQuery({
+    queryKey: serviceKeys.list(query.filters),
+    queryFn: () => getServices(query),
+    staleTime: 10 * 60 * 1000,
+    ...queryOpts,
+  });
+}
 
-// /**
-//  * Hook to fetch services infinitely (for large lists)
-//  */
+/**
+ * Infinite scroll hook for services
+ */
+export function useInfiniteServices(
+  query: ListQuery<ServiceFilters> = {},
+  queryOpts?: Omit<
+    UseInfiniteQueryOptions<
+      PaginationResponse<ServiceCard>,
+      Error,
+      InfiniteData<PaginationResponse<ServiceCard>, number>,
+      readonly unknown[],
+      number
+    >,
+    "queryKey" | "queryFn" | "getNextPageParam" | "initialPageParam"
+  >
+): UseInfiniteQueryResult<
+  InfiniteData<PaginationResponse<ServiceCard>, number>,
+  Error
+> {
+  return useInfiniteQuery<
+    PaginationResponse<ServiceCard>,
+    Error,
+    InfiniteData<PaginationResponse<ServiceCard>, number>,
+    readonly unknown[],
+    number
+  >({
+    queryKey: [...serviceKeys.lists(), "infinite", query.filters],
+    queryFn: ({ pageParam = 1 }) =>
+      getServices({
+        ...query,
+        pagination: {
+          ...query.pagination,
+          page: pageParam,
+          limit: query.pagination?.limit ?? 20,
+        },
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
+    initialPageParam: 1,
+    staleTime: 10 * 60 * 1000,
+    ...queryOpts,
+  });
+}
 
-// export function useInfiniteServices(query: ListQuery<any> = {}) {
-//   return useInfiniteQuery({
-//     queryKey: serviceKeys.infinite(),
-//     queryFn: ({ pageParam = 1 }) => getServices({ ...query, pagination: { ...query.pagination, page: pageParam } }),
-//     getNextPageParam: (lastPage: PaginationResponse<Service>) => {
-//       return lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined;
-//     },
-//     staleTime: 5 * 60 * 1000,
-//   });
-// }
+/**
+ * Hook to fetch service statistics
+ */
+export function useServiceStats(
+  filters?: ServiceFilters,
+  queryOpts?: Omit<
+    UseQueryOptions<Awaited<ReturnType<typeof getServiceStats>>, Error>,
+    "queryKey" | "queryFn"
+  >
+) {
+  return useQuery({
+    queryKey: serviceKeys.stats(filters),
+    queryFn: () => getServiceStats(filters),
+    staleTime: 10 * 60 * 1000,
+    ...queryOpts,
+  });
+}
 
-// /**
-//  * Hook to fetch service statistics
-//  */
-// export function useServiceStats(filters?: any) {
-//   return useQuery({
-//     queryKey: serviceKeys.stat(filters),
-//     queryFn: () => getServiceStats(filters),
-//     staleTime: 10 * 60 * 1000, // 10 minutes
-//   });
-// }
+// ============================================================================
+// MUTATIONS
+// ============================================================================
 
-// // ============================================================================
-// // MUTATIONS
-// // ============================================================================
+/**
+ * Hook to create a new service
+ */
+export function useCreateService(
+  mutationOpts?: Omit<UseMutationOptions<Service, Error, NewService>, "mutationFn">
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    ...mutationOpts,
+    mutationFn: createService,
+    onSuccess: (...args) => {
+      queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
+      (mutationOpts?.onSuccess as any)?.(...args);
+    },
+  });
+}
 
-// /**
-//  * Hook to create a new service
-//  */
-// export function useCreateService() {
-//   const queryClient = useQueryClient();
+/**
+ * Hook to update a service
+ */
+export function useUpdateService(
+  mutationOpts?: Omit<
+    UseMutationOptions<Service, Error, { id: string; data: Partial<NewService> }>,
+    "mutationFn"
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    ...mutationOpts,
+    mutationFn: ({ id, data }) => updateService(id, data),
+    onSuccess: (...args) => {
+      const { id } = args[1] as { id: string };
+      queryClient.invalidateQueries({ queryKey: serviceKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
+      (mutationOpts?.onSuccess as any)?.(...args);
+    },
+  });
+}
 
-//   return useMutation({
-//     mutationFn: (data: NewService) => createService(data),
-//     onSuccess: (newService) => {
-//       // Invalidate list queries to refetch
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.stats() });
-//       // Optionally add to cache immediately
-//       queryClient.setQueryData(serviceKeys.detail(newService.id), newService);
-//     },
-//   });
-// }
-
-// /**
-//  * Hook to update a service
-//  */
-// export function useUpdateService() {
-//   const queryClient = useQueryClient();
-
-//   return useMutation({
-//     mutationFn: ({ id, data }: { id: string; data: Partial<NewService> }) => updateService(id, data),
-//     onSuccess: (updatedService) => {
-//       // Update cache immediately
-//       queryClient.setQueryData(serviceKeys.detail(updatedService.id), updatedService);
-//       // Invalidate list queries
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.stats() });
-//     },
-//   });
-// }
-
-// /**
-//  * Hook to delete (soft delete) a service
-//  */
-// export function useDeleteService() {
-//   const queryClient = useQueryClient();
-
-//   return useMutation({
-//     mutationFn: (id: string) => deleteService(id),
-//     onSuccess: (deletedService) => {
-//       // Remove from cache
-//       queryClient.removeQueries({ queryKey: serviceKeys.detail(deletedService.id) });
-//       // Invalidate list queries
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.stats() });
-//     },
-//   });
-// }
-
-// // ============================================================================
-// // OPTIMISTIC UPDATES (optional helpers)
-// // ============================================================================
-
-// /**
-//  * Helper for optimistic updates when updating a service
-//  */
-// export function useOptimisticUpdateService() {
-//   const queryClient = useQueryClient();
-
-//   return useMutation({
-//     mutationFn: ({ id, data }: { id: string; data: Partial<NewService> }) => updateService(id, data),
-//     onMutate: async ({ id, data }) => {
-//       // Cancel any outgoing refetches
-//       await queryClient.cancelQueries({ queryKey: serviceKeys.detail(id) });
-
-//       // Snapshot the previous value
-//       const previousService = queryClient.getQueryData(serviceKeys.detail(id));
-
-//       // Optimistically update to the new value
-//       if (previousService) {
-//         queryClient.setQueryData(serviceKeys.detail(id), { ...previousService, ...data });
-//       }
-
-//       // Return context with the previous service
-//       return { previousService };
-//     },
-//     onError: (err, { id }, context) => {
-//       // Rollback on error
-//       if (context?.previousService) {
-//         queryClient.setQueryData(serviceKeys.detail(id), context.previousService);
-//       }
-//     },
-//     onSettled: (data, error, { id }) => {
-//       // Always refetch after error or success
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.detail(id) });
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
-//       queryClient.invalidateQueries({ queryKey: serviceKeys.stats() });
-//     },
-//   });
-// }
+/**
+ * Hook to delete a service
+ */
+export function useDeleteService(
+  mutationOpts?: Omit<UseMutationOptions<Service, Error, string>, "mutationFn">
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    ...mutationOpts,
+    mutationFn: deleteService,
+    onSuccess: (...args) => {
+      const id = args[1] as string;
+      queryClient.invalidateQueries({ queryKey: serviceKeys.lists() });
+      queryClient.removeQueries({ queryKey: serviceKeys.detail(id) });
+      (mutationOpts?.onSuccess as any)?.(...args);
+    },
+  });
+}

@@ -32,6 +32,9 @@ import {
 } from "@/actions/shops";
 import { ListQuery, PaginationResponse, ShopFilters } from "@/types/api";
 import { NewShop, Shop, Theme } from "@/database/schema";
+import {
+  type ShopCard, type UserMini, type ShopMini,
+} from "@/types/view-models";
 import { useCallback, useEffect, useState } from "react";
 import { useDebounce } from "./use-debounce";
 
@@ -84,7 +87,7 @@ export function useShopById(
     queryKey: shopKeys.detail(id, options?.populate),
     queryFn: () => (id ? getShopById(id, options) : null),
     enabled: !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
     ...queryOpts,
   });
 }
@@ -103,7 +106,7 @@ export function useShopByName(
     queryKey: shopKeys.detail(name),
     queryFn: () => (name ? getShopByName(name) : null),
     enabled: !!name,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -115,7 +118,7 @@ export function useShopsByOwner(
   ownerId: string | undefined,
   query: ListQuery<ShopFilters> = {},
   queryOpts?: Omit<
-    UseQueryOptions<PaginationResponse<Shop>, Error>,
+    UseQueryOptions<PaginationResponse<ShopCard>, Error>,
     "queryKey" | "queryFn"
   >
 ) {
@@ -125,18 +128,18 @@ export function useShopsByOwner(
       ownerId
         ? getShopsByOwner(ownerId, query)
         : {
-            data: [],
-            pagination: {
-              page: 1,
-              limit: 50,
-              total: 0,
-              totalPages: 0,
-              hasNext: false,
-              hasPrev: false,
-            },
+          data: [],
+          pagination: {
+            page: 1,
+            limit: 50,
+            total: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
           },
+        },
     enabled: !!ownerId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -147,14 +150,14 @@ export function useShopsByOwner(
 export function useShops(
   query: ListQuery<ShopFilters> = {},
   queryOpts?: Omit<
-    UseQueryOptions<PaginationResponse<Shop>, Error>,
+    UseQueryOptions<PaginationResponse<ShopCard>, Error>,
     "queryKey" | "queryFn"
   >
 ) {
   return useQuery({
     queryKey: shopKeys.list(query.filters, query.options),
     queryFn: () => getShops(query),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -164,12 +167,12 @@ export function useShops(
  */
 export function usePopularShops(
   limit: number = 10,
-  queryOpts?: Omit<UseQueryOptions<Shop[], Error>, "queryKey" | "queryFn">
+  queryOpts?: Omit<UseQueryOptions<ShopCard[], Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: shopKeys.popular(limit),
     queryFn: () => getPopularShops(limit),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -180,14 +183,14 @@ export function usePopularShops(
 export function useVerifiedShops(
   query: ListQuery<ShopFilters> = {},
   queryOpts?: Omit<
-    UseQueryOptions<PaginationResponse<Shop>, Error>,
+    UseQueryOptions<PaginationResponse<ShopCard>, Error>,
     "queryKey" | "queryFn"
   >
 ) {
   return useQuery({
     queryKey: shopKeys.verified(query),
     queryFn: () => getVerifiedShops(query),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -205,7 +208,7 @@ export function useShopStats(
   return useQuery({
     queryKey: shopKeys.stats(filters),
     queryFn: () => getShopStats(filters),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -224,7 +227,7 @@ export function useShopStatsById(
     queryKey: shopKeys.statsById(shopId),
     queryFn: () => (shopId ? getShopStatsById(shopId) : null),
     enabled: !!shopId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });
 }
@@ -240,23 +243,23 @@ export function useInfiniteShops(
   query: ListQuery<ShopFilters> = {},
   queryOpts?: Omit<
     UseInfiniteQueryOptions<
-      PaginationResponse<Shop>,                // TQueryFnData
+      PaginationResponse<ShopCard>,                // TQueryFnData
       Error,                                  // TError
-      InfiniteData<PaginationResponse<Shop>>, // TData
+      InfiniteData<PaginationResponse<ShopCard>>, // TData
       readonly unknown[],                     // TQueryKey
       number                                  // ✅ TPageParam
     >,
     "queryKey" | "queryFn" | "getNextPageParam" | "initialPageParam"
   >
 ): UseInfiniteQueryResult<
-  InfiniteData<PaginationResponse<Shop>, number>,
+  InfiniteData<PaginationResponse<ShopCard>, number>,
   Error
 > {
   // @ts-ignore
   return useInfiniteQuery<
-    PaginationResponse<Shop>,                 // TQueryFnData
+    PaginationResponse<ShopCard>,                 // TQueryFnData
     Error,                                   // TError
-    InfiniteData<PaginationResponse<Shop>>,  // TData
+    InfiniteData<PaginationResponse<ShopCard>>,  // TData
     readonly unknown[],                      // TQueryKey
     number                                   // ✅ TPageParam
   >({
@@ -278,7 +281,7 @@ export function useInfiniteShops(
         : undefined,
 
     initialPageParam: 1,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10 * 60 * 1000,
 
     ...queryOpts,
   });
@@ -522,9 +525,9 @@ export function useShopsFilters() {
 
   // Mettre à jour un filtre
   const updateFilter = useCallback((key: string, value: any) => {
-    setFilters(prev => ({ 
-      ...prev, 
-      [key]: value === "all" || value === "" ? undefined : value 
+    setFilters(prev => ({
+      ...prev,
+      [key]: value === "all" || value === "" ? undefined : value
     }));
   }, []);
 

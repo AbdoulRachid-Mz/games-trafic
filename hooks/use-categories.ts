@@ -62,8 +62,8 @@ export function useCategories(query: ListQuery<CategoryFilters> = {}) {
   return useQuery<PaginationResponse<Category>, Error>({
     queryKey: categoryKeys.list(query),
     queryFn: () => getCategories(query),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 20 * 60 * 1000, // 20 minutes
   });
 }
 
@@ -84,8 +84,8 @@ export function useInfiniteCategories(query: ListQuery<CategoryFilters> = {}) {
     getPreviousPageParam: (firstPage) =>
       firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: 1,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -94,8 +94,8 @@ export function useCategoryById(id: string, options?: { populate?: string[] }) {
     queryKey: categoryKeys.detail(id),
     queryFn: () => getCategoryById(id, options),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -104,8 +104,8 @@ export function useCategoryBySlug(slug: string) {
     queryKey: categoryKeys.slug(slug),
     queryFn: () => getCategoryBySlug(slug),
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -113,8 +113,8 @@ export function useRootCategories(options?: QueryOptions) {
   return useQuery<CategoryWithChildren[], Error>({
     queryKey: categoryKeys.roots(),
     queryFn: () => getRootCategories(options),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -123,8 +123,8 @@ export function useCategoryChildren(parentId: string) {
     queryKey: categoryKeys.children(parentId),
     queryFn: () => getCategoryChildren(parentId),
     enabled: !!parentId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -132,8 +132,8 @@ export function useCategoryTree() {
   return useQuery<CategoryWithChildren[], Error>({
     queryKey: categoryKeys.tree(),
     queryFn: getCategoryTree,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -145,8 +145,8 @@ export function useCategoriesByEntityType(
     queryKey: categoryKeys.entityType(entityType),
     queryFn: () => getCategoriesByEntityType(entityType, options),
     enabled: !!entityType,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -154,8 +154,8 @@ export function useCategoryStats(filters?: CategoryFilters) {
   return useQuery({
     queryKey: categoryKeys.stats(filters),
     queryFn: () => getCategoryStats(filters),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -164,8 +164,8 @@ export function useEntityCategories(entityId: string, entityType: string) {
     queryKey: categoryKeys.entityCategories(entityId, entityType),
     queryFn: () => getEntityCategories(entityId, entityType),
     enabled: !!entityId && !!entityType,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -174,8 +174,8 @@ export function useCategoryEntities(categoryId: string, entityType?: string) {
     queryKey: categoryKeys.categoryEntities(categoryId, entityType),
     queryFn: () => getCategoryEntities(categoryId, entityType),
     enabled: !!categoryId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 }
 

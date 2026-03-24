@@ -4,6 +4,9 @@ import { games, gameItems, requests, type Game, type NewGame, type GameItem, typ
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull } from 'drizzle-orm';
 import { type GameFilters, type GameItemFilters, type GameItemRequestFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import { type GameCard, GAME_CARD_COLUMNS, PAGINATION_DEFAULTS } from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -13,6 +16,9 @@ import { db } from '@/lib/db';
  * Récupère un jeu par son ID
  */
 export async function getGameById(id: string): Promise<Game | null> {
+  'use cache';
+  cacheTag(`game-${id}`, 'games');
+  cacheLife('minutes');
   try {
     const result = await db
       .select()
@@ -30,6 +36,9 @@ export async function getGameById(id: string): Promise<Game | null> {
  * Récupère un jeu par son nom
  */
 export async function getGameByName(name: string): Promise<Game | null> {
+  'use cache';
+  cacheTag('games');
+  cacheLife('minutes');
   try {
     const result = await db
       .select()
@@ -46,20 +55,22 @@ export async function getGameByName(name: string): Promise<Game | null> {
 /**
  * Liste les jeux avec pagination, filtres et options
  */
-export async function getGames(query: ListQuery<GameFilters> = {}): Promise<PaginationResponse<Game>> {
+export async function getGames(query: ListQuery<GameFilters> = {}): Promise<PaginationResponse<GameCard>> {
+  'use cache';
+  cacheTag('games');
+  cacheLife('minutes');
   try {
-    const { pagination = { page: 1, limit: 20 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildGameWhereConditions(filters, options);
 
-    let gamesData: Game[];
-
-    if (options.withRelations) {
-      gamesData = await db.query.games.findMany({
+    const [gamesData, totalResult] = await Promise.all([
+      db.query.games.findMany({
+        columns: GAME_CARD_COLUMNS,
         where: whereConditions,
         limit: pagination.limit,
-        offset,
+        offset: offset,
         orderBy: (games, { desc, asc }) => {
           if (options.sortBy) {
             const sortField = options.sortBy as any;
@@ -67,40 +78,17 @@ export async function getGames(query: ListQuery<GameFilters> = {}): Promise<Pagi
           }
           return [desc(games.createdAt)];
         },
-        with: {
+        with: options.withRelations ? {
           gameItems: true
-        }
-      }) as any[];
-    } else {
-      const itemsQuery = db
-        .select()
-        .from(games)
-        .where(whereConditions)
-        .limit(pagination.limit)
-        .offset(offset);
-
-      if (options.sortBy) {
-        const sortField = options.sortBy as keyof Game;
-        const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-        itemsQuery.orderBy(sortOrder(games[sortField]));
-      } else {
-        itemsQuery.orderBy(desc(games.createdAt));
-      }
-      
-      gamesData = await itemsQuery;
-    }
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(games)
-      .where(whereConditions);
-
-    const totalResult = await countQuery;
+        } : undefined
+      }),
+      db.select({ count: count() }).from(games).where(whereConditions)
+    ]);
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: gamesData,
+      data: gamesData as GameCard[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -120,6 +108,9 @@ export async function getGames(query: ListQuery<GameFilters> = {}): Promise<Pagi
  * Récupère les statistiques des jeux
  */
 export async function getGameStats(filters?: GameFilters) {
+  'use cache';
+  cacheTag('games', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildGameWhereConditions(filters || {});
 
@@ -148,6 +139,9 @@ export async function getGameStats(filters?: GameFilters) {
  * Récupère un item de jeu par son ID
  */
 export async function getGameItemById(id: string): Promise<GameItem | null> {
+  'use cache';
+  cacheTag(`game-item-${id}`, 'game-items');
+  cacheLife('minutes');
   try {
     const result = await db
       .select()
@@ -165,8 +159,11 @@ export async function getGameItemById(id: string): Promise<GameItem | null> {
  * Liste les items d'un jeu spécifique
  */
 export async function getGameItemsByGameId(gameId: string, query: ListQuery<GameItemFilters> = {}): Promise<PaginationResponse<GameItem>> {
+  'use cache';
+  cacheTag('game-items', `game-items-${gameId}`);
+  cacheLife('minutes');
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = and(
@@ -219,8 +216,11 @@ export async function getGameItemsByGameId(gameId: string, query: ListQuery<Game
  * Liste tous les items de jeu avec pagination, filtres et options
  */
 export async function getGameItems(query: ListQuery<GameItemFilters> = {}): Promise<PaginationResponse<GameItem>> {
+  'use cache';
+  cacheTag('game-items');
+  cacheLife('minutes');
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildGameItemWhereConditions(filters, options);
@@ -296,6 +296,9 @@ export async function getGameItems(query: ListQuery<GameItemFilters> = {}): Prom
  * Récupère une demande d'item de jeu par son ID
  */
 export async function getGameItemRequestById(id: string): Promise<Request | null> {
+  'use cache';
+  cacheTag(`game-request-${id}`, 'game-requests');
+  cacheLife('minutes');
   try {
     const result = await db
       .select()
@@ -314,7 +317,7 @@ export async function getGameItemRequestById(id: string): Promise<Request | null
  */
 export async function getGameItemRequestsByUserId(userId: string, query: ListQuery<GameItemRequestFilters> = {}): Promise<PaginationResponse<Request>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = and(
@@ -369,7 +372,7 @@ export async function getGameItemRequestsByUserId(userId: string, query: ListQue
  */
 export async function getGameItemRequests(query: ListQuery<GameItemRequestFilters> = {}): Promise<PaginationResponse<Request>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = and(
@@ -450,6 +453,7 @@ export async function createGame(gameData: NewGame): Promise<Game> {
       })
       .returning();
 
+    revalidateTag('games', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating game:', error);
@@ -486,6 +490,8 @@ export async function updateGame(id: string, gameData: Partial<NewGame>): Promis
       .where(eq(games.id, id))
       .returning();
 
+    revalidateTag('games', 'max');
+    revalidateTag(`game-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating game:', error);
@@ -514,6 +520,8 @@ export async function deleteGame(id: string): Promise<Game> {
       throw new Error('Game not found');
     }
 
+    revalidateTag('games', 'max');
+    revalidateTag(`game-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting game:', error);
@@ -547,6 +555,7 @@ export async function createGameItem(itemData: NewGameItem): Promise<GameItem> {
       })
       .returning();
 
+    revalidateTag('game-items', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating game item:', error);
@@ -576,6 +585,8 @@ export async function updateGameItem(id: string, itemData: Partial<NewGameItem>)
       .where(eq(gameItems.id, id))
       .returning();
 
+    revalidateTag('game-items', 'max');
+    revalidateTag(`game-item-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating game item:', error);
@@ -605,6 +616,8 @@ export async function deleteGameItem(id: string): Promise<GameItem> {
       throw new Error('Game item not found');
     }
 
+    revalidateTag('game-items', 'max');
+    revalidateTag(`game-item-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting game item:', error);
@@ -639,6 +652,7 @@ export async function createGameItemRequest(requestData: NewRequest): Promise<Re
       })
       .returning();
 
+    revalidateTag('game-requests', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating game item request:', error);
@@ -668,6 +682,8 @@ export async function updateGameItemRequest(id: string, requestData: Partial<New
       .where(eq(requests.id, id))
       .returning();
 
+    revalidateTag('game-requests', 'max');
+    revalidateTag(`game-request-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating game item request:', error);
@@ -710,6 +726,8 @@ export async function processGameItemRequest(id: string, processedByUserId: stri
       .where(eq(requests.id, id))
       .returning();
 
+    revalidateTag('game-requests', 'max');
+    revalidateTag(`game-request-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error processing game item request:', error);
@@ -734,6 +752,7 @@ export async function deleteGameItemRequest(id: string): Promise<Request> {
       throw new Error('Game item request not found');
     }
 
+    revalidateTag('game-requests', 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting game item request:', error);

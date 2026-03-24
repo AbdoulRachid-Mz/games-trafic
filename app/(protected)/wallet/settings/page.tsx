@@ -48,12 +48,12 @@ const WalletSettingsPage = () => {
 
   const handlePinUpdate = async () => {
     if (!wallet) return
-    
+
     if (newPin.length < 4) {
       toast.error('Le PIN doit contenir au moins 4 chiffres')
       return
     }
-    
+
     if (newPin !== confirmPin) {
       toast.error('Les nouveaux PIN ne correspondent pas')
       return
@@ -61,7 +61,7 @@ const WalletSettingsPage = () => {
 
     try {
       setUpdatingPin(true)
-      
+
       // Verify current PIN first
       const verification = await verifyWalletPin(wallet.id, currentPin)
       if (!verification.success) {
@@ -73,7 +73,7 @@ const WalletSettingsPage = () => {
       const updatedWallet = await updateUserWallet(wallet.id, {
         pinHash: newPin // In real app, hash this
       })
-      
+
       setWallet(updatedWallet)
       toast.success('PIN mis à jour avec succès')
       setCurrentPin('')
@@ -89,7 +89,7 @@ const WalletSettingsPage = () => {
 
   const handleLockToggle = async () => {
     if (!wallet) return
-    
+
     try {
       setUpdatingLock(true)
       const updatedWallet = await toggleWalletLock(wallet.id, !wallet.isLocked)
@@ -267,8 +267,8 @@ const WalletSettingsPage = () => {
               </div>
             </div>
 
-            <Button 
-              onClick={handlePinUpdate} 
+            <Button
+              onClick={handlePinUpdate}
               disabled={updatingPin || !currentPin || !newPin || !confirmPin}
               className="w-full"
             >
@@ -291,10 +291,10 @@ const WalletSettingsPage = () => {
               <p className="text-sm font-medium">Statut actuel</p>
               <Badge variant={
                 wallet.verificationStatus === 'VERIFIED' ? "default" :
-                wallet.verificationStatus === 'PENDING' ? "outline" : "secondary"
+                  wallet.verificationStatus === 'PENDING' ? "outline" : "secondary"
               }>
                 {wallet.verificationStatus === 'VERIFIED' ? 'Vérifié' :
-                 wallet.verificationStatus === 'PENDING' ? 'En attente' : 'Non vérifié'}
+                  wallet.verificationStatus === 'PENDING' ? 'En attente' : 'Non vérifié'}
               </Badge>
             </div>
             {wallet.verificationStatus !== 'VERIFIED' && (

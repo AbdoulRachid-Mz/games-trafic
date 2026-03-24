@@ -5,6 +5,13 @@ import {
   primaryKey, pgEnum, real
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
+import {
+  UserMini, ShopMini, TournamentMini, GameMini,
+  CategoryMini, TeamMini, ProductCard, PartnerMini,
+  TournamentCard,
+  PostCard,
+  EditionMini, PhaseMini, GroupMini, MatchMini
+} from '@/types/view-models';
 
 // ============================================================================
 // ENUMS
@@ -2117,41 +2124,41 @@ export const appSettings = pgTable('app_settings', {
 // database/schema/api-keys.ts
 export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
-  
+
   userId: text('user_id').notNull().references(() => users.id),
-  
+
   // Clé (hashée)
   hash: text('hash').unique().notNull(),
   keyPrefix: text('key_prefix').notNull(), // gt_user_, gt_app_, etc.
-  
+
   // Métadonnées
   name: text('name'),
   type: text('type').notNull(), // USER, APPLICATION, SERVICE
   applicationName: text('application_name'),
-  
+
   // Permissions
   permissions: text('permissions').array().default([]),
-  
+
   // Sécurité
   allowedIps: text('allowed_ips').array().default([]),
   allowedOrigins: text('allowed_origins').array().default([]),
-  
+
   // Stats
   lastUsedAt: timestamp('last_used_at'),
   lastUsedIp: text('last_used_ip'),
   requestCount: integer('request_count').default(0),
-  
+
   // Expiration
   expiresAt: timestamp('expires_at'),
-  
+
   // Statut
   status: text('status').default('ACTIVE'), // ACTIVE, REVOKED, EXPIRED
-  
+
   // Révocation
   revokedAt: timestamp('revoked_at'),
   revokedReason: text('revoked_reason'),
   revokedBy: text('revoked_by').references(() => users.id),
-  
+
   // Timestamps
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -2164,22 +2171,22 @@ export const apiKeys = pgTable('api_keys', {
 // database/schema/api-logs.ts (simplifié)
 export const apiLogs = pgTable('api_logs', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
-  
+
   userId: text('user_id').references(() => users.id),
   apiKeyId: text('api_key_id').references(() => apiKeys.id),
-  
+
   method: text('method').notNull(),
   path: text('path').notNull(),
   query: jsonb('query'),
   statusCode: integer('status_code').notNull(),
-  
+
   ip: text('ip'),
   userAgent: text('user_agent'),
   duration: integer('duration'), // ms
-  
+
   errorCode: text('error_code'),
   errorMessage: text('error_message'),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => [
   index('api_logs_user_idx').on(table.userId),
@@ -2191,10 +2198,10 @@ export const apiLogs = pgTable('api_logs', {
 
 export const apiRateLimits = pgTable('api_rate_limits', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
-  
+
   identifier: text('identifier').notNull(), // ip:xxx ou apikey:xxx
   windowKey: text('window_key').notNull(), // Pour le grouping par fenêtre
-  
+
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => [
@@ -2220,7 +2227,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   posts: many(posts),
   sentMessages: many(messages, { relationName: 'sent_messages' }),
   receivedMessages: many(messages, { relationName: 'received_messages' }),
-  interactions: many(interactions),
+  interactions: many(interactions, { relationName: 'interaction_author' }),
+  receivedInteractions: many(interactions, { relationName: 'interaction_target' }),
   notifications: many(notifications),
   pushSubscriptions: many(pushSubscriptions),
   gameItemRequests: many(requests),
@@ -2566,7 +2574,8 @@ export const messagesRelations = relations(messages, ({ one, many }) => ({
 }));
 
 export const interactionsRelations = relations(interactions, ({ one }) => ({
-  user: one(users, { fields: [interactions.userId], references: [users.id] }),
+  user: one(users, { fields: [interactions.userId], references: [users.id], relationName: 'interaction_author' }),
+  targetUser: one(users, { fields: [interactions.entityId], references: [users.id], relationName: 'interaction_target' }),
   post: one(posts, { fields: [interactions.postId], references: [posts.id] }),
   product: one(products, { fields: [interactions.productId], references: [products.id] }),
   message: one(messages, { fields: [interactions.messageId], references: [messages.id] }),
@@ -2842,6 +2851,10 @@ export type NewMessage = typeof messages.$inferInsert;
 export type Group = typeof groups.$inferSelect;
 export type NewGroup = typeof groups.$inferInsert;
 
+export type GroupWithMembers = Group & {
+  members?: GroupMember[];
+};
+
 export type GroupMember = typeof groupMembers.$inferSelect;
 export type NewGroupMember = typeof groupMembers.$inferInsert;
 
@@ -2902,7 +2915,7 @@ export type NewPartnership = typeof partnerships.$inferInsert;
 
 
 export type TournamentWithRelations = Tournament & {
-  organizer?: User;
+  organizer?: UserMini;
   editions?: TournamentEdition[];
   members?: TournamentMember[];
   theme?: Theme;
@@ -2910,40 +2923,40 @@ export type TournamentWithRelations = Tournament & {
 
 export type TournamentEditionWithRelations = TournamentEdition & {
   tournament?: Tournament;
-  registrations?: EditionRegistration[];
-  phases?: TournamentPhase[];
-  results?: EditionResult[];
+  registrations?: EditionRegistrationWithRelations[];
+  phases?: TournamentPhaseWithRelations[];
+  results?: EditionResultWithRelations[];
   financialAccount?: FinancialAccount;
 };
 
 export type EditionRegistrationWithRelations = EditionRegistration & {
-  edition?: TournamentEdition;
-  user?: User;
-  team?: Team;
+  edition?: EditionMini;
+  user?: UserMini;
+  team?: TeamMini;
 };
 
 export type TournamentMemberWithRelations = TournamentMember & {
-  tournament?: Tournament;
-  user?: User;
-  team?: Team;
+  tournament?: TournamentMini;
+  user?: UserMini;
+  team?: TeamMini;
 };
 
 
 export type TournamentPhaseWithRelations = TournamentPhase & {
-  edition?: TournamentEdition;
-  groups?: PhaseGroup[];
+  edition?: EditionMini;
+  groups?: PhaseGroupWithRelations[];
   bracketNodes?: BracketNode[];
-  matches?: Match[];
+  matches?: MatchWithRelations[];
 };
 
 export type PhaseGroupWithRelations = PhaseGroup & {
-  phase?: TournamentPhase;
-  participants?: PhaseGroupParticipant[];
+  phase?: PhaseMini;
+  participants?: PhaseGroupParticipantWithRelations[];
 };
 
 export type PhaseGroupParticipantWithRelations = PhaseGroupParticipant & {
-  group?: PhaseGroup;
-  registration?: EditionRegistration;
+  group?: GroupMini;
+  registration?: EditionRegistrationWithRelations;
 };
 
 export type BracketNodeWithRelations = BracketNode & {
@@ -2955,50 +2968,50 @@ export type BracketNodeWithRelations = BracketNode & {
 };
 
 export type MatchWithRelations = Match & {
-  edition?: TournamentEdition;
-  phase?: TournamentPhase;
-  group?: PhaseGroup;
+  edition?: EditionMini;
+  phase?: PhaseMini;
+  group?: GroupMini;
   bracketNode?: BracketNode;
-  participant1?: EditionRegistration;
-  participant2?: EditionRegistration;
-  winner?: EditionRegistration;
-  loser?: EditionRegistration;
+  participant1?: EditionRegistrationWithRelations;
+  participant2?: EditionRegistrationWithRelations;
+  winner?: EditionRegistrationWithRelations;
+  loser?: EditionRegistrationWithRelations;
 };
 
 export type EditionResultWithRelations = EditionResult & {
-  edition?: TournamentEdition;
-  registration?: EditionRegistration;
+  edition?: EditionMini;
+  registration?: EditionRegistrationWithRelations;
   paymentTransaction?: WalletTransaction;
 };
 
 export type RegistrationPaymentWithRelations = RegistrationPayment & {
-  registration?: EditionRegistration;
+  registration?: EditionRegistrationWithRelations;
   transaction?: WalletTransaction;
 };
 
 export type TeamWithRelations = Team & {
-  captain?: User;
-  viceCaptain?: User;
-  members?: TeamMember[];
+  captain?: UserMini;
+  viceCaptain?: UserMini;
+  members?: TeamMemberWithRelations[];
 };
 
 export type TeamMemberWithRelations = TeamMember & {
-  team?: Team;
-  user?: User;
+  team?: TeamMini;
+  user?: UserMini;
 };
 
 export type ProductWithRelations = Product & {
-  shop?: Shop;
-  user?: User;
-  category?: Category; // Utilise Category (catégorie principale)
-  orders?: Order[];
+  shop?: ShopMini;
+  user?: UserMini;
+  category?: CategoryMini;
+  orders?: OrderWithRelations[];
   medias?: Media;
 };
 
 export type OrderWithRelations = Order & {
-  shop?: Shop;
-  buyer?: User;
-  product?: Product;
+  shop?: ShopMini;
+  buyer?: UserMini;
+  product?: Product & { shop?: ShopMini };
   transaction?: WalletTransaction;
   medias?: Media[];
 };
@@ -3006,34 +3019,38 @@ export type OrderWithRelations = Order & {
 
 
 export type RequestWithRelations = Request & {
-  user?: User;
+  user?: UserMini;
   gameItem?: GameItem;
   transaction?: WalletTransaction;
-  processedBy?: User;
+  processedBy?: UserMini;
 };
 
 export type GameItemWithRelations = GameItem & {
-  game?: Game;
+  game?: GameMini;
 };
 
 export type GameWithRelations = Game & {
   gameItems?: GameItem[];
+  stats?: {
+    productCount: number;
+    tournamentCount: number;
+    clipCount: number;
+  };
 };
 
 export type GameClipWithRelations = GameClip & {
-  author?: User;
-  shop?: Shop;
-  game?: Game;
-
+  author?: UserMini;
+  shop?: ShopMini;
+  game?: GameMini;
 };
 
 export type MessageWithRelations = Message & {
-  sender?: User;
-  recipient?: User;
+  sender?: UserMini;
+  recipient?: UserMini;
   group?: Group;
   parentMessage?: Message;
   replies?: Message[];
-  shop?: Shop;
+  shop?: ShopMini;
   post?: Post;
   product?: Product;
   interactions?: Interaction[];
@@ -3044,6 +3061,7 @@ export type MessageWithRelations = Message & {
 
 export type InteractionWithRelations = Interaction & {
   user?: User;
+  targetUser?: User;
   post?: Post;
   product?: Product;
   message?: Message;
@@ -3247,7 +3265,7 @@ export type NewGuideStep = typeof guideSteps.$inferInsert;
 
 // Types pour les relations chargées
 export type BlogWithRelations = Blog & {
-  author?: User;
+  author?: UserMini;
   medias?: Media;
 };
 
@@ -3258,11 +3276,11 @@ export type BlogWithRelations = Blog & {
 export type UserWithRelations = User & {
   wallet?: UserWallet;
   vipSubscription?: VipSubscription;
-  shops?: Shop[];
-  products?: Product[];
-  tournaments?: Tournament[];
+  shops?: ShopMini[];
+  products?: ProductCard[];
+  tournaments?: TournamentCard[];
   gameClips?: GameClip[];
-  posts?: Post[];
+  posts?: PostCard[];
   announcements?: Announcement[];
   transactions?: WalletTransaction[];
   notifications?: Notification[];
@@ -3284,8 +3302,8 @@ export type UserWithRelations = User & {
 };
 
 export type ShopWithRelations = Shop & {
-  owner?: User;
-  products?: Product[];
+  owner?: UserMini;
+  products?: ProductCard[];
   orders?: Order[];
   categories?: EntityCategory[];
   financialAccount?: FinancialAccount;
@@ -3294,7 +3312,7 @@ export type ShopWithRelations = Shop & {
 
 
 export type UserWalletWithRelations = UserWallet & {
-  user?: User;
+  user?: UserMini;
   financialAccount?: FinancialAccount;
   transactions?: WalletTransaction[];
 };
@@ -3302,14 +3320,14 @@ export type UserWalletWithRelations = UserWallet & {
 export type WalletTransactionWithRelations = WalletTransaction & {
   wallet?: UserWallet;
   financialAccount?: FinancialAccount;
-  fromUser?: User;
-  toUser?: User;
+  fromUser?: UserMini;
+  toUser?: UserMini;
   ledgerEntries?: LedgerEntry[];
 };
 
 export type FinancialAccountWithRelations = FinancialAccount & {
-  ownerUser?: User;
-  ownerShop?: Shop;
+  ownerUser?: UserMini;
+  ownerShop?: ShopMini;
   ledgerEntries?: LedgerEntry[];
   transactions?: WalletTransaction[];
 };
@@ -3320,19 +3338,19 @@ export type LedgerEntryWithRelations = LedgerEntry & {
 };
 // Types pour les relations chargées
 export type PostWithRelations = Post & {
-  author?: User;
+  author?: UserMini;
   interactions?: Interaction;
   messages?: Message;
   medias?: Media;
 };
 
 export type ServiceWithRelations = Service & {
-  admin?: User;
+  admin?: UserMini;
   medias?: Media;
 };
 
 export type GuideWithRelations = Guide & {
-  admin?: User;
+  admin?: UserMini;
   steps?: GuideStep[];
 };
 
@@ -3342,11 +3360,11 @@ export type GuideStepWithRelations = GuideStep & {
 };
 
 export type PartnerWithRelations = Partner & {
-  partnerships?: Partnership[];
+  partnerships?: PartnershipWithRelations[];
 }
 
 export type PartnershipWithRelations = Partnership & {
-  partner?: Partner;
+  partner?: PartnerMini;
 }
 
 

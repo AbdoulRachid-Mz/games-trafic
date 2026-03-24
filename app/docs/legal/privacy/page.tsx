@@ -1,3 +1,5 @@
+// @/docs/legal/privacy/page.tsx
+
 "use client";
 
 import { useState } from "react";

@@ -1,10 +1,11 @@
+// components/shared/qr-code.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { cn } from "@/lib/utils";
 import { Typography } from "@/components/ui/typography";
-import { Download, Share2, Loader2, QrCode } from "lucide-react";
+import { Download, Share2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -13,6 +14,8 @@ interface TransactionQRCodeProps {
   size?: number;
   label?: string;
   className?: string;
+  withLogo?: boolean;
+  logoUrl?: string;
 }
 
 export function TransactionQRCode({
@@ -20,6 +23,8 @@ export function TransactionQRCode({
   size = 200,
   label,
   className,
+  withLogo = true,
+  logoUrl,
 }: TransactionQRCodeProps) {
   const [qrUrl, setQrUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -28,15 +33,25 @@ export function TransactionQRCode({
     const generateQR = async () => {
       try {
         setIsLoading(true);
-        const url = await QRCode.toDataURL(data, {
+
+        // Options de base du QR code
+        const options: QRCode.QRCodeOptions = {
           width: size,
-          margin: 1,
+          margin: 2,
           color: {
             dark: "#000000",
             light: "#ffffff",
           },
           errorCorrectionLevel: "H",
-        });
+        };
+
+        let url = await QRCode.toDataURL(data, options);
+
+        // Ajouter le logo si demandé
+        if (withLogo && (logoUrl || "/logo.png")) {
+          url = await addLogoToQR(url, logoUrl || "/logo.png", size);
+        }
+
         setQrUrl(url);
       } catch (err) {
         console.error("QR Generation error", err);
@@ -45,7 +60,52 @@ export function TransactionQRCode({
       }
     };
     generateQR();
-  }, [data, size]);
+  }, [data, size, withLogo, logoUrl]);
+
+  const addLogoToQR = async (qrDataUrl: string, logoPath: string, size: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const qrImage = new Image();
+      const logoImage = new Image();
+
+      canvas.width = size;
+      canvas.height = size;
+
+      qrImage.onload = () => {
+        logoImage.onload = () => {
+          if (!ctx) return;
+          ctx.drawImage(qrImage, 0, 0, size, size);
+
+          // Taille du logo (20% du QR)
+          const logoSize = size * 0.2;
+          const logoX = (size - logoSize) / 2;
+          const logoY = (size - logoSize) / 2;
+
+          // Fond blanc pour le logo
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(logoX - 5, logoY - 5, logoSize + 10, logoSize + 10);
+
+          // Arrondir les coins du fond
+          ctx.beginPath();
+          ctx.roundRect(logoX - 5, logoY - 5, logoSize + 10, logoSize + 10, 8);
+          ctx.fill();
+
+          // Dessiner le logo
+          ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+
+          resolve(canvas.toDataURL());
+        };
+        logoImage.onerror = () => {
+          // Si le logo ne charge pas, retourner le QR sans logo
+          resolve(qrDataUrl);
+        };
+        logoImage.src = logoPath;
+      };
+      qrImage.onerror = reject;
+      qrImage.src = qrDataUrl;
+    });
+  };
 
   const handleDownload = () => {
     if (!qrUrl) return;
@@ -59,7 +119,10 @@ export function TransactionQRCode({
   };
 
   return (
-    <div className={cn("flex flex-col items-center gap-4 p-6 bg-white rounded-3xl border border-slate-200 shadow-xl shadow-black/5 animate-in fade-in zoom-in duration-500", className)}>
+    <div className={cn(
+      "flex flex-col items-center gap-4 p-6 bg-white rounded-3xl border border-slate-200 shadow-xl shadow-black/5 animate-in fade-in zoom-in duration-500",
+      className
+    )}>
       <div className="relative group">
         <div className="absolute -inset-4 bg-primary/10 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition duration-500" />
         <div className="relative bg-white p-4 rounded-2xl border-2 border-slate-100 overflow-hidden min-w-[120px] min-h-[120px] flex items-center justify-center">
@@ -94,16 +157,20 @@ export function TransactionQRCode({
   );
 }
 
-export function QRCodeSimple({ data, size = 128, className }: { data: string; size?: number; className?: string }) {
-  const [qrUrl, setQrUrl] = useState<string>("");
-
-  useEffect(() => {
-    QRCode.toDataURL(data, { width: size, margin: 1 }).then(setQrUrl);
-  }, [data, size]);
-
-  return (
-    <div className={cn("bg-white p-2 rounded-xl border border-slate-100 shadow-sm", className)}>
-      <img src={qrUrl} alt="QR" className="w-full h-auto block" />
-    </div>
-  );
+// Helper pour arrondir les rectangles
+if (!(window as any).CanvasRenderingContext2D.prototype.roundRect) {
+  (window as any).CanvasRenderingContext2D.prototype.roundRect = function (x: number, y: number, w: number, h: number, r: number) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    return this;
+  };
 }

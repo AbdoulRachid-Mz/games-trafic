@@ -31,19 +31,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Shop, User, ShopWithRelations } from "@/database/schema";
+import { type ShopCard as ShopCardType } from "@/types/view-models";
 
 // Types simplifiés
 type ViewMode = "grid" | "list" | "compact";
 type CardVariant = "default" | "premium" | "admin";
 
 interface ShopCardProps {
-  shop: Shop & {
-    owner?: User;
+  shop: ShopCardType & {
     stats?: {
-      productCount: number;
-      rating: number;
-      followersCount: number;
+      productCount?: number;
+      rating?: number;
+      followersCount?: number;
     };
   };
   viewMode?: ViewMode;

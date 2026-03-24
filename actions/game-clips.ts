@@ -10,13 +10,20 @@ import {
   interactions,
   messages
 } from "@/database/schema";
-import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, or, count } from "drizzle-orm";
 import { db } from "@/lib/db";
+import {
+  type GameClipCard, type UserMini, type ShopMini, type GameCard,
+  GAME_CLIP_CARD_COLUMNS, USER_MINI_COLUMNS, SHOP_MINI_COLUMNS, GAME_CARD_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from "@/types/view-models";
 import {
   createGameClipSchema,
   updateGameClipSchema,
   gameClipFiltersSchema
 } from "@/validations/game-clips";
+import { ListQuery, PaginationResponse } from "@/types/api";
+import { cacheLife, cacheTag } from "next/cache";
 
 // Types réutilisables
 export type CreateGameClipParams = {
@@ -30,8 +37,7 @@ export type UpdateGameClipParams = {
   userId: string;
 };
 
-export type GetGameClipsParams = {
-  filters?: z.infer<typeof gameClipFiltersSchema>;
+export type GetGameClipsParams = ListQuery<z.input<typeof gameClipFiltersSchema>> & {
   userId?: string;
 };
 
@@ -262,12 +268,21 @@ export async function createGameClip({ data, userId }: CreateGameClipParams) {
   return result[0];
 }
 
-export async function getGameClips({
-  filters = { sortBy: "createdAt", sortOrder: "desc", limit: 20, offset: 0 },
-  userId,
-}: GetGameClipsParams) {
+export async function getGameClips(
+  query: GetGameClipsParams = {}
+): Promise<PaginationResponse<GameClipCard>> {
+  'use cache';
+  cacheTag('game-clips');
+  cacheLife('minutes');
+  
+  const { 
+    filters = {}, 
+    pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED },
+    userId 
+  } = query;
   // Validate filters
   const validatedFilters = gameClipFiltersSchema.parse(filters);
+  const offset = (pagination.page - 1) * pagination.limit;
 
   // Build conditions
   const conditions = [eq(gameClips.isActive, true)];
@@ -300,90 +315,42 @@ export async function getGameClips({
 
   const whereClause = and(...conditions);
 
-  // Get total count
-  const [countResult] = await db
-    .select({
-      count: sql<number>`count(*)::int`,
+  // Get total count and clips in parallel
+  const [countResult, clips] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(gameClips)
+      .leftJoin(users, eq(gameClips.authorId, users.id))
+      .where(whereClause),
+    db.query.gameClips.findMany({
+      columns: GAME_CLIP_CARD_COLUMNS,
+      where: whereClause,
+      with: {
+        author: { columns: USER_MINI_COLUMNS },
+        shop: { columns: SHOP_MINI_COLUMNS },
+        game: { columns: GAME_CARD_COLUMNS },
+      },
+      orderBy: (gameClips, { desc, asc }) => {
+        const sortOrder = validatedFilters.sortOrder === "desc" ? desc : asc;
+        if (validatedFilters.sortBy === "likes") {
+          return [sortOrder(sql`(SELECT count(*) FROM interactions WHERE entity_id = ${gameClips.id} AND entity_type = 'GAMECLIP' AND type = 'LIKE')`)];
+        }
+        if (validatedFilters.sortBy === "views") {
+          return [sortOrder(sql`(SELECT count(*) FROM interactions WHERE entity_id = ${gameClips.id} AND entity_type = 'GAMECLIP' AND type = 'VIEW')`)];
+        }
+        return [sortOrder(gameClips.createdAt)];
+      },
+      limit: pagination.limit,
+      offset: offset,
     })
-    .from(gameClips)
-    .leftJoin(users, eq(gameClips.authorId, users.id))
-    .where(whereClause);
+  ]);
 
-  const total = countResult?.count || 0;
-
-  // Get clips
-  const clips = await db
-    .select({
-      clip: gameClips,
-      author: {
-        id: users.id,
-        username: users.username,
-        fullName: users.fullName,
-        profileImage: users.profileImage,
-      },
-      shop: {
-        id: shops.id,
-        name: shops.name,
-        profileImage: shops.profileImage,
-      },
-      game: {
-        id: games.id,
-        name: games.name,
-        coverImage: games.coverImage,
-      },
-    })
-    .from(gameClips)
-    .leftJoin(users, eq(gameClips.authorId, users.id))
-    .leftJoin(shops, eq(gameClips.shopId, shops.id))
-    .leftJoin(games, eq(gameClips.gameId, games.id))
-    .where(whereClause)
-    .orderBy(
-      ...(validatedFilters.sortOrder === "desc"
-        ? [desc(
-          validatedFilters.sortBy === "likes"
-            ? sql`(
-                  SELECT COUNT(*)::int
-                  FROM interactions
-                  WHERE interactions.entity_id = ${gameClips.id}
-                    AND interactions.entity_type = 'GAMECLIP'
-                    AND interactions.type = 'LIKE'
-                )`
-            : validatedFilters.sortBy === "views"
-              ? sql`(
-                  SELECT COUNT(*)::int
-                  FROM interactions
-                  WHERE interactions.entity_id = ${gameClips.id}
-                    AND interactions.entity_type = 'GAMECLIP'
-                    AND interactions.type = 'VIEW'
-                )`
-              : gameClips.createdAt
-        )]
-        : [asc(
-          validatedFilters.sortBy === "likes"
-            ? sql`(
-                  SELECT COUNT(*)::int
-                  FROM interactions
-                  WHERE interactions.entity_id = ${gameClips.id}
-                    AND interactions.entity_type = 'GAMECLIP'
-                    AND interactions.type = 'LIKE'
-                )`
-            : validatedFilters.sortBy === "views"
-              ? sql`(
-                  SELECT COUNT(*)::int
-                  FROM interactions
-                  WHERE interactions.entity_id = ${gameClips.id}
-                    AND interactions.entity_type = 'GAMECLIP'
-                    AND interactions.type = 'VIEW'
-                )`
-              : gameClips.createdAt
-        )]
-      )
-    )
-    .limit(validatedFilters.limit)
-    .offset(validatedFilters.offset);
+  const total = countResult[0]?.count || 0;
 
   // Get interaction counts and comments
-  const clipIds = clips.map(item => item.clip.id);
+  const clipIds = clips.map(item => item.id);
   const [interactionCounts, commentsCounts, userInteractions] = await Promise.all([
     getInteractionCounts(clipIds),
     getCommentsCount(clipIds),
@@ -392,55 +359,48 @@ export async function getGameClips({
 
   // Transform data
   const data = clips.map(item => {
-    const counts = interactionCounts[item.clip.id] || { likes: 0, views: 0, bookmarks: 0 };
-    const commentsCount = commentsCounts[item.clip.id] || 0;
+    const counts = interactionCounts[item.id] || { likes: 0, views: 0, bookmarks: 0 };
+    const commentsCount = commentsCounts[item.id] || 0;
 
     return {
-      ...item.clip,
+      ...item,
       author: item.author,
-      shop: item.shop?.id ? item.shop : undefined,
-      game: item.game?.id ? item.game : undefined,
-      likesCount: counts.likes,
-      viewsCount: counts.views,
-      bookmarksCount: counts.bookmarks,
-      commentsCount,
-      userInteractions: userId ? {
-        liked: (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[item.clip.id]?.liked || false,
-        bookmarked: (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[item.clip.id]?.bookmarked || false,
-      } : undefined,
-    };
+      shop: (item.shop as any)?.id ? item.shop : undefined,
+      game: item.game ? { id: item.game.id, name: item.game.name, profileImage: item.game.profileImage } : null,
+      authorId: item.authorId,
+      stats: {
+        likesCount: counts.likes,
+        viewsCount: counts.views,
+        commentsCount,
+        liked: userId ? (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[item.id]?.liked || false : false,
+        bookmarked: userId ? (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[item.id]?.bookmarked || false : false,
+      },
+      createdAt: item.createdAt,
+    } as GameClipCard;
   });
 
-  return { data, total };
+  return {
+    data,
+    pagination: {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      hasNext: pagination.page * pagination.limit < total,
+      hasPrev: pagination.page > 1,
+    }
+  };
 }
 
 export async function getGameClipById(id: string, userId?: string) {
-  const [result] = await db
-    .select({
-      clip: gameClips,
-      author: {
-        id: users.id,
-        username: users.username,
-        fullName: users.fullName,
-        profileImage: users.profileImage,
-      },
-      shop: {
-        id: shops.id,
-        name: shops.name,
-        profileImage: shops.profileImage,
-      },
-      game: {
-        id: games.id,
-        name: games.name,
-        coverImage: games.coverImage,
-      },
-    })
-    .from(gameClips)
-    .leftJoin(users, eq(gameClips.authorId, users.id))
-    .leftJoin(shops, eq(gameClips.shopId, shops.id))
-    .leftJoin(games, eq(gameClips.gameId, games.id))
-    .where(eq(gameClips.id, id))
-    .limit(1);
+  const result = await db.query.gameClips.findFirst({
+    where: eq(gameClips.id, id),
+    with: {
+      author: { columns: USER_MINI_COLUMNS },
+      shop: { columns: SHOP_MINI_COLUMNS },
+      game: { columns: GAME_CARD_COLUMNS },
+    },
+  });
 
   if (!result) return null;
 
@@ -455,17 +415,18 @@ export async function getGameClipById(id: string, userId?: string) {
   const commentsCount = commentsCounts[id] || 0;
 
   return {
-    ...result.clip,
+    ...result,
     author: result.author,
-    shop: result.shop?.id ? result.shop : undefined,
-    game: result.game?.id ? result.game : undefined,
-    likesCount: counts.likes,
-    viewsCount: counts.views,
-    bookmarksCount: counts.bookmarks,
-    commentsCount,
-    userInteractions: userId ? {
-      liked: (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[id]?.liked || false,
-      bookmarked: (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[id]?.bookmarked || false,
-    } : undefined,
+    shop: (result.shop as any)?.id ? result.shop : undefined,
+    game: result.game ? { id: result.game.id, name: result.game.name, profileImage: result.game.profileImage } : null,
+    authorId: result.authorId,
+    stats: {
+      likesCount: counts.likes,
+      viewsCount: counts.views,
+      commentsCount,
+      liked: userId ? (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[id]?.liked || false : false,
+      bookmarked: userId ? (userInteractions as Record<string, { liked?: boolean; bookmarked?: boolean }>)[id]?.bookmarked || false : false,
+    },
+    createdAt: result.createdAt,
   };
 }

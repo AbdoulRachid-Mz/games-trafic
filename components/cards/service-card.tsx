@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { ArrowRight, CheckCircle, Star, Shield, Zap, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { Service } from "@/database/schema";
+import { type ServiceCard as ServiceCardType } from "@/types/view-models";
 import { useRouter } from "next/navigation";
 // import { useRouter } from "next/router";
 
@@ -18,7 +18,7 @@ type ViewMode = "grid" | "list" | "compact";
 type CardVariant = "default" | "premium" | "admin";
 
 interface ServiceCardProps {
-    service: Service;
+    service: ServiceCardType;
     className?: string;
     viewMode?: ViewMode;
     variant?: CardVariant;

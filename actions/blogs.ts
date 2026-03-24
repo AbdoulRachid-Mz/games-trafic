@@ -1,9 +1,16 @@
 'use server';
 
-import { blogs, type Blog, type NewBlog, users, interactions, viewers, BlogWithRelations } from '@/database/schema';
+import { blogs, type Blog, type NewBlog, users, interactions, viewers, type BlogWithRelations } from '@/database/schema';
 import { eq, and, or, like, ilike, desc, asc, sql, count, gte, lte, isNull } from 'drizzle-orm';
 import { type BlogFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type BlogCard, type UserMini,
+  BLOG_CARD_COLUMNS, USER_MINI_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -16,15 +23,18 @@ export async function getBlogById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<BlogWithRelations | null> {
+  'use cache';
+  cacheTag(`blog-${id}`, 'blogs');
+  cacheLife('hours');
   try {
     if (options?.populate && options.populate.length > 0) {
-      const query = db.query.blogs.findFirst({
+      const result = await db.query.blogs.findFirst({
         where: (blogs, { eq }) => eq(blogs.id, id),
         with: {
-          author: options.populate.includes('author') ? true : undefined,
+          author: options.populate.includes('author') ? { columns: USER_MINI_COLUMNS } : undefined,
         }
       });
-      return (await query) ?? null;
+      return result ? result as unknown as BlogWithRelations : null;
     }
 
     const result = await db
@@ -45,51 +55,49 @@ export async function getBlogById(
  */
 export async function getBlogs(
   query: ListQuery<BlogFilters> = {}
-): Promise<PaginationResponse<Blog>> {
+): Promise<PaginationResponse<BlogCard>> {
+  'use cache';
+  cacheTag('blogs');
+  cacheLife('hours');
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const { pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildBlogWhereConditions(filters, options);
 
-    const blogsQuery = db
-      .select()
-      .from(blogs)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Blog;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      blogsQuery.orderBy(sortOrder(blogs[sortField]));
-    } else {
-      blogsQuery.orderBy(desc(blogs.createdAt));
-    }
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(blogs)
-      .where(whereConditions);
-
     const [blogsData, totalResult] = await Promise.all([
-      blogsQuery,
-      countQuery
+      db.query.blogs.findMany({
+        columns: BLOG_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (blogs, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((blogs as any)[sortField]) : asc((blogs as any)[sortField])];
+          }
+          return [desc(blogs.createdAt)];
+        },
+        with: options.populate?.includes('author')
+          ? { author: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(blogs).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: blogsData,
+      data: blogsData as BlogCard[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
         total,
         totalPages,
         hasNext: pagination.page < totalPages,
-        hasPrev: pagination.page > 1
-      }
+        hasPrev: pagination.page > 1,
+      },
     };
   } catch (error) {
     console.error('Error getting blogs:', error);
@@ -103,7 +111,10 @@ export async function getBlogs(
 export async function getBlogsByAuthor(
   authorId: string,
   query: ListQuery<BlogFilters> = {}
-): Promise<PaginationResponse<Blog>> {
+): Promise<PaginationResponse<BlogCard>> {
+  'use cache';
+  cacheTag('blogs', `blog-author-${authorId}`);
+  cacheLife('hours');
   try {
     const { pagination = { page: 1, limit: 20 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -113,22 +124,20 @@ export async function getBlogsByAuthor(
       buildBlogWhereConditions(filters, options)
     );
 
-    const blogsQuery = db
-      .select()
-      .from(blogs)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset)
-      .orderBy(desc(blogs.createdAt));
-
-    const countQuery = db
-      .select({ count: count() })
-      .from(blogs)
-      .where(whereConditions);
-
     const [blogsData, totalResult] = await Promise.all([
-      blogsQuery,
-      countQuery
+      db.query.blogs.findMany({
+        columns: BLOG_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (blogs, { desc }) => [desc(blogs.createdAt)],
+        with: {
+          author: {
+            columns: USER_MINI_COLUMNS,
+          },
+        },
+      }),
+      db.select({ count: count() }).from(blogs).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
@@ -155,6 +164,9 @@ export async function getBlogsByAuthor(
  * Récupère les statistiques des blogs
  */
 export async function getBlogStats(filters?: BlogFilters) {
+  'use cache';
+  cacheTag('blogs', 'stats');
+  cacheLife('hours');
   try {
     const whereConditions = buildBlogWhereConditions(filters || {});
 
@@ -212,6 +224,7 @@ export async function createBlog(blogData: NewBlog): Promise<Blog> {
       })
       .returning();
 
+    revalidateTag('blogs', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating blog:', error);
@@ -245,6 +258,8 @@ export async function updateBlog(
       .where(eq(blogs.id, id))
       .returning();
 
+    revalidateTag('blogs', 'max');
+    revalidateTag(`blog-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating blog:', error);
@@ -274,6 +289,8 @@ export async function deleteBlog(id: string): Promise<Blog> {
       throw new Error('Blog not found');
     }
 
+    revalidateTag('blogs', 'max');
+    revalidateTag(`blog-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting blog:', error);
@@ -303,6 +320,8 @@ export async function restoreBlog(id: string): Promise<Blog> {
       throw new Error('Blog not found');
     }
 
+    revalidateTag('blogs', 'max');
+    revalidateTag(`blog-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring blog:', error);
@@ -332,6 +351,8 @@ export async function toggleBlogStatus(id: string): Promise<Blog> {
       .where(eq(blogs.id, id))
       .returning();
 
+    revalidateTag('blogs', 'max');
+    revalidateTag(`blog-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error toggling blog status:', error);
@@ -375,6 +396,9 @@ export async function incrementBlogViews(
  * Récupère les blogs populaires (par nombre de vues)
  */
 export async function getPopularBlogs(limit: number = 10): Promise<Blog[]> {
+  'use cache';
+  cacheTag('blogs');
+  cacheLife('hours');
   try {
     // Récupérer les blogs avec le plus de vues
     const popularBlogs = await db
@@ -406,6 +430,9 @@ export async function searchBlogs(
   searchTerm: string,
   query: ListQuery<BlogFilters> = {}
 ): Promise<PaginationResponse<Blog>> {
+  'use cache';
+  cacheTag('blogs');
+  cacheLife('minutes');
   try {
     const { pagination = { page: 1, limit: 20 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;

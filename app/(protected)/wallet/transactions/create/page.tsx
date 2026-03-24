@@ -172,7 +172,7 @@ function CreateTransactionContent({
           description: edition.description || "",
           price: parseFloat(edition.entryFee || "0"),
           currency: edition.prizeCurrency || "GTC",
-          image: edition.tournament?.profileImage || edition.tournament?.coverImage || undefined,
+          image: edition.tournament?.profileImage || edition.tournament?.profileImage || undefined,
           metadata: {
             tournamentId: edition.tournamentId,
             editionNumber: edition.editionNumber,
@@ -185,13 +185,16 @@ function CreateTransactionContent({
   };
 
   // Récupération des paramètres d'URL et fetch de l'entité
+  // Dans le composant CreateTransactionContent, mettre à jour loadTransactionFromParams
+
   useEffect(() => {
     const loadTransactionFromParams = async () => {
       const type = searchParams.get("type") as TransactionType;
       const amount = searchParams.get("amount");
       const entityId = searchParams.get("entityId");
-      const targetId = searchParams.get("targetId"); // Fallback
+      const targetId = searchParams.get("targetId");
       const itemId = searchParams.get("itemId");
+      const imageUrl = searchParams.get("image"); // Ajout du paramètre image
 
       if (type && TRANSACTION_CONFIGS[type]) {
         const config = TRANSACTION_CONFIGS[type];
@@ -200,8 +203,44 @@ function CreateTransactionContent({
         const newData: TransactionData = {
           type,
           amount: amount ? parseFloat(amount) : 0,
-          metadata: {},
+          metadata: {
+            ...(imageUrl && { image: imageUrl }) // Stocker l'image
+          },
         };
+
+        // Pour DEPOSIT et WITHDRAWAL, on vérifie si on doit sauter l'étape des détails
+        const hasPaymentDetails = searchParams.get("paymentMethod") ||
+          searchParams.get("paymentProvider") ||
+          searchParams.get("paymentAccountId");
+
+        if (type === "DEPOSIT" && !hasPaymentDetails) {
+          // Si pas de détails de paiement en param, on reste sur l'étape DEPOSIT_DETAILS
+          setCurrentStep(0);
+        } else if (type === "DEPOSIT" && hasPaymentDetails) {
+          // Si détails fournis, on passe directement à l'étape AMOUNT_INPUT
+          const stepIndex = config.steps.indexOf("AMOUNT_INPUT");
+          setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
+          // Remplir les détails
+          newData.metadata = {
+            ...newData.metadata,
+            paymentMethod: searchParams.get("paymentMethod") || "",
+            paymentProvider: searchParams.get("paymentProvider") || "",
+            paymentAccountId: searchParams.get("paymentAccountId") || "",
+          };
+        }
+
+        if (type === "WITHDRAWAL" && !hasPaymentDetails) {
+          setCurrentStep(0);
+        } else if (type === "WITHDRAWAL" && hasPaymentDetails) {
+          const stepIndex = config.steps.indexOf("AMOUNT_INPUT");
+          setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
+          newData.metadata = {
+            ...newData.metadata,
+            paymentMethod: searchParams.get("paymentMethod") || "",
+            paymentProvider: searchParams.get("paymentProvider") || "",
+            paymentAccountId: searchParams.get("paymentAccountId") || "",
+          };
+        }
 
         if (type === "VIP_SUBSCRIPTION" && !newData.amount) {
           const monthly = parseFloat(settings?.vipMonthlyPrice || "0");
@@ -209,6 +248,7 @@ function CreateTransactionContent({
             newData.amount = monthly;
           }
         }
+
         if (type === "TRANSFER" && actualEntityId) {
           newData.recipientWalletId = actualEntityId;
           setPrefilledRecipientWalletId(actualEntityId);
@@ -221,6 +261,10 @@ function CreateTransactionContent({
             const entity = await fetchEntityByType(type, actualEntityId);
             if (entity) {
               newData.targetId = actualEntityId;
+              // Ajouter l'image si elle vient des paramètres
+              if (imageUrl) {
+                entity.image = imageUrl;
+              }
               newData.entity = entity as any;
               if (type === "GAME_ITEM_PURCHASE" && entity.price) {
                 if (newData.amount && Math.abs(newData.amount - entity.price) > 0.01) {
@@ -248,7 +292,6 @@ function CreateTransactionContent({
           !!newData.targetId || !!newData.recipientWalletId
         );
         setCurrentStep(initialStepIndex);
-
       }
 
       if (completeData && !completeData?.wallet) {
@@ -260,7 +303,7 @@ function CreateTransactionContent({
     if (completeData) {
       loadTransactionFromParams();
     }
-  }, [searchParams, completeData, router]);
+  }, [searchParams, completeData, router, settings]);
 
   const config = transactionData.type
     ? TRANSACTION_CONFIGS[transactionData.type]
@@ -319,12 +362,19 @@ function CreateTransactionContent({
       const type = decoded.t;
       const entityId = decoded.id;
       const amount = decoded.a;
+      const imageUrl = decoded.i; // Récupérer l'image du QR
 
       const newData: TransactionData = {
         type,
         amount: amount || 0,
         metadata: decoded.m || {},
       };
+
+      // Ajouter l'image si présente
+      if (imageUrl) {
+        newData.metadata.image = imageUrl;
+      }
+
       if (type === "TRANSFER" && entityId) {
         newData.recipientWalletId = entityId;
         setPrefilledRecipientWalletId(entityId);
@@ -336,6 +386,10 @@ function CreateTransactionContent({
         const entity = await fetchEntityByType(type, entityId);
         if (entity) {
           newData.targetId = entityId;
+          // Ajouter l'image du QR si disponible
+          if (imageUrl) {
+            entity.image = imageUrl;
+          }
           newData.entity = entity as any;
           if (type === "GAME_ITEM_PURCHASE" && entity.price) {
             if (newData.amount && Math.abs(newData.amount - entity.price) > 0.01) {
@@ -408,7 +462,7 @@ function CreateTransactionContent({
           description: edition.description || entity.description,
           price: parseFloat(edition.entryFee || "0"),
           currency: edition.prizeCurrency || "GTC",
-          image: edition.tournament?.profileImage || edition.tournament?.coverImage || entity.image,
+          image: edition.tournament?.profileImage || entity.image,
           metadata: {
             ...(entity.metadata || {}),
             tournamentId: edition.tournamentId,

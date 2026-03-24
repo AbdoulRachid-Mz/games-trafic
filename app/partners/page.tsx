@@ -10,7 +10,7 @@ import Link from "next/link";
 import { PartnerCard } from "@/components/cards/partner-card";
 
 //mise en cache des partenaires
-export const revalidate = 60; // Rafraîchir chaque minute
+
 
 export const metadata: Metadata = {
   title: "Nos Partenaires | Plateforme de Tournois Gaming",

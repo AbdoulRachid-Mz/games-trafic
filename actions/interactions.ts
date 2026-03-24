@@ -16,7 +16,7 @@ import {
 } from "@/database/schema";
 import {
   eq,
-  
+
   and,
   or,
   like,
@@ -243,22 +243,22 @@ export async function getEntityInteractions(
       eq(
         interactions.entityType,
         entityType as
-          | "PRODUCT"
-          | "POST"
-          | "SHOP"
-          | "TOURNAMENT"
-          | "USER"
-          | "BLOG"
-          | "MESSAGE"
-          | "TEAM"
-          | "THEME"
-          | "NEWS"
-          | "GROUP"
-          | "ANNOUNCEMENT"
-          | "SERVICE"
-          | "GUIDE"
-          | "COMMENT"
-          | "MATCH"
+        | "PRODUCT"
+        | "POST"
+        | "SHOP"
+        | "TOURNAMENT"
+        | "USER"
+        | "BLOG"
+        | "MESSAGE"
+        | "TEAM"
+        | "THEME"
+        | "NEWS"
+        | "GROUP"
+        | "ANNOUNCEMENT"
+        | "SERVICE"
+        | "GUIDE"
+        | "COMMENT"
+        | "MATCH"
       )
     );
 
@@ -280,6 +280,95 @@ export async function getEntityInteractions(
   } catch (error) {
     console.error("Error getting entity interactions:", error);
     throw new Error("Failed to fetch entity interactions");
+  }
+}
+
+/**
+ * Récupère les interactions avec relations, filtres et pagination
+ */
+export async function getInteractionsWithRelations(
+  filters?: InteractionFilters,
+  pagination?: { page: number; limit: number },
+  options?: QueryOptions
+): Promise<{
+  data: InteractionWithRelations[];
+  pagination: PaginationParams;
+}> {
+  try {
+    const whereConditions = buildInteractionWhereConditions(
+      filters || {},
+      options || {}
+    );
+
+    // Build orderBy array first
+    const orderByClause = options?.sortBy
+      ? options.sortOrder === "asc"
+        ? asc((interactions as any)[options.sortBy])
+        : desc((interactions as any)[options.sortBy])
+      : desc(interactions.createdAt);
+
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 50;
+    const offset = (page - 1) * limit;
+
+    // Query for total count
+    const countQuery = db
+      .select({ count: count() })
+      .from(interactions)
+      .where(whereConditions);
+
+    // Query for paginated data
+    const dataQuery = db.query.interactions.findMany({
+      where: whereConditions,
+      with: {
+        user: true,
+        targetUser: true,
+        post: true,
+        product: true,
+        message: true,
+        tournament: true,
+        shop: true,
+        theme: true,
+        game: true,
+        gameItem: true,
+      },
+      orderBy: [orderByClause],
+      limit,
+      offset,
+    });
+
+    const [totalResult, raw] = await Promise.all([countQuery, dataQuery]);
+
+    const total = totalResult[0]?.count ?? 0;
+    const totalPages = Math.ceil(total / limit);
+
+    const data = raw.map((i) => ({
+      ...i,
+      targetUser: i.targetUser ?? undefined,
+      post: i.post ?? undefined,
+      product: i.product ?? undefined,
+      message: i.message ?? undefined,
+      tournament: i.tournament ?? undefined,
+      shop: i.shop ?? undefined,
+      theme: i.theme ?? undefined,
+      game: i.game ?? undefined,
+      gameItem: i.gameItem ?? undefined,
+    }));
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: String(total),
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting interactions with relations:", error);
+    throw new Error("Failed to fetch interactions");
   }
 }
 
@@ -306,24 +395,24 @@ export async function getEntityInteractionsWithRelations(
       eq(
         interactions.entityType,
         entityType as
-          | "PRODUCT"
-          | "POST"
-          | "SHOP"
-          | "TOURNAMENT"
-          | "USER"
-          | "BLOG"
-          | "MESSAGE"
-          | "TEAM"
-          | "THEME"
-          | "NEWS"
-          | "GROUP"
-          | "GAME"
-          | "GAME_ITEM"
-          | "ANNOUNCEMENT"
-          | "SERVICE"
-          | "GUIDE"
-          | "COMMENT"
-          | "MATCH"
+        | "PRODUCT"
+        | "POST"
+        | "SHOP"
+        | "TOURNAMENT"
+        | "USER"
+        | "BLOG"
+        | "MESSAGE"
+        | "TEAM"
+        | "THEME"
+        | "NEWS"
+        | "GROUP"
+        | "GAME"
+        | "GAME_ITEM"
+        | "ANNOUNCEMENT"
+        | "SERVICE"
+        | "GUIDE"
+        | "COMMENT"
+        | "MATCH"
       )
     );
 
@@ -353,6 +442,7 @@ export async function getEntityInteractionsWithRelations(
       where: finalWhere,
       with: {
         user: true,
+        targetUser: true,
         post: true,
         product: true,
         message: true,
@@ -374,6 +464,7 @@ export async function getEntityInteractionsWithRelations(
 
     const data = raw.map(i => ({
       ...i,
+      targetUser: i.targetUser ?? undefined,
       post: i.post ?? undefined,
       product: i.product ?? undefined,
       message: i.message ?? undefined,
@@ -421,22 +512,22 @@ export async function countEntityInteractions(
           eq(
             interactions.entityType,
             entityType as
-              | "PRODUCT"
-              | "POST"
-              | "SHOP"
-              | "TOURNAMENT"
-              | "USER"
-              | "BLOG"
-              | "MESSAGE"
-              | "TEAM"
-              | "THEME"
-              | "NEWS"
-              | "GROUP"
-              | "ANNOUNCEMENT"
-              | "SERVICE"
-              | "GUIDE"
-              | "COMMENT"
-              | "MATCH"
+            | "PRODUCT"
+            | "POST"
+            | "SHOP"
+            | "TOURNAMENT"
+            | "USER"
+            | "BLOG"
+            | "MESSAGE"
+            | "TEAM"
+            | "THEME"
+            | "NEWS"
+            | "GROUP"
+            | "ANNOUNCEMENT"
+            | "SERVICE"
+            | "GUIDE"
+            | "COMMENT"
+            | "MATCH"
           ),
           eq(interactions.isDeleted, false)
         )

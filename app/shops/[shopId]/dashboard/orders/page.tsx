@@ -72,21 +72,23 @@ export default function ShopOrdersPage() {
     try {
       const enriched: UiOrder[] = [];
       for (const o of ordersData?.data || []) {
-        let name = o.productId;
+        let name = o.product?.name || o.product?.id || "Unknown";
         let image: string | undefined;
         try {
-          const p = await getProductById(o.productId);
-          if (p) {
-            name = p.name;
-            image = (p as any).featuredImage || undefined;
+          if (o.product?.id) {
+            const p = await getProductById(o.product.id);
+            if (p) {
+              name = p.name;
+              image = (p as any).featuredImage || undefined;
+            }
           }
         } catch { }
         enriched.push({
           id: o.id,
-          productId: o.productId,
+          productId: o.product?.id || "",
           productName: name,
           productImage: image,
-          buyerId: o.buyerId,
+          buyerId: o.buyer?.id || "",
           amount: Number(o.price || 0),
           status: o.status as UiOrder["status"],
           createdAt: o.createdAt as Date,

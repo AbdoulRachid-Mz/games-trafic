@@ -1,37 +1,14 @@
-// @/hooks/use-game-clips.ts
 "use client";
 
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getGameClips, getGameClipById, createGameClip, shareGameClip } from "@/actions/game-clips";
 import { useAuthContext } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { useCallback } from "react";
-import { ClipFilters, GameClipWithRelations } from "@/types/game-clips";
+import { type GameClipFilters, type PaginationResponse } from "@/types/api";
+import { type GameClipCard } from "@/types/view-models";
 
-const MOCK_CLIPS: Partial<GameClipWithRelations>[] = [
-  {
-    id: "mock-1",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-gaming-setup-with-neon-lights-40011-large.mp4",
-    caption: "Bienvenue sur Game Trafic ! 🎮 Découvrez notre nouvelle marketplace.",
-    likesCount: 1500,
-    commentsCount: 45,
-    author: { id: "system", username: "GT_System", profileImage: "/logo.png" } as any,
-    game: { id: "gt", name: "Game Trafic" } as any,
-    createdAt: new Date()
-  },
-  {
-    id: "mock-2",
-    videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-professional-gamer-playing-an-action-video-game-40012-large.mp4",
-    caption: "Sécurisez vos transactions avec notre système de Wallet intégré. 💰",
-    likesCount: 890,
-    commentsCount: 12,
-    author: { id: "system", username: "GT_Security", profileImage: "/logo.png" } as any,
-    game: { id: "gt", name: "Wallet" } as any,
-    createdAt: new Date()
-  }
-];
-
-export function useGameClips(filters: ClipFilters = {}) {
+export function useGameClips(filters: GameClipFilters = {}) {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
 
@@ -39,54 +16,35 @@ export function useGameClips(filters: ClipFilters = {}) {
     data,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage,
     isLoading,
+    isFetchingNextPage,
     refetch,
-  } = useInfiniteQuery({
+  } = useInfiniteQuery<
+    PaginationResponse<GameClipCard>,
+    Error,
+    InfiniteData<PaginationResponse<GameClipCard>, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: ["game-clips", filters, user?.id],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryFn: async ({ pageParam = 1 }) => {
       const result = await getGameClips({
-        filters: {
-          ...filters,
+        filters,
+        pagination: {
+          page: pageParam,
           limit: filters.limit || 20,
-          offset: pageParam,
-          sortBy: filters.sortBy || "createdAt",
-          sortOrder: filters.sortOrder || "desc",
         },
         userId: user?.id,
       });
 
-      return {
-        data: result.data as unknown as GameClipWithRelations[],
-        total: result.total,
-        nextOffset: pageParam + (filters.limit || 20),
-      };
+      return result;
     },
-    getNextPageParam: (lastPage, allPages) => {
-      const totalLoaded = allPages.flatMap((p) => p.data).length;
-      return totalLoaded < lastPage.total ? lastPage.nextOffset : undefined;
-    },
-    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
+    initialPageParam: 1,
   });
 
-  let clips = data?.pages.flatMap((page) => page.data) || [];
-
-  // Ajouter des mocks uniquement si on demande plus de 20 clips ET qu'on a moins de 20 clips
-  // Ne pas ajouter de mocks pour la home page (limit < 20)
-  if (!isLoading && 
-      !isFetchingNextPage && 
-      clips.length < 20 && 
-      clips.length > 0 && 
-      (!filters.limit || filters.limit >= 20)) {
-    const remaining = 20 - clips.length;
-    const paddedMocks = Array.from({ length: remaining }).map((_, i) => ({
-      ...MOCK_CLIPS[i % MOCK_CLIPS.length],
-      id: `mock-extra-${i}`,
-      caption: `${MOCK_CLIPS[i % MOCK_CLIPS.length].caption} (Clip System #${i + 1})`
-    })) as unknown as GameClipWithRelations[];
-
-    clips = [...clips, ...paddedMocks];
-  }
+  const clips = data?.pages.flatMap((page) => page.data) || [];
 
   const createMutation = useMutation({
     mutationFn: async (data: {

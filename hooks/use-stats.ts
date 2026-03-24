@@ -5,8 +5,8 @@ import { getStats, getGlobalStats, getDashboardStats, getPerformanceMetrics, get
 import type { StatsFilters, StatsResponse, GlobalStats, RecentActivity } from '@/actions/stats';
 
 // Cache configuration
-const STATS_CACHE_TIME = 1000 * 60 * 5; // 5 minutes
-const STALE_TIME = 1000 * 60 * 2; // 2 minutes
+const STATS_CACHE_TIME = 1000 * 60 * 15; // 15 minutes
+const STALE_TIME = 1000 * 60 * 10; // 10 minutes
 const RETRY_COUNT = 1;
 
 // Query key factory

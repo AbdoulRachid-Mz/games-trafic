@@ -121,11 +121,21 @@ export function ShopPageContent() {
     {
       icon: Package,
       label: "Produits",
-      value: shop?.productCount || 0,
+      value: shop?.stats?.productCount || shop?.productCount || 0,
       color: "text-blue-500",
     },
-    { icon: Users, label: "Suiveurs", value: "1.2k", color: "text-green-500" },
-    { icon: Star, label: "Note", value: "4.8/5", color: "text-amber-500" },
+    {
+      icon: Users,
+      label: "Suiveurs",
+      value: shop?.stats?.followerCount || "0",
+      color: "text-green-500"
+    },
+    {
+      icon: Eye,
+      label: "Vues",
+      value: shop?.stats?.viewCount || shop?.viewCount || 0,
+      color: "text-amber-500"
+    },
     {
       icon: Clock,
       label: "Expédition",
@@ -140,8 +150,8 @@ export function ShopPageContent() {
     },
     {
       icon: Trophy,
-      label: "Classement",
-      value: "#12",
+      label: "Ventes",
+      value: shop?.stats?.totalSales || 0,
       color: "text-orange-500",
     },
   ];
@@ -154,9 +164,7 @@ export function ShopPageContent() {
       description: "Compte ou items premium pour jeux mobiles et PC",
       price: (49.99 + i * 10).toFixed(2),
       currency: "GTC",
-      featuredImage: `https://via.placeholder.com/400x300/3b82f6/ffffff?text=Product+${
-        i + 1
-      }`,
+      featuredImage: `/images/icons/app/gt-primary.png`,
       status: i % 6 === 0 ? "VENDU" : "NON_VENDU",
       game: ["Clash Royale", "Fortnite", "COD Mobile", "Free Fire", "Valorant"][
         i % 5
@@ -713,23 +721,23 @@ export function ShopPageContent() {
 
               {/* avis */}
               {activeTab === "reviews" && (
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Star className="h-5 w-5 text-yellow-500" />
-                      Avis des clients
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <CommentsSection
-                    entityId={shopId}
-                    entityType="SHOP"
-                    title={`Avis de la boutique ${shop.name}`} 
-                    />
-                  </CardContent>
-                </Card>
-              </div>
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Star className="h-5 w-5 text-yellow-500" />
+                        Avis des clients
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <CommentsSection
+                        entityId={shopId}
+                        entityType="SHOP"
+                        title={`Avis de la boutique ${shop.name}`}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
               )}
 
               {/* About Tab */}
@@ -757,7 +765,7 @@ export function ShopPageContent() {
 
                       <Separator />
 
-                                            {/* Contact Info */}
+                      {/* Contact Info */}
                       <div className="bg-muted/30 rounded-lg p-6">
                         <Typography
                           variant="h4"
@@ -933,7 +941,7 @@ export function ShopPageContent() {
                         <ShopCard
                           key={similarShop.id}
                           shop={similarShop}
-                        //   viewMode="grid"
+                          //   viewMode="grid"
                           showStats={false}
                           showActions={true}
                           onView={() => router.push(`/shops/${similarShop.id}`)}

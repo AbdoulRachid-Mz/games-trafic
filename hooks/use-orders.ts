@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { OrderFilters, OrderStatus } from '@/types/api';
+import { OrderFilters, OrderStatus, PaginationResponse } from '@/types/api';
 import { toast } from 'sonner';
 import {
   createProductOrder,
@@ -9,12 +9,13 @@ import {
   getOrderStats,
   getOrderById,
   getOrdersByShopId} from '@/actions/orders';
+import { type OrderCard } from '@/types/view-models';
 const ORDERS_QUERY_KEY = 'orders';
 const ORDER_STATS_QUERY_KEY = 'order-stats';
 
 // ---------- QUERIES ----------
-export function useOrders(filters?: OrderFilters) {
-  return useQuery({
+export function useOrders(filters: OrderFilters = {}) {
+  return useQuery<PaginationResponse<OrderCard>, Error>({
     queryKey: [ORDERS_QUERY_KEY, filters],
     queryFn: () => getOrders(filters),
     staleTime: 1000 * 60, // 1 min
@@ -30,8 +31,8 @@ export function useOrderById(orderId: string) {
   });
 }
 
-export function useOrdersByShopId(shopId: string, filters?: { status?: OrderStatus | OrderStatus[]; limit?: number; page?: number }) {
-  return useQuery({
+export function useOrdersByShopId(shopId: string, filters: { status?: OrderStatus | OrderStatus[]; limit?: number; page?: number } = {}) {
+  return useQuery<PaginationResponse<OrderCard>, Error>({
     queryKey: [ORDERS_QUERY_KEY, 'shop', shopId, filters],
     queryFn: () => getOrdersByShopId(shopId, filters),
     enabled: !!shopId,

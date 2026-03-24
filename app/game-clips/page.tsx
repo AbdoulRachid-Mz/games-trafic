@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { ClientGameClipsContent, ClientGameClipsContentSkeleton } from "./client-page";
 
 // mise en cache
-export const revalidate = 60; // 1 minute`
+
 
 // generate metadata
 export const metadata = {

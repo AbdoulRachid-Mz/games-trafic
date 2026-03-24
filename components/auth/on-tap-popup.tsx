@@ -7,45 +7,45 @@ import { Loader2 } from "lucide-react";
 import { XIcon } from "../icons/x";
 import { useNetworkStatus } from "@/hooks/network-status";
 import { useAuthContext } from "@/contexts/auth-context";
-// import { XIcon } from "../icons/x";
+import { toast } from "sonner";
 
 export default function OnTapPopup() {
   const { resolvedTheme } = useTheme();
   const { user: session } = useAuthContext();
   const buttonRef = useRef<HTMLDivElement>(null);
-  const { isOnline } = useNetworkStatus();
+
+  const { isOnline, isReachable, isChecking } = useNetworkStatus();
+  const isConnected = isOnline && isReachable;
 
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  
-  // Prevent hydration mismatch (next-themes fix)
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
-  
-  // Load visibility from sessionStorage
+
+  // ✅ Charger même offline
   useEffect(() => {
-    if (!isMounted || !isOnline) return;
-    
+    if (!isMounted) return;
+
     const stored = sessionStorage.getItem("onTapPopupVisible");
     if (stored !== null) {
       setIsVisible(JSON.parse(stored));
     }
-    
-  }, [isMounted, isOnline]);
-  
-  // Persist visibility
+  }, [isMounted]);
+
+  // ✅ Sauvegarder même offline
   useEffect(() => {
-    if (!isMounted || !isOnline) return;
+    if (!isMounted) return;
     sessionStorage.setItem("onTapPopupVisible", JSON.stringify(isVisible));
-  }, [isVisible, isMounted, isOnline]);
-  
-  // Initialize One Tap
+  }, [isVisible, isMounted]);
+
+  // ✅ Init One Tap uniquement si internet réel
   useEffect(() => {
-    if (!isMounted || !isOnline) return;
+    if (!isMounted || !isConnected) return;
     if (session) return;
-    
+
     const initOneTap = async () => {
       setIsLoading(true);
       try {
@@ -71,11 +71,27 @@ export default function OnTapPopup() {
     };
 
     initOneTap();
+  }, [resolvedTheme, session, isMounted, isConnected]);
 
-  }, [resolvedTheme, session, isMounted, isOnline]);
+  // ❌ Pas monté ou connecté ou loggé
+  if (!isMounted || session) return null;
 
-  // Do not render if logged in or not mounted
-  if (!isMounted || session || !isOnline) return null;
+  // 🔴 Pas de connexion réelle
+  // if (!isConnected) {
+  //   toast.warning(`${isOnline ? "Connexion instable..." : "Vous êtes hors ligne"}`);
+  // }
+
+  // if (!isConnected) {
+  //   return (
+  //     <div className="fixed top-20 right-3 z-100 w-[260px] rounded-lg border border-red-500 bg-background shadow-lg p-3 text-sm">
+  //       <p className="text-red-500">
+  //         {isOnline
+  //           ? "Connexion instable..."
+  //           : "Vous êtes hors ligne"}
+  //       </p>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div
@@ -84,12 +100,14 @@ export default function OnTapPopup() {
     >
       <div className="relative">
 
-        {/* Close button */}
-        <XIcon size={16} className="absolute top-2 right-2 z-10 text-primary hover:opacity-70" onClick={() => setIsVisible(false)} /> 
-          
+        <XIcon
+          size={16}
+          className="absolute top-2 right-2 z-10 text-primary hover:opacity-70"
+          onClick={() => setIsVisible(false)}
+        />
 
-        {/* Loader overlay */}
-        {isLoading && (
+        {/* Loader global (init ou checking réseau) */}
+        {(isLoading || isChecking) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>

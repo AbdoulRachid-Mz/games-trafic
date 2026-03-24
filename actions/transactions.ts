@@ -650,7 +650,7 @@ export async function refundTransaction(
     }
 
     if (originalTransaction.status !== "COMPLETED") {
-      throw new Error("Only completed transactions can be refunded");
+      throw new Error("seuls les transactions terminées peuvent être remboursées");
     }
 
     // Création d'une transaction de remboursement
@@ -690,13 +690,14 @@ export async function refundTransaction(
 
     return refundResult;
   } catch (error) {
-    console.error("Error refunding transaction:", error);
+    console.error("Erreur lors du remboursement de la transaction:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("Failed to refund transaction");
+    throw new Error("Impossible de rembourser la transaction");
   }
 }
+
 
 /**
  * Supprime une transaction (soft delete)
@@ -715,16 +716,17 @@ export async function deleteTransaction(
       .returning();
 
     if (result.length === 0) {
-      throw new Error("Transaction not found");
+      throw new Error("Transaction non trouvée");
     }
 
     return result[0];
   } catch (error) {
-    console.error("Error deleting transaction:", error);
+    //en fr: Erreur lors de la suppression de la transaction
+    console.error("Erreur lors de la suppression de la transaction:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("Failed to delete transaction");
+    throw new Error("Impossible de supprimer la transaction");
   }
 }
 
@@ -745,16 +747,16 @@ export async function restoreTransaction(
       .returning();
 
     if (result.length === 0) {
-      throw new Error("Transaction not found");
+      throw new Error("Transaction non trouvée");
     }
 
     return result[0];
   } catch (error) {
-    console.error("Error restoring transaction:", error);
+    console.error("Erreur lors de la restauration de la transaction:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("Failed to restore transaction");
+    throw new Error("Impossible de restaurer la transaction");
   }
 }
 

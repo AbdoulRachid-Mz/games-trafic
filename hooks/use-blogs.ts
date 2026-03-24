@@ -13,8 +13,10 @@ import {
   getPopularBlogs,
   searchBlogs,
 } from '@/actions/blogs';
-import type { Blog, NewBlog } from '@/database/schema';
 import type { BlogFilters, ListQuery, PaginationResponse } from '@/types/api';
+import { type BlogCard } from '@/types/view-models';
+import { type InfiniteData } from '@tanstack/react-query';
+import { NewBlog } from '@/database/schema';
 
 // Query keys factory
 const blogKeys = {
@@ -39,11 +41,11 @@ const blogKeys = {
  * Fetch a single blog by ID
  */
 export function useBlogById(id: string, options?: { populate?: string[] }) {
-  return useQuery({
+  return useQuery<Awaited<ReturnType<typeof getBlogById>>, Error>({
     queryKey: blogKeys.detail(id, options?.populate),
     queryFn: () => getBlogById(id, options),
     enabled: !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -51,20 +53,40 @@ export function useBlogById(id: string, options?: { populate?: string[] }) {
  * Fetch paginated blogs with filters
  */
 export function useBlogs(filters: BlogFilters = {}, options: ListQuery<BlogFilters>['options'] = {}) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    PaginationResponse<BlogCard>,
+    Error,
+    InfiniteData<PaginationResponse<BlogCard>, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: blogKeys.list(filters, options),
-    queryFn: ({ pageParam = 1 }) =>
-      getBlogs({
-        pagination: { page: pageParam, limit: 50 },
-        filters,
-        options,
-      }),
+    queryFn: async ({ pageParam = 1 }) => {
+      const pagination = { page: pageParam, limit: 20 };
+      const [blogsResponse, statsResponse] = await Promise.all([
+        getBlogs({ pagination, filters, options }),
+        getBlogStats(filters),
+      ]);
+
+      const total = statsResponse?.total || blogsResponse.pagination.total;
+      const totalPages = Math.ceil(total / pagination.limit);
+
+      return {
+        data: blogsResponse.data,
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          total,
+          totalPages,
+          hasNext: pagination.page < totalPages,
+          hasPrev: pagination.page > 1,
+        },
+      };
+    },
     getNextPageParam: (lastPage) =>
       lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
-    getPreviousPageParam: (firstPage) =>
-      firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: 1,
-    staleTime: 1000 * 60 * 3, // 3 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -72,7 +94,13 @@ export function useBlogs(filters: BlogFilters = {}, options: ListQuery<BlogFilte
  * Fetch blogs by author
  */
 export function useBlogsByAuthor(authorId: string, filters: BlogFilters = {}) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    PaginationResponse<BlogCard>,
+    Error,
+    InfiniteData<PaginationResponse<BlogCard>, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: blogKeys.author(authorId),
     queryFn: ({ pageParam = 1 }) =>
       getBlogsByAuthor(authorId, {
@@ -83,7 +111,7 @@ export function useBlogsByAuthor(authorId: string, filters: BlogFilters = {}) {
       lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
     initialPageParam: 1,
     enabled: !!authorId,
-    staleTime: 1000 * 60 * 3,
+    staleTime: 15 * 60 * 1000,
   });
 }
 
@@ -94,7 +122,7 @@ export function useBlogStats(filters?: BlogFilters) {
   return useQuery({
     queryKey: blogKeys.stats(),
     queryFn: () => getBlogStats(filters),
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -102,10 +130,10 @@ export function useBlogStats(filters?: BlogFilters) {
  * Fetch popular blogs
  */
 export function usePopularBlogs(limit = 10) {
-  return useQuery({
+  return useQuery<BlogCard[], Error>({
     queryKey: blogKeys.popular(),
     queryFn: () => getPopularBlogs(limit),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 15 * 60 * 1000,
   });
 }
 
@@ -124,7 +152,7 @@ export function useSearchBlogs(searchTerm: string, filters: BlogFilters = {}) {
       lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
     initialPageParam: 1,
     enabled: searchTerm.length > 2,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 15 * 60 * 1000,
   });
 }
 

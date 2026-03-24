@@ -13,6 +13,7 @@ import type { UserRoles } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import OnTapPopup from "../auth/on-tap-popup";
+import Image from "next/image";
 
 // Loading Screen Premium
 function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
@@ -37,10 +38,16 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
 
             {/* Logo in center */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center">
+                {/* <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+                </svg> */}
+                <Image
+                  src="/images/icons/app/gt-primary.png"
+                  alt="Logo"
+                  width={50}
+                  height={50}
+                />
               </div>
             </div>
           </motion.div>
@@ -115,10 +122,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     maintenanceMessage,
   } = useApp();
 
-  const [isChecking, setIsChecking] = useState(true);
-  const [hasAccess, setHasAccess] = useState(true);
-  const [redirectTo, setRedirectTo] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [initialPath] = useState(pathname);
 
   // Calculate user roles
   const userRoles: UserRoles = useMemo(
@@ -135,8 +140,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Resolve route
   const resolved = useMemo(() => {
     if (!isInitialized) return null;
-    return resolveRoute(pathname, userRoles);
-  }, [pathname, userRoles, isInitialized]);
+    return resolveRoute(initialPath, userRoles);
+  }, [initialPath, userRoles, isInitialized]);
 
   // Initialize app
   useEffect(() => {
@@ -148,34 +153,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         console.error("Error initializing app:", error);
       } finally {
         setIsInitialized(true);
-        setIsChecking(false);
       }
     };
 
     init();
   }, [refreshUser]);
-
-  // Check access when route is resolved
-  useEffect(() => {
-    if (!resolved) return;
-
-    if (!resolved.hasAccess) {
-      setHasAccess(false);
-      if (resolved.redirectTo) {
-        setRedirectTo(resolved.redirectTo);
-      }
-    } else {
-      setHasAccess(true);
-      setRedirectTo(null);
-    }
-  }, [resolved]);
-
-  // Handle redirects
-  useEffect(() => {
-    if (redirectTo && redirectTo !== pathname) {
-      router.push(redirectTo);
-    }
-  }, [redirectTo, router, pathname]);
 
   // Handle announcements
   useEffect(() => {
@@ -202,10 +184,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     toggleAnnouncements,
     isAuthenticated,
   ]);
+
   // Handle maintenance mode
   useEffect(() => {
     if (maintenanceMode && !isAdmin && isInitialized) {
-      const isPublicRoute = resolved && !resolved.requireAuth && !resolved.requireAdmin;
+      const isPublicRoute =
+        resolved && !resolved.requireAuth && !resolved.requireAdmin;
 
       if (!isPublicRoute && pathname !== "/maintenance") {
         router.push("/maintenance");
@@ -214,7 +198,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [maintenanceMode, isAdmin, isInitialized, resolved, pathname, router]);
 
   // Show loading during initialization
-  if (!isInitialized || isChecking) {
+  if (!isInitialized) {
     return <LoadingScreen message="Initialisation..." />;
   }
 
@@ -223,14 +207,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <LoadingScreen message="Vérification..." />;
   }
 
-  // Show loading during redirect
-  if (redirectTo && redirectTo !== pathname) {
-    return <LoadingScreen message="Redirection..." />;
-  }
-
-  // No access
-  if (!hasAccess) {
-    return <LoadingScreen message="Vérification des accès..." />;
+  // Sécurité (si le proxy n'a pas redirigé pour une raison X ou Y)
+  if (resolved && !resolved.hasAccess) {
+    return null;
   }
 
   // Special layout routes

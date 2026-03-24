@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { partners, users } from "@/database/schema";
+import { partners, users, interactions } from "@/database/schema";
 import type { Partner, NewPartner } from "@/database/schema";
 import {
   createPartnerSchema,
@@ -11,7 +11,13 @@ import {
   type UpdatePartnerInput,
   type PartnerFilters,
 } from "@/validations/partners";
-import { eq, and, or, like, desc, asc, sql } from "drizzle-orm";
+import { eq, and, or, like, desc, asc, sql, count } from "drizzle-orm";
+import {
+  type PartnerCard,
+  type PartnerDetail,
+  PARTNER_CARD_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from "@/types/view-models";
 
 // Helper function to check if user is admin
 async function checkAdminAccess(userId: string): Promise<boolean> {
@@ -141,14 +147,14 @@ export async function deletePartner(
 // Get partners with filters (public)
 export async function getPartners(
   filters: PartnerFilters = {
-    limit: 10,
+    limit: PAGINATION_DEFAULTS.FEED,
     offset: 0,
     sortBy: "createdAt",
     sortOrder: "desc",
   }
 ): Promise<{
   success: boolean;
-  data?: Partner[];
+  data?: PartnerCard[];
   total?: number;
   error?: string;
 }> {
@@ -202,13 +208,13 @@ export async function getPartners(
         ? asc(partners[validatedFilters.sortBy])
         : desc(partners[validatedFilters.sortBy]);
 
-    const partnersList = await db
-      .select()
-      .from(partners)
-      .where(whereClause)
-      .orderBy(orderBy)
-      .limit(validatedFilters.limit)
-      .offset(validatedFilters.offset);
+    const partnersList = await db.query.partners.findMany({
+      columns: PARTNER_CARD_COLUMNS,
+      where: whereClause,
+      orderBy: orderBy,
+      limit: validatedFilters.limit,
+      offset: validatedFilters.offset,
+    });
 
     return { success: true, data: partnersList, total: count };
   } catch (error) {
@@ -224,7 +230,7 @@ export async function getPartners(
 // Get a single partner by ID (public)
 export async function getPartnerById(
   id: string,
-): Promise<{ success: boolean; data?: Partner; error?: string }> {
+): Promise<{ success: boolean; data?: PartnerDetail; error?: string }> {
   try {
     const [partner] = await db
       .select()
@@ -244,7 +250,24 @@ export async function getPartnerById(
       })
       .where(eq(partners.id, id));
 
-    return { success: true, data: partner };
+    // Get follower count
+    const [followerCount] = await db
+      .select({ count: count() })
+      .from(interactions)
+      .where(and(eq(interactions.entityId, id), eq(interactions.entityType, 'PARTNER'), eq(interactions.type, 'LIKE')));
+
+    return {
+      success: true,
+      data: {
+        ...partner,
+        stats: {
+          totalPartnerships: partner.totalPartnerships || 0,
+          totalInvestment: partner.totalInvestment || '0',
+          viewCount: (partner.viewCount || 0) + 1,
+          followerCount: followerCount?.count || 0,
+        }
+      }
+    };
   } catch (error) {
     console.error("Error fetching partner:", error);
     return {

@@ -10,6 +10,7 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { getUserNotifications } from "@/actions/notifications";
 import { type Notification } from "@/database/schema";
 import { Bell } from "lucide-react";
+import { NotificationCard } from "@/components/cards/notification-card";
 
 export default function NotificationsDashboardPage() {
   const { isSmallScreen, isMediumScreen } = useScreenSize();
@@ -72,7 +73,7 @@ export default function NotificationsDashboardPage() {
         onSearchChange={onSearchChange}
         onFilterChange={onFilterChange}
         onViewModeChange={setViewMode}
-        renderCard={(item) => renderNotificationCard(item)}
+        renderCard={(item) => <NotificationCard notification={item} />}
         showSearch={true}
         showFilters={true}
         showViewToggle={true}

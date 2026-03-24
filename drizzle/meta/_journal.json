@@ -78,6 +78,13 @@
       "when": 1771933715517,
       "tag": "0010_chief_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1774309813675,
+      "tag": "0011_yielding_lord_tyger",
+      "breakpoints": true
     }
   ]
 }

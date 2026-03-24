@@ -1,4 +1,4 @@
-import { PartnerWithRelations } from "@/database/schema";
+import { PartnerCard as PartnerCardType } from "@/types/view-models";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Building2, ExternalLink, Mail, Phone, MapPin, ShieldCheck } from "lucide-react";
@@ -9,7 +9,7 @@ type ViewMode = "grid" | "list" | "compact";
 type CardVariant = "default" | "premium" | "admin";
 
 interface PartnerCardProps {
-  partner: PartnerWithRelations;
+  partner: PartnerCardType;
   viewMode?: ViewMode;
   showActions?: boolean;
   showBadge?: boolean;
@@ -81,26 +81,34 @@ export function PartnerCard({
             )}
           </div>
 
-          {!isCompact && showDescription && partner.description && (
+          {!isCompact && showDescription && partner.shortDescription && (
             <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
-              {partner.description}
+              {partner.shortDescription}
             </p>
           )}
 
           {showContactInfo && !isCompact && (
             <div className="space-y-1.5 mb-4">
-              {partner.contactEmail && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors">
-                  <Mail className="w-3.5 h-3.5" />
-                  <a href={`mailto:${partner.contactEmail}`} className="truncate">{partner.contactEmail}</a>
-                </div>
-              )}
-              {partner.city && (
+              {partner.country && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span className="truncate">{partner.city}{partner.country ? `, ${partner.country}` : ''}</span>
+                  <span className="truncate">{partner.country}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Stats Section */}
+          {!isCompact && (
+            <div className="flex items-center gap-4 mb-3">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Building2 className="w-3.5 h-3.5" />
+                <span>{partner.totalPartnerships || 0} Projets</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{partner.viewCount || 0} Vues</span>
+              </div>
             </div>
           )}
         </div>

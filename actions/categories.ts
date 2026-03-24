@@ -4,6 +4,8 @@ import { categories, type Category, type NewCategory, entityCategories, type Ent
 import { eq, and, or, like, ilike, inArray, desc, asc, sql, count, isNull, isNotNull, gte, lte, gt, lt, between, exists } from 'drizzle-orm';
 import { type CategoryFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -16,6 +18,9 @@ export async function getCategoryById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<CategoryWithChildren | null> {
+  'use cache';
+  cacheTag(`category-${id}`, 'categories');
+  cacheLife('hours');
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.categories.findFirst({
@@ -47,6 +52,9 @@ export async function getCategoryById(
  * Récupère une catégorie par son slug
  */
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
+  'use cache';
+  cacheTag('categories');
+  cacheLife('hours');
   try {
     const result = await db
       .select()
@@ -67,6 +75,9 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
 export async function getCategories(
   query: ListQuery<CategoryFilters> = {}
 ): Promise<PaginationResponse<Category>> {
+  'use cache';
+  cacheTag('categories');
+  cacheLife('hours');
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -122,6 +133,9 @@ export async function getCategories(
  * Récupère les catégories racines (sans parent)
  */
 export async function getRootCategories(options?: QueryOptions): Promise<Category[]> {
+  'use cache';
+  cacheTag('categories', 'category-tree');
+  cacheLife('hours');
   try {
     const query = db
       .select()
@@ -140,6 +154,9 @@ export async function getRootCategories(options?: QueryOptions): Promise<Categor
  * Récupère les sous-catégories d'une catégorie
  */
 export async function getCategoryChildren(parentId: string): Promise<CategoryWithChildren[]> {
+  'use cache';
+  cacheTag('categories', `category-children-${parentId}`);
+  cacheLife('hours');
   try {
     const query = db
       .select()
@@ -158,6 +175,9 @@ export async function getCategoryChildren(parentId: string): Promise<CategoryWit
  * Récupère l'arborescence complète des catégories
  */
 export async function getCategoryTree(): Promise<CategoryWithChildren[]> {
+  'use cache';
+  cacheTag('categories', 'category-tree');
+  cacheLife('hours');
   try {
     const allCategories = await db
       .select()
@@ -200,6 +220,9 @@ export async function getCategoriesByEntityType(
   entityType: string,
   options?: QueryOptions
 ): Promise<Category[]> {
+  'use cache';
+  cacheTag('categories', `category-entity-${entityType}`);
+  cacheLife('hours');
   try {
     const query = db
       .select()
@@ -223,6 +246,9 @@ export async function getCategoriesByEntityType(
  * Récupère les statistiques des catégories
  */
 export async function getCategoryStats(filters?: CategoryFilters) {
+  'use cache';
+  cacheTag('categories', 'stats');
+  cacheLife('hours');
   try {
     const whereConditions = buildCategoryWhereConditions(filters || {});
 
@@ -322,6 +348,8 @@ export async function createCategory(categoryData: NewCategory): Promise<Categor
       })
       .returning();
 
+    revalidateTag('categories', 'max');
+    revalidateTag('category-tree', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating category:', error);
@@ -391,6 +419,9 @@ export async function updateCategory(
       .where(eq(categories.id, id))
       .returning();
 
+    revalidateTag('categories', 'max');
+    revalidateTag('category-tree', 'max');
+    revalidateTag(`category-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating category:', error);
@@ -436,6 +467,9 @@ export async function deleteCategory(id: string): Promise<Category> {
       throw new Error('Category not found');
     }
 
+    revalidateTag('categories', 'max');
+    revalidateTag('category-tree', 'max');
+    revalidateTag(`category-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting category:', error);
@@ -465,6 +499,9 @@ export async function restoreCategory(id: string): Promise<Category> {
       throw new Error('Category not found');
     }
 
+    revalidateTag('categories', 'max');
+    revalidateTag('category-tree', 'max');
+    revalidateTag(`category-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring category:', error);
@@ -493,6 +530,8 @@ export async function updateCategoryItemCount(categoryId: string, increment: num
       throw new Error('Category not found');
     }
 
+    revalidateTag('categories', 'max');
+    revalidateTag(`category-${categoryId}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating category item count:', error);
@@ -537,6 +576,7 @@ export async function attachCategoryToEntity(
     // Mettre à jour le compteur d'éléments
     await updateCategoryItemCount(categoryId, 1);
 
+    revalidateTag('categories', 'max');
     return result[0];
   } catch (error) {
     console.error('Error attaching category to entity:', error);
@@ -569,6 +609,7 @@ export async function detachCategoryFromEntity(
     if (result.count > 0) {
       // Mettre à jour le compteur d'éléments
       await updateCategoryItemCount(categoryId, -1);
+      revalidateTag('categories', 'max');
     }
   } catch (error) {
     console.error('Error detaching category from entity:', error);
@@ -583,6 +624,9 @@ export async function getEntityCategories(
   entityId: string,
   entityType: string
 ): Promise<Category[]> {
+  'use cache';
+  cacheTag('categories', `entity-categories-${entityId}`);
+  cacheLife('hours');
   try {
     const query = db
       .select({
@@ -633,6 +677,9 @@ export async function getCategoryEntities(
   categoryId: string,
   entityType?: string
 ): Promise<EntityCategory[]> {
+  'use cache';
+  cacheTag('categories', `category-entities-${categoryId}`);
+  cacheLife('hours');
   try {
     const conditions = [eq(entityCategories.categoryId, categoryId)];
     

@@ -1,17 +1,17 @@
-// utils/qr-utils.ts
-
+// utils/qr-utils.ts (mis à jour)
 import { TransactionType } from "@/types/transaction-types";
 
 /**
  * QR Data structure versioning to handle future changes
  */
-const QR_VERSION = "v1";
+const QR_VERSION = "v2";
 
 export interface TransactionQRData {
     v: string; // version
     t: TransactionType; // type
     id: string; // entity/target id
     a?: number; // optional amount/price
+    i?: string; // optional image URL
     m?: Record<string, any>; // optional metadata
 }
 
@@ -36,7 +36,7 @@ export function decodeTransactionQR(qrString: string): TransactionQRData | null 
         const jsonPart = qrString.replace("gt-tx:", "");
         const data = JSON.parse(jsonPart) as TransactionQRData;
 
-        if (data.v !== QR_VERSION) {
+        if (data.v !== QR_VERSION && data.v !== "v1") {
             console.warn("QR Version mismatch", data.v);
         }
 

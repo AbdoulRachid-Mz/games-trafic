@@ -416,31 +416,22 @@ export interface ProductFilters extends BaseFilters {
 }
 
 // Orders - Basé sur la table `orders`
+export type OrderStatus =
+  | 'PENDING'
+  | 'ACCEPTED_BY_SHOP'
+  | 'PROCESSING_BY_ADMIN'
+  | 'COMPLETED'
+  | 'REJECTED_BY_SHOP'
+  | 'REJECTED_BY_ADMIN'
+  | 'CANCELLED';
+
 export interface OrderFilters extends BaseFilters {
   id?: string;
   productId?: string;
   buyerId?: string;
   shopId?: string;
-  statuses?: (
-    | "PENDING"
-    | "ACCEPTED"
-    | "ACCEPTED_BY_SHOP"
-    | "REJECTED"
-    | "REJECTED_BY_SHOP"
-    | "REJECTED_BY_ADMIN"
-    | "COMPLETED"
-    | "CANCELLED"
-  )[];
-  status?: (
-    | "PENDING"
-    | "ACCEPTED"
-    | "ACCEPTED_BY_SHOP"
-    | "REJECTED"
-    | "REJECTED_BY_SHOP"
-    | "REJECTED_BY_ADMIN"
-    | "COMPLETED"
-    | "CANCELLED"
-  );
+  statuses?: OrderStatus[];
+  status?: OrderStatus | OrderStatus[];
   limit?: number;
   page?: number;
   priceMin?: number;
@@ -452,7 +443,6 @@ export interface OrderFilters extends BaseFilters {
   createdFrom?: Date | string;
   createdTo?: Date | string;
 }
-export type OrderStatus = 'COMPLETED' | 'CANCELLED' | 'REJECTED_BY_SHOP' | 'REJECTED_BY_ADMIN' | 'PENDING' | 'ACCEPTED_BY_SHOP';
 
 export interface OrderStats {
   total: number;
@@ -968,7 +958,7 @@ export interface TournamentWithDetails extends TournamentWithRelations {
   };
 }
 
-export interface EditionWithDetails extends TournamentEditionWithRelations {
+export interface EditionWithDetails extends Omit<TournamentEditionWithRelations, "tournament" | "phases" | "registrations" | "matches" | "results"> {
   tournament?: TournamentWithRelations;
   phases?: TournamentPhaseWithRelations[];
   registrations?: EditionRegistrationWithRelations[];
@@ -988,7 +978,7 @@ export interface EditionWithDetails extends TournamentEditionWithRelations {
   };
 }
 
-export interface PhaseWithDetails extends TournamentPhaseWithRelations {
+export interface PhaseWithDetails extends Omit<TournamentPhaseWithRelations, "edition" | "groups" | "bracketNodes"> {
   edition?: TournamentEditionWithRelations;
   groups?: PhaseGroupWithRelations[];
   bracketNodes?: BracketNodeWithRelations[];
@@ -1001,7 +991,7 @@ export interface PhaseWithDetails extends TournamentPhaseWithRelations {
   };
 }
 
-export interface GroupWithDetails extends PhaseGroupWithRelations {
+export interface GroupWithDetails extends Omit<PhaseGroupWithRelations, "phase" | "participants" | "matches"> {
   phase?: TournamentPhaseWithRelations;
   participants?: PhaseGroupParticipantWithRelations[];
   matches?: MatchWithRelations[];
@@ -1013,7 +1003,7 @@ export interface GroupWithDetails extends PhaseGroupWithRelations {
   }>;
 }
 
-export interface BracketNodeWithDetails extends BracketNodeWithRelations {
+export interface BracketNodeWithDetails extends Omit<BracketNodeWithRelations, "phase" | "group" | "parent" | "children" | "match"> {
   phase?: TournamentPhaseWithRelations;
   group?: PhaseGroupWithRelations;
   parent?: BracketNodeWithRelations;
@@ -1021,7 +1011,7 @@ export interface BracketNodeWithDetails extends BracketNodeWithRelations {
   match?: MatchWithRelations;
 }
 
-export interface MatchWithDetails extends MatchWithRelations {
+export interface MatchWithDetails extends Omit<MatchWithRelations, "edition" | "phase" | "group"> {
   edition?: TournamentEditionWithRelations;
   phase?: TournamentPhaseWithRelations;
   group?: PhaseGroupWithRelations;
@@ -1213,7 +1203,7 @@ export interface GameItemRequestFilters extends BaseFilters {
 }
 
 // Game Clips - Basé sur la table `gameClips`
-export interface GameClipFilters extends BaseFilters {
+export interface GameClipFilters extends Omit<EntityQueryParams, "sortBy" | "sortOrder"> {
   id?: string;
   authorId?: string;
   shopId?: string;
@@ -1223,6 +1213,10 @@ export interface GameClipFilters extends BaseFilters {
   videoUrl?: string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
+  limit?: number;
+  page?: number;
+  sortBy?: "createdAt" | "likes" | "views" | "comments";
+  sortOrder?: "asc" | "desc";
 }
 
 // Posts - Basé sur la table `posts`

@@ -5,14 +5,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Loader2, Volume2, VolumeX, Plus } from "lucide-react";
 import { GameClipPlayer } from "./game-clip-player";
 import { cn } from "@/lib/utils";
-import { GameClipWithRelations } from "@/types/game-clips";
+import { GameClipCard } from "@/types/view-models";
 import { Typography } from "../ui/typography";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface GameClipReelProps {
   initialClipId?: string;
-  clips: GameClipWithRelations[];
+  clips: GameClipCard[];
   loading?: boolean;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -36,7 +36,7 @@ export function GameClipReel({
   className,
 }: GameClipReelProps) {
   const router = useRouter();
-  const [orderedClips, setOrderedClips] = useState<GameClipWithRelations[]>([]);
+  const [orderedClips, setOrderedClips] = useState<GameClipCard[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -51,7 +51,7 @@ export function GameClipReel({
   const globalPaused = areCommentsOpen || isTransitioning;
 
   // Fonction de shuffle
-  const shuffleArray = useCallback((array: GameClipWithRelations[]) => {
+  const shuffleArray = useCallback((array: GameClipCard[]) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));

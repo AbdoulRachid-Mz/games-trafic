@@ -46,7 +46,7 @@ import { fr } from "date-fns/locale";
 import { InteractionButton } from "@/components/shared/interaction-button";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { useProduct } from "@/hooks/use-products";
-import type { ProductWithRelations } from "@/database/schema";
+import type { ProductDetail, ProductCard as ProductCardType } from "@/types/view-models";
 import { ProductCard } from "@/components/cards/product-card";
 import {
   Drawer,
@@ -61,8 +61,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 interface ProductDetailProps {
   productId: string;
-  initialProduct: ProductWithRelations;
-  initialRelated: ProductWithRelations[];
+  initialProduct: ProductDetail;
+  initialRelated: ProductCardType[];
 }
 
 export function ProductDetail({ productId, initialProduct, initialRelated }: ProductDetailProps) {
@@ -84,7 +84,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     ? currentProduct.images[selectedImageIndex]
     : "/placeholder-product.jpg";
 
-  const isOwner = user && currentProduct && (user.id === currentProduct.userId || user.id === currentProduct.shop?.ownerId);
+  const isOwner = user && currentProduct && (user.id === currentProduct.userId);
   const isAvailable = currentProduct.status === "NON_VENDU" || currentProduct.status === "RESERVE";
   const images = currentProduct.images && currentProduct.images.length > 0 ? currentProduct.images : [mainImage];
 
@@ -108,6 +108,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     const params = new URLSearchParams({
       type: "PURCHASE",
       amount: currentProduct.price.toString(),
+      image: currentProduct.featuredImage || currentProduct.images?.[0] || "",
       entityData: JSON.stringify({
         productId: currentProduct.id,
         productName: currentProduct.name,
@@ -474,9 +475,9 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                           <BadgeCheck className="h-4 w-4 text-green-500" />
                         )}
                       </div>
-                      <Typography variant="caption2" theme="muted" className="truncate">
+                      {/* <Typography variant="caption2" theme="muted" className="truncate">
                         {currentProduct.shop.description || "Boutique gaming"}
-                      </Typography>
+                      </Typography> */}
                       <div className="flex items-center gap-4 mt-2">
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 text-amber-500" />
@@ -606,7 +607,15 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                   </div>
                   <div>
                     <Typography variant="caption2" theme="muted">Vues</Typography>
-                    <Typography variant="body-sm">{currentProduct.viewCount || 0}</Typography>
+                    <Typography variant="body-sm">{currentProduct.stats?.viewCount || currentProduct.viewCount || 0}</Typography>
+                  </div>
+                  <div>
+                    <Typography variant="caption2" theme="muted">Commandes</Typography>
+                    <Typography variant="body-sm">{currentProduct.stats?.orderCount || 0}</Typography>
+                  </div>
+                  <div>
+                    <Typography variant="caption2" theme="muted">Favoris</Typography>
+                    <Typography variant="body-sm">{currentProduct.stats?.likeCount || 0}</Typography>
                   </div>
                 </div>
 

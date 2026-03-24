@@ -61,7 +61,7 @@ export default function ProfileSettingsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto max-w-4xl">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -91,7 +91,7 @@ export default function ProfileSettingsPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <TabsList className="grid grid-cols-4 gap-2 w-full">
           <TabsTrigger value="personal" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Informations</span>

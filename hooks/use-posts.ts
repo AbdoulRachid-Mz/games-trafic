@@ -1,9 +1,15 @@
 'use client';
 
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPostById, getPosts, getPostsByUserId, getActiveStories } from '@/actions/posts';
-import { type Post, type NewPost } from '@/database/schema';
-import { type PostFilters, type ListQuery, type PaginationResponse } from '@/types/api';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import {
+  getPostById,
+  getPosts,
+  getPostsByUserId,
+  getActiveStories
+} from '@/actions/posts';
+import type { PostFilters, ListQuery, PaginationResponse } from '@/types/api';
+import { type PostCard } from '@/types/view-models';
+import { toast } from 'sonner';
 
 // ============================================================================
 // QUERY KEYS
@@ -36,14 +42,19 @@ export function usePostById(id: string, options?: { populate?: string[] }, enabl
  * Optimisé pour le scroll infini
  */
 export function useInfinitePosts(filters: PostFilters = {}, options: ListQuery<PostFilters>['options'] = {}, limit = 50) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    PaginationResponse<PostCard>,
+    Error,
+    InfiniteData<PaginationResponse<PostCard>, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: [POSTS_QUERY_KEY, filters, options],
     queryFn: ({ pageParam = 1 }) => getPosts({ pagination: { page: pageParam, limit }, filters, options }),
     getNextPageParam: (lastPage) => lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
-    getPreviousPageParam: (firstPage) => firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: 1,
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    gcTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
   });
 }
 
@@ -51,15 +62,20 @@ export function useInfinitePosts(filters: PostFilters = {}, options: ListQuery<P
  * Hook pour récupérer les posts d'un utilisateur avec pagination
  */
 export function usePostsByUserId(userId: string, filters: PostFilters = {}, options: ListQuery<PostFilters>['options'] = {}, limit = 20) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<
+    PaginationResponse<PostCard>,
+    Error,
+    InfiniteData<PaginationResponse<PostCard>, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: [USER_POSTS_QUERY_KEY, userId, filters, options],
     queryFn: ({ pageParam = 1 }) => getPostsByUserId(userId, { pagination: { page: pageParam, limit }, filters, options }),
     getNextPageParam: (lastPage) => lastPage.pagination.hasNext ? lastPage.pagination.page + 1 : undefined,
-    getPreviousPageParam: (firstPage) => firstPage.pagination.hasPrev ? firstPage.pagination.page - 1 : undefined,
     initialPageParam: 1,
     enabled: !!userId,
-    staleTime: 1000 * 60 * 3, // 3 minutes
-    gcTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
   });
 }
 

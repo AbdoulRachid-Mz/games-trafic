@@ -56,7 +56,7 @@ export default function Footer() {
                 {/* <Gamepad2 className="w-6 h-6" /> */}
                 {/* image logo */}
                   <Image
-                  src="/images/icons/app/gt-gold.png"
+                  src="/images/icons/app/gt-primary.png"
                   alt="Gamers Trafics"
                   width={100}
                   height={100}

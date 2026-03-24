@@ -4,10 +4,7 @@ import { motion } from "framer-motion";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { Users, UserPlus, FileText } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { FollowersModal } from "./followers-modal";
-import { FollowingModal } from "./following-modal";
 
 interface ProfileStatsProps {
   followersCount: number;
@@ -16,6 +13,7 @@ interface ProfileStatsProps {
   userId: string;
   isOwnProfile?: boolean;
   className?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export function ProfileStats({
@@ -25,10 +23,8 @@ export function ProfileStats({
   userId,
   isOwnProfile,
   className,
+  onTabChange,
 }: ProfileStatsProps) {
-  const [showFollowers, setShowFollowers] = useState(false);
-  const [showFollowing, setShowFollowing] = useState(false);
-
   const stats = [
     {
       label: "Publications",
@@ -40,13 +36,13 @@ export function ProfileStats({
       label: "Abonnés",
       value: followersCount,
       icon: Users,
-      onClick: () => setShowFollowers(true),
+      onClick: () => onTabChange?.("followers"),
     },
     {
       label: "Abonnements",
       value: followingCount,
       icon: UserPlus,
-      onClick: () => setShowFollowing(true),
+      onClick: () => onTabChange?.("following"),
     },
   ];
 
@@ -86,21 +82,6 @@ export function ProfileStats({
           </motion.div>
         ))}
       </motion.div>
-
-      {/* Modals */}
-      <FollowersModal
-        userId={userId}
-        open={showFollowers}
-        onOpenChange={setShowFollowers}
-        isOwnProfile={isOwnProfile}
-      />
-
-      <FollowingModal
-        userId={userId}
-        open={showFollowing}
-        onOpenChange={setShowFollowing}
-        isOwnProfile={isOwnProfile}
-      />
     </>
   );
 }

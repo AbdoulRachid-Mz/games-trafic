@@ -4,7 +4,7 @@
 import {
   shops, users, themes, products, entityCategories, categories,
   type Shop, type NewShop, type User, type Theme,
-  interactions
+  interactions, orders,
 } from '@/database/schema';
 import {
   eq, and, or, like, ilike, inArray, between,
@@ -23,6 +23,14 @@ import {
   type QueryOptions
 } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import {
+  type ShopCard, type ShopDetail, type ShopStats, type ShopDetailStats, type ShopContext,
+  type ProductCard,
+  USER_MINI_COLUMNS, SHOP_CARD_COLUMNS, PRODUCT_CARD_COLUMNS, SHOP_MINI_COLUMNS,
+  PAGINATION_DEFAULTS,
+} from '@/types/view-models';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -34,51 +42,39 @@ import { db } from '@/lib/db';
 export async function getShopById(
   id: string,
   options?: { populate?: string[] }
-): Promise<(Shop & {
-  owner?: User;
-  theme?: Theme;
-  productsCount?: number;
-  categories?: any[];
-}) | null> {
+): Promise<ShopDetail | null> {
+  'use cache';
+  cacheTag(`shop-${id}`, 'shops');
+  cacheLife('minutes');
   try {
-    if (options?.populate && options.populate.length > 0) {
-      // Utilisation des relational queries pour les relations complexes
-      const shopWithRelations = await db.query.shops.findFirst({
-        where: (shops, { eq }) => eq(shops.id, id),
-        with: {
-          owner: options.populate.includes('owner') ? true : undefined,
-          theme: options.populate.includes('theme') ? true : undefined,
-          products: options.populate.includes('products') ? {
-            columns: { id: true }
-          } : undefined,
-          categories: options.populate.includes('categories') ? {
-            with: {
-              category: true
-            }
-          } : undefined,
-        },
-      });
+    const shopWithRelations = await db.query.shops.findFirst({
+      where: (shops, { eq }) => eq(shops.id, id),
+      with: {
+        owner: options?.populate?.includes('owner') ? { columns: USER_MINI_COLUMNS } : undefined,
+        theme: options?.populate?.includes('theme') ? true : undefined,
+      },
+    });
 
-      if (!shopWithRelations) return null;
+    if (!shopWithRelations) return null;
 
-      // Transformation des données pour inclure les counts
-      const result: any = { ...shopWithRelations };
+    // Get additional stats
+    const [followerCount, totalSales] = await Promise.all([
+      db.select({ count: count() }).from(interactions).where(and(eq(interactions.entityId, id), eq(interactions.entityType, 'SHOP'), eq(interactions.type, 'LIKE'))),
+      db.select({ count: count() }).from(orders).where(and(eq(orders.shopId, id), eq(orders.status, 'COMPLETED'))),
+    ]);
 
-      if (options.populate.includes('products')) {
-        result.productsCount = shopWithRelations.products?.length || 0;
+    const result = shopWithRelations as unknown as ShopDetail;
+
+    return {
+      ...result,
+      stats: {
+        productCount: result.productCount || 0,
+        viewCount: result.viewCount || 0,
+        followerCount: followerCount[0]?.count || 0,
+        balance: result.balance?.toString() || '0',
+        totalSales: totalSales[0]?.count || 0,
       }
-
-      return result;
-    }
-
-    // Requête simple sans relations
-    const result = await db
-      .select()
-      .from(shops)
-      .where(eq(shops.id, id))
-      .limit(1);
-
-    return result[0] || null;
+    };
   } catch (error) {
     console.error('Error getting shop by ID:', error);
     throw new Error('Failed to fetch shop');
@@ -89,6 +85,9 @@ export async function getShopById(
  * Récupère une boutique par son nom
  */
 export async function getShopByName(name: string): Promise<Shop | null> {
+  'use cache';
+  cacheTag('shops');
+  cacheLife('minutes');
   try {
     const result = await db
       .select()
@@ -109,7 +108,7 @@ export async function getShopByName(name: string): Promise<Shop | null> {
 export async function getShopsByOwner(
   ownerId: string,
   query: ListQuery<ShopFilters> = {}
-): Promise<PaginationResponse<Shop>> {
+): Promise<PaginationResponse<ShopCard>> {
   try {
     const filters = { ...query.filters, ownerId };
     return await getShops({ ...query, filters });
@@ -124,52 +123,45 @@ export async function getShopsByOwner(
  */
 export async function getShops(
   query: ListQuery<ShopFilters> = {}
-): Promise<PaginationResponse<Shop>> {
+): Promise<PaginationResponse<ShopCard>> {
+  'use cache';
+  cacheTag('shops');
+  cacheLife('minutes');
   try {
     const {
-      pagination = { page: 1, limit: 50 },
+      pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED },
       filters = {},
       options = {}
     } = query;
 
     const offset = (pagination.page - 1) * pagination.limit;
-
-    // Construction des conditions WHERE
     const whereConditions = buildShopWhereConditions(filters, options);
 
-    // Requête pour les données
-    const shopsQuery = db
-      .select()
-      .from(shops)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    // Application du tri
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof Shop;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      shopsQuery.orderBy(sortOrder(shops[sortField]));
-    } else {
-      shopsQuery.orderBy(desc(shops.createdAt));
-    }
-
-    // Requête pour le count total
-    const countQuery = db
-      .select({ count: count() })
-      .from(shops)
-      .where(whereConditions);
-
     const [shopsData, totalResult] = await Promise.all([
-      shopsQuery,
-      countQuery
+      db.query.shops.findMany({
+        columns: SHOP_CARD_COLUMNS,
+        where: whereConditions,
+        limit: pagination.limit,
+        offset: offset,
+        orderBy: (shops, { desc, asc }) => {
+          if (options.sortBy) {
+            const sortField = options.sortBy as any;
+            return [options.sortOrder === 'desc' ? desc((shops as any)[sortField]) : asc((shops as any)[sortField])];
+          }
+          return [desc(shops.createdAt)];
+        },
+        with: options.populate?.includes('owner')
+          ? { owner: { columns: USER_MINI_COLUMNS } }
+          : undefined,
+      }),
+      db.select({ count: count() }).from(shops).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: shopsData,
+      data: shopsData as ShopCard[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -190,7 +182,10 @@ export async function getShops(
  */
 export async function getPopularShops(
   limit: number = 10
-): Promise<Shop[]> {
+): Promise<ShopCard[]> {
+  'use cache';
+  cacheTag('shops');
+  cacheLife('minutes');
   try {
     // Use a subquery to count products per shop
     const productCountSubquery = db
@@ -271,7 +266,10 @@ export async function getPopularShops(
       )
       .limit(limit);
 
-    return result as Shop[];
+    // @ts-ignore
+    return result.map(row => ({
+      ...row,
+    })) as unknown as ShopCard[];
   } catch (error) {
     console.error('Error getting popular shops:', error);
     throw new Error('Failed to fetch popular shops');
@@ -283,7 +281,7 @@ export async function getPopularShops(
  */
 export async function getVerifiedShops(
   query: ListQuery<ShopFilters> = {}
-): Promise<PaginationResponse<Shop>> {
+): Promise<PaginationResponse<ShopCard>> {
   try {
     const filters = { ...query.filters, verified: true };
     return await getShops({ ...query, filters });
@@ -296,92 +294,41 @@ export async function getVerifiedShops(
 /**
  * Récupère les statistiques des boutiques
  */
-export async function getShopStats(filters?: ShopFilters) {
+export async function getShopStats(filters?: ShopFilters): Promise<ShopStats> {
+  'use cache';
+  cacheTag('shops', 'stats');
+  cacheLife('minutes');
   try {
     const whereConditions = buildShopWhereConditions(filters || {});
+    const safeWhere = whereConditions || sql`true`;
 
-    // Récupérer le total de boutiques
-    const totalResult = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(whereConditions);
+    // Parallelize ALL stat queries
+    const [
+      totalResult,
+      activeResult,
+      visibleResult,
+      verifiedResult,
+      featuredResult,
+      totalProductsResult,
+      totalViewsResult,
+      totalBalanceResult,
+      averageProductsResult,
+      averageViewsResult,
+      averageBalanceResult,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(shops).where(whereConditions),
+      db.select({ count: count() }).from(shops).where(and(safeWhere, eq(shops.isActive, true))),
+      db.select({ count: count() }).from(shops).where(and(safeWhere, eq(shops.isVisible, true))),
+      db.select({ count: count() }).from(shops).where(and(safeWhere, eq(shops.verified, true))),
+      db.select({ count: count() }).from(shops).where(and(safeWhere, eq(shops.featured, true))),
+      db.select({ total: sum(shops.productCount) }).from(shops).where(whereConditions),
+      db.select({ total: sum(shops.viewCount) }).from(shops).where(whereConditions),
+      db.select({ total: sum(shops.balance) }).from(shops).where(whereConditions),
+      db.select({ avg: sql<number>`avg(${shops.productCount})`.mapWith(Number) }).from(shops).where(whereConditions),
+      db.select({ avg: sql<number>`avg(${shops.viewCount})`.mapWith(Number) }).from(shops).where(whereConditions),
+      db.select({ avg: sql<number>`avg(${shops.balance})`.mapWith(Number) }).from(shops).where(whereConditions),
+    ]);
 
-    // Récupérer les comptes actifs
-    const activeResult = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(
-        and(
-          whereConditions || sql`true`,
-          eq(shops.isActive, true)
-        )
-      );
-
-    // Récupérer les comptes visibles
-    const visibleResult = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(
-        and(
-          whereConditions || sql`true`,
-          eq(shops.isVisible, true)
-        )
-      );
-
-    // Récupérer les comptes vérifiés
-    const verifiedResult = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(
-        and(
-          whereConditions || sql`true`,
-          eq(shops.verified, true)
-        )
-      );
-
-    // Récupérer les comptes en vedette
-    const featuredResult = await db
-      .select({ count: count() })
-      .from(shops)
-      .where(
-        and(
-          whereConditions || sql`true`,
-          eq(shops.featured, true)
-        )
-      );
-
-    // Récupérer les totaux et moyennes via des requêtes séparées
-    const totalProductsResult = await db
-      .select({ total: sum(shops.productCount) })
-      .from(shops)
-      .where(whereConditions);
-
-    const totalViewsResult = await db
-      .select({ total: sum(shops.viewCount) })
-      .from(shops)
-      .where(whereConditions);
-
-    const totalBalanceResult = await db
-      .select({ total: sum(shops.balance) })
-      .from(shops)
-      .where(whereConditions);
-
-    const averageProductsResult = await db
-      .select({ avg: sql<number>`avg(${shops.productCount})`.mapWith(Number) })
-      .from(shops)
-      .where(whereConditions);
-
-    const averageViewsResult = await db
-      .select({ avg: sql<number>`avg(${shops.viewCount})`.mapWith(Number) })
-      .from(shops)
-      .where(whereConditions);
-
-    const averageBalanceResult = await db
-      .select({ avg: sql<number>`avg(${shops.balance})`.mapWith(Number) })
-      .from(shops)
-      .where(whereConditions);
-
-    // Compiler les résultats
     return {
       total: totalResult[0]?.count || 0,
       active: activeResult[0]?.count || 0,
@@ -390,11 +337,11 @@ export async function getShopStats(filters?: ShopFilters) {
       featured: featuredResult[0]?.count || 0,
       totalProducts: totalProductsResult[0]?.total || 0,
       totalViews: totalViewsResult[0]?.total || 0,
-      totalFollowers: 0, // Non disponible dans le schéma actuel
+      totalFollowers: 0,
       totalBalance: totalBalanceResult[0]?.total || '0',
       averageProducts: averageProductsResult[0]?.avg || 0,
       averageViews: averageViewsResult[0]?.avg || 0,
-      averageFollowers: 0, // Non disponible dans le schéma actuel
+      averageFollowers: 0,
       averageBalance: averageBalanceResult[0]?.avg || '0',
     };
   } catch (error) {
@@ -409,14 +356,7 @@ export async function getShopStats(filters?: ShopFilters) {
  */
 export async function getShopStatsById(
   shopId: string
-): Promise<{
-  productCount: number;
-  viewCount: number;
-  followerCount: number;
-  balance: string;
-  averageRating: number;
-  totalSales: number;
-} | null> {
+): Promise<ShopDetailStats | null> {
   try {
     // Vérification que la boutique existe
     const shop = await getShopById(shopId);
@@ -424,69 +364,89 @@ export async function getShopStatsById(
       return null;
     }
 
-    // Compter les produits actifs
-    const productCountResult = await db
-      .select({ count: count() })
-      .from(products)
-      .where(
-        and(
-          eq(products.shopId, shopId),
-          eq(products.isDeleted, false)
-        )
-      );
-
-    // Compter les followers
-    const followerCountResult = await db
-      .select({ count: count() })
-      .from(interactions)
-      .where(
-        and(
-          eq(interactions.entityId, shopId),
-          eq(interactions.entityType, 'SHOP'),
-          eq(interactions.type, 'FOLLOW'),
-          eq(interactions.isDeleted, false)
-        )
-      );
-
-    // Récupérer la note moyenne (si disponible dans le schéma)
-    // Ici on suppose qu'une table reviews existe avec un champ rating
-    // Sinon, retourner 0 par défaut
-    const averageRatingResult = await db
-      .select({
-        avg: sql<number>`avg(rating)`.mapWith(Number)
-      })
-      .from(sql`reviews`) // Remplacer par la vraie table si elle existe
-      .where(
-        and(
-          sql`shop_id = ${shopId}`,
-          sql`is_deleted = false`
-        )
-      );
-
-    // Récupérer le total des ventes (si disponible dans le schéma)
-    // Ici on suppose qu'une table orders existe
-    // Sinon, retourner 0 par défaut
-    const totalSalesResult = await db
-      .select({ count: count() })
-      .from(sql`orders`) // Remplacer par la vraie table si elle existe
-      .where(
-        and(
-          sql`shop_id = ${shopId}`,
-          sql`status = 'completed'`
-        )
-      );
+    // Parallelize all stat queries
+    const [productCountResult, followerCountResult, totalSalesResult] = await Promise.all([
+      // Compter les produits actifs
+      db
+        .select({ count: count() })
+        .from(products)
+        .where(
+          and(
+            eq(products.shopId, shopId),
+            eq(products.isDeleted, false)
+          )
+        ),
+      // Compter les followers
+      db
+        .select({ count: count() })
+        .from(interactions)
+        .where(
+          and(
+            eq(interactions.entityId, shopId),
+            eq(interactions.entityType, 'SHOP'),
+            eq(interactions.type, 'FOLLOW'),
+            eq(interactions.isDeleted, false)
+          )
+        ),
+      // Compter les ventes complétées (utilise la vraie table orders)
+      db
+        .select({ count: count() })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.shopId, shopId),
+            eq(orders.status, 'COMPLETED'),
+            eq(orders.isDeleted, false)
+          )
+        ),
+    ]);
 
     return {
       productCount: productCountResult[0]?.count || 0,
       viewCount: shop.viewCount || 0,
       followerCount: followerCountResult[0]?.count || 0,
       balance: '0', // Managed via ledger
-      averageRating: averageRatingResult[0]?.avg || 0,
       totalSales: totalSalesResult[0]?.count || 0,
     };
   } catch (error) {
     console.error('Error getting shop stats by ID:', error);
     throw new Error('Failed to fetch shop statistics');
+  }
+}
+
+/**
+ * Récupère le contexte complet d'une boutique (détail + stats + top produits)
+ */
+export async function getShopContext(shopId: string): Promise<ShopContext | null> {
+  'use cache';
+  cacheTag(`shop-${shopId}`, 'shops');
+  cacheLife('minutes');
+  try {
+    const shop = await getShopById(shopId, { populate: ['owner'] });
+    if (!shop) return null;
+
+    const [stats, topProductsRes] = await Promise.all([
+      getShopStatsById(shopId),
+      db.query.products.findMany({
+        columns: PRODUCT_CARD_COLUMNS,
+        where: (products, { and, eq }) => and(
+          eq(products.shopId, shopId),
+          eq(products.isDeleted, false),
+          eq(products.isActive, true),
+        ),
+        limit: PAGINATION_DEFAULTS.RELATED,
+        orderBy: (products, { desc }) => [desc(products.viewCount)],
+      }),
+    ]);
+
+    return {
+      shop: shop as ShopDetail,
+      stats: stats || { productCount: 0, viewCount: 0, followerCount: 0, balance: '0', totalSales: 0 },
+      topProducts: topProductsRes as ProductCard[],
+    };
+  } catch (error) {
+    console.error('Error getting shop context:', error);
+    throw new Error('Failed to fetch shop context');
   }
 }
 
@@ -679,6 +639,8 @@ export async function updateShop(
       .where(eq(shops.id, id))
       .returning();
 
+    revalidateTag('shops', 'max');
+    revalidateTag(`shop-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating shop:', error);
@@ -718,6 +680,8 @@ export async function deleteShop(id: string): Promise<Shop> {
     //   })
     //   .where(eq(users.id, result[0].ownerId));
 
+    revalidateTag('shops', 'max');
+    revalidateTag(`shop-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting shop:', error);
@@ -757,6 +721,8 @@ export async function restoreShop(id: string): Promise<Shop> {
     //   })
     //   .where(eq(users.id, result[0].ownerId));
 
+    revalidateTag('shops', 'max');
+    revalidateTag(`shop-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring shop:', error);
@@ -793,6 +759,8 @@ export async function updateShopStats(
       throw new Error('Shop not found');
     }
 
+    revalidateTag('shops', 'max');
+    revalidateTag(`shop-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating shop stats:', error);
@@ -818,6 +786,8 @@ export async function incrementShopViews(id: string): Promise<Shop> {
       throw new Error('Shop not found');
     }
 
+    revalidateTag('shops', 'max');
+    revalidateTag(`shop-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error incrementing shop views:', error);
@@ -848,6 +818,8 @@ export async function updateShopTheme(
       throw new Error('Shop not found');
     }
 
+    revalidateTag('shops', 'max');
+    revalidateTag(`shop-${shopId}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating shop theme:', error);

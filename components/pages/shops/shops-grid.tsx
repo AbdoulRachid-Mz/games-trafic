@@ -7,11 +7,11 @@ import { Store, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { ShopCardList } from "@/components/pages/shops/shop-card-list";
-import { Shop } from "@/database/schema";
+import { ShopCard as ShopCardType } from "@/types/view-models";
 import { ShopCard } from "@/components/cards/shop-card";
 
 interface ShopsGridProps {
-  shops: Shop[];
+  shops: ShopCardType[];
   viewMode: "grid" | "list";
   isLoading: boolean;
   isFetchingNextPage: boolean;

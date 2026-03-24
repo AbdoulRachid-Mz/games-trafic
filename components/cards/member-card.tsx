@@ -74,7 +74,7 @@ export function MemberCard({
         <div className="flex items-center gap-4">
           <Avatar className="h-10 w-10 border">
             <AvatarImage
-              src={member.avatar || user?.profileImage || user?.image || undefined}
+              src={member.avatar || user?.profileImage || undefined}
               alt={member.displayName || user?.username || "User"}
             />
             <AvatarFallback>
@@ -208,7 +208,7 @@ export function MemberCard({
 
         <div className="relative">
           <Avatar className="h-24 w-24 border-4 border-background shadow-xl scale-100 group-hover:scale-105 transition-transform duration-300">
-            <AvatarImage src={member.avatar || user?.profileImage || user?.image || undefined} alt={member.displayName || user?.username || "User"} />
+            <AvatarImage src={member.avatar || user?.profileImage || undefined} alt={member.displayName || user?.username || "User"} />
             <AvatarFallback className="text-2xl bg-primary/10 text-primary font-black italic">
               {(member.displayName || user?.username || "U")
                 .substring(0, 2)

@@ -3,13 +3,10 @@ import { getProductById, getProducts } from "@/actions/products";
 import { notFound } from "next/navigation";
 import type { ProductWithRelations } from "@/database/schema";
 import { ProductDetail } from "@/components/pages/products/product-detail/product-detail";
-import { TransactionQRCode } from "@/components/shared/qr-code";
-import { encodeTransactionQR } from "@/utils/qr-utils";
-import { Typography } from "@/components/ui/typography";
-import { Card, CardContent } from "@/components/ui/card";
+
 
 // mise en cache de la page
-export const revalidate = 60; // 60 secondes
+
 
 interface PageProps {
   params: Promise<{ productId: string }>;
@@ -39,8 +36,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ProductPage({ params }: PageProps) {
   const { productId } = await params;
 
-  const product = await getProductById(productId, { 
-    populate: ["shop", "category", "user"] 
+  const product = await getProductById(productId, {
+    populate: ["shop", "category", "user"]
   }) as ProductWithRelations;
 
   if (!product) {
@@ -49,19 +46,19 @@ export default async function ProductPage({ params }: PageProps) {
 
   // Récupérer les produits similaires de même catégorie
   let relatedProducts: ProductWithRelations[] = [];
-  
+
   if (product.categoryId) {
     const res = await getProducts({
-      filters: { 
+      filters: {
         categoryId: product.categoryId,
         status: ["NON_VENDU", "RESERVE"],
         isDeleted: false,
-        isActive: true 
+        isActive: true
       },
       pagination: { limit: 6, page: 1 },
-      options: { 
-        sortBy: "viewCount", 
-        sortOrder: "desc" 
+      options: {
+        sortBy: "viewCount",
+        sortOrder: "desc"
       }
     });
     relatedProducts = (res.data as ProductWithRelations[]).filter(p => p.id !== product.id);

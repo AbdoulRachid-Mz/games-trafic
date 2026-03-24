@@ -5,6 +5,8 @@ import { themes, type Theme, type NewTheme, themePurchases, type ThemePurchase, 
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull, exists } from 'drizzle-orm';
 import { type ThemeFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { cacheTag, cacheLife } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -17,6 +19,9 @@ export async function getThemeById(
   id: string,
   options?: { populate?: string[] }
 ): Promise<Theme | null> {
+  'use cache';
+  cacheTag(`theme-${id}`, 'themes');
+  cacheLife('hours');
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.themes.findFirst({
@@ -49,6 +54,9 @@ export async function getThemeById(
  * Récupère un thème par son nom
  */
 export async function getThemeByName(name: string): Promise<Theme | null> {
+  'use cache';
+  cacheTag('themes');
+  cacheLife('hours');
   try {
     const result = await db
       .select()
@@ -69,6 +77,9 @@ export async function getThemeByName(name: string): Promise<Theme | null> {
 export async function getThemes(
   query: ListQuery<ThemeFilters> = {}
 ): Promise<PaginationResponse<Theme>> {
+  'use cache';
+  cacheTag('themes');
+  cacheLife('hours');
   try {
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
@@ -124,6 +135,9 @@ export async function getThemes(
  * Récupère les statistiques des thèmes
  */
 export async function getThemeStats(filters?: ThemeFilters) {
+  'use cache';
+  cacheTag('themes', 'stats');
+  cacheLife('hours');
   try {
     const whereConditions = buildThemeWhereConditions(filters || {});
 
@@ -170,6 +184,9 @@ export async function getThemeStats(filters?: ThemeFilters) {
  * Récupère les thèmes populaires
  */
 export async function getPopularThemes(limit: number = 10): Promise<Theme[]> {
+  'use cache';
+  cacheTag('themes');
+  cacheLife('hours');
   try {
     const result = await db
       .select()
@@ -189,6 +206,9 @@ export async function getPopularThemes(limit: number = 10): Promise<Theme[]> {
  * Récupère les thèmes par catégorie
  */
 export async function getThemesByCategory(category: string): Promise<Theme[]> {
+  'use cache';
+  cacheTag('themes', `theme-category-${category}`);
+  cacheLife('hours');
   try {
     const result = await db
       .select()
@@ -268,6 +288,7 @@ export async function createTheme(themeData: NewTheme): Promise<Theme> {
       })
       .returning();
 
+    revalidateTag('themes', 'max');
     return result[0];
   } catch (error) {
     console.error('Error creating theme:', error);
@@ -307,6 +328,8 @@ export async function updateTheme(
       .where(eq(themes.id, id))
       .returning();
 
+    revalidateTag('themes', 'max');
+    revalidateTag(`theme-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error updating theme:', error);
@@ -336,6 +359,8 @@ export async function deleteTheme(id: string): Promise<Theme> {
       throw new Error('Theme not found');
     }
 
+    revalidateTag('themes', 'max');
+    revalidateTag(`theme-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error deleting theme:', error);
@@ -365,6 +390,8 @@ export async function restoreTheme(id: string): Promise<Theme> {
       throw new Error('Theme not found');
     }
 
+    revalidateTag('themes', 'max');
+    revalidateTag(`theme-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error restoring theme:', error);
@@ -393,6 +420,8 @@ export async function incrementThemeDownloads(id: string): Promise<Theme> {
       throw new Error('Theme not found');
     }
 
+    revalidateTag('themes', 'max');
+    revalidateTag(`theme-${id}`, 'max');
     return result[0];
   } catch (error) {
     console.error('Error incrementing theme downloads:', error);

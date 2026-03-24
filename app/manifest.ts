@@ -13,7 +13,8 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     orientation: "portrait",
 
-    background_color: "#0f0a1f",
+    // background_color: "#0f0a1f",
+    background_color: "#ffffffff",
     theme_color: "#7C3AED",
 
     categories: ["games", "entertainment", "shopping"],
@@ -22,27 +23,27 @@ export default function manifest(): MetadataRoute.Manifest {
 
     icons: [
       {
-        src: "/icons/icon-72.png",
+        src: "/icons/gt-primary.png",
         sizes: "72x72",
         type: "image/png",
       },
       {
-        src: "/icons/icon-96.png",
+        src: "/icons/gt-primary.png",
         sizes: "96x96",
         type: "image/png",
       },
       {
-        src: "/icons/icon-128.png",
+        src: "/icons/gt-primary.png",
         sizes: "128x128",
         type: "image/png",
       },
       {
-        src: "/icons/icon-144.png",
+        src: "/icons/gt-primary.png",
         sizes: "144x144",
         type: "image/png",
       },
       {
-        src: "/icons/icon-192.png",
+        src: "/icons/gt-primary.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
