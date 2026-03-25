@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTransactionStats } from "@/actions/transactions";
+
+// export const dynamic = 'force-dynamic';
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { userWallets } from "@/database/schema";

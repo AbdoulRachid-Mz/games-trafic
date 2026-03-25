@@ -10,11 +10,19 @@ import { formatDate } from "@/lib/utils";
 import Image from "next/image";
 
 export default async function BlogsPage() {
-  const result = await getBlogs({
-    pagination: { page: 1, limit: 12 },
-    filters: {},
-    options: { includeDeleted: false, includeInactive: false },
-  });
+  let result: Awaited<ReturnType<typeof getBlogs>>;
+  try {
+    result = await getBlogs({
+      pagination: { page: 1, limit: 12 },
+      filters: {},
+      options: { includeDeleted: false, includeInactive: false },
+    });
+  } catch {
+    result = {
+      data: [],
+      pagination: { page: 1, limit: 12, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+    };
+  }
 
   const blogs = result.data;
 

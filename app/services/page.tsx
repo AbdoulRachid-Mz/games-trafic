@@ -8,11 +8,19 @@ import { Badge } from "@/components/ui/badge";
 
 
 export default async function ServicesPage() {
-  const result = await getServices({
-    pagination: { page: 1, limit: 100 },
-    filters: { isActive: true },
-    options: { includeDeleted: false },
-  });
+  let result: Awaited<ReturnType<typeof getServices>>;
+  try {
+    result = await getServices({
+      pagination: { page: 1, limit: 100 },
+      filters: { isActive: true },
+      options: { includeDeleted: false },
+    });
+  } catch {
+    result = {
+      data: [],
+      pagination: { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+    };
+  }
 
   const services = result.data;
 

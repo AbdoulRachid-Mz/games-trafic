@@ -1,5 +1,7 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+
+// export const dynamic = 'force-dynamic';
 import { unifiedSearch, recordSearchTrend } from '@/actions/search';
 import { getCurrentUser } from '@/lib/auth/session';
 
@@ -7,12 +9,12 @@ export async function GET(request: NextRequest) {
   try {
     // Authentification
     const user = await getCurrentUser();
-    
+
     // Paramètres
     const searchParams = request.nextUrl.searchParams;
     const term = searchParams.get('term') || '';
     const entity = searchParams.get('entity') || '';
-    
+
     if (!term || term.length < 2) {
       return NextResponse.json([], { status: 200 });
     }

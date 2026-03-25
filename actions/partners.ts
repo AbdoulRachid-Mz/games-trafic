@@ -203,10 +203,18 @@ export async function getPartners(
       .where(whereClause);
 
     // Get partners
+    const sortableColumns = {
+      name: partners.name,
+      createdAt: partners.createdAt,
+      viewCount: partners.viewCount,
+      totalInvestment: partners.totalInvestment,
+    } as const;
+
+    const sortColumn = sortableColumns[validatedFilters.sortBy];
     const orderBy =
       validatedFilters.sortOrder === "asc"
-        ? asc(partners[validatedFilters.sortBy])
-        : desc(partners[validatedFilters.sortBy]);
+        ? asc(sortColumn)
+        : desc(sortColumn);
 
     const partnersList = await db.query.partners.findMany({
       columns: PARTNER_CARD_COLUMNS,

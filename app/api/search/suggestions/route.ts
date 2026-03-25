@@ -1,5 +1,7 @@
 // app/api/search/suggestions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+
+// export const dynamic = 'force-dynamic';
 import { getSearchTrends } from '@/actions/search';
 import { getCurrentUser } from '@/lib/auth/session';
 
