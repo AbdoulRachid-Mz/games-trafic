@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { TournamentCard } from "./tournament-card";
+// import { TournamentCard } from "./tournament-card";
 import { TournamentFilters } from "./tournament-filters";
 import { CreateTournamentCTA } from "./create-tournament-cta";
 import { Typography } from "@/components/ui/typography";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { TournamentCard } from "@/components/cards/tournament-card";
 
 interface TournamentsListProps {
   initialTournaments: any[]; // À typer correctement avec le schéma
@@ -81,7 +82,7 @@ export function TournamentsList({ initialTournaments }: TournamentsListProps) {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
               >
-                <TournamentCard tournament={tournament} />
+                <TournamentCard showDetails={false} tournament={tournament} />
               </motion.div>
             ))}
           </AnimatePresence>

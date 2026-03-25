@@ -451,8 +451,8 @@ export function CategorySelector({
           newSelection = isSelected
             ? prev.filter((id) => id !== categoryId)
             : prev.length < maxCategories
-            ? [...prev, categoryId]
-            : prev;
+              ? [...prev, categoryId]
+              : prev;
         }
 
         // Appeler les callbacks
@@ -497,23 +497,12 @@ export function CategorySelector({
   }) => {
     return createMutation.mutateAsync({
       ...data,
+      // ✅ Correction: parentId null si vide
+      parentId: data.parentId && data.parentId !== '' ? data.parentId : null,
       applicableEntities: [entityType] as [
-        | "PRODUCT"
-        | "POST"
-        | "SHOP"
-        | "TOURNAMENT"
-        | "USER"
-        | "BLOG"
-        | "MESSAGE"
-        | "TEAM"
-        | "THEME"
-        | "NEWS"
-        | "GROUP"
-        | "ANNOUNCEMENT"
-        | "SERVICE"
-        | "GUIDE"
-        | "COMMENT"
-        | "MATCH"
+        "PRODUCT" | "POST" | "SHOP" | "TOURNAMENT" | "USER" | "BLOG" |
+        "MESSAGE" | "TEAM" | "THEME" | "NEWS" | "GROUP" | "ANNOUNCEMENT" |
+        "SERVICE" | "GUIDE" | "COMMENT" | "MATCH"
       ],
       slug: data.name
         .toLowerCase()
@@ -540,9 +529,9 @@ export function CategorySelector({
         slug:
           data.name !== editingCategory.name
             ? data.name
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/^-|-$/g, "")
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "")
             : undefined,
       },
     });
@@ -985,22 +974,22 @@ export function QuickCategorySelector({
     filters: {
       applicableEntities: [
         entityType as
-          | "PRODUCT"
-          | "POST"
-          | "SHOP"
-          | "TOURNAMENT"
-          | "USER"
-          | "BLOG"
-          | "MESSAGE"
-          | "TEAM"
-          | "THEME"
-          | "NEWS"
-          | "GROUP"
-          | "ANNOUNCEMENT"
-          | "SERVICE"
-          | "GUIDE"
-          | "COMMENT"
-          | "MATCH",
+        | "PRODUCT"
+        | "POST"
+        | "SHOP"
+        | "TOURNAMENT"
+        | "USER"
+        | "BLOG"
+        | "MESSAGE"
+        | "TEAM"
+        | "THEME"
+        | "NEWS"
+        | "GROUP"
+        | "ANNOUNCEMENT"
+        | "SERVICE"
+        | "GUIDE"
+        | "COMMENT"
+        | "MATCH",
       ],
       isFeatured: true,
     },

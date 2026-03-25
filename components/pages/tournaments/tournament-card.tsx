@@ -1,11 +1,9 @@
 "use client";
 
-import React from "react";
 import {
   Card,
   CardContent,
-  CardFooter,
-  CardHeader,
+  CardFooter
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,16 +13,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { QrCode } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { TransactionQRCode } from "@/components/shared/qr-code";
-import { encodeTransactionQR } from "@/utils/qr-utils";
 import { TournamentWithRelations } from "@/database/schema";
 
 interface TournamentCardProps {

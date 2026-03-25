@@ -249,7 +249,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/transactions",
     icon: CreditCard,
     description: "Transactions financières",
-    requiredLevel: 'B',
+    requiredLevel: 'C',
     isFinancial: true,
   },
   {
@@ -258,7 +258,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/requests",
     icon: AlertCircle,
     description: "Dépôts, retraits et items",
-    requiredLevel: 'B',
+    requiredLevel: 'C',
     isFinancial: true,
   },
 
@@ -269,7 +269,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/wallets",
     icon: Wallet,
     description: "Gestion des portefeuilles",
-    requiredLevel: 'B',
+    requiredLevel: 'C',
     isFinancial: true,
   },
 
@@ -280,7 +280,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/vip",
     icon: Award,
     description: "Gestion des abonnements VIP",
-    requiredLevel: 'B',
+    requiredLevel: 'C',
   },
 
   // Jeux et Items
@@ -310,8 +310,6 @@ export const intermediateAdminRoutes: AdminRoute[] = [
       },
     ],
   },
-
-  // Thèmes
   {
     id: "themes",
     label: "Thèmes",
@@ -320,8 +318,6 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     description: "Thèmes personnalisés",
     requiredLevel: 'B',
   },
-
-  // Catégories
   {
     id: "categories",
     label: "Catégories",
@@ -330,7 +326,6 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     description: "Catégories et tags",
     requiredLevel: 'B',
   },
-  // médias
   {
     id: "media",
     label: "Médias",
@@ -339,8 +334,6 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     description: "Gestion des médias",
     requiredLevel: 'B',
   },
-
-  // Services
   {
     id: "services",
     label: "Services",
@@ -349,8 +342,6 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     description: "Services support",
     requiredLevel: 'B',
   },
-
-  // Réclamations
   {
     id: "claims",
     label: "Réclamations",
@@ -455,15 +446,15 @@ export const superAdminRoutes: AdminRoute[] = [
  */
 export function getAdminRoutesForLevel(level: 'A' | 'B' | 'C'): AdminRoute[] {
   let routes = [...commonAdminRoutes];
-  
+
   if (level === 'A' || level === 'B') {
     routes = [...routes, ...intermediateAdminRoutes];
   }
-  
+
   if (level === 'A') {
     routes = [...routes, ...superAdminRoutes];
   }
-  
+
   return routes;
 }
 
@@ -472,7 +463,7 @@ export function getAdminRoutesForLevel(level: 'A' | 'B' | 'C'): AdminRoute[] {
  */
 export function getAdminRouteById(id: string, level: 'A' | 'B' | 'C' = 'C'): AdminRoute | undefined {
   const routes = getAdminRoutesForLevel(level);
-  
+
   function search(routes: AdminRoute[]): AdminRoute | undefined {
     for (const route of routes) {
       if (route.id === id) return route;
@@ -490,12 +481,12 @@ export function getAdminRouteById(id: string, level: 'A' | 'B' | 'C' = 'C'): Adm
  */
 export function isRouteAccessible(route: AdminRoute, userLevel: 'A' | 'B' | 'C'): boolean {
   if (!route.requiredLevel) return true;
-  
+
   // Convertir les niveaux en poids
   const levelWeights = { 'A': 3, 'B': 2, 'C': 1 };
   const routeWeight = levelWeights[route.requiredLevel];
   const userWeight = levelWeights[userLevel];
-  
+
   return userWeight >= routeWeight;
 }
 
@@ -523,54 +514,54 @@ export function getAdminRouteGroups(level: 'A' | 'B' | 'C'): Array<{
   routes: AdminRoute[];
 }> {
   const routes = getAdminRoutesForLevel(level);
-  
+
   return [
     {
       label: "Général",
       icon: Home,
-      routes: routes.filter(r => 
+      routes: routes.filter(r =>
         ['overview', 'users', 'shops', 'products', 'orders'].includes(r.id)
       ),
     },
     {
       label: "Compétitions",
       icon: Trophy,
-      routes: routes.filter(r => 
+      routes: routes.filter(r =>
         ['tournaments', 'teams', 'tournament-editions', 'tournament-phases', 'tournament-matches'].includes(r.id)
       ),
     },
     {
       label: "Finances",
       icon: CreditCard,
-      routes: routes.filter(r => r.isFinancial || 
+      routes: routes.filter(r => r.isFinancial ||
         ['transactions', 'wallets', 'vip'].includes(r.id)
       ),
     },
     {
       label: "Contenu",
       icon: Newspaper,
-      routes: routes.filter(r => 
+      routes: routes.filter(r =>
         ['content', 'posts', 'blogs', 'guides', 'announcements', 'communication'].includes(r.id)
       ),
     },
     {
       label: "Jeux",
       icon: Gamepad2,
-      routes: routes.filter(r => 
+      routes: routes.filter(r =>
         ['games', 'game-items', 'game-requests', 'themes'].includes(r.id)
       ),
     },
     {
       label: "Communauté",
       icon: Users2,
-      routes: routes.filter(r => 
+      routes: routes.filter(r =>
         ['groups', 'interactions', 'messages', 'claims'].includes(r.id)
       ),
     },
     {
       label: "Configuration",
       icon: Settings,
-      routes: routes.filter(r => 
+      routes: routes.filter(r =>
         ['categories', 'services', 'system', 'settings', 'database', 'logs', 'advanced'].includes(r.id)
       ),
     },
@@ -587,13 +578,13 @@ export function checkRouteAccess(path: string, userLevel: 'A' | 'B' | 'C'): {
 } {
   const allRoutes = flattenAdminRoutes(getAdminRoutesForLevel('A'));
   const route = allRoutes.find(r => r.path === path);
-  
+
   if (!route) {
     return { accessible: false };
   }
-  
+
   const accessible = isRouteAccessible(route, userLevel);
-  
+
   return {
     accessible,
     route,

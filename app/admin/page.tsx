@@ -97,11 +97,13 @@ export default function AdminOverviewPage() {
     tournaments: null,
   });
 
+
+  const router = useRouter();
+
   useEffect(() => {
     loadStats();
   }, []);
 
-  const router = useRouter();
 
   const loadStats = async () => {
     try {
@@ -197,20 +199,6 @@ export default function AdminOverviewPage() {
   const visibleTabs = allTabs.slice(0, visibleCount);
   const dropdownTabs = allTabs.slice(visibleCount);
 
-  // Redirection pour les nouveaux onglets
-  useEffect(() => {
-    if (activeTab === "categories") {
-      router.push("/admin/categories");
-    } else if (activeTab === "settings") {
-      router.push("/admin/settings");
-    } else if (activeTab === "vip") {
-      router.push("/admin/vip");
-    } else if (activeTab === "groups") {
-      router.push("/admin/groups");
-    } else if (activeTab === "media") {
-      router.push("/admin/media");
-    }
-  }, [activeTab]);
 
   return (
     <div className="space-y-6 p-4">

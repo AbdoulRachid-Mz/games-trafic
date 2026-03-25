@@ -32,6 +32,7 @@ type TournamentStatus = "UPCOMING" | "LIVE" | "COMPLETED" | "CANCELLED";
 interface TournamentCardProps {
   tournament: Tournament & {
     currentEdition?: {
+      id: string;
       name: string;
       startDate: Date;
       prizePool: number;
@@ -128,9 +129,9 @@ export function TournamentCard({
           <Trophy className="w-16 h-16 text-primary/30" />
         </div>
       )}
-      
+
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-      
+
       {/* Statut en overlay */}
       <div className="absolute top-3 right-3 z-10">
         <Badge className={cn(
@@ -190,7 +191,7 @@ export function TournamentCard({
             >
               {tournament.name}
             </Typography>
-            
+
             {showDetails && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant="outline" className="text-xs">
@@ -219,7 +220,7 @@ export function TournamentCard({
         )}
 
         {/* Statistiques */}
-        {showStats && (
+        {showStats && showDetails && (
           <div className="grid grid-cols-2 gap-3 py-3 border-y border-border/50">
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-lg font-bold text-primary">
@@ -244,24 +245,26 @@ export function TournamentCard({
 
         {/* Édition courante */}
         {tournament.currentEdition && showDetails && (
-          <div className="rounded-lg bg-secondary/30 p-3 border border-border/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <Typography variant="body-sm" weight="semibold">
-                  {tournament.currentEdition.name || "Édition en cours"}
-                </Typography>
-                <div className="flex items-center gap-2 mt-1">
-                  <Calendar className="w-3 h-3 text-muted-foreground" />
-                  <Typography variant="caption2" theme="muted">
-                    {new Date(tournament.currentEdition.startDate).toLocaleDateString('fr-FR')}
+          <Link href={`/tournaments/${tournament.id}/editions/${tournament.currentEdition.id}`}>
+            <div className="rounded-lg bg-secondary/10 cursor-pointer p-3 border border-border/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography variant="body-sm" weight="semibold">
+                    {tournament.currentEdition.name || "Édition en cours"}
                   </Typography>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                    <Typography variant="caption2" theme="muted">
+                      {new Date(tournament.currentEdition.startDate).toLocaleDateString('fr-FR')}
+                    </Typography>
+                  </div>
                 </div>
+                <Badge variant="secondary">
+                  {tournament.currentEdition.participants || 0} inscrits
+                </Badge>
               </div>
-              <Badge variant="secondary">
-                {tournament.currentEdition.participants || 0} inscrits
-              </Badge>
             </div>
-          </div>
+          </Link>
         )}
 
         {/* Actions */}
@@ -288,7 +291,7 @@ export function TournamentCard({
                 />
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
               {tournament.status === "UPCOMING" && (
                 <Button

@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export default function ActivityFeedSection() {
   const activities = [
     {
-      user: { name: "AlexPro", image: "/avatars/1.jpg", fallback: "AP" },
+      user: { name: "AlexPro", image: "/icons/avatar-240.png", fallback: "AP" },
       action: "a remporté le tournoi Solo Mid",
       target: "League of Legends",
       time: "Il y a 2 min",
@@ -18,7 +18,7 @@ export default function ActivityFeedSection() {
       color: "bg-yellow-500/10 text-yellow-500",
     },
     {
-      user: { name: "GameStore", image: "/avatars/2.jpg", fallback: "GS" },
+      user: { name: "GameStore", image: "/icons/avatar-240.png", fallback: "GS" },
       action: "a ajouté 15 nouveaux items",
       target: "Fortnite Skins",
       time: "Il y a 15 min",
@@ -27,7 +27,7 @@ export default function ActivityFeedSection() {
       color: "bg-blue-500/10 text-blue-500",
     },
     {
-      user: { name: "TeamRocket", image: "/avatars/3.jpg", fallback: "TR" },
+      user: { name: "TeamRocket", image: "/icons/avatar-240.png", fallback: "TR" },
       action: "a rejoint le groupe",
       target: "Pro Gamers FR",
       time: "Il y a 32 min",
@@ -36,7 +36,7 @@ export default function ActivityFeedSection() {
       color: "bg-purple-500/10 text-purple-500",
     },
     {
-      user: { name: "MarcGamer", image: "/avatars/4.jpg", fallback: "MG" },
+      user: { name: "MarcGamer", image: "/icons/avatar-240.png", fallback: "MG" },
       action: "a mis en vente son compte",
       target: "Valorant Ascendant 3",
       time: "Il y a 1h",

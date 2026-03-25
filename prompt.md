@@ -1,190 +1,103 @@
-✓ Collecting page data using 7 workers in 12.3s
-Erreur lors de la récupération de la session: Error: During prerendering, `headers()` rejects when the prerender is complete. Typically these errors are handled by React but if you move `headers()` to a different context by using `setTimeout`, `after`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "/api/search/suggestions".
-    at new Promise (<anonymous>)
-    at i (lib\auth\session.ts:11:22)
-    at o (lib\auth\session.ts:31:25)
-    at w (app\api\search\suggestions\route.ts:9:24)
-   9 |   try {
-  10 |     const session = await auth.api.getSession({
-> 11 |       headers: await headers()
-     |                      ^
-  12 |     });
-  13 |     return session;
-  14 |   } catch (error) { {
-  route: '/api/search/suggestions',
-  expression: '`headers()`',
-  digest: 'HANGING_PROMISE_REJECTION'
-}
-Suggestions API error: Error: Route /api/search/suggestions needs to bail out of prerendering at this point because it used nextUrl.searchParams.
-    at w (app\api\search\suggestions\route.ts:10:42)
-   8 |   try {
-   9 |     const user = await getCurrentUser();
-> 10 |     const searchParams = request.nextUrl.searchParams;
-     |                                          ^
-  11 |     const term = searchParams.get('term') || '';
-  12 |
-  13 |     if (!term || term.length < 2) { {
-  digest: 'NEXT_PRERENDER_INTERRUPTED'
-}
-Error fetching partners: Error: Failed query: select count(*)::int from "partners" where ("partners"."is_deleted" = $1 and "partners"."status" = $2 and "partners"."verified" = $3 and "partners"."is_active" = $4 and "partners"."is_visible" = $5)
-params: false,ACTIVE,true,true,true
-    at async r (actions\partners.ts:200:25)
-    at async n (app\partners\page.tsx:21:18)
-  198 |
-  199 |     // Get total count
-> 200 |     const [{ count }] = await db
-      |                         ^
-  201 |       .select({ count: sql<number>`count(*)::int` })
-  202 |       .from(partners)
-  203 |       .where(whereClause); {
-  query: 'select count(*)::int from "partners" where ("partners"."is_deleted" = $1 and "partners"."status" = $2 and "partners"."verified" = $3 and "partners"."is_active" = $4 and "partners"."is_visible" = $5)',
+Error getting categories by entity type: Error: Failed query: select "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at" from "categories" where ("categories"."is_deleted" = $1 and "categories"."applicable_entities" && ($2)) order by "categories"."sort_order" asc, "categories"."name" asc
+params: false,USER
+    at async getCategoriesByEntityType (actions\categories.ts:238:12)
+  236 |       .orderBy(asc(categories.sortOrder), asc(categories.name));
+  237 |
+> 238 |     return await query;
+      |            ^
+  239 |   } catch (error) {
+  240 |     console.error('Error getting categories by entity type:', error);
+  241 |     throw new Error('Failed to fetch categories by entity type'); {
+  query: 'select "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at" from "categories" where ("categories"."is_deleted" = $1 and "categories"."applicable_entities" && ($2)) order by "categories"."sort_order" asc, "categories"."name" asc',
   params: [Array],
-  [cause]: Error: getaddrinfo ENOTFOUND ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech
+  [cause]: Error [PostgresError]: malformed array literal: "USER"
       at ignore-listed frames {
-    errno: -3008,
-    code: 'ENOTFOUND',
-    syscall: 'getaddrinfo',
-    hostname: 'ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech'
+    severity_local: 'ERROR',
+    severity: 'ERROR',
+    code: '22P02',
+    detail: 'Array value must start with "{" or dimension information.',
+    where: "unnamed portal parameter $2 = '...'",
+    file: 'arrayfuncs.c',
+    line: '262',
+    routine: 'array_in'
   }
 }
-Erreur lors de la récupération de la session: Error: During prerendering, `headers()` rejects when the prerender is complete. Typically these errors are handled by React but if you move `headers()` to a different context by using `setTimeout`, `after`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "/api/search".
-    at new Promise (<anonymous>)
-    at i (lib\auth\session.ts:11:22)
-    at o (lib\auth\session.ts:31:25)
-    at w (app\api\search\route.ts:9:24)
-   9 |   try {
-  10 |     const session = await auth.api.getSession({
-> 11 |       headers: await headers()
-     |                      ^
-  12 |     });
-  13 |     return session;
-  14 |   } catch (error) { {
-  route: '/api/search',
-  expression: '`headers()`',
-  digest: 'HANGING_PROMISE_REJECTION'
+ Cache  Error getting categories by entity type: Error: Failed query: select "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at" from "categories" where ("categories"."is_deleted" = $1 and "categories"."applicable_entities" && ($2)) order by "categories"."sort_order" asc, "categories"."name" asc
+params: false,USER
+    at getCategoriesByEntityType (actions\categories.ts:238:12)
+  236 |       .orderBy(asc(categories.sortOrder), asc(categories.name));
+  237 |
+> 238 |     return await query;
+      |            ^
+  239 |   } catch (error) {
+  240 |     console.error('Error getting categories by entity type:', error);
+  241 |     throw new Error('Failed to fetch categories by entity type'); {
+  environmentName: 'Cache'
 }
-Search API error: Error: Route /api/search needs to bail out of prerendering at this point because it used nextUrl.searchParams.
-    at w (app\api\search\route.ts:12:42)
-  10 |
-  11 |     // Paramètres
-> 12 |     const searchParams = request.nextUrl.searchParams;
-     |                                          ^
-  13 |     const term = searchParams.get('term') || '';
-  14 |     const entity = searchParams.get('entity') || '';
-  15 |      {
-  digest: 'NEXT_PRERENDER_INTERRUPTED'
-}
-Error fetching partners: Error: Failed query: select count(*)::int from "partners" where ("partners"."is_deleted" = $1 and "partners"."status" = $2 and "partners"."verified" = $3 and "partners"."is_active" = $4 and "partners"."is_visible" = $5)
-params: false,ACTIVE,true,true,true
-    at async r (actions\partners.ts:200:25)
-    at async n (app\partners\page.tsx:21:18)
-  198 |
-  199 |     // Get total count
-> 200 |     const [{ count }] = await db
-      |                         ^
-  201 |       .select({ count: sql<number>`count(*)::int` })
-  202 |       .from(partners)
-  203 |       .where(whereClause); {
-  query: 'select count(*)::int from "partners" where ("partners"."is_deleted" = $1 and "partners"."status" = $2 and "partners"."verified" = $3 and "partners"."is_active" = $4 and "partners"."is_visible" = $5)',
-  params: [Array],
-  [cause]: Error: getaddrinfo ENOTFOUND ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech
-      at ignore-listed frames {
-    errno: -3008,
-    code: 'ENOTFOUND',
-    syscall: 'getaddrinfo',
-    hostname: 'ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech'
-  }
-}
-Erreur lors de la récupération de la session: Error: During prerendering, `headers()` rejects when the prerender is complete. Typically these errors are handled by React but if you move `headers()` to a different context by using `setTimeout`, `after`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "/api/wallet/stats".
-    at new Promise (<anonymous>)
-    at i (lib\auth\session.ts:11:22)
-    at o (lib\auth\session.ts:31:25)
-    at b (app\api\wallet\stats\route.ts:10:27)
-   9 |   try {
-  10 |     const session = await auth.api.getSession({
-> 11 |       headers: await headers()
-     |                      ^
-  12 |     });
-  13 |     return session;
-  14 |   } catch (error) { {
-  route: '/api/wallet/stats',
-  expression: '`headers()`',
-  digest: 'HANGING_PROMISE_REJECTION'
-}
-Error getting blogs: Error: Failed query: select "id", "title", "content", "images", "is_active", "created_at", "author_id" from "blogs" "blogs" where ("blogs"."is_deleted" = $1 and "blogs"."is_active" = $2) order by "blogs"."created_at" desc limit $3
-params: false,true,12
-    at async p (actions\blogs.ts:68:38)
-  66 |     const whereConditions = buildBlogWhereConditions(filters, options);
-  67 |
-> 68 |     const [blogsData, totalResult] = await Promise.all([
-     |                                      ^
-  69 |       db.query.blogs.findMany({
-  70 |         columns: BLOG_CARD_COLUMNS,
-  71 |         where: whereConditions, {
-  query: 'select "id", "title", "content", "images", "is_active", "created_at", "author_id" from "blogs" "blogs" where ("blogs"."is_deleted" = $1 and "blogs"."is_active" = $2) order by "blogs"."created_at" desc limit $3',
-  params: [Array],
-  [cause]: Error: getaddrinfo ENOTFOUND ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech
-      at ignore-listed frames {
-    errno: -3008,
-    code: 'ENOTFOUND',
-    syscall: 'getaddrinfo',
-    hostname: 'ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech'
-  }
-}
-⨯ Error: Failed to fetch blogs
-    at p (actions\blogs.ts:104:11)
-  102 |   } catch (error) {
-  103 |     console.error('Error getting blogs:', error);
-> 104 |     throw new Error('Failed to fetch blogs');
+⨯ Error: Failed to fetch categories by entity type
+    at getCategoriesByEntityType (actions\categories.ts:241:11)
+  239 |   } catch (error) {
+  240 |     console.error('Error getting categories by entity type:', error);
+> 241 |     throw new Error('Failed to fetch categories by entity type');
       |           ^
-  105 |   }
-  106 | }
-  107 | {
-  digest: '2521792'
+  242 |   }
+  243 | }
+  244 | {
+  environmentName: 'Cache',
+  digest: '333199655'
 }
-Error getting services: Error: Failed query: select "id", "title", "description", "icon", "images", "is_active", "created_at", "admin_id" from "services" "services" where ("services"."is_deleted" = $1 and "services"."is_active" = $2) order by "services"."created_at" desc limit $3
-params: false,true,100
-    at async o (actions\services.ts:73:41)
-  71 |     const whereConditions = buildServiceWhereConditions(filters, options);
-  72 |
-> 73 |     const [servicesData, totalResult] = await Promise.all([
-     |                                         ^
-  74 |       db.query.services.findMany({
-  75 |         columns: SERVICE_CARD_COLUMNS,
-  76 |         where: whereConditions, {
-  query: 'select "id", "title", "description", "icon", "images", "is_active", "created_at", "admin_id" from "services" "services" where ("services"."is_deleted" = $1 and "services"."is_active" = $2) order by "services"."created_at" desc limit $3',
+ POST /admin/categories 500 in 567ms (compile: 9ms, proxy.ts: 13ms, render: 545ms)
+Error creating category: Error: Failed query: insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"
+params: jeu,premiere categorie,jeu,,0,jeu,jeu,{"USER"},0,true,2026-03-25T21:56:41.217Z,2026-03-25T21:56:41.217Z
+    at async createCategory (actions\categories.ts:339:20)
+  337 |     }
+  338 |
+> 339 |     const result = await db
+      |                    ^
+  340 |       .insert(categories)
+  341 |       .values({
+  342 |         ...categoryData, {
+  query: 'insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"',
   params: [Array],
-  [cause]: Error: getaddrinfo ENOTFOUND ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech
+  [cause]: Error [PostgresError]: insert or update on table "categories" violates foreign key constraint "categories_parent_id_categories_id_fk"
       at ignore-listed frames {
-    errno: -3008,
-    code: 'ENOTFOUND',
-    syscall: 'getaddrinfo',
-    hostname: 'ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech'
+    severity_local: 'ERROR',
+    severity: 'ERROR',
+    code: '23503',
+    detail: 'Key (parent_id)=() is not present in table "categories".',
+    schema_name: 'public',
+    table_name: 'categories',
+    constraint_name: 'categories_parent_id_categories_id_fk',
+    file: 'ri_triggers.c',
+    line: '2599',
+    routine: 'ri_ReportViolation'
   }
 }
-⨯ Error: Failed to fetch services
-    at o (actions\services.ts:109:11)
-  107 |   } catch (error) {
-  108 |     console.error('Error getting services:', error);
-> 109 |     throw new Error('Failed to fetch services');
-      |           ^
-  110 |   }
-  111 | }
-  112 | {
-  digest: '1920442209'
+⨯ Error: Failed query: insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"
+params: jeu,premiere categorie,jeu,,0,jeu,jeu,{"USER"},0,true,2026-03-25T21:56:41.217Z,2026-03-25T21:56:41.217Z
+    at async createCategory (actions\categories.ts:339:20)
+  337 |     }
+  338 |
+> 339 |     const result = await db
+      |                    ^
+  340 |       .insert(categories)
+  341 |       .values({
+  342 |         ...categoryData, {
+  query: 'insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"',
+  params: [Array],
+  digest: '1188116301',
+  [cause]: Error [PostgresError]: insert or update on table "categories" violates foreign key constraint "categories_parent_id_categories_id_fk"
+      at ignore-listed frames {
+    severity_local: 'ERROR',
+    severity: 'ERROR',
+    code: '23503',
+    detail: 'Key (parent_id)=() is not present in table "categories".',
+    schema_name: 'public',
+    table_name: 'categories',
+    constraint_name: 'categories_parent_id_categories_id_fk',
+    file: 'ri_triggers.c',
+    line: '2599',
+    routine: 'ri_ReportViolation'
+  }
 }
-Error occurred prerendering page "/blogs". Read more: https://nextjs.org/docs/messages/prerender-error
-Error: Failed to fetch blogs
-    at p (actions\blogs.ts:104:11)
-  102 |   } catch (error) {
-  103 |     console.error('Error getting blogs:', error);
-> 104 |     throw new Error('Failed to fetch blogs');
-      |           ^
-  105 |   }
-  106 | }
-  107 | {
-  digest: '2521792'
-}
-Export encountered an error on /blogs/page: /blogs, exiting the build.
-⨯ Next.js build worker exited with code: 1 and signal: null
- ELIFECYCLE  Command failed with exit code 1.
+ POST /admin/categories 500 in 1980ms (compile: 12ms, proxy.ts: 22ms, render: 1945ms)

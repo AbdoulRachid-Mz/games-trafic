@@ -153,7 +153,7 @@ const TopMiddle = ({
               className="relative w-14 h-14"
             >
               <Image
-                src={`/images/icons/app/gt-primary.png`}
+                src={`/icons/icon-128.png`}
                 alt="app-logo"
                 fill
                 className="object-contain drop-shadow-lg"

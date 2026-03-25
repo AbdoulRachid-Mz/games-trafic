@@ -70,14 +70,14 @@ export default function manifest(): MetadataRoute.Manifest {
 
     screenshots: [
       {
-        src: "/screenshots/home.png",
-        sizes: "1280x720",
+        src: "/icons/gt-controller-600.png",
+        sizes: "600x600",
         type: "image/png",
         form_factor: "wide",
       },
       {
         src: "/screenshots/marketplace.png",
-        sizes: "1280x720",
+        sizes: "1920x2060",
         type: "image/png",
       },
     ],
@@ -88,21 +88,21 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: "Market",
         description: "Acheter et vendre des comptes gaming",
         url: "/marketplace",
-        icons: [{ src: "/icons/market.png", sizes: "192x192" }],
+        icons: [{ src: "/icons/marketplace-500.png", sizes: "500x536", type: "image/png" }],
       },
       {
         name: "Tournois",
         short_name: "Tournois",
         description: "Participer aux tournois",
         url: "/tournaments",
-        icons: [{ src: "/icons/tournament.png", sizes: "192x192" }],
+        icons: [{ src: "/icons/tournament-500.png", sizes: "500x504", type: "image/png" }],
       },
       {
         name: "Communauté",
         short_name: "Social",
         description: "Reels et posts gaming",
         url: "/community",
-        icons: [{ src: "/icons/community.png", sizes: "192x192" }],
+        icons: [{ src: "/icons/avatar-500.png", sizes: "500x500", type: "image/png" }],
       },
     ],
   };

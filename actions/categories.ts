@@ -224,13 +224,16 @@ export async function getCategoriesByEntityType(
   cacheTag('categories', `category-entity-${entityType}`);
   cacheLife('hours');
   try {
+    // ✅ Correction: Utiliser le format PostgreSQL pour les tableaux
+    // L'opérateur && vérifie si les tableaux se chevauchent
+    // On doit passer un tableau PostgreSQL valide: `{ENTITY_TYPE}`
     const query = db
       .select()
       .from(categories)
       .where(
         and(
           eq(categories.isDeleted, false),
-          sql`${categories.applicableEntities} && ${[entityType]}`
+          sql`${categories.applicableEntities} && ARRAY[${entityType}]::entity_type[]`
         )
       )
       .orderBy(asc(categories.sortOrder), asc(categories.name));
@@ -297,6 +300,7 @@ export async function getCategoryStats(filters?: CategoryFilters) {
 /**
  * Crée une nouvelle catégorie
  */
+
 export async function createCategory(categoryData: NewCategory): Promise<Category> {
   try {
     // Validation des données requises
@@ -310,9 +314,14 @@ export async function createCategory(categoryData: NewCategory): Promise<Categor
       throw new Error('Category with this slug already exists');
     }
 
+    // ✅ Correction: Gérer correctement parentId
+    const parentId = categoryData.parentId && categoryData.parentId !== '' && categoryData.parentId !== 'null'
+      ? categoryData.parentId
+      : null;
+
     // Si parentId est fourni, vérifier que le parent existe
-    if (categoryData.parentId) {
-      const parent = await getCategoryById(categoryData.parentId);
+    if (parentId) {
+      const parent = await getCategoryById(parentId);
       if (!parent) {
         throw new Error('Parent category not found');
       }
@@ -325,6 +334,7 @@ export async function createCategory(categoryData: NewCategory): Promise<Categor
         .insert(categories)
         .values({
           ...categoryData,
+          parentId,
           level,
           path,
           fullPath,
@@ -333,13 +343,17 @@ export async function createCategory(categoryData: NewCategory): Promise<Categor
         })
         .returning();
 
+      revalidateTag('categories', 'max');
+      revalidateTag('category-tree', 'max');
       return result[0];
     }
 
+    // ✅ Correction: Pour les catégories racines, parentId doit être null
     const result = await db
       .insert(categories)
       .values({
         ...categoryData,
+        parentId: null,
         level: 0,
         path: categoryData.slug,
         fullPath: categoryData.name,
@@ -682,7 +696,7 @@ export async function getCategoryEntities(
   cacheLife('hours');
   try {
     const conditions = [eq(entityCategories.categoryId, categoryId)];
-    
+
     if (entityType) {
       conditions.push(eq(entityCategories.entityType, entityType as any));
     }
@@ -707,6 +721,7 @@ export async function getCategoryEntities(
 /**
  * Construit les conditions WHERE pour les requêtes categories
  */
+
 function buildCategoryWhereConditions(
   filters: CategoryFilters,
   options: QueryOptions = {}
@@ -728,16 +743,16 @@ function buildCategoryWhereConditions(
   if (filters.slug) {
     conditions.push(ilike(categories.slug, `%${filters.slug}%`));
   }
-  // if (filters.description) {
-  //   conditions.push(ilike(categories.description, `%${filters.description}%`));
-  // }
+
+  // ✅ Correction: parentId doit être null pour les catégories racines
   if (filters.parentId !== undefined) {
-    if (filters.parentId === null) {
+    if (filters.parentId === null || filters.parentId === '' || filters.parentId === 'null') {
       conditions.push(isNull(categories.parentId));
     } else {
       conditions.push(eq(categories.parentId, filters.parentId));
     }
   }
+
   if (filters.level !== undefined) {
     conditions.push(eq(categories.level, filters.level));
   }
@@ -747,9 +762,14 @@ function buildCategoryWhereConditions(
   if (filters.fullPath) {
     conditions.push(ilike(categories.fullPath, `%${filters.fullPath}%`));
   }
+
+  // ✅ Correction: Format PostgreSQL correct pour les tableaux
   if (filters.applicableEntities && filters.applicableEntities.length > 0) {
-    conditions.push(sql`${categories.applicableEntities} && ${filters.applicableEntities}`);
+    conditions.push(
+      sql`${categories.applicableEntities} && ARRAY[${filters.applicableEntities.join(',')}]::entity_type[]`
+    );
   }
+
   if (typeof filters.isFeatured === 'boolean') {
     conditions.push(eq(categories.isFeatured, filters.isFeatured));
   }
