@@ -1,7 +1,6 @@
 // app/not-found.tsx
 
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 
 export default function NotFound() {
   return (
@@ -17,12 +16,12 @@ export default function NotFound() {
           La page que vous recherchez n'existe pas ou a été déplacée.
         </p>
         <div className="mt-6 flex justify-center gap-3">
-          <Button asChild>
-            <Link href="/">Retour à l'accueil</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/contact">Contacter le support</Link>
-          </Button>
+          <Link href="/" className="btn">
+            Retour à l'accueil
+          </Link>
+          <Link href="/contact" className="btn btn-outline">
+            Contacter le support
+          </Link>
         </div>
       </div>
     </div>
