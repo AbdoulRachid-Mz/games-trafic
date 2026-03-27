@@ -40,6 +40,7 @@ interface EditionCardProps {
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   isDashboard?: boolean;
+  showDetails?: boolean;
   className?: string;
 }
 
@@ -73,6 +74,7 @@ export function EditionCard({
   onEdit,
   onDelete,
   isDashboard,
+  showDetails,
   className,
 }: EditionCardProps) {
   const router = useRouter();
@@ -94,7 +96,7 @@ export function EditionCard({
       className={cn("group h-full", className)}
     >
       <Card
-        className="h-full overflow-hidden border-border/50 bg-card hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300 relative"
+        className="h-full overflow-hidden py-0 border-border/50 bg-card hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-300 relative"
       >
         {/* Banner with Status */}
         <div className="relative h-32 overflow-hidden" onClick={handleNavigate}>
@@ -132,8 +134,8 @@ export function EditionCard({
                 <DropdownMenuItem onClick={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}/dashboard`)}>
                   <ChevronRight className="h-4 w-4 mr-2" /> Dashboard
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="text-destructive" 
+                <DropdownMenuItem
+                  className="text-destructive"
                   onClick={() => onDelete?.(edition.id)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" /> Supprimer
@@ -143,7 +145,7 @@ export function EditionCard({
           </div>
         )}
 
-        <CardContent className="p-4 flex flex-col h-[calc(100%-8rem)]" onClick={handleNavigate}>
+        <CardContent className="p-2 flex flex-col h-[calc(100%-8rem)]" onClick={handleNavigate}>
           {/* ... existing content ... */}
           <div className="flex-1 space-y-4">
             <div>
@@ -158,41 +160,47 @@ export function EditionCard({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-              <div className="space-y-0.5">
-                <Typography variant="caption2" theme="muted" className="flex items-center gap-1 uppercase tracking-tighter font-semibold">
-                  <Trophy className="h-3 w-3" /> Cashprize
-                </Typography>
-                <Typography variant="body-sm" weight="bold" className="text-primary">
-                  {edition.prizePool || 0} {edition.prizeCurrency || "GTC"}
-                </Typography>
-              </div>
-              <div className="space-y-0.5">
-                <Typography variant="caption2" theme="muted" className="flex items-center gap-1 uppercase tracking-tighter font-semibold">
-                  <Users className="h-3 w-3" /> Joueurs
-                </Typography>
-                <Typography variant="body-sm" weight="bold">
-                  {edition.currentParticipants || 0}/{edition.maxParticipants || "∞"}
-                </Typography>
-              </div>
-            </div>
+            {/* Edition Details */}
+            {showDetails && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+                  <div className="space-y-0.5">
+                    <Typography variant="caption2" theme="muted" className="flex items-center gap-1 uppercase tracking-tighter font-semibold">
+                      <Trophy className="h-3 w-3" /> Cashprize
+                    </Typography>
+                    <Typography variant="body-sm" weight="bold" className="text-primary">
+                      {edition.prizePool || 0} {edition.prizeCurrency || "GTC"}
+                    </Typography>
+                  </div>
+                  <div className="space-y-0.5">
+                    <Typography variant="caption2" theme="muted" className="flex items-center gap-1 uppercase tracking-tighter font-semibold">
+                      <Users className="h-3 w-3" /> Joueurs
+                    </Typography>
+                    <Typography variant="body-sm" weight="bold">
+                      {edition.currentParticipants || 0}/{edition.maxParticipants || "∞"}
+                    </Typography>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span className="truncate">{edition.location || "En ligne"}</span>
-            </div>
-          </div>
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <MapPin className="h-3 w-3" />
+                  <span className="truncate">{edition.location || "En ligne"}</span>
+                </div>
+              </div>
+            )}
 
-          <div className="mt-5">
-            <Button
-              variant="outline"
-              className="w-full group/btn relative overflow-hidden transition-all duration-300 hover:bg-primary hover:text-white"
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                Détails de l'édition
-                <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1" />
-              </span>
-            </Button>
+            <div className="mt-5">
+              <Button
+                onClick={() => showDetails ? handleNavigate() : () => handleNavigate()}
+                variant="outline"
+                className="w-full group/btn relative overflow-hidden transition-all duration-300 hover:bg-primary hover:text-white"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  Détails de l'édition
+                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1" />
+                </span>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

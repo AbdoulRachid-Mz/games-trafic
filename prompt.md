@@ -1,103 +1,282 @@
-Error getting categories by entity type: Error: Failed query: select "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at" from "categories" where ("categories"."is_deleted" = $1 and "categories"."applicable_entities" && ($2)) order by "categories"."sort_order" asc, "categories"."name" asc
-params: false,USER
-    at async getCategoriesByEntityType (actions\categories.ts:238:12)
-  236 |       .orderBy(asc(categories.sortOrder), asc(categories.name));
-  237 |
-> 238 |     return await query;
-      |            ^
-  239 |   } catch (error) {
-  240 |     console.error('Error getting categories by entity type:', error);
-  241 |     throw new Error('Failed to fetch categories by entity type'); {
-  query: 'select "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at" from "categories" where ("categories"."is_deleted" = $1 and "categories"."applicable_entities" && ($2)) order by "categories"."sort_order" asc, "categories"."name" asc',
-  params: [Array],
-  [cause]: Error [PostgresError]: malformed array literal: "USER"
-      at ignore-listed frames {
-    severity_local: 'ERROR',
-    severity: 'ERROR',
-    code: '22P02',
-    detail: 'Array value must start with "{" or dimension information.',
-    where: "unnamed portal parameter $2 = '...'",
-    file: 'arrayfuncs.c',
-    line: '262',
-    routine: 'array_in'
-  }
-}
- Cache  Error getting categories by entity type: Error: Failed query: select "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at" from "categories" where ("categories"."is_deleted" = $1 and "categories"."applicable_entities" && ($2)) order by "categories"."sort_order" asc, "categories"."name" asc
-params: false,USER
-    at getCategoriesByEntityType (actions\categories.ts:238:12)
-  236 |       .orderBy(asc(categories.sortOrder), asc(categories.name));
-  237 |
-> 238 |     return await query;
-      |            ^
-  239 |   } catch (error) {
-  240 |     console.error('Error getting categories by entity type:', error);
-  241 |     throw new Error('Failed to fetch categories by entity type'); {
-  environmentName: 'Cache'
-}
-⨯ Error: Failed to fetch categories by entity type
-    at getCategoriesByEntityType (actions\categories.ts:241:11)
-  239 |   } catch (error) {
-  240 |     console.error('Error getting categories by entity type:', error);
-> 241 |     throw new Error('Failed to fetch categories by entity type');
-      |           ^
-  242 |   }
-  243 | }
-  244 | {
-  environmentName: 'Cache',
-  digest: '333199655'
-}
- POST /admin/categories 500 in 567ms (compile: 9ms, proxy.ts: 13ms, render: 545ms)
-Error creating category: Error: Failed query: insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"
-params: jeu,premiere categorie,jeu,,0,jeu,jeu,{"USER"},0,true,2026-03-25T21:56:41.217Z,2026-03-25T21:56:41.217Z
-    at async createCategory (actions\categories.ts:339:20)
-  337 |     }
-  338 |
-> 339 |     const result = await db
-      |                    ^
-  340 |       .insert(categories)
-  341 |       .values({
-  342 |         ...categoryData, {
-  query: 'insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"',
-  params: [Array],
-  [cause]: Error [PostgresError]: insert or update on table "categories" violates foreign key constraint "categories_parent_id_categories_id_fk"
-      at ignore-listed frames {
-    severity_local: 'ERROR',
-    severity: 'ERROR',
-    code: '23503',
-    detail: 'Key (parent_id)=() is not present in table "categories".',
-    schema_name: 'public',
-    table_name: 'categories',
-    constraint_name: 'categories_parent_id_categories_id_fk',
-    file: 'ri_triggers.c',
-    line: '2599',
-    routine: 'ri_ReportViolation'
-  }
-}
-⨯ Error: Failed query: insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"
-params: jeu,premiere categorie,jeu,,0,jeu,jeu,{"USER"},0,true,2026-03-25T21:56:41.217Z,2026-03-25T21:56:41.217Z
-    at async createCategory (actions\categories.ts:339:20)
-  337 |     }
-  338 |
-> 339 |     const result = await db
-      |                    ^
-  340 |       .insert(categories)
-  341 |       .values({
-  342 |         ...categoryData, {
-  query: 'insert into "categories" ("id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at") values (default, $1, $2, $3, default, default, default, $4, $5, $6, $7, $8, default, $9, default, default, default, $10, default, $11, $12) returning "id", "name", "description", "slug", "icon", "color", "image", "parent_id", "level", "path", "full_path", "applicable_entities", "filters", "sort_order", "metadata", "item_count", "is_featured", "is_active", "is_deleted", "created_at", "updated_at"',
-  params: [Array],
-  digest: '1188116301',
-  [cause]: Error [PostgresError]: insert or update on table "categories" violates foreign key constraint "categories_parent_id_categories_id_fk"
-      at ignore-listed frames {
-    severity_local: 'ERROR',
-    severity: 'ERROR',
-    code: '23503',
-    detail: 'Key (parent_id)=() is not present in table "categories".',
-    schema_name: 'public',
-    table_name: 'categories',
-    constraint_name: 'categories_parent_id_categories_id_fk',
-    file: 'ri_triggers.c',
-    line: '2599',
-    routine: 'ri_ReportViolation'
-  }
-}
- POST /admin/categories 500 in 1980ms (compile: 12ms, proxy.ts: 22ms, render: 1945ms)
+🧠 PROMPT FINAL — REFONTE & CORRECTION MODULE TOURNOIS (PRO LEVEL)
+🎯 OBJECTIF GLOBAL
+
+Refactorer, corriger et compléter le système de gestion des tournois (éditions, phases, groupes, brackets, matches) en respectant :
+
+✅ L’architecture existante (NE PAS casser)
+✅ Les tables déjà définies (source of truth)
+✅ Les pages/components déjà en place
+✅ Ajouter uniquement ce qui manque + corriger les incohérences
+🧩 ÉTAPE 1 — AUDIT COMPLET (OBLIGATOIRE AVANT TOUT)
+
+Analyser TOUS les fichiers liés aux tournois :
+
+Backend / Data
+schema (déjà fourni)
+actions (CRUD + logique métier)
+queries / getters
+lib / utils
+Frontend
+hooks
+components
+pages (dashboard + public)
+forms
+tables
+stats-carousel
+⚠️ IMPORTANT
+
+Ne rien coder avant d’avoir identifié :
+
+incohérences
+duplications
+logiques cassées
+manques
+🧠 ÉTAPE 2 — ARCHITECTURE DES HOOKS (NOUVELLE STRUCTURE)
+
+Créer des hooks modulaires par entité :
+
+1. Phases
+usePhaseManager(editionId)
+Inclut :
+createPhase (single / bulk)
+updatePhase
+deletePhase
+reorderPhase (⚠️ backend gère order)
+activatePhase
+Helpers :
+generatePhasesAuto(config)
+validatePhase()
+2. Groupes
+useGroupManager(phaseId)
+Inclut :
+createGroup (single / bulk)
+assignParticipants (auto / manual)
+removeParticipant
+generateGroupsAuto()
+Helpers :
+seedParticipantsRandom()
+seedParticipantsManual()
+3. Brackets
+useBracketManager({ phaseId, groupId })
+Inclut :
+generateBracket (AUTO / MANUAL)
+createNode
+deleteNode
+linkNodes
+Helpers :
+generateSingleElimination()
+generateDoubleElimination()
+detectConflicts()
+4. Matches
+useMatchManager(context)
+Inclut :
+createMatch (single / bulk)
+updateMatch
+deleteMatch
+bulkActions
+⚠️ CRITICAL
+
+Avant création :
+
+checkDuplicateMatch(participant1, participant2)
+
+➡️ Si existe → afficher WARNING (pas bloquant)
+
+📊 ÉTAPE 3 — ENRICHISSEMENT DES GETTERS (STATS + CONTEXT)
+
+Chaque getById doit retourner :
+
+🎯 Edition
+total participants
+checked-in
+éliminés / actifs
+total matches
+matches terminés / en cours
+progression réelle
+standings
+🎯 Phase
+nombre de groupes
+participants total
+matches stats
+completion %
+🎯 Groupe
+participants
+matches
+standings (points, diff, etc.)
+qualifiés
+🎯 Bracket
+rounds
+nodes
+matches liés
+progression
+🎯 Match
+statut détaillé
+participants
+historique
+validation
+🧱 ÉTAPE 4 — LOGIQUE DE GESTION PAR NIVEAU (ULTRA IMPORTANT)
+🧩 RÈGLE FONDAMENTALE
+
+👉 Chaque entité gère SES ENFANTS DIRECTS
+
+🎮 Edition
+
+Pages :
+
+overview
+members
+phases
+standings
+Members page
+
+2 listes :
+
+✅ membres de l’édition
+➕ membres du tournoi NON ajoutés
+
+Actions :
+
+ajouter à l’édition
+retirer de l’édition
+⚠️ CONTRAINTE RETRAIT
+
+Avant suppression :
+
+vérifier matches
+vérifier groupes
+vérifier bracket
+
+➡️ sinon bloquer
+
+🧩 Phase
+
+Gère :
+
+groupes uniquement
+👥 Groupe
+Participants page
+
+2 tabs :
+
+dans le groupe
+hors groupe (mais dans édition)
+
+Actions :
+
+add/remove
+⚔️ Bracket
+généré depuis participants du groupe
+AUTO ou MANUAL
+support :
+aller simple
+aller-retour
+🎯 Match
+lié à :
+phase
+group (optionnel)
+bracketNode (optionnel)
+⚙️ ÉTAPE 5 — BULK ACTIONS (OBLIGATOIRE)
+
+Créer un composant :
+
+<BulkActions />
+
+Supporte :
+
+création multiple
+suppression multiple
+update multiple
+
+Utilisé dans :
+
+matches
+groupes
+brackets
+⚠️ ÉTAPE 6 — CORRECTIONS CRITIQUES
+❌ Problèmes à corriger
+1. Doublons de matches
+
+✔️ Ajouter vérification + warning UI
+
+2. Mauvaise source participants
+
+✔️ Toujours utiliser :
+
+EditionParticipants (registrations)
+
+❌ jamais directement tournamentMembers
+
+3. Order dans forms
+
+✔️ supprimer des formulaires
+✔️ gérer uniquement backend
+
+4. Relations cassées
+
+✔️ Vérifier cascade logique :
+
+edition → phase → group → bracket → match
+🏆 ÉTAPE 7 — STANDINGS (IMPORTANT)
+
+Ajouter standings :
+
+1. Edition (public page)
+classement global
+2. Groupe
+points
+wins/loss
+diff
+3. Bracket
+progression
+élimination
+🎨 ÉTAPE 8 — UI/UX (AMÉLIORATION)
+Stats
+
+Utiliser :
+
+<StatsCarousel />
+
+Pour :
+
+édition
+phase
+groupe
+bracket
+Actions
+
+Chaque entité doit avoir :
+
+➕ Add
+✏️ Edit
+❌ Delete
+👁️ View details
+Pages détails
+
+Chaque entité → page dédiée avec :
+
+infos
+stats
+enfants
+🔐 ÉTAPE 9 — RÈGLES MÉTIER IMPORTANTES
+un participant = editionRegistration
+un groupe ⟶ contient uniquement participants de l’édition
+un match ⟶ appartient à :
+phase (obligatoire)
+group (optionnel)
+bracket (optionnel)
+🚀 LIVRABLE ATTENDU
+
+Le système doit permettre :
+
+✅ gérer une édition complète
+✅ ajouter/retirer participants proprement
+✅ générer groupes automatiquement
+✅ générer brackets intelligents
+✅ gérer matches (single + bulk)
+✅ afficher stats + standings partout
+✅ éviter incohérences
+on assure bien le responsive (surtout pour les mobile) avec le hook use-screen
+
+💡 BONUS (OPTIONNEL MAIS FORTEMENT RECOMMANDÉ)
+cache avec React Query / TanStack
+optimistic updates

@@ -161,15 +161,33 @@ export function PhaseItemActions({
                 </Link>
             </Button>
 
-            <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                onClick={handleDelete}
-                disabled={isPending}
-            >
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        disabled={isPending}
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Supprimer la phase</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Êtes-vous sûr de vouloir supprimer la phase "{phase.name}" ?
+                            Cette action est irréversible et supprimera tous les groupes et matchs associés.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                            Supprimer
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

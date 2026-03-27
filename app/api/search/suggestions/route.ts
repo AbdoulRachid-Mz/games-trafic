@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // export const dynamic = 'force-dynamic';
 import { getSearchTrends } from '@/actions/search';
-import { getCurrentUser } from '@/lib/auth/session';
+import { getCurrentUser2 } from '@/lib/auth/session';
+import { headers } from 'next/headers';
 
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser2(await headers());
     const searchParams = request.nextUrl.searchParams;
     const term = searchParams.get('term') || '';
 

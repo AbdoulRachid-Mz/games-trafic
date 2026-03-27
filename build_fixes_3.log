@@ -1,0 +1,127 @@
+
+> gt-v3@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.1.6 (Turbopack, Cache Components)
+- Environments: .env
+- Experiments (use with caution):
+  Ô£ô globalNotFound
+  Ô£ô useCache
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 2.0min
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/160) ...
+Search API error: Error: During prerendering, `headers()` rejects when the prerender is complete. Typically these errors are handled by React but if you move `headers()` to a different context by using `setTimeout`, `after`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "/api/search".
+    at new Promise (<anonymous>)
+    at q (app\api\search\route.ts:12:46)
+  10 |   try {
+  11 |     // Authentification
+> 12 |     const user = await getCurrentUser2(await headers());
+     |                                              ^
+  13 |
+  14 |     // Param├¿tres
+  15 |     const searchParams = request.nextUrl.searchParams; {
+  route: '/api/search',
+  expression: '`headers()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+}
+Suggestions API error: Error: During prerendering, `headers()` rejects when the prerender is complete. Typically these errors are handled by React but if you move `headers()` to a different context by using `setTimeout`, `after`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "/api/search/suggestions".
+    at new Promise (<anonymous>)
+    at q (app\api\search\suggestions\route.ts:12:46)
+  10 | export async function GET(request: NextRequest) {
+  11 |   try {
+> 12 |     const user = await getCurrentUser2(await headers());
+     |                                              ^
+  13 |     const searchParams = request.nextUrl.searchParams;
+  14 |     const term = searchParams.get('term') || '';
+  15 | {
+  route: '/api/search/suggestions',
+  expression: '`headers()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+}
+Error fetching wallet stats: Error: During prerendering, `headers()` rejects when the prerender is complete. Typically these errors are handled by React but if you move `headers()` to a different context by using `setTimeout`, `after`, or similar functions you may observe this error and you should handle it in that context. This occurred at route "/api/wallet/stats".
+    at new Promise (<anonymous>)
+    at C (app\api\wallet\stats\route.ts:13:49)
+  11 | export async function GET(request: NextRequest) {
+  12 |   try {
+> 13 |     const session = await getCurrentUser2(await headers());
+     |                                                 ^
+  14 |     if (!session) {
+  15 |       return NextResponse.json({ error: "Non authentifi├®" }, { status: 401 });
+  16 |     } {
+  route: '/api/wallet/stats',
+  expression: '`headers()`',
+  digest: 'HANGING_PROMISE_REJECTION'
+}
+  Generating static pages using 7 workers (40/160) 
+Error getting blogs: Error: Failed query: select "id", "title", "content", "images", "is_active", "created_at", "author_id" from "blogs" "blogs" where ("blogs"."is_deleted" = $1 and "blogs"."is_active" = $2) order by "blogs"."created_at" desc limit $3
+params: false,true,12
+    at async p (actions\blogs.ts:68:38)
+  66 |     const whereConditions = buildBlogWhereConditions(filters, options);
+  67 |
+> 68 |     const [blogsData, totalResult] = await Promise.all([
+     |                                      ^
+  69 |       db.query.blogs.findMany({
+  70 |         columns: BLOG_CARD_COLUMNS,
+  71 |         where: whereConditions, {
+  query: 'select "id", "title", "content", "images", "is_active", "created_at", "author_id" from "blogs" "blogs" where ("blogs"."is_deleted" = $1 and "blogs"."is_active" = $2) order by "blogs"."created_at" desc limit $3',
+  params: [Array],
+  [cause]: Error: Client network socket disconnected before secure TLS connection was established
+      at ignore-listed frames {
+    code: 'ECONNRESET',
+    path: undefined,
+    host: undefined,
+    port: undefined,
+    localAddress: undefined
+  }
+}
+Ô¿» Error: Failed to fetch blogs
+    at p (actions\blogs.ts:104:11)
+  102 |   } catch (error) {
+  103 |     console.error('Error getting blogs:', error);
+> 104 |     throw new Error('Failed to fetch blogs');
+      |           ^
+  105 |   }
+  106 | }
+  107 | {
+  digest: '2521792'
+}
+Error fetching partners: Error: Failed query: select count(*)::int from "partners" where ("partners"."is_deleted" = $1 and "partners"."status" = $2 and "partners"."verified" = $3 and "partners"."is_active" = $4 and "partners"."is_visible" = $5)
+params: false,ACTIVE,true,true,true
+    at async r (actions\partners.ts:200:25)
+    at async n (app\partners\page.tsx:21:18)
+  198 |
+  199 |     // Get total count
+> 200 |     const [{ count }] = await db
+      |                         ^
+  201 |       .select({ count: sql<number>`count(*)::int` })
+  202 |       .from(partners)
+  203 |       .where(whereClause); {
+  query: 'select count(*)::int from "partners" where ("partners"."is_deleted" = $1 and "partners"."status" = $2 and "partners"."verified" = $3 and "partners"."is_active" = $4 and "partners"."is_visible" = $5)',
+  params: [Array],
+  [cause]: Error: Client network socket disconnected before secure TLS connection was established
+      at ignore-listed frames {
+    code: 'ECONNRESET',
+    path: undefined,
+    host: undefined,
+    port: undefined,
+    localAddress: undefined
+  }
+}
+Error occurred prerendering page "/blogs". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: Failed to fetch blogs
+    at p (actions\blogs.ts:104:11)
+  102 |   } catch (error) {
+  103 |     console.error('Error getting blogs:', error);
+> 104 |     throw new Error('Failed to fetch blogs');
+      |           ^
+  105 |   }
+  106 | }
+  107 | {
+  digest: '2521792'
+}
+Export encountered an error on /blogs/page: /blogs, exiting the build.
+  Generating static pages using 7 workers (80/160) 
+Ô¿» Next.js build worker exited with code: 1 and signal: null

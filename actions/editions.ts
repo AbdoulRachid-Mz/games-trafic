@@ -10,6 +10,9 @@ import {
   NewEditionRegistration,
   TournamentEditionWithRelations,
   tournamentPhases,
+  phaseGroupParticipants,
+  matches,
+  type NewTournamentEdition,
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
@@ -218,7 +221,7 @@ export async function joinEdition(
 /**
  * Update Edition
  */
-export async function updateEdition(id: string, data: any) {
+export async function updateEdition(id: string, data: Partial<NewTournamentEdition>) {
   try {
     const result = await db.update(tournamentEditions)
       .set({
@@ -256,6 +259,7 @@ export async function deleteEdition(id: string) {
 }
 /**
  * Delete Edition Registration
+ * Vérifie les dépendances avant suppression (matches, groupes)
  */
 export async function deleteEditionRegistrationAction(id: string) {
   try {
@@ -265,14 +269,59 @@ export async function deleteEditionRegistrationAction(id: string) {
 
     if (!registration) throw new Error("Registration not found");
 
-    await db.delete(editionRegistrations).where(eq(editionRegistrations.id, id));
+    // ⚠️ Vérifier les dépendances avant suppression
+    const deps = await checkParticipantDependencies(id);
+    if (deps.hasBlockers) {
+      throw new Error(
+        `Impossible de retirer ce participant : il est impliqué dans ${
+          deps.matchCount > 0 ? `${deps.matchCount} match(s)` : ""
+        }${
+          deps.groupCount > 0
+            ? `, ${deps.groupCount} groupe(s)`
+            : ""
+        }. Retirez-le d'abord de ces entités.`
+      );
+    }
 
+    await db.delete(editionRegistrations).where(eq(editionRegistrations.id, id));
     revalidatePath(`/tournaments/${registration.editionId}/dashboard/participants`);
     return { success: true };
   } catch (error) {
     console.error("Delete registration failed", error);
     throw error;
   }
+}
+
+/**
+ * Helper: vérifie si une registration est utilisée dans des matches ou des groupes
+ */
+export async function checkParticipantDependencies(registrationId: string): Promise<{
+  hasBlockers: boolean;
+  matchCount: number;
+  groupCount: number;
+}> {
+  const [groupParticipants, matchesAsP1, matchesAsP2] = await Promise.all([
+    db.query.phaseGroupParticipants.findMany({
+      where: eq(phaseGroupParticipants.registrationId, registrationId),
+    }),
+    db.query.matches.findMany({
+      where: eq(matches.participant1RegistrationId, registrationId),
+      columns: { id: true },
+    }),
+    db.query.matches.findMany({
+      where: eq(matches.participant2RegistrationId, registrationId),
+      columns: { id: true },
+    }),
+  ]);
+
+  const matchCount = matchesAsP1.length + matchesAsP2.length;
+  const groupCount = groupParticipants.length;
+
+  return {
+    hasBlockers: matchCount > 0 || groupCount > 0,
+    matchCount,
+    groupCount,
+  };
 }
 
 /**

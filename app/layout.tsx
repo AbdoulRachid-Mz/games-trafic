@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto } from "next/font/google";
-// import { poppins, montserrat } from "./fonts";
+import { roboto, montserrat } from "./fonts";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import QueryProvider from "@/providers/query-provider";
@@ -16,17 +15,7 @@ import { getAppUrlEnv } from "@/utils/app-url";
 import { ExplanationManager } from "@/components/onboarding/explanation-manager";
 import OnTapPopup from "@/components/auth/on-tap-popup";
 
-const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Games Trafics",
@@ -48,9 +37,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={roboto.variable} suppressHydrationWarning>
+    <html lang="fr" className={`${roboto.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${roboto.variable} antialiased`}
+        className={`${roboto.variable} ${montserrat.variable} antialiased`}
       >
         <Toaster />
         {/* <TooltipProvider> */}

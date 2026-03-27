@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTransactionStats } from "@/actions/transactions";
 
 // export const dynamic = 'force-dynamic';
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentUser2 } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { userWallets } from "@/database/schema";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentUser();
+    const session = await getCurrentUser2(await headers());
     if (!session) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }

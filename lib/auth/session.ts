@@ -16,6 +16,19 @@ export async function getServerSession() {
     return null;
   }
 }
+
+export async function getServerSession2(headersObj: Headers) {
+  try {
+    const session = await auth.api.getSession({
+      headers: headersObj
+    });
+    return session;
+  } catch (error) {
+    console.error("Erreur session:", error);
+    return null;
+  }
+}
+
 /**
  * Vérifie si l'utilisateur est authentifié
  */
@@ -29,5 +42,10 @@ export async function isAuthenticated(): Promise<boolean> {
  */
 export async function getCurrentUser() {
   const session = await getServerSession();
+  return session?.user || null;
+}
+
+export async function getCurrentUser2(headersObj: Headers) {
+  const session = await getServerSession2(headersObj);
   return session?.user || null;
 }

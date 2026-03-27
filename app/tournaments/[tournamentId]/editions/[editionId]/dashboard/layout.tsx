@@ -53,7 +53,7 @@ export default function EditionDashboardLayout({
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push("/auth/login");
+      router.push("/sign-in");
       return;
     }
 

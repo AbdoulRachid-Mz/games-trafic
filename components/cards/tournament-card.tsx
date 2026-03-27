@@ -24,6 +24,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { Tournament, TournamentWithRelations } from "@/database/schema";
+import { useRouter } from "next/navigation";
 
 // Types
 export type ViewMode = "grid" | "list" | "compact";
@@ -69,6 +70,7 @@ export function TournamentCard({
   const isGrid = viewMode === "grid";
   const isList = viewMode === "list";
   const isCompact = viewMode === "compact";
+  const router = useRouter();
 
   const statusConfig: Record<TournamentStatus, {
     label: string;
@@ -101,6 +103,7 @@ export function TournamentCard({
     if (onView) {
       onView(tournament.id);
     }
+    router.push(`/tournaments/${tournament.id}`);
   };
 
   const handleJoin = (e: React.MouseEvent) => {
@@ -112,7 +115,7 @@ export function TournamentCard({
 
   // Rendu de l'image
   const renderImage = () => (
-    <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 aspect-[16/9]">
+    <div className="relative overflow-hidden py-0 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 aspect-[16/9]">
       {tournament.coverImage ? (
         <Image
           src={tournament.coverImage}

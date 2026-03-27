@@ -2,8 +2,9 @@ import { Metadata } from "next"
 import { QrTransaction } from "@/components/transactions/qr-transaction"
 import { Typography } from "@/components/ui/typography"
 import { Card, CardContent } from "@/components/ui/card"
-import { getCurrentUser } from "@/lib/auth/session"
+import { getCurrentUser, getCurrentUser2 } from "@/lib/auth/session"
 import { redirect } from "next/navigation"
+import { headers } from "next/headers";
 
 export const metadata: Metadata = {
   title: "Scanner QR | Transactions",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 }
 
 export default async function WalletQrTransactionPage() {
-  const user = await getCurrentUser()
+  const user = await getCurrentUser2(await headers())
   if (!user) {
     redirect("/sign-in")
   }

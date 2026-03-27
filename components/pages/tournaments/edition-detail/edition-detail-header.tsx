@@ -76,24 +76,50 @@ export function EditionDetailHeader({
     {
       label: "Tableau de bord",
       icon: null,
-      onClick: () => router.push(`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`),
+      onClick: () =>
+        router.push(`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`),
       disabled: false,
       requireOrganizer: true,
     },
     {
       label: "Matchs",
       icon: null,
-      onClick: () => router.push(`/tournaments/${tournament.id}/editions/${edition.id}/matches`),
+      onClick: () =>
+        router.push(`/tournaments/${tournament.id}/editions/${edition.id}/matches`),
       disabled: false,
       requireOrganizer: true,
     },
     {
       label: "Calendrier",
-      icon: null,
-      onClick: () => router.push(`/tournaments/${tournament.id}/editions/${edition.id}/calendar`),
+      icon: Calendar,
+      onClick: () =>
+        router.push(`/tournaments/${tournament.id}/editions/${edition.id}/calendar`),
       disabled: false,
       requireOrganizer: true,
-    }
+    },
+    {
+      label: "Modifier",
+      icon: Edit,
+      onClick: onEdit,
+      disabled: false,
+      requireOrganizer: true,
+    },
+    {
+      label: "Supprimer",
+      icon: Trash2,
+      onClick: () => {
+        if (confirm("Êtes-vous sûr de vouloir supprimer cette édition ?")) {
+          deleteMutation.mutate(edition.id, {
+            onSuccess: () => {
+              router.push(`/tournaments/${tournament.id}`);
+            },
+          });
+        }
+      },
+      disabled: deleteMutation.isPending,
+      requireOrganizer: true,
+      variant: "destructive",
+    },
   ];
 
   const getStatusColor = (status: string) => {
@@ -139,6 +165,11 @@ export function EditionDetailHeader({
       });
     }
   };
+  const visibleActions = dropdownData.filter(
+    (item) => !item.requireOrganizer || isOrganizer
+  );
+  const primaryActions = visibleActions.slice(0, 2);
+  const secondaryActions = visibleActions.slice(2);
 
   return (
     <div className="relative border-b bg-gradient-to-b from-background via-background to-muted/10">
@@ -240,7 +271,7 @@ export function EditionDetailHeader({
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
                 <span>
-                  {edition.currentParticipants || 0} / {edition.maxParticipants}{" "}
+                  {edition.registrations?.length || 0} / {edition.maxParticipants}{" "}
                   participants
                 </span>
               </div>
@@ -248,94 +279,49 @@ export function EditionDetailHeader({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            {/* Join button for non-organizers */}
-            {!isOrganizer && !isRegistered && (
+          <div className="flex items-center max-md:my-2 max-md:w-full gap-3">
+            {primaryActions.map((action, index) => (
               <Button
+                key={index}
                 variant="default"
                 size="sm"
-                onClick={onJoinClick}
+                onClick={action.onClick}
+                disabled={action.disabled}
+                className="gap-2 flex-1"
               >
-                Joindre
+                {action.icon && <action.icon className="h-4 w-4" />}
+                {action.label}
               </Button>
-            )}
-            <InteractionButton
-              entityId={edition.id}
-              entityType="EDITION"
-              type="follow"
-            />
-
-            {/* Share button for non-organizers */}
-            {/* {!isOrganizer && (
-              <Button variant="outline" size="sm" className="gap-2">
-                <Share2 className="h-4 w-4" />
-                Partager
-              </Button>
-            )} */}
-
-            {/* Map button */}
-            {edition.locationType !== "ONLINE" && edition.location && (
-              <Button variant="default" className="gap-2" asChild>
-                <a
-                  href={`https://maps.google.com/?q=${edition.location}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MapPin className="h-4 w-4" />
-                  Voir sur la carte
-                </a>
-              </Button>
-            )}
-                        {/* Organizer actions dropdown */}
-            {isOrganizer && (
+            ))}
+            {secondaryActions.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
+
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}
+                  {secondaryActions.map((action, index) => (
+                    <DropdownMenuItem
+                      key={index}
+                      onClick={action.onClick}
+                      disabled={action.disabled}
+                      className={cn(
+                        action.variant === "destructive" && "text-destructive"
+                      )}
                     >
-                      Tableau de bord
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}
-                    >
-                      Matchs
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}
-                    >
-                      Calendrier
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      // TODO: Open edit dialog or navigate to edit
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifier
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleDelete}
-                    disabled={deleteMutation.isPending}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer
-                  </DropdownMenuItem>
+                      {action.icon && (
+                        <action.icon className="h-4 w-4 mr-2" />
+                      )}
+                      {action.label}
+                    </DropdownMenuItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
           </div>
+
         </div>
       </div>
     </div>

@@ -75,14 +75,7 @@ import { useScreenSize } from "@/hooks/use-screen";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { TournamentCard } from "@/components/pages/tournaments/tournament-card";
-// import { MemberCard } from "@/components/pages/tournaments/member-card";
-// import { EditionCard } from "@/components/pages/tournaments/edition-card";
-// import { MembershipRequestDialog } from "@/components/pages/tournaments/membership-request-dialog";
-// import {
-//   getTournamentMembers,
-//   addTournamentMember,
-// } from "@/actions/tournanents";
+// import { TournamentCard } from "@/components/pages/tournaments/tournament-card";
 import type {
   TournamentWithRelations,
   Tournament,
@@ -98,6 +91,9 @@ import {
   getTournamentMembers,
   getTournaments,
 } from "@/actions/tournaments";
+import { TournamentCard } from "@/components/cards/tournament-card";
+import { StatsCard } from "@/components/ui/stats-card";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 export function TournamentPageContent() {
   const params = useParams();
@@ -198,35 +194,34 @@ export function TournamentPageContent() {
     {
       icon: Users,
       label: "Participants",
-      value: tournament?.totalParticipants || 0,
+      value: tournament?.members?.length || 0,
       color: "text-blue-500",
     },
     {
       icon: Calendar,
       label: "Éditions",
-      value: tournament?.totalEditions || 0,
+      value: tournament?.editions?.length || 0,
       color: "text-green-500",
     },
-    {
-      icon: Star,
-      label: "Note",
-      value: "4.9/5",
-      color: "text-amber-500",
-    },
-    {
-      icon: Clock,
-      label: "Durée moyenne",
-      value: "3h",
-      color: "text-purple-500",
-    },
-    {
-      icon: Crown,
-      label: "Classement",
-      value: "#8",
-      color: "text-orange-500",
-    },
+    // {
+    //   icon: Star,
+    //   label: "Note",
+    //   value: "4.9/5",
+    //   color: "text-amber-500",
+    // },
+    // {
+    //   icon: Clock,
+    //   label: "Durée moyenne",
+    //   value: "3h",
+    //   color: "text-purple-500",
+    // },
+    // {
+    //   icon: Crown,
+    //   label: "Classement",
+    //   value: "#8",
+    //   color: "text-orange-500",
+    // },
   ];
-
   const editions = tournament?.editions || [];
 
   const displayedEditions = showAllEditions ? editions : editions.slice(0, 6);
@@ -552,35 +547,17 @@ export function TournamentPageContent() {
       </div>
 
       {/* Stats Grid */}
-      <div className="container mx-auto p-3">
+      <div className="container mx-auto p-2">
         <div className="overflow-x-auto w-full">
-          <div className="flex gap-3 justify-center items-center min-w-max">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex-1 max-md:min-w-[150px]"
-              >
-                <Card className="h-full hover:shadow-md p-2 transition-all">
-                  <CardContent className="p-2 text-center">
-                    <div
-                      className={`p-2 rounded-full ${stat.color}/10 inline-flex mb-2`}
-                    >
-                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                    </div>
-                    <Typography variant="h5" weight="bold" className="mb-1">
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="caption1" theme="muted">
-                      {stat.label}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+          <StatsCarousel
+            data={stats.map(s => ({ ...s, icon: <s.icon className="h-5 w-5" /> }))}
+            itemsPerView={{
+              mobile: 1,
+              lg: 3,
+              xl: 4,
+            }}
+            className="min-w-max"
+          />
         </div>
       </div>
 
@@ -1044,6 +1021,7 @@ export function TournamentPageContent() {
                         <EditionCard
                           key={edition.id}
                           edition={edition}
+                          showDetails={false}
                           tournamentId={tournamentId}
                         />
                       ))}
@@ -1092,6 +1070,7 @@ export function TournamentPageContent() {
                       <EditionCard
                         key={edition.id}
                         edition={edition}
+                        showDetails={false}
                         tournamentId={tournamentId}
                         onView={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}`)}
                       />
@@ -1337,7 +1316,7 @@ export function TournamentPageContent() {
                 </Typography>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {similarTournaments.map((t) => (
-                    <TournamentCard key={t.id} tournament={t} />
+                    <TournamentCard showDetails={false} key={t.id} tournament={t} />
                   ))}
                 </div>
               </div>

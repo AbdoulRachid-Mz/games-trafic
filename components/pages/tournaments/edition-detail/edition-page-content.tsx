@@ -11,13 +11,11 @@ import {
   TournamentEditionWithRelations,
   Team,
 } from "@/database/schema";
-// import { TournamentEditionWithRelations } from "@/actions/editions";
 import { EditionDetailHeader } from "./edition-detail-header";
-import { EditionStatsGrid } from "./edition-stats-grid";
 import { EditionParticipantsList } from "./edition-participants-list";
 import { EditionPhasesView } from "./edition-phases-view";
 import { EditionJoinDialog } from "./edition-join-dialog";
-import { EditionPaymentDialog } from "./edition-payment-dialog"; // Import new dialog
+import { EditionPaymentDialog } from "./edition-payment-dialog";
 import { StandingsTable } from "./standings-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Typography } from "@/components/ui/typography";
@@ -27,6 +25,9 @@ import { useJoinEdition } from "@/hooks/use-editions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CommentsSection } from "@/components/comments/comments-section";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { Users, Target, Trophy, Calendar, Wallet } from "lucide-react";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EditionPageContentProps {
   tournament: Tournament;
@@ -64,12 +65,55 @@ export function EditionPageContent({
   isOrganizer = false,
 }: EditionPageContentProps) {
   const { user } = useAuthContext();
+  const { isMobile } = useScreenSize();
   const router = useRouter();
   const [showJoinDialog, setShowJoinDialog] = useState(false);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false); // State for payment dialog
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [standingsMode, setStandingsMode] = useState<"group" | "edition">("group");
   const joinMutation = useJoinEdition();
 
   const isRegistered = !!currentUserRegistration;
+  const registrations = edition.registrations || [];
+  const checkedInCount = registrations.filter((r) => r.checkedIn).length;
+  const totalMatchCount =
+    (edition.matchCount || 0);
+
+  const editionStats = [
+    {
+      icon: <Users className="h-5 w-5" />,
+      label: "Participants",
+      value: `${edition.currentParticipants || registrations.length}/${edition.maxParticipants || "∞"}`,
+      color: "text-blue-500",
+    },
+    {
+      icon: <Target className="h-5 w-5" />,
+      label: "Check-in",
+      value: checkedInCount,
+      color: "text-indigo-500",
+    },
+    {
+      icon: <Trophy className="h-5 w-5" />,
+      label: "Matchs joués",
+      value: edition.completedMatchCount || 0,
+      color: "text-green-500",
+    },
+    {
+      icon: <Calendar className="h-5 w-5" />,
+      label: "Phases",
+      value: phases.length,
+      color: "text-purple-500",
+    },
+    ...(Number(edition.entryFee) > 0
+      ? [
+          {
+            icon: <Wallet className="h-5 w-5" />,
+            label: "Frais",
+            value: `${edition.entryFee} ${edition.prizeCurrency || "GTC"}`,
+            color: "text-amber-500",
+          },
+        ]
+      : []),
+  ];
 
   const handleJoinClick = () => {
     if (!user) {
@@ -112,7 +156,7 @@ export function EditionPageContent({
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-16">
       <EditionDetailHeader
         tournament={tournament}
         edition={edition}
@@ -126,9 +170,14 @@ export function EditionPageContent({
       />
 
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Stats Carousel */}
+        <StatsCarousel
+          data={editionStats}
+          itemsPerView={{ mobile: 2, lg: 4, xl: 5 }}
+        />
+
         <div className="flex flex-col md:flex-row gap-4 items-start">
           <div className="flex-1 w-full space-y-4">
-            <EditionStatsGrid edition={edition} />
 
             {/* Organizer dashboard link */}
             {isOrganizer && (
@@ -172,13 +221,25 @@ export function EditionPageContent({
             )}
 
             <Tabs defaultValue="standings" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 mb-8">
-                <TabsTrigger value="overview">Infos</TabsTrigger>
-                <TabsTrigger value="standings">Classement</TabsTrigger>
-                <TabsTrigger value="groups">Groupes</TabsTrigger>
-                <TabsTrigger value="calendar">Calendrier</TabsTrigger>
-                <TabsTrigger value="matches">Matches</TabsTrigger>
-                <TabsTrigger value="members">Membres</TabsTrigger>
+              <TabsList className="flex w-full overflow-auto mb-3 gap-2 px-1 md:justify-center">
+                <TabsTrigger value="overview" className="flex-shrink-0">
+                  Infos
+                </TabsTrigger>
+                <TabsTrigger value="standings" className="flex-shrink-0">
+                  Classement
+                </TabsTrigger>
+                <TabsTrigger value="groups" className="flex-shrink-0">
+                  Groupes
+                </TabsTrigger>
+                <TabsTrigger value="calendar" className="flex-shrink-0">
+                  Calendrier
+                </TabsTrigger>
+                <TabsTrigger value="matches" className="flex-shrink-0">
+                  Matches
+                </TabsTrigger>
+                <TabsTrigger value="members" className="flex-shrink-0">
+                  Membres
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
@@ -215,11 +276,36 @@ export function EditionPageContent({
                 </div>
               </TabsContent>
 
-              <TabsContent value="standings" className="mt-6">
+              <TabsContent value="standings" className="mt-6 space-y-4">
+                {/* Toggle between group standings and global edition standings */}
+                {standings.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={standingsMode === "group" ? "default" : "outline"}
+                      onClick={() => setStandingsMode("group")}
+                    >
+                      Par groupe
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={standingsMode === "edition" ? "default" : "outline"}
+                      onClick={() => setStandingsMode("edition")}
+                    >
+                      Classement global
+                    </Button>
+                  </div>
+                )}
                 <StandingsTable
                   groups={standings}
                   registrations={edition.registrations}
-                  title="Classement de la phase active"
+                  title={
+                    standingsMode === "edition"
+                      ? "Classement global de l'édition"
+                      : "Classement par groupe"
+                  }
+                  mode={standingsMode}
+                  currentRegistrationId={currentUserRegistration?.id}
                 />
               </TabsContent>
 

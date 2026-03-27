@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MoreHorizontal, Shield, User, Trophy, Mail, ShieldCheck, ShieldAlert } from "lucide-react";
+import { MoreHorizontal, Shield, User, Trophy, Mail, ShieldCheck, ShieldAlert, PenSquare, Eye } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,13 +14,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TournamentMemberWithRelations } from "@/database/schema";
 import { cn } from "@/lib/utils";
+import { useScreenSize } from "@/hooks/use-screen";
+import { useRouter } from "next/navigation";
 
 interface MemberCardProps {
   member: TournamentMemberWithRelations;
   viewMode?: "grid" | "list";
   userDisplay?: "admin" | "organizer" | "member";
+  showDetail?: boolean;
   actions?: {
     onEdit?: (id: string) => void;
+    onManage?: () => void;
     onDelete?: (id: string) => void;
     onViewProfile?: (id: string) => void;
     onToggleCoOrganizer?: (id: string) => void;
@@ -31,6 +35,7 @@ export function MemberCard({
   member,
   viewMode = "grid",
   userDisplay = "member",
+  showDetail,
   actions,
 }: MemberCardProps) {
   const user = member?.user;
@@ -38,6 +43,7 @@ export function MemberCard({
   const isActive = member.isActive ?? true;
   const isBanned = member.isBanned ?? false;
   const isMe = member.userId === user?.id;
+  const { isMobile } = useScreenSize()
 
   // Helper to determine role color/icon
   const getRoleBadge = (role: string) => {
@@ -74,7 +80,7 @@ export function MemberCard({
         <div className="flex items-center gap-4">
           <Avatar className="h-10 w-10 border">
             <AvatarImage
-              src={member.avatar || user?.profileImage || undefined}
+              src={member.avatar || user?.profileImage || "/icons/avatar-2.png"}
               alt={member.displayName || user?.username || "User"}
             />
             <AvatarFallback>
@@ -208,7 +214,7 @@ export function MemberCard({
 
         <div className="relative">
           <Avatar className="h-24 w-24 border-4 border-background shadow-xl scale-100 group-hover:scale-105 transition-transform duration-300">
-            <AvatarImage src={member.avatar || user?.profileImage || undefined} alt={member.displayName || user?.username || "User"} />
+            <AvatarImage src={member.avatar || user?.profileImage || "/icons/avatar-2.png"} alt={member.displayName || user?.username || "User"} />
             <AvatarFallback className="text-2xl bg-primary/10 text-primary font-black italic">
               {(member.displayName || user?.username || "U")
                 .substring(0, 2)
@@ -240,7 +246,7 @@ export function MemberCard({
           {member.team && (
             <Badge
               variant="outline"
-              className="bg-background/50 backdrop-blur-sm border-primary/20"
+              className="bg-background/50 backdrop-blur-sm border-primary/20 flex items-center justify-center gap-2"
               title={member.team.name}
             >
               <Trophy className="w-3 h-3 mr-1 text-primary" />
@@ -256,7 +262,10 @@ export function MemberCard({
             className="w-full font-bold h-9"
             onClick={() => actions?.onViewProfile?.(member.id)}
           >
-            Voir le profil
+            <Eye className="w-3 h-3" />
+            <span className="hidden md:inline">
+              Voir le profil
+            </span>
           </Button>
 
           {userDisplay === "organizer" && member.userId && !isMe && (
@@ -278,14 +287,17 @@ export function MemberCard({
             </Button>
           )}
 
-          {member.team && (
+          {member.team && isMe && (
             <Button
               variant="outline"
               size="sm"
               className="w-full font-bold h-9 bg-primary/5 border-primary/20 hover:bg-primary/10"
-              onClick={() => {/* Gérer logic */ }}
+              onClick={actions?.onManage!}
             >
-              Gérer l&apos;équipe
+              <PenSquare className="w-3 h-3" />
+              <span className="md:inline hidden">
+                Gérer l&apos;équipe
+              </span>
             </Button>
           )}
         </div>
@@ -296,6 +308,6 @@ export function MemberCard({
           </div>
         )}
       </CardContent>
-    </Card>
+    </Card >
   );
 }

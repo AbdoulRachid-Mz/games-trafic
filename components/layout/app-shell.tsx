@@ -12,6 +12,7 @@ import { resolveRoute } from "@/lib/routes/resolver";
 import type { UserRoles } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
+import { useSearchParams } from "next/navigation";
 import OnTapPopup from "../auth/on-tap-popup";
 import Image from "next/image";
 
@@ -123,7 +124,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   } = useApp();
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [welcomeChecked, setWelcomeChecked] = useState(false);
   const [initialPath] = useState(pathname);
+  const searchParams = useSearchParams();
+
+  // Handle welcome redirect
+  useEffect(() => {
+    const isWelcomePath = pathname === "/welcome";
+    const ignore = searchParams?.get("ignore_visite") === "true";
+
+    if (ignore) {
+      setWelcomeChecked(true);
+      return;
+    }
+
+    const hasVisited = typeof window !== "undefined" ? localStorage.getItem("gt_welcome_visited") : null;
+    
+    if (!hasVisited && !isWelcomePath) {
+      router.replace("/welcome");
+    } else {
+      setWelcomeChecked(true);
+    }
+  }, [pathname, router, searchParams]);
 
   // Calculate user roles
   const userRoles: UserRoles = useMemo(
@@ -198,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [maintenanceMode, isAdmin, isInitialized, resolved, pathname, router]);
 
   // Show loading during initialization
-  if (!isInitialized) {
+  if (!isInitialized || !welcomeChecked) {
     return <LoadingScreen message="Initialisation..." />;
   }
 

@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { StatsCard } from "@/components/ui/stats-card";
+import Image from "next/image";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 interface PageProps {
   params: Promise<{
@@ -54,7 +57,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
   const stats = [
     {
       label: "Participants",
-      value: `${edition.currentParticipants || 0} / ${edition.maxParticipants || "∞"}`,
+      value: `${edition.registrations?.length || 0} / ${edition.maxParticipants || "∞"}`,
       icon: Users,
       color: "text-blue-500",
       bg: "bg-blue-500/10",
@@ -70,7 +73,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
     },
     {
       label: "Phases",
-      value: phasesResponse.data.length,
+      value: phasesResponse.data.length || edition.phases?.length,
       icon: GitBranch,
       color: "text-purple-500",
       bg: "bg-purple-500/10",
@@ -111,30 +114,28 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <Card key={i} className="border-border/50 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={cn("p-2 rounded-lg", stat.bg)}>
-                  <stat.icon className={cn("h-5 w-5", stat.color)} />
-                </div>
-                <Typography variant="caption2" theme="muted" className="font-semibold uppercase tracking-wider">
-                  {stat.label}
-                </Typography>
-              </div>
-              <div>
-                <Typography variant="h4" weight="bold" className="leading-none mb-2">
-                  {stat.value}
-                </Typography>
-                <Typography variant="caption2" theme="muted">
-                  {stat.description}
-                </Typography>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatsCarousel
+        data={stats.map((stat) => ({
+          title: stat.label,
+          value: stat.value,
+          icon: <stat.icon />,
+          variant:
+            stat.color === "text-blue-500" ? "primary" :
+              stat.color === "text-amber-500" ? "warning" :
+                stat.color === "text-purple-500" ? "secondary" :
+                  stat.color === "text-emerald-500" ? "success" : "default",
+          className: "min-w-full md:min-w-[250px] lg:flex-1 p-1 border-secondary border-2 bg-secondary/20",
+          bgType: "solid",
+          description: stat.description,
+        }))}
+        itemsPerView={{
+          mobile: 1,
+          md: 2,
+          lg: 3,
+          xl: 4,
+        }}
+        gap={12}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Registrations */}
@@ -166,9 +167,9 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                     className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
+                      <div className="h-10 w-10 relative rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
                         {reg.member?.avatar ? (
-                          <img src={reg.member.avatar} alt="" className="h-full w-full object-cover" />
+                          <Image src={reg.member.avatar || '/icons/avatar-2-128.png'} fill alt={`avatar image - ${reg.member?.displayName}`}  className="h-full w-full object-cover" />
                         ) : (
                           reg.member?.displayName?.substring(0, 2).toUpperCase() || "??"
                         )}

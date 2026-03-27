@@ -1,5 +1,3 @@
-import { StaticImageData } from "next/image";
-
 export interface WelcomeData {
   title: string;
   description: string;
@@ -10,74 +8,84 @@ export interface WelcomeData {
 export const welcomeSlides: WelcomeData[] = [
   {
     title: "Bienvenue sur Games-Trafics",
-    description: "Votre plateforme de confiance pour l'achat, la vente et les tournois de jeux vidéo.",
-    image: "/images/pages/welcome/img1.png",
+    description: "La plateforme ultime pour acheter, vendre, jouer et gagner dans l’univers du gaming.",
+    image: "/images/icons/pages/welcome/welcome.png",
     details: [
       "Une communauté active de gamers passionnés",
-      "Des transactions sécurisées et garanties", 
-      "Des tournois excitants avec des récompenses",
-      "Un support client disponible 24/7",
-      "Une expérience unique dédiée aux joueurs"
+      "Transactions rapides, fiables et sécurisées",
+      "Tournois compétitifs avec récompenses réelles",
+      "Support client réactif 24h/24",
+      "Une expérience moderne pensée pour les gamers"
     ]
   },
   {
-    title: "Acheter et vendre des comptes de jeux",
-    description: "Trouvez des comptes de jeux à acheter ou vendez les vôtres en toute sécurité.",
-    image: "/images/icons/pages/welcome/img2.png",
+    title: "Achetez et vendez en toute sécurité",
+    description: "Accédez à un marketplace fiable pour échanger vos comptes et produits gaming sans risque.",
+    image: "/icons/marketplace-500.png",
     details: [
-      "Système de transaction sécurisé avec protection acheteur/vendeur",
-      "Gestion des paiements via portefeuille électronique (Wallet)",
-      "Possibilité d'ajouter des cartes bancaires pour les transactions",
-      "Système de réclamation (Claims) en cas de litige",
-      "Vérification d'identité des vendeurs pour plus de sécurité"
+      "Protection acheteur et vendeur intégrée",
+      "Paiements sécurisés via portefeuille (GTC Wallet)",
+      "Ajout et gestion de cartes virtuelles",
+      "Système de litiges (Claims) en cas de problème",
+      "Vendeurs vérifiés pour plus de confiance"
     ]
   },
   {
-    title: "Participer à des tournois", 
-    description: "Rejoignez des tournois compétitifs et gagnez des prix.",
-    image: "/images/icons/pages/welcome/img3.png",
+    title: "Participez à des tournois et gagnez",
+    description: "Affrontez d'autres joueurs, grimpez dans les classements et remportez des récompenses.",
+    image: "/images/icons/pages/welcome/tournoi.png",
     details: [
-      "Organisation de tournois avec système de brackets",
-      "Gestion des participants et des résultats de matchs",
-      "Prix en monnaie virtuelle (GTC) ou réelle",
-      "Communication via messages de tournoi et groupes WhatsApp",
-      "Formats variés (élimination simple, etc.)"
+      "Tournois organisés avec système de brackets",
+      "Suivi en temps réel des matchs et résultats",
+      "Récompenses en GTC ou en argent réel",
+      "Communication intégrée (chat & groupes)",
+      "Formats variés : élimination directe, ligues, etc."
     ]
   },
   {
-    title: "Créer votre boutique",
-    description: "Ouvrez votre propre boutique et vendez vos produits.",
-    image: "/images/icons/pages/welcome/img4.png",
+    title: "Créez votre propre boutique",
+    description: "Lancez votre business gaming et vendez facilement vos produits à une large audience.",
+    image: "/images/icons/pages/welcome/market.png",
     details: [
-      "Création de boutique personnalisée avec profil et couverture",
-      "Gestion des catégories de produits",
-      "Système de notation et d'avis",
-      "Suivi des commandes et des transactions",
-      "Outils de promotion et mise en avant des produits"
+      "Boutique personnalisée avec profil et design",
+      "Gestion simple des produits et catégories",
+      "Système d’avis et de notation clients",
+      "Suivi complet des ventes et transactions",
+      "Outils pour booster votre visibilité"
     ]
   },
   {
-    title: "Communauté de joueurs",
-    description: "Connectez-vous avec d'autres joueurs et partagez votre passion.",
-image: "/images/icons/pages/welcome/img5.png",
+    title: "Rejoignez une communauté active",
+    description: "Échangez, partagez et connectez-vous avec des joueurs du monde entier.",
+    image: "/images/icons/pages/welcome/social.png",
     details: [
-      "Profils personnalisables avec réseaux sociaux",
-      "Système de messagerie intégré",
-      "Partage de posts et interactions",
+      "Profils personnalisables et sociaux",
+      "Messagerie instantanée intégrée",
+      "Publications et interactions communautaires",
       "Notifications en temps réel",
-      "Historique des activités et recherches"
+      "Historique et suivi de vos activités"
     ]
   },
   {
-    title: "Personnalisez votre expérience",
-    description: "Adaptez l'interface à vos préférences pour une expérience unique.",
-    image: "/images/icons/pages/welcome/img6.png",
+    title: "Une expérience qui vous ressemble",
+    description: "Personnalisez votre interface pour une immersion totale.",
+    image: "/images/icons/pages/welcome/gt-player.webp",
     details: [
-      "Choix entre mode clair et sombre",
-      "Personnalisation des couleurs de l'interface",
-      "Options d'affichage configurables",
-      "Disposition adaptable des éléments",
-      "Sauvegarde de vos préférences"
+      "Mode clair et sombre adaptatif",
+      "Thème violet & gold premium",
+      "Interface flexible et responsive",
+      "Paramètres personnalisables",
+      "Sauvegarde automatique de vos préférences"
+    ]
+  },
+  {
+    title: "Prêt à commencer ?",
+    description: "Rejoignez Games-Trafics dès maintenant et entrez dans une nouvelle dimension du gaming.",
+    image: "/images/icons/pages/welcome/gt-primary.png",
+    details: [
+      "Créer un compte en quelques secondes",
+      "Accéder à toutes les fonctionnalités",
+      "Commencer à acheter, vendre et jouer"
     ]
   }
 ]

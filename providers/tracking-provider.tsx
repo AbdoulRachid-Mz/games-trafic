@@ -13,7 +13,7 @@ const TrackingProviders = ({ children }: Props) => {
         isActive: true, // Peut être piloté par une config ou env
         enabled: process.env.NODE_ENV === "production",
         showExplanations: true,
-        redirectFirstTimeUsers: true,
+        redirectFirstTimeUsers: false,
       }}
     >
       <Suspense fallback={null}>

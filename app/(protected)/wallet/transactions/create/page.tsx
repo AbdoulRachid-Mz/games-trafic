@@ -208,32 +208,17 @@ function CreateTransactionContent({
           },
         };
 
-        // Pour DEPOSIT et WITHDRAWAL, on vérifie si on doit sauter l'étape des détails
+        // Pour DEPOSIT et WITHDRAWAL, on pré-rempli les détails si fournis
         const hasPaymentDetails = searchParams.get("paymentMethod") ||
           searchParams.get("paymentProvider") ||
           searchParams.get("paymentAccountId");
 
-        if (type === "DEPOSIT" && !hasPaymentDetails) {
-          // Si pas de détails de paiement en param, on reste sur l'étape DEPOSIT_DETAILS
-          setCurrentStep(0);
-        } else if (type === "DEPOSIT" && hasPaymentDetails) {
-          // Si détails fournis, on passe directement à l'étape AMOUNT_INPUT
-          const stepIndex = config.steps.indexOf("AMOUNT_INPUT");
-          setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
-          // Remplir les détails
-          newData.metadata = {
-            ...newData.metadata,
-            paymentMethod: searchParams.get("paymentMethod") || "",
-            paymentProvider: searchParams.get("paymentProvider") || "",
-            paymentAccountId: searchParams.get("paymentAccountId") || "",
-          };
-        }
+        let customInitialStep: number | null = null;
 
-        if (type === "WITHDRAWAL" && !hasPaymentDetails) {
-          setCurrentStep(0);
-        } else if (type === "WITHDRAWAL" && hasPaymentDetails) {
+        if ((type === "DEPOSIT" || type === "WITHDRAWAL") && hasPaymentDetails) {
           const stepIndex = config.steps.indexOf("AMOUNT_INPUT");
-          setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
+          customInitialStep = stepIndex >= 0 ? stepIndex : 0;
+          
           newData.metadata = {
             ...newData.metadata,
             paymentMethod: searchParams.get("paymentMethod") || "",
@@ -286,11 +271,13 @@ function CreateTransactionContent({
         setTransactionData(newData);
 
         // Calculer les étapes initiales
-        const initialStepIndex = getInitialStepForType(
-          type,
-          config,
-          !!newData.targetId || !!newData.recipientWalletId
-        );
+        const initialStepIndex = customInitialStep !== null 
+          ? customInitialStep 
+          : getInitialStepForType(
+              type,
+              config,
+              !!newData.targetId || !!newData.recipientWalletId
+            );
         setCurrentStep(initialStepIndex);
       }
 

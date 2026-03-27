@@ -306,6 +306,7 @@ export async function isUserTournamentOrganizer(
   }
 }
 
+
 /**
  * Met à jour le rôle d'un membre du tournoi
  */
@@ -315,14 +316,21 @@ export async function updateTournamentMemberRole(
   isCoOrganizer: boolean
 ) {
   try {
-    await db
+    const result = await db
       .update(tournamentMembers)
       .set({
         role,
         isCoOrganizer,
         updatedAt: new Date(),
       })
-      .where(eq(tournamentMembers.id, memberId));
+      .where(eq(tournamentMembers.id, memberId))
+      .returning();
+      
+    if (result[0]?.tournamentId) {
+      revalidatePath(`/tournaments/${result[0].tournamentId}/dashboard/members`);
+      revalidatePath(`/tournaments/${result[0].tournamentId}`);
+    }
+    
     return { success: true };
   } catch (error) {
     console.error("Error updating member role:", error);
@@ -1021,6 +1029,18 @@ export async function updateTournamentMember(
     if (result.length === 0) {
       throw new Error("Tournament member not found");
     }
+
+    if (result[0]?.tournamentId) {
+      // Import can just be at top but we already have it in the file now
+      try {
+        const { revalidatePath } = require("next/cache");
+        revalidatePath(`/tournaments/${result[0].tournamentId}/dashboard/members`);
+        revalidatePath(`/tournaments/${result[0].tournamentId}`);
+      } catch (e) {
+        console.error("Revalidation failed", e);
+      }
+    }
+
     return result[0];
   } catch (error) {
     console.error("Error updating tournament member:", error);

@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCookieCache } from "better-auth/cookies";
+import { auth } from "@/lib/auth";
 import { resolveRoute } from "@/lib/routes/resolver";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1️⃣ Lire session correctement via Better Auth
-  const session = await getCookieCache(request);
+  const session = await auth.api.getSession({
+    headers: request.headers
+  });
   const isAuthenticated = Boolean(session);
 
   let isAdmin = false;
@@ -22,7 +24,7 @@ export async function proxy(request: NextRequest) {
       session.user.role === "vip" ||
       session.user.isVip === true;
 
-    hasWallet = !!session.user.walletId;
+    hasWallet = !!session.user;
   }
 
   // 2️⃣ Résolution via config routes

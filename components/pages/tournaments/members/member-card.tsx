@@ -6,11 +6,11 @@ import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Crown, 
-  Sword, 
-  Target, 
-  Medal, 
+import {
+  Crown,
+  Sword,
+  Target,
+  Medal,
   Trophy,
   Eye,
   MessageCircle,
@@ -27,15 +27,15 @@ interface MemberCardProps {
   isOrganizer?: boolean;
 }
 
-export function MemberCard({ 
-  member, 
-  viewMode = "grid", 
+export function MemberCard({
+  member,
+  viewMode = "grid",
   onView,
   onMessage,
-  isOrganizer = false 
+  isOrganizer = false
 }: MemberCardProps) {
   const isGrid = viewMode === "grid";
-  
+
   if (!isGrid) {
     return (
       <Card className="hover:shadow-md transition-all">
@@ -43,7 +43,7 @@ export function MemberCard({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={member.avatar || undefined} />
+                <AvatarImage src={member.avatar || '/icons/avatar.png'} />
                 <AvatarFallback>
                   {member.displayName?.[0] || "M"}
                 </AvatarFallback>
@@ -69,7 +69,7 @@ export function MemberCard({
                 </Typography>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <Typography variant="body-base" weight="bold">
@@ -79,7 +79,7 @@ export function MemberCard({
                   Points
                 </Typography>
               </div>
-              
+
               <div className="text-center">
                 <Typography variant="body-base" weight="bold">
                   {member.totalWins || 0}
@@ -88,7 +88,7 @@ export function MemberCard({
                   Victoires
                 </Typography>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={onView}>
                   <Eye className="h-4 w-4" />
@@ -111,7 +111,7 @@ export function MemberCard({
           {/* Avatar avec badge de rôle */}
           <div className="relative">
             <Avatar className="h-20 w-20 border-2 border-primary/20">
-              <AvatarImage src={member.avatar || undefined} />
+              <AvatarImage src={member.avatar || "/icons/avatar.png"} />
               <AvatarFallback className="text-lg">
                 {member.displayName?.[0] || "M"}
               </AvatarFallback>
@@ -124,7 +124,7 @@ export function MemberCard({
               </div>
             )}
           </div>
-          
+
           {/* Nom et tag */}
           <div className="space-y-1">
             <Typography variant="body-base" weight="semibold" className="truncate w-full">
@@ -134,7 +134,7 @@ export function MemberCard({
               {member.gameTag || "Aucun tag"}
             </Typography>
           </div>
-          
+
           {/* Rôle */}
           <Badge variant={member.isCoOrganizer ? "default" : "secondary"} className="gap-1">
             {member.isCoOrganizer ? (
@@ -149,7 +149,7 @@ export function MemberCard({
               </>
             )}
           </Badge>
-          
+
           {/* Stats */}
           <div className="grid grid-cols-2 gap-4 w-full pt-2">
             <div className="text-center">
@@ -163,7 +163,7 @@ export function MemberCard({
                 Points
               </Typography>
             </div>
-            
+
             <div className="text-center">
               <div className="flex items-center justify-center gap-1">
                 <Medal className="h-4 w-4 text-green-500" />
@@ -176,20 +176,20 @@ export function MemberCard({
               </Typography>
             </div>
           </div>
-          
+
           {/* Actions */}
           <div className="flex gap-2 w-full pt-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="flex-1"
               onClick={onView}
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="default" 
-              size="sm" 
+            <Button
+              variant="default"
+              size="sm"
               className="flex-1"
               onClick={onMessage}
             >

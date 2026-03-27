@@ -15,6 +15,16 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogCancel,
+    AlertDialogAction
+} from "@/components/ui/alert-dialog";
 
 interface ParticipantRowActionsProps {
     registrationId: string;
@@ -64,21 +74,46 @@ export function ParticipantRowActions({
         });
     };
 
+    const [isAlertOpen, setIsAlertOpen] = React.useState(false);
+
     const handleDelete = () => {
-        if (confirm("Êtes-vous sûr de vouloir supprimer ce participant ?")) {
-            startTransition(async () => {
-                try {
-                    await deleteEditionRegistrationAction(registrationId);
-                    toast.success("Participant supprimé");
-                } catch (error) {
-                    toast.error("Erreur lors de la suppression");
-                }
-            });
-        }
+        startTransition(async () => {
+            try {
+                await deleteEditionRegistrationAction(registrationId);
+                toast.success("Participant supprimé");
+                setIsAlertOpen(false);
+            } catch (error) {
+                toast.error("Erreur lors de la suppression");
+            }
+        });
     };
 
     return (
         <div className="flex items-center justify-end gap-2">
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Retirer le participant</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Êtes-vous sûr de vouloir retirer ce participant de l'édition ?
+                            Cette action supprimera également ses résultats dans les groupes et brackets.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isPending}>Annuler</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                handleDelete();
+                            }}
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                            disabled={isPending}
+                        >
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Supprimer
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <div className="hidden lg:flex items-center gap-1.5">
                 <Button
                     variant={checkedIn ? "secondary" : "outline"}
@@ -138,7 +173,13 @@ export function ParticipantRowActions({
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+                    <DropdownMenuItem
+                        className="text-destructive"
+                        onSelect={(e) => {
+                            e.preventDefault();
+                            setIsAlertOpen(true);
+                        }}
+                    >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Retirer de l'édition
                     </DropdownMenuItem>

@@ -348,7 +348,7 @@ export default function SignInPage() {
                 <div className="relative h-full flex flex-col justify-end text-white">
                   {/* logo */}
                   <div className="w-full h-full flex items-center justify-center relative">
-                    <Image src="/images/icons/app/gt-gold.png" alt="logo" fill className="object-contain" />
+                    <Image src="/images/icons/app/gt-primary.png" alt="logo" fill className="object-contain" />
                   </div>
                   <h2 className="text-2xl font-bold mb-2">Bienvenue sur GamesTrafics</h2>
                   <p className="text-white/80 text-sm">
@@ -381,11 +381,11 @@ export default function SignInPage() {
         {/* Terms */}
         <p className="text-center text-xs text-white/40 mt-6">
           En continuant, vous acceptez nos{" "}
-          <Link href="/terms" className="text-white/60 hover:text-white underline underline-offset-2">
+          <Link href="/docs/legal/terms" className="text-white/60 hover:text-white underline underline-offset-2">
             conditions d'utilisation
           </Link>{" "}
           et notre{" "}
-          <Link href="/privacy" className="text-white/60 hover:text-white underline underline-offset-2">
+          <Link href="/docs/legal/privacy" className="text-white/60 hover:text-white underline underline-offset-2">
             politique de confidentialité
           </Link>
         </p>

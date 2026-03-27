@@ -5,3 +5,4 @@ export * from "./match.generator";
 export * from "./participant.selector";
 export * from "./result.engine";
 export * from "./tree.engine";
+export * from "./utils";
