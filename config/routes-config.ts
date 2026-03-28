@@ -4,7 +4,6 @@
 import { IconKey } from "@/types/icons";
 import { NavItem } from "@/types/routes";
 
-
 export interface RouteConfig {
   path: string | string[];
   name: string;
@@ -70,7 +69,7 @@ export const defaultDockLinks: DockLinkConfig[] = [
   {
     href: "/games",
     label: "Jeux",
-    icon: 'swords',
+    icon: "swords",
     requireAuth: false,
   },
   {
@@ -108,7 +107,14 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   // ROUTES SANS LAYOUT (PRIORITÉ MAX)
   // =============================================
   {
-    path: ["/sign-in", "/sign-up", "/forgot-password", "/reset-password", "error", "/auth/**"],
+    path: [
+      "/sign-in",
+      "/sign-up",
+      "/forgot-password",
+      "/reset-password",
+      "error",
+      "/auth/**",
+    ],
     name: "Authentification",
     excludeLayout: true,
     requireAuth: false,
@@ -204,7 +210,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       "/tournaments/[tournamentId]/editions/[editionId]/dashboard",
       "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**",
       "/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/**",
-      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/groupes/**"
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/groupes/**",
     ],
     name: "Dashboard Édition",
     excludeLayout: false,
@@ -221,7 +227,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     // styleGroup: "dashboard",
   },
   {
-    path: ["/tournaments/[tournamentId]/dashboard", "/tournaments/[tournamentId]/dashboard/**"],
+    path: [
+      "/tournaments/[tournamentId]/dashboard",
+      "/tournaments/[tournamentId]/dashboard/**",
+    ],
     name: "Dashboard Tournoi",
     excludeLayout: false,
     leftBar: true,
@@ -238,7 +247,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   },
   // edition
   {
-    path: ["/tournaments/[tournamentId]/editions/[editionId]/dashboard", "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**"],
+    path: [
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard",
+      "/tournaments/[tournamentId]/editions/[editionId]/dashboard/**",
+    ],
     name: "Dashboard Édition",
     excludeLayout: false,
     leftBar: false,
@@ -266,11 +278,14 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     floatingActions: true,
     showAIAssistant: false,
-    styleGroup: "dashboard",  
+    styleGroup: "dashboard",
     showOnTap: false,
   },
   {
-    path: ["/marketplace/[productId]/dashboard", "/marketplace/[productId]/dashboard/**"],
+    path: [
+      "/marketplace/[productId]/dashboard",
+      "/marketplace/[productId]/dashboard/**",
+    ],
     name: "Dashboard Produit",
     excludeLayout: false,
     leftBar: true,
@@ -282,7 +297,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     floatingActions: true,
     showAIAssistant: false,
-    styleGroup: "dashboard",  
+    styleGroup: "dashboard",
     showOnTap: false,
   },
 
@@ -302,7 +317,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: false,
     floatingActions: true,
     showAIAssistant: false,
-    styleGroup: "profile",  
+    styleGroup: "profile",
     showOnTap: false,
   },
   {
@@ -510,7 +525,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
       { href: "/games", label: "Jeux", icon: "swords", requireAuth: false },
       { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
-      { href: "/game-clips", label: "clips", icon: "clips", requireAuth: false, },
+      {
+        href: "/game-clips",
+        label: "clips",
+        icon: "clips",
+        requireAuth: false,
+      },
     ],
     activeFabActionId: "goto-market",
     menu: true,
@@ -573,8 +593,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
       { href: "/games", label: "Jeux", icon: "swords", requireAuth: false },
       { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
-      { href: "/game-clips", label: "clips", icon: "clips", requireAuth: false, },
-
+      {
+        href: "/game-clips",
+        label: "clips",
+        icon: "clips",
+        requireAuth: false,
+      },
     ],
     menu: true,
     menuOrder: 2,
@@ -633,7 +657,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
       // { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
     leftBar: true,
     rightBar: false,
@@ -662,7 +691,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
       // { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
   },
 
@@ -685,7 +719,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
       // { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
   },
   {
@@ -703,7 +742,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
       // { href: "/themes", label: "Thèmes", icon: "themes", requireAuth: false },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
   },
 
@@ -725,9 +769,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
-      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: false,
+      },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
   },
 
@@ -749,9 +803,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
-      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: false,
+      },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
   },
 
@@ -804,9 +868,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: false },
-      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: false,
+      },
       { href: "/games", label: "Jeux", icon: "games", requireAuth: false },
-      { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "gameClips",
+        requireAuth: false,
+      },
     ],
   },
   {
@@ -822,7 +896,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     showOnTap: true,
     dockLinks: defaultDockLinks,
   },
-   {
+  {
     path: ["/services/[id]"],
     name: "Detail-service",
     breadcrumbs: true,
@@ -966,7 +1040,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         icon: "tournaments",
         requireAuth: false,
       },
-      { href: "/game-clips", label: "Clips", icon: "clips", requireAuth: false },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "clips",
+        requireAuth: false,
+      },
       { href: "/games", label: "Jeux", icon: "swords", requireAuth: false },
     ],
   },

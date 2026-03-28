@@ -12,7 +12,7 @@ import Link from "next/link";
 import type { BracketNode, PhaseGroupParticipant, EditionRegistration, Match } from "@/database/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ChevronLeft, Plus, Swords, Clock, CheckCircle, XCircle, Pause } from "lucide-react";
+import { ChevronLeft, Plus, Swords, Clock, CheckCircle, XCircle, Pause, Settings2 } from "lucide-react";
 
 interface PageProps {
   params: Promise<{
@@ -110,9 +110,16 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
               </Link>
             </Button>
           </div>
-          <Typography variant="h3" weight="bold">
-            Nœud {node?.nodeCode || bracketId.slice(0, 6)}
-          </Typography>
+          <div className="flex items-center gap-3">
+            <Typography variant="h3" weight="bold">
+              Nœud {node?.nodeCode || bracketId.slice(0, 6)}
+            </Typography>
+            <Button variant="outline" size="sm" className="gap-2 h-8" asChild>
+              <Link href={`${basePath}/brackets/${bracketId}/organize`}>
+                <Settings2 className="h-4 w-4" /> Organiser en masse
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -1,14 +1,14 @@
 // @/components/game-clips/game-clip-reel.tsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Loader2, Volume2, VolumeX, Plus } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+import { Loader2, Volume2, VolumeX, ArrowLeft } from "lucide-react";
 import { GameClipPlayer } from "./game-clip-player";
 import { cn } from "@/lib/utils";
 import { GameClipCard } from "@/types/view-models";
 import { Typography } from "../ui/typography";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 
 interface GameClipReelProps {
   initialClipId?: string;
@@ -39,250 +39,144 @@ export function GameClipReel({
   const [orderedClips, setOrderedClips] = useState<GameClipCard[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
   const containerRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef(0);
-  const touchStartX = useRef(0);
-  const wheelTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const isInitialized = useRef(false);
+  const itemsRef = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Pause globale
-  const globalPaused = areCommentsOpen || isTransitioning;
-
-  // Fonction de shuffle
-  const shuffleArray = useCallback((array: GameClipCard[]) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
+  // Shuffle logic
+  const shuffleAndSet = useCallback((clipsToShuffle: GameClipCard[]) => {
+    const shuffled = [...clipsToShuffle].sort(() => Math.random() - 0.5);
+    setOrderedClips(shuffled);
+    setActiveIndex(0);
+    if (containerRef.current) containerRef.current.scrollTop = 0;
   }, []);
 
-  // Initialiser l'ordre des clips
+  // Sync clips
   useEffect(() => {
-    if (originalClips.length > 0) {
+    if (originalClips.length > 0 && orderedClips.length === 0) {
       setOrderedClips(originalClips);
+    } else if (originalClips.length > orderedClips.length) {
+      // Append new clips from pagination
+      setOrderedClips(prev => {
+        const existingIds = new Set(prev.map(c => c.id));
+        const news = originalClips.filter(c => !existingIds.has(c.id));
+        return [...prev, ...news];
+      });
     }
-  }, [originalClips]);
+  }, [originalClips, orderedClips.length]);
 
-  // Initialisation de l'index actif
+  // Initial scroll to active
   useEffect(() => {
     if (!isInitialized.current && orderedClips.length > 0) {
+      let index = 0;
       if (initialClipId) {
-        const index = orderedClips.findIndex((c) => c.id === initialClipId);
-        if (index !== -1) {
-          setActiveIndex(index);
-          onClipChange?.(orderedClips[index].id);
-        } else {
-          setActiveIndex(0);
-          onClipChange?.(orderedClips[0].id);
-        }
-      } else {
-        setActiveIndex(0);
-        onClipChange?.(orderedClips[0].id);
+        index = orderedClips.findIndex(c => c.id === initialClipId);
+        if (index === -1) index = 0;
+      }
+      
+      setActiveIndex(index);
+      if (containerRef.current) {
+        containerRef.current.scrollTop = index * window.innerHeight;
       }
       isInitialized.current = true;
     }
-  }, [orderedClips, initialClipId, onClipChange]);
+  }, [orderedClips, initialClipId]);
 
-  // Reset quand on change de clip
-  useEffect(() => {
-    if (!globalPaused) {
-      // Le player gère le reset
-    }
-  }, [activeIndex, globalPaused]);
-
-  const handleClipChange = useCallback((index: number) => {
-    if (orderedClips[index]) {
+  // Hook to handle intersection and update activeIndex
+  const handleIntersect = useCallback((index: number, isIntersecting: boolean) => {
+    if (isIntersecting) {
+      setActiveIndex(index);
       onClipChange?.(orderedClips[index].id);
-    }
-  }, [orderedClips, onClipChange]);
 
-  const goToNext = useCallback(() => {
-    if (isTransitioning || orderedClips.length === 0) return;
-
-    setIsTransitioning(true);
-    setTimeout(() => setIsTransitioning(false), 500);
-
-    if (activeIndex < orderedClips.length - 1) {
-      // Clip suivant normal
-      const newIndex = activeIndex + 1;
-      setActiveIndex(newIndex);
-      handleClipChange(newIndex);
-    } else if (hasNextPage && onFetchNextPage && !isFetchingNextPage) {
-      // Charger plus de clips
-      onFetchNextPage();
-    } else {
-      // Dernier clip atteint : shuffle et recommencer
-      const shuffled = shuffleArray(orderedClips);
-      setOrderedClips(shuffled);
-      setActiveIndex(0);
-      handleClipChange(0);
-    }
-  }, [
-    activeIndex,
-    orderedClips,
-    hasNextPage,
-    onFetchNextPage,
-    isFetchingNextPage,
-    isTransitioning,
-    shuffleArray,
-    handleClipChange
-  ]);
-
-  const goToPrev = useCallback(() => {
-    if (isTransitioning || orderedClips.length === 0) return;
-
-    setIsTransitioning(true);
-    setTimeout(() => setIsTransitioning(false), 500);
-
-    if (activeIndex > 0) {
-      const newIndex = activeIndex - 1;
-      setActiveIndex(newIndex);
-      handleClipChange(newIndex);
-    } else {
-      // Au début, on va à la fin (avec shuffle optionnel)
-      const newIndex = orderedClips.length - 1;
-      setActiveIndex(newIndex);
-      handleClipChange(newIndex);
-    }
-  }, [activeIndex, orderedClips.length, isTransitioning, handleClipChange]);
-
-  // Wheel navigation
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-
-    if (isTransitioning || globalPaused) return;
-
-    clearTimeout(wheelTimeout.current);
-    wheelTimeout.current = setTimeout(() => {
-      if (Math.abs(e.deltaY) < 10) return;
-
-      if (e.deltaY > 0) {
-        goToNext();
-      } else {
-        goToPrev();
-      }
-    }, 100);
-  }, [goToNext, goToPrev, isTransitioning, globalPaused]);
-
-  // Touch navigation
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartY.current = e.targetTouches[0].clientY;
-    touchStartX.current = e.targetTouches[0].clientX;
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const touchEndX = e.changedTouches[0].clientX;
-    const deltaY = touchStartY.current - touchEndY;
-    const deltaX = touchStartX.current - touchEndX;
-
-    if (isTransitioning || globalPaused) return;
-
-    // Navigation verticale (clips)
-    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 50) {
-      if (deltaY > 0) {
-        goToNext();
-      } else {
-        goToPrev();
+      // Load more if near end
+      if (index >= orderedClips.length - 2 && hasNextPage && !isFetchingNextPage) {
+        onFetchNextPage?.();
       }
     }
-    // Navigation horizontale (gérée par le player)
-  }, [goToNext, goToPrev, isTransitioning, globalPaused]);
+  }, [orderedClips, onClipChange, hasNextPage, isFetchingNextPage, onFetchNextPage]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (globalPaused) return;
-
+      if (areCommentsOpen) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        goToNext();
+        containerRef.current?.scrollBy({ top: window.innerHeight, behavior: "smooth" });
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        goToPrev();
+        containerRef.current?.scrollBy({ top: -window.innerHeight, behavior: "smooth" });
       } else if (e.key === "m" || e.key === "M") {
-        e.preventDefault();
-        setIsMuted((prev) => !prev);
+        setIsMuted(prev => !prev);
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToNext, goToPrev, globalPaused]);
+  }, [areCommentsOpen]);
 
-  const currentClip = orderedClips[activeIndex];
+  // Handle end of reel
+  const handleLastClipEnd = useCallback(() => {
+    if (!hasNextPage) {
+      // Shuffle and restart
+      shuffleAndSet(orderedClips);
+    }
+  }, [hasNextPage, orderedClips, shuffleAndSet]);
 
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "relative h-screen w-full overflow-hidden bg-black touch-pan-y",
-        className
-      )}
-      onWheel={handleWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Global Mute Toggle */}
+    <div className={cn("relative h-screen w-full bg-black overflow-hidden", className)}>
+      {/* Fixed UI Overlays */}
+      <div className="absolute top-6 left-6 z-50 flex items-center gap-4">
+        <button
+          onClick={() => router.back()}
+          className="bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all shadow-xl"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+      </div>
+
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsMuted(!isMuted);
-        }}
-        className="absolute top-6 right-6 z-50 bg-black/60 backdrop-blur-xl rounded-full p-4 text-white hover:bg-black/80 transition-all border border-white/20 md:top-20 shadow-2xl hover:scale-105"
+        onClick={() => setIsMuted(!isMuted)}
+        className="absolute top-6 right-6 z-50 bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all shadow-xl md:top-20"
       >
         {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
-      {/* Create Clip Button */}
-      {/* <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.5, type: "spring" }}
-        onClick={() => router.push("/game-clips?create=true")}
-        className="fixed bottom-8 right-8 z-50 bg-primary rounded-full p-4 shadow-2xl hover:scale-110 transition-all border-2 border-white/20"
-      >
-        <Plus className="h-6 w-6 text-white" />
-      </motion.button> */}
-
-      {/* Clips Container */}
+      {/* Reel Scroll Container */}
       <div
-        className="h-full w-full transition-transform duration-300 ease-out will-change-transform"
-        style={{ transform: `translateY(-${activeIndex * 100}%)` }}
+        ref={containerRef}
+        className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-none"
       >
         {orderedClips.map((clip, index) => (
-          <div key={clip.id} className="h-full w-full shrink-0 snap-start snap-always">
-            <GameClipPlayer
-              clip={clip}
-              isActive={index === activeIndex}
-              isMuted={isMuted}
-              onMuteToggle={() => setIsMuted(!isMuted)}
-              onAutoNext={goToNext}
-              onAutoPrev={goToPrev}
-              onCommentsToggle={onCommentsToggle}
-              isPaused={globalPaused}
-              hasMore={hasNextPage}
-            />
-          </div>
+          <ReelItem
+            key={clip.id}
+            clip={clip}
+            index={index}
+            isActive={index === activeIndex}
+            isMuted={isMuted}
+            isPaused={areCommentsOpen}
+            onAutoNext={() => {
+              if (index === orderedClips.length - 1) {
+                handleLastClipEnd();
+              } else {
+                containerRef.current?.scrollBy({ top: window.innerHeight, behavior: "smooth" });
+              }
+            }}
+            onAutoPrev={() => {
+              containerRef.current?.scrollBy({ top: -window.innerHeight, behavior: "smooth" });
+            }}
+            onIntersect={handleIntersect}
+            onCommentsToggle={onCommentsToggle}
+            onMuteToggle={() => setIsMuted(!isMuted)}
+            // Windowing: only render core player for active and neighbors
+            shouldRenderPlayer={index >= activeIndex - 1 && index <= activeIndex + 1}
+          />
         ))}
 
-        {/* Loading State */}
+        {/* Loading Indicator at end */}
         {hasNextPage && (
-          <div className="h-full w-full shrink-0 flex items-center justify-center bg-black/95 backdrop-blur-xl">
+          <div className="h-screen w-full flex items-center justify-center snap-start">
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <Typography variant="body-sm" className="text-white/50 font-medium">
-                Chargement du clip suivant...
-              </Typography>
+              <Typography variant="body-sm" className="text-white/50">Chargement...</Typography>
             </div>
           </div>
         )}
@@ -290,31 +184,94 @@ export function GameClipReel({
 
       {/* Empty State */}
       {!loading && orderedClips.length === 0 && (
-        <div className="h-full w-full flex flex-col items-center justify-center text-white p-6 text-center bg-gradient-to-b from-black/95 to-black/80">
-          <div className="mb-6 p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl">
-            <div className="text-6xl mb-4 animate-pulse">🎮</div>
-          </div>
-          <Typography variant="h3" className="text-2xl font-bold mb-3 tracking-tight">
-            Aucun clip à l'horizon
-          </Typography>
-          <Typography variant="body-base" className="text-white/50 max-w-sm mb-8">
-            Sois le premier à partager ton meilleur moment de jeu !
-          </Typography>
-          <button
-            onClick={() => router.push('/game-clips?create=true')}
-            className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-primary/20"
-          >
-            Créer un Clip
-          </button>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black p-6 text-center">
+           <Typography variant="h3" className="mb-4">Aucun clip pour le moment</Typography>
+           <button 
+             onClick={() => router.push("/game-clips?create=true")}
+             className="bg-primary px-8 py-3 rounded-full font-bold"
+           >
+             Créer un Clip
+           </button>
         </div>
       )}
 
-      {/* Loading Overlay */}
+      {/* Initial Loading Overlay */}
       {loading && orderedClips.length === 0 && (
-        <div className="absolute inset-0 z-[60] bg-black/95 backdrop-blur-xl flex items-center justify-center">
+        <div className="absolute inset-0 z-[60] bg-black flex items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       )}
     </div>
   );
 }
+
+interface ReelItemProps {
+  clip: GameClipCard;
+  index: number;
+  isActive: boolean;
+  isMuted: boolean;
+  isPaused: boolean;
+  onAutoNext: () => void;
+  onAutoPrev: () => void;
+  onIntersect: (index: number, isIntersecting: boolean) => void;
+  onCommentsToggle?: () => void;
+  onMuteToggle: () => void;
+  shouldRenderPlayer: boolean;
+}
+
+const ReelItem = memo(({ 
+  clip, 
+  index, 
+  isActive, 
+  isMuted, 
+  isPaused, 
+  onAutoNext, 
+  onAutoPrev, 
+  onIntersect,
+  onCommentsToggle,
+  onMuteToggle,
+  shouldRenderPlayer
+}: ReelItemProps) => {
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        onIntersect(index, entry.isIntersecting);
+      },
+      { threshold: 0.6 } // High threshold to ensure it's mostly centered
+    );
+
+    if (itemRef.current) observer.observe(itemRef.current);
+    return () => observer.disconnect();
+  }, [index, onIntersect]);
+
+  return (
+    <div
+      ref={itemRef}
+      className="h-screen w-full shrink-0 snap-start snap-always relative"
+    >
+      {shouldRenderPlayer ? (
+        <GameClipPlayer
+          clip={clip}
+          isActive={isActive}
+          isMuted={isMuted}
+          onMuteToggle={onMuteToggle}
+          onAutoNext={onAutoNext}
+          onAutoPrev={onAutoPrev}
+          onCommentsToggle={onCommentsToggle}
+          isPaused={isPaused}
+        />
+      ) : (
+        <div className="h-full w-full bg-black/40 animate-pulse flex items-center justify-center">
+            {clip.thumbnailUrl && (
+                <img src={clip.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-20" alt="" />
+            )}
+            <Loader2 className="h-8 w-8 animate-spin text-white/10" />
+        </div>
+      )}
+    </div>
+  );
+});
+
+ReelItem.displayName = "ReelItem";

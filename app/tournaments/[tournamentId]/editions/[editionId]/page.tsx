@@ -58,42 +58,7 @@ export default async function EditionPage({ params }: PageProps) {
   });
   const phases = phasesResponse.data || edition.phases;
 
-  let standings: any[] = [];
-
-  if (activePhase) {
-    const groupsRes = await getPhaseGroups({
-      filters: { phaseId: activePhase.id },
-      options: { sortBy: "order", sortOrder: "asc" },
-      pagination: { page: 1, limit: 100 },
-    });
-    const groups = groupsRes.data;
-    for (const g of groups) {
-      const participantsRes = await getPhaseGroupParticipants({
-        filters: { groupId: g.id },
-        options: { sortBy: "points", sortOrder: "desc" },
-        pagination: { page: 1, limit: 500 },
-      });
-      const rows = (participantsRes.data || []).map((p: any) => ({
-        registrationId: p.registrationId,
-        points: p.points ?? 0,
-        matchesPlayed: p.matchesPlayed ?? 0,
-        matchesWon: p.matchesWon ?? 0,
-        matchesDrawn: p.matchesDrawn ?? 0,
-        matchesLost: p.matchesLost ?? 0,
-        scoreFor: p.scoreFor ?? 0,
-        scoreAgainst: p.scoreAgainst ?? 0,
-        scoreDifference: (p.scoreFor ?? 0) - (p.scoreAgainst ?? 0),
-        position: p.position ?? undefined,
-        qualified: p.qualified ?? false,
-      }));
-
-      standings.push({
-        groupId: g.id,
-        groupName: g.name,
-        rows,
-      });
-    }
-  }
+  // Removed server-side standings load to use Client Component independent loading.
 
   // 2. Vérifier si l'utilisateur est organisateur
   const isOrganizer = !!(user && tournament.organizerId === user.id);
@@ -133,7 +98,7 @@ export default async function EditionPage({ params }: PageProps) {
         tournament={tournament}
         edition={edition}
         phases={phases || edition.phases}
-        standings={standings}
+        activePhaseId={activePhase?.id}
         currentUserMember={currentUserMember}
         currentUserRegistration={currentUserRegistration}
         isOrganizer={isOrganizer}

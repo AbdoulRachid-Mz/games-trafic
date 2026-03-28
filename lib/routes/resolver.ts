@@ -217,37 +217,17 @@ function determineLayout(
   routeConfig: RouteConfig,
   pathname: string,
 ): ResolvedRoute["layout"] {
+  // Si la config demande d'exclure le layout, on respecte aveuglément
   if (routeConfig.excludeLayout) {
-    // Pages d'authentification
-    if (
-      pathname.includes("/sign-") ||
-      pathname.includes("/auth/") ||
-      pathname.includes("/password") ||
-      pathname.includes("/verify-email")
-    ) {
-      return "none";
-    }
-    // Maintenance
-    if (pathname === "/maintenance") {
-      return "none";
-    }
-    // Admin
-    if (pathname.startsWith("/admin")) {
+    if (routeConfig.styleGroup === "admin" || pathname.startsWith("/admin")) {
       return "admin";
     }
-    // Dashboard
-    if (pathname.includes("/dashboard")) {
-      return "dashboard";
-    }
-    // Profil, wallet, chat
-    if (
-      pathname.startsWith("/profile") ||
-      pathname.startsWith("/wallet") ||
-      pathname.startsWith("/chats") ||
-      pathname.startsWith("/messages")
-    ) {
-      return "none";
-    }
+    return "none";
+  }
+
+  // Pour différencier les dashboards si besoin dans app-shell
+  if (routeConfig.styleGroup === "dashboard") {
+    return "dashboard";
   }
 
   return "public";
@@ -270,7 +250,7 @@ export function resolveRoute(
   const accessCheck = canAccessRouteOriginal(normalizedPath, userRoles);
 
   //3. showOnTap
-  const showOnTap =  true;
+  const showOnTap = true;
 
   // 3. Déterminer le layout
   const layout = determineLayout(routeConfig, normalizedPath);
@@ -304,7 +284,7 @@ export function resolveRoute(
     },
     breadcrumbs: routeConfig.breadcrumbs !== false,
     leftBar: {
-      enabled: routeConfig.leftBar !== false && layout === "public",
+      enabled: routeConfig.leftBar !== false,
       requireAuth: routeConfig.requireAuth || false,
     },
     rightBar: {
@@ -312,26 +292,24 @@ export function resolveRoute(
       requireAuth: routeConfig.requireAuth || false,
     },
     footer: {
-      enabled: routeConfig.footer !== false && layout === "public",
+      enabled: routeConfig.footer !== false,
     },
     floatingDock: {
       enabled:
         floatingDockLinks.length > 0 &&
-        layout === "public" &&
         !routeConfig.hideFloatingActions,
       links: floatingDockLinks,
     },
     fabActions: {
       enabled:
         fabActions.length > 0 &&
-        layout === "public" &&
         !routeConfig.hideFloatingActions,
       actions: fabActions,
     },
     activeFabActionId: routeConfig.activeFabActionId,
     showOnTap,
     aiAssistant: {
-      enabled: routeConfig.showAIAssistant !== false && layout === "public",
+      enabled: routeConfig.showAIAssistant !== false,
     },
     styleGroup: routeConfig.styleGroup,
   };

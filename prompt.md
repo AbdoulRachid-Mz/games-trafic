@@ -1,282 +1,245 @@
-🧠 PROMPT FINAL — REFONTE & CORRECTION MODULE TOURNOIS (PRO LEVEL)
-🎯 OBJECTIF GLOBAL
+🎯 OBJECTIF
 
-Refactorer, corriger et compléter le système de gestion des tournois (éditions, phases, groupes, brackets, matches) en respectant :
+Refactoriser et corriger entièrement la gestion des éditions de tournois, en respectant une logique réelle de compétition, avec :
 
-✅ L’architecture existante (NE PAS casser)
-✅ Les tables déjà définies (source of truth)
-✅ Les pages/components déjà en place
-✅ Ajouter uniquement ce qui manque + corriger les incohérences
-🧩 ÉTAPE 1 — AUDIT COMPLET (OBLIGATOIRE AVANT TOUT)
+Chargement correct des données
+Gestion des participants cohérente
+Génération intelligente (auto + manuelle)
+Progression automatique
+Bulk actions
+Standings dynamiques
+UX propre et réaliste
 
-Analyser TOUS les fichiers liés aux tournois :
+⚠️ IMPORTANT :
+Ne rien recréer inutilement → corriger, compléter, améliorer l’existant
 
-Backend / Data
-schema (déjà fourni)
-actions (CRUD + logique métier)
-queries / getters
-lib / utils
-Frontend
-hooks
-components
-pages (dashboard + public)
-forms
-tables
-stats-carousel
-⚠️ IMPORTANT
+1️⃣ 🔍 ANALYSE OBLIGATOIRE AVANT TOUT
 
-Ne rien coder avant d’avoir identifié :
+Analyser TOUS les fichiers liés :
 
-incohérences
-duplications
-logiques cassées
-manques
-🧠 ÉTAPE 2 — ARCHITECTURE DES HOOKS (NOUVELLE STRUCTURE)
+actions (server)
+hooks (tanstack)
+schema (drizzle)
+components (UI)
+pages (app router)
+utils / lib
 
-Créer des hooks modulaires par entité :
+👉 Identifier :
 
-1. Phases
-usePhaseManager(editionId)
-Inclut :
-createPhase (single / bulk)
-updatePhase
-deletePhase
-reorderPhase (⚠️ backend gère order)
-activatePhase
-Helpers :
-generatePhasesAuto(config)
-validatePhase()
-2. Groupes
-useGroupManager(phaseId)
-Inclut :
-createGroup (single / bulk)
-assignParticipants (auto / manual)
-removeParticipant
-generateGroupsAuto()
-Helpers :
-seedParticipantsRandom()
-seedParticipantsManual()
-3. Brackets
-useBracketManager({ phaseId, groupId })
-Inclut :
-generateBracket (AUTO / MANUAL)
-createNode
-deleteNode
-linkNodes
-Helpers :
-generateSingleElimination()
-generateDoubleElimination()
-detectConflicts()
-4. Matches
-useMatchManager(context)
-Inclut :
-createMatch (single / bulk)
-updateMatch
-deleteMatch
-bulkActions
-⚠️ CRITICAL
+incohérences de data fetching
+relations mal exploitées
+données non jointes (participants, matches, standings)
 
-Avant création :
+3️⃣ 📊 CORRECTION PAGE editionId (PUBLIC)
+❌ Problème actuel
+Données mal récupérées
+Tout dépend de la requête édition
+✅ Nouvelle règle
 
-checkDuplicateMatch(participant1, participant2)
+👉 CHAQUE TAB = FETCH INDÉPENDANT
 
-➡️ Si existe → afficher WARNING (pas bloquant)
-
-📊 ÉTAPE 3 — ENRICHISSEMENT DES GETTERS (STATS + CONTEXT)
-
-Chaque getById doit retourner :
-
-🎯 Edition
-total participants
-checked-in
-éliminés / actifs
+🧩 TAB MATCHES
+À faire :
+récupérer séparément
+pagination (20 par batch)
+afficher participants (plus de “À déterminer”)
+UI :
+Stats globales :
 total matches
-matches terminés / en cours
-progression réelle
-standings
-🎯 Phase
-nombre de groupes
-participants total
-matches stats
-completion %
-🎯 Groupe
-participants
-matches
-standings (points, diff, etc.)
-qualifiés
-🎯 Bracket
-rounds
-nodes
-matches liés
-progression
-🎯 Match
-statut détaillé
-participants
-historique
-validation
-🧱 ÉTAPE 4 — LOGIQUE DE GESTION PAR NIVEAU (ULTRA IMPORTANT)
-🧩 RÈGLE FONDAMENTALE
+terminés
+en cours
+afficher :
+👉 10 derniers matches
+bouton :
+👉 "Voir tous les matches"
+🧩 TAB STANDINGS (CLASSEMENT)
+❌ problème :
 
-👉 Chaque entité gère SES ENFANTS DIRECTS
+scores = 0
 
-🎮 Edition
+✅ solution :
 
-Pages :
+Recalcul backend basé sur matches :
 
-overview
-members
-phases
-standings
-Members page
+matchesPlayed
+wins
+losses
+draws
+points
+goalDiff
 
-2 listes :
+👉 basé sur :
 
-✅ membres de l’édition
-➕ membres du tournoi NON ajoutés
+score1 / score2
+winnerRegistrationId
+🧩 TAB GROUPES
+❌ problème :
 
+"Aucune phase configurée"
+
+✅ solution :
+fetch phases
+fetch groupes liés
+fetch matches liés
+
+👉 si matches existent → afficher structure automatiquement
+
+4️⃣ 🧑‍🤝‍🧑 DASHBOARD ÉDITION — PARTICIPANTS
+❌ problème
+liste incomplète
+✅ logique correcte
+Deux listes OBLIGATOIRES :
+1. Participants de l’édition
+2. Membres du tournoi NON dans l’édition
 Actions :
+➕ Ajouter
 
-ajouter à l’édition
-retirer de l’édition
-⚠️ CONTRAINTE RETRAIT
+(si membre ∉ édition)
 
-Avant suppression :
+➖ Retirer
 
-vérifier matches
-vérifier groupes
-vérifier bracket
+(si membre ∈ édition)
 
-➡️ sinon bloquer
+⚠️ Règle critique (SUPPRESSION)
 
-🧩 Phase
+Avant suppression vérifier :
 
-Gère :
+a des matches ?
+dans un groupe ?
+dans un bracket ?
 
-groupes uniquement
-👥 Groupe
-Participants page
+👉 si OUI → bloquer ou confirmer
 
-2 tabs :
+5️⃣ 🧩 BULK ACTIONS (PARTOUT)
 
-dans le groupe
-hors groupe (mais dans édition)
+À ajouter dans :
 
-Actions :
-
-add/remove
-⚔️ Bracket
-généré depuis participants du groupe
-AUTO ou MANUAL
-support :
-aller simple
-aller-retour
-🎯 Match
-lié à :
-phase
-group (optionnel)
-bracketNode (optionnel)
-⚙️ ÉTAPE 5 — BULK ACTIONS (OBLIGATOIRE)
-
-Créer un composant :
-
-<BulkActions />
-
-Supporte :
-
-création multiple
-suppression multiple
-update multiple
-
-Utilisé dans :
-
-matches
+participants
 groupes
 brackets
-⚠️ ÉTAPE 6 — CORRECTIONS CRITIQUES
-❌ Problèmes à corriger
-1. Doublons de matches
+matches
+Types :
+ajout multiple
+suppression multiple
+génération auto
+modification multiple
+6️⃣ 🎮 CRÉATION MATCH — VALIDATION STRICTE
+❌ problèmes :
+1 seul joueur
+duplication
+✅ règles :
+player1 ≠ player2
+match déjà existant → ALERTE
 
-✔️ Ajouter vérification + warning UI
+👉 vérifier :
 
-2. Mauvaise source participants
+participant1 === X && participant2 === Y
+OU
+participant1 === Y && participant2 === X
+7️⃣ ⚙️ GÉNÉRATION MATCHES (GROUP / BRACKET)
+📍 Page GroupId
+bouton "Générer matches"
 
-✔️ Toujours utiliser :
+➡️ ouvre un dialog
 
-EditionParticipants (registrations)
+config :
+nombre de nodes
+type :
+round robin
+elimination
+aller simple / aller-retour
 
-❌ jamais directement tournamentMembers
+👉 basé UNIQUEMENT sur :
+participants du groupe
 
-3. Order dans forms
+📍 Page BracketId
 
-✔️ supprimer des formulaires
-✔️ gérer uniquement backend
+➡️ générer matches depuis nodes
 
-4. Relations cassées
+8️⃣ 🧠 ORGANISATION COMPLÈTE (FEATURE MAJEURE)
+Nouvelle page :
 
-✔️ Vérifier cascade logique :
+👉 /edition/[id]/organize
 
-edition → phase → group → bracket → match
-🏆 ÉTAPE 7 — STANDINGS (IMPORTANT)
+Objectif :
 
-Ajouter standings :
+Créer TOUT en une seule fois :
 
-1. Edition (public page)
-classement global
-2. Groupe
-points
-wins/loss
-diff
-3. Bracket
-progression
-élimination
-🎨 ÉTAPE 8 — UI/UX (AMÉLIORATION)
-Stats
+étapes :
+créer phases
+créer groupes par phase
+assigner participants :
+tous
+qualifiés
+éliminés
+manuel
+créer brackets
+générer matches
+Résultat :
 
-Utiliser :
+👉 à la soumission :
 
-<StatsCarousel />
+génération automatique des matches (phase 1)
+structure complète prête
+9️⃣ 🔄 PROGRESSION AUTOMATIQUE
+À chaque fin de match :
+vérifier :
+joueur a fini tous ses matches ?
+est qualifié ?
+SI QUALIFIÉ :
 
-Pour :
+➡️ ajouter dans phase suivante
+
+SINON :
+
+➡️ éliminé
+
+🔟 📈 STANDINGS (PARTOUT)
+
+Ajouter :
 
 édition
-phase
 groupe
 bracket
-Actions
+calcul dynamique basé sur matches
+11️⃣ 🧩 PHASES — LOGIQUE AVANCÉE
+création multiple :
 
-Chaque entité doit avoir :
+ex:
 
-➕ Add
-✏️ Edit
-❌ Delete
-👁️ View details
-Pages détails
+👉 "Group Stage + Elimination"
 
-Chaque entité → page dédiée avec :
+➡️ crée :
 
-infos
-stats
-enfants
-🔐 ÉTAPE 9 — RÈGLES MÉTIER IMPORTANTES
-un participant = editionRegistration
-un groupe ⟶ contient uniquement participants de l’édition
-un match ⟶ appartient à :
-phase (obligatoire)
-group (optionnel)
-bracket (optionnel)
-🚀 LIVRABLE ATTENDU
+phase 1 (groupes)
+phase 2 (knockout)
+12️⃣ 📦 STRUCTURE HOOKS
 
-Le système doit permettre :
+Créer :
 
-✅ gérer une édition complète
-✅ ajouter/retirer participants proprement
-✅ générer groupes automatiquement
-✅ générer brackets intelligents
-✅ gérer matches (single + bulk)
-✅ afficher stats + standings partout
-✅ éviter incohérences
-on assure bien le responsive (surtout pour les mobile) avec le hook use-screen
+usePhaseManager
+useGroupManager
+useBracketManager
+avec :
+actions simples
+bulk actions
+génération auto
+génération manuelle
+13️⃣ 🎯 UX OBLIGATOIRE
 
-💡 BONUS (OPTIONNEL MAIS FORTEMENT RECOMMANDÉ)
-cache avec React Query / TanStack
-optimistic updates
+Dans CHAQUE PAGE :
+
+bouton :
+ajouter
+bulk
+générer auto
+stats-carousel utilisé partout
+✅ RÉSULTAT ATTENDU
+
+Un système :
+
+cohérent
+scalable
+réaliste (comme FIFA / esports)
+automatisé mais contrôlable
+sans incohérences de données

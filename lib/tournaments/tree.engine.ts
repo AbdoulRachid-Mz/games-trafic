@@ -4,7 +4,7 @@ export function propagateWinners(bracket: Bracket): Bracket {
   const nodes = [...bracket.nodes];
 
   nodes.forEach(node => {
-    if (!node.match?.winnerId || !node.nextNodeId) return;
+    if (!node.match?.winnerRegistrationId || !node.nextNodeId) return;
 
     const nextNode = nodes.find(n => n.id === node.nextNodeId);
     if (!nextNode?.match) return;

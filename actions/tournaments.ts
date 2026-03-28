@@ -87,13 +87,16 @@ import {
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { cacheTag, cacheLife } from 'next/cache';
-import { revalidateTag } from 'next/cache';
+import { cacheTag, cacheLife } from "next/cache";
+import { revalidateTag } from "next/cache";
 import {
-  type TournamentCard, type TournamentStats,
-  TOURNAMENT_CARD_COLUMNS, USER_MINI_COLUMNS, EDITION_SUMMARY_COLUMNS,
+  type TournamentCard,
+  type TournamentStats,
+  TOURNAMENT_CARD_COLUMNS,
+  USER_MINI_COLUMNS,
+  EDITION_SUMMARY_COLUMNS,
   PAGINATION_DEFAULTS,
-} from '@/types/view-models';
+} from "@/types/view-models";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -104,11 +107,11 @@ import {
 export async function getTournamentsWithEditions(
   limit: number = PAGINATION_DEFAULTS.FEED,
   sortBy: keyof Tournament = "createdAt",
-  sortOrder: "asc" | "desc" = "desc"
+  sortOrder: "asc" | "desc" = "desc",
 ): Promise<Tournament[]> {
-  'use cache';
-  cacheTag('tournaments');
-  cacheLife('minutes');
+  "use cache";
+  cacheTag("tournaments");
+  cacheLife("minutes");
   try {
     const order = sortOrder === "desc" ? desc : asc;
     const result = await db.query.tournaments.findMany({
@@ -131,21 +134,25 @@ export async function getTournamentsWithEditions(
  */
 export async function getTournamentById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<TournamentWithRelations | null> {
-  'use cache';
-  cacheTag(`tournament-${id}`, 'tournaments');
-  cacheLife('minutes');
+  "use cache";
+  cacheTag(`tournament-${id}`, "tournaments");
+  cacheLife("minutes");
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournaments.findFirst({
         where: (tournaments, { eq }) => eq(tournaments.id, id),
         with: {
-          organizer: options.populate.includes("organizer") ? { columns: USER_MINI_COLUMNS } : undefined,
+          organizer: options.populate.includes("organizer")
+            ? { columns: USER_MINI_COLUMNS }
+            : undefined,
           members: options.populate.includes("members") ? true : undefined,
-          editions: options.populate.includes("editions") ? {
-            columns: EDITION_SUMMARY_COLUMNS,
-          } : undefined,
+          editions: options.populate.includes("editions")
+            ? {
+                columns: EDITION_SUMMARY_COLUMNS,
+              }
+            : undefined,
           theme: options.populate.includes("theme") ? {} : undefined,
         },
       });
@@ -155,7 +162,7 @@ export async function getTournamentById(
       return {
         ...rest,
         theme: options.populate.includes("theme")
-          ? theme ?? undefined
+          ? (theme ?? undefined)
           : undefined,
       } as TournamentWithRelations;
     }
@@ -176,11 +183,11 @@ export async function getTournamentById(
  */
 export async function getTournamentEditionById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<TournamentEditionWithRelations | null> {
-  'use cache';
-  cacheTag(`tournament-edition-${id}`, 'tournaments');
-  cacheLife('minutes');
+  "use cache";
+  cacheTag(`tournament-edition-${id}`, "tournaments");
+  cacheLife("minutes");
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournamentEditions.findFirst({
@@ -214,11 +221,11 @@ export async function getTournamentEditionById(
  * Liste les tournois avec pagination, filtres et options
  */
 export async function getTournaments(
-  query: ListQuery<TournamentFilters> = {}
+  query: ListQuery<TournamentFilters> = {},
 ): Promise<PaginationResponse<Tournament>> {
-  'use cache';
-  cacheTag('tournaments');
-  cacheLife('minutes');
+  "use cache";
+  cacheTag("tournaments");
+  cacheLife("minutes");
   try {
     const {
       pagination = { page: 1, limit: PAGINATION_DEFAULTS.FEED },
@@ -227,7 +234,10 @@ export async function getTournaments(
     } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
-    const whereConditions = await buildTournamentWhereConditions(filters, options);
+    const whereConditions = await buildTournamentWhereConditions(
+      filters,
+      options,
+    );
 
     const [tournamentsData, totalResult] = await Promise.all([
       db.query.tournaments.findMany({
@@ -238,15 +248,16 @@ export async function getTournaments(
         orderBy: (tournaments, { desc, asc }) => {
           if (options.sortBy) {
             const sortField = options.sortBy as any;
-            return [options.sortOrder === 'desc' ? desc((tournaments as any)[sortField]) : asc((tournaments as any)[sortField])];
+            return [
+              options.sortOrder === "desc"
+                ? desc((tournaments as any)[sortField])
+                : asc((tournaments as any)[sortField]),
+            ];
           }
           return [desc(tournaments.createdAt)];
         },
       }),
-      db
-        .select({ count: count() })
-        .from(tournaments)
-        .where(whereConditions),
+      db.select({ count: count() }).from(tournaments).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
@@ -274,7 +285,7 @@ export async function getTournaments(
  */
 export async function isUserTournamentOrganizer(
   tournamentId: string,
-  userId: string
+  userId: string,
 ): Promise<boolean> {
   try {
     // 1. Vérifier si c'est le propriétaire
@@ -294,8 +305,8 @@ export async function isUserTournamentOrganizer(
           or(
             eq(tournamentMembers.role, "ORGANIZER"),
             eq(tournamentMembers.role, "CO_ORGANIZER"),
-            eq(tournamentMembers.isCoOrganizer, true)
-          )
+            eq(tournamentMembers.isCoOrganizer, true),
+          ),
         ),
     });
 
@@ -306,14 +317,13 @@ export async function isUserTournamentOrganizer(
   }
 }
 
-
 /**
  * Met à jour le rôle d'un membre du tournoi
  */
 export async function updateTournamentMemberRole(
   memberId: string,
   role: string,
-  isCoOrganizer: boolean
+  isCoOrganizer: boolean,
 ) {
   try {
     const result = await db
@@ -325,12 +335,14 @@ export async function updateTournamentMemberRole(
       })
       .where(eq(tournamentMembers.id, memberId))
       .returning();
-      
+
     if (result[0]?.tournamentId) {
-      revalidatePath(`/tournaments/${result[0].tournamentId}/dashboard/members`);
+      revalidatePath(
+        `/tournaments/${result[0].tournamentId}/dashboard/members`,
+      );
       revalidatePath(`/tournaments/${result[0].tournamentId}`);
     }
-    
+
     return { success: true };
   } catch (error) {
     console.error("Error updating member role:", error);
@@ -356,11 +368,11 @@ export async function deleteTournamentMember(memberId: string) {
  * Liste les éditions avec pagination, filtres et options
  */
 export async function getTournamentEditions(
-  query: ListQuery<TournamentEditionFilters> = {}
+  query: ListQuery<TournamentEditionFilters> = {},
 ): Promise<PaginationResponse<TournamentEdition>> {
-  'use cache';
-  cacheTag('tournaments');
-  cacheLife('minutes');
+  "use cache";
+  cacheTag("tournaments");
+  cacheLife("minutes");
   try {
     const {
       pagination = { page: 1, limit: 50 },
@@ -371,7 +383,7 @@ export async function getTournamentEditions(
 
     const whereConditions = buildTournamentEditionWhereConditions(
       filters,
-      options
+      options,
     );
 
     const editionsQuery = db
@@ -422,10 +434,12 @@ export async function getTournamentEditions(
 /**
  * Récupère les statistiques des tournois
  */
-export async function getTournamentStats(filters?: TournamentFilters): Promise<TournamentStats> {
-  'use cache';
-  cacheTag('tournaments', 'stats');
-  cacheLife('minutes');
+export async function getTournamentStats(
+  filters?: TournamentFilters,
+): Promise<TournamentStats> {
+  "use cache";
+  cacheTag("tournaments", "stats");
+  cacheLife("minutes");
   try {
     const whereConditions = buildTournamentWhereConditions(filters || {});
 
@@ -461,7 +475,7 @@ export async function getTournamentStats(filters?: TournamentFilters): Promise<T
         .select({ count: count() })
         .from(tournaments)
         .where(
-          and(await whereConditions, eq(tournaments.visibility, "PRIVATE"))
+          and(await whereConditions, eq(tournaments.visibility, "PRIVATE")),
         ),
     ]);
 
@@ -492,7 +506,7 @@ export async function getEditionDetailTree(
     bracketNodes?: BracketNodeFilters;
     matches?: MatchFilters;
   } = {},
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ): Promise<any | null> {
   try {
     const edition = await db.query.tournamentEditions.findFirst({
@@ -523,9 +537,16 @@ export async function getEditionDetailTree(
     const filterPhase = (p: any) => {
       const f = filters.phases || {};
       if (options.includeDeleted !== true && p.isDeleted) return false;
-      if (options.includeInactive !== true && p.isActive === false) return false;
-      if (f.phaseType && Array.isArray(f.phaseType) && !f.phaseType.includes(p.phaseType)) return false;
-      if (f.isCompleted !== undefined && p.isCompleted !== f.isCompleted) return false;
+      if (options.includeInactive !== true && p.isActive === false)
+        return false;
+      if (
+        f.phaseType &&
+        Array.isArray(f.phaseType) &&
+        !f.phaseType.includes(p.phaseType)
+      )
+        return false;
+      if (f.isCompleted !== undefined && p.isCompleted !== f.isCompleted)
+        return false;
       if (f.isHidden !== undefined && p.isHidden !== f.isHidden) return false;
       if (f.orderMin !== undefined && p.order < f.orderMin) return false;
       if (f.orderMax !== undefined && p.order > f.orderMax) return false;
@@ -535,8 +556,14 @@ export async function getEditionDetailTree(
     const filterGroup = (g: any) => {
       const f = filters.groups || {};
       if (options.includeDeleted !== true && g.isDeleted) return false;
-      if (f.groupType && Array.isArray(f.groupType) && !f.groupType.includes(g.groupType)) return false;
-      if (f.isCompleted !== undefined && g.isCompleted !== f.isCompleted) return false;
+      if (
+        f.groupType &&
+        Array.isArray(f.groupType) &&
+        !f.groupType.includes(g.groupType)
+      )
+        return false;
+      if (f.isCompleted !== undefined && g.isCompleted !== f.isCompleted)
+        return false;
       if (f.isLocked !== undefined && g.isLocked !== f.isLocked) return false;
       if (f.orderMin !== undefined && g.order < f.orderMin) return false;
       if (f.orderMax !== undefined && g.order > f.orderMax) return false;
@@ -546,11 +573,24 @@ export async function getEditionDetailTree(
     const filterNode = (n: any) => {
       const f = filters.bracketNodes || {};
       if (options.includeDeleted !== true && n.isDeleted) return false;
-      if (f.bracketType && Array.isArray(f.bracketType) && !f.bracketType.includes(n.bracketType)) return false;
+      if (
+        f.bracketType &&
+        Array.isArray(f.bracketType) &&
+        !f.bracketType.includes(n.bracketType)
+      )
+        return false;
       if (f.roundMin !== undefined && (n.round ?? 0) < f.roundMin) return false;
       if (f.roundMax !== undefined && (n.round ?? 0) > f.roundMax) return false;
-      if (f.matchNumberMin !== undefined && (n.matchNumber ?? 0) < f.matchNumberMin) return false;
-      if (f.matchNumberMax !== undefined && (n.matchNumber ?? 0) > f.matchNumberMax) return false;
+      if (
+        f.matchNumberMin !== undefined &&
+        (n.matchNumber ?? 0) < f.matchNumberMin
+      )
+        return false;
+      if (
+        f.matchNumberMax !== undefined &&
+        (n.matchNumber ?? 0) > f.matchNumberMax
+      )
+        return false;
       if (f.depthMin !== undefined && (n.depth ?? 0) < f.depthMin) return false;
       if (f.depthMax !== undefined && (n.depth ?? 0) > f.depthMax) return false;
       return true;
@@ -559,7 +599,12 @@ export async function getEditionDetailTree(
     const filterMatch = (m: any) => {
       const f = filters.matches || {};
       if (options.includeDeleted !== true && m.isDeleted) return false;
-      if (f.statuses && Array.isArray(f.statuses) && !f.statuses.includes(m.status)) return false;
+      if (
+        f.statuses &&
+        Array.isArray(f.statuses) &&
+        !f.statuses.includes(m.status)
+      )
+        return false;
       if (f.matchType) {
         if (Array.isArray(f.matchType)) {
           if (!f.matchType.includes(m.matchType)) return false;
@@ -604,7 +649,7 @@ export async function getEditionDetailTree(
  * Crée un nouveau tournoi
  */
 export async function createTournament(
-  tournamentData: NewTournament
+  tournamentData: NewTournament,
 ): Promise<Tournament> {
   try {
     if (
@@ -634,7 +679,7 @@ export async function createTournament(
       })
       .returning();
 
-    revalidateTag('tournaments', 'max');
+    revalidateTag("tournaments", "max");
     return result[0];
   } catch (error) {
     console.error("Error creating tournament:", error);
@@ -649,7 +694,7 @@ export async function createTournament(
  * Crée une nouvelle édition de tournoi
  */
 export async function createTournamentEdition(
-  editionData: NewTournamentEdition
+  editionData: NewTournamentEdition,
 ): Promise<TournamentEdition> {
   try {
     if (
@@ -666,8 +711,8 @@ export async function createTournamentEdition(
         .insert(financialAccounts)
         .values({
           ownerEditionId: undefined, // Will link after edition is created
-          type: 'TOURNAMENT_POOL',
-          currency: editionData.prizeCurrency || 'GTC',
+          type: "TOURNAMENT_POOL",
+          currency: editionData.prizeCurrency || "GTC",
           isActive: true,
           createdAt: new Date(),
         })
@@ -706,7 +751,7 @@ export async function createTournamentEdition(
  */
 export async function updateTournament(
   id: string,
-  tournamentData: Partial<NewTournament>
+  tournamentData: Partial<NewTournament>,
 ): Promise<Tournament> {
   try {
     const existingTournament = await getTournamentById(id);
@@ -737,8 +782,8 @@ export async function updateTournament(
       .where(eq(tournaments.id, id))
       .returning();
 
-    revalidateTag('tournaments', 'max');
-    revalidateTag(`tournament-${id}`, 'max');
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-${id}`, "max");
     return result[0];
   } catch (error) {
     console.error("Error updating tournament:", error);
@@ -754,7 +799,7 @@ export async function updateTournament(
  */
 export async function updateTournamentEdition(
   id: string,
-  editionData: Partial<NewTournamentEdition>
+  editionData: Partial<NewTournamentEdition>,
 ): Promise<TournamentEdition> {
   try {
     const existingEdition = await getTournamentEditionById(id);
@@ -771,8 +816,8 @@ export async function updateTournamentEdition(
       .where(eq(tournamentEditions.id, id))
       .returning();
 
-    revalidateTag('tournaments', 'max');
-    revalidateTag(`tournament-edition-${id}`, 'max');
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-edition-${id}`, "max");
     return result[0];
   } catch (error) {
     console.error("Error updating tournament edition:", error);
@@ -801,8 +846,8 @@ export async function deleteTournament(id: string): Promise<Tournament> {
     if (result.length === 0) {
       throw new Error("Tournament not found");
     }
-    revalidateTag('tournaments', 'max');
-    revalidateTag(`tournament-${id}`, 'max');
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-${id}`, "max");
     return result[0];
   } catch (error) {
     console.error("Error deleting tournament:", error);
@@ -817,7 +862,7 @@ export async function deleteTournament(id: string): Promise<Tournament> {
  * Supprime une édition de tournoi (soft delete)
  */
 export async function deleteTournamentEdition(
-  id: string
+  id: string,
 ): Promise<TournamentEdition> {
   try {
     const result = await db
@@ -833,8 +878,8 @@ export async function deleteTournamentEdition(
     if (result.length === 0) {
       throw new Error("Tournament edition not found");
     }
-    revalidateTag('tournaments', 'max');
-    revalidateTag(`tournament-edition-${id}`, 'max');
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-edition-${id}`, "max");
     return result[0];
   } catch (error) {
     console.error("Error deleting tournament edition:", error);
@@ -877,7 +922,7 @@ export async function restoreTournament(id: string): Promise<Tournament> {
  * Restaure une édition de tournoi supprimée
  */
 export async function restoreTournamentEdition(
-  id: string
+  id: string,
 ): Promise<TournamentEdition> {
   try {
     const result = await db
@@ -914,7 +959,7 @@ export async function restoreTournamentEdition(
  * Ajoute un membre à un tournoi
  */
 export async function addTournamentMember(
-  memberData: NewTournamentMember
+  memberData: NewTournamentMember,
 ): Promise<TournamentMember> {
   try {
     if (!memberData.tournamentId) {
@@ -932,14 +977,14 @@ export async function addTournamentMember(
     // Check by Contact Email if provided (important for Guests)
     if (memberData.contactEmail) {
       conditions.push(
-        eq(tournamentMembers.contactEmail, memberData.contactEmail)
+        eq(tournamentMembers.contactEmail, memberData.contactEmail),
       );
     }
 
     // Check by Contact Phone if provided
     if (memberData.contactPhone) {
       conditions.push(
-        eq(tournamentMembers.contactPhone, memberData.contactPhone)
+        eq(tournamentMembers.contactPhone, memberData.contactPhone),
       );
     }
 
@@ -952,15 +997,15 @@ export async function addTournamentMember(
         .where(
           and(
             eq(tournamentMembers.tournamentId, memberData.tournamentId),
-            or(...conditions)
-          )
+            or(...conditions),
+          ),
         )
         .limit(1);
 
       if (existingMember.length > 0) {
         // We can be specific about why it failed if we want, but a generic message is safer
         throw new Error(
-          "Member already exists in this tournament (same User, Email, or Phone)"
+          "Member already exists in this tournament (same User, Email, or Phone)",
         );
       }
     }
@@ -1004,7 +1049,7 @@ export async function addTournamentMember(
       throw error;
     }
     throw new Error(
-      "Failed to add tournament member: " + (error.message || "Unknown error")
+      "Failed to add tournament member: " + (error.message || "Unknown error"),
     );
   }
 }
@@ -1014,7 +1059,7 @@ export async function addTournamentMember(
  */
 export async function updateTournamentMember(
   id: string,
-  memberData: Partial<NewTournamentMember>
+  memberData: Partial<NewTournamentMember>,
 ): Promise<TournamentMember> {
   try {
     const result = await db
@@ -1034,7 +1079,9 @@ export async function updateTournamentMember(
       // Import can just be at top but we already have it in the file now
       try {
         const { revalidatePath } = require("next/cache");
-        revalidatePath(`/tournaments/${result[0].tournamentId}/dashboard/members`);
+        revalidatePath(
+          `/tournaments/${result[0].tournamentId}/dashboard/members`,
+        );
         revalidatePath(`/tournaments/${result[0].tournamentId}`);
       } catch (e) {
         console.error("Revalidation failed", e);
@@ -1055,7 +1102,7 @@ export async function updateTournamentMember(
  * Liste les membres d'un tournoi
  */
 export async function getTournamentMembers(
-  query: ListQuery<TournamentMemberFilters> = {}
+  query: ListQuery<TournamentMemberFilters> = {},
 ): Promise<PaginationResponse<TournamentMember>> {
   try {
     const {
@@ -1067,7 +1114,7 @@ export async function getTournamentMembers(
 
     const whereConditions = buildTournamentMemberWhereConditions(
       filters,
-      options
+      options,
     );
 
     const membersQuery = db
@@ -1123,7 +1170,7 @@ export async function getTournamentMembers(
  * Crée une phase de tournoi
  */
 export async function createTournamentPhase(
-  phaseData: NewTournamentPhase
+  phaseData: NewTournamentPhase,
 ): Promise<TournamentPhase> {
   try {
     if (
@@ -1157,7 +1204,7 @@ export async function createTournamentPhase(
  * Liste les phases d'un tournoi
  */
 export async function getTournamentPhases(
-  query: ListQuery<TournamentPhaseFilters> = {}
+  query: ListQuery<TournamentPhaseFilters> = {},
 ): Promise<PaginationResponse<TournamentPhase>> {
   try {
     const {
@@ -1169,7 +1216,7 @@ export async function getTournamentPhases(
 
     const whereConditions = buildTournamentPhaseWhereConditions(
       filters,
-      options
+      options,
     );
 
     const phasesQuery = db
@@ -1218,7 +1265,7 @@ export async function getTournamentPhases(
  * Crée un groupe de phase
  */
 export async function createPhaseGroup(
-  groupData: NewPhaseGroup
+  groupData: NewPhaseGroup,
 ): Promise<PhaseGroup> {
   try {
     if (
@@ -1252,7 +1299,7 @@ export async function createPhaseGroup(
  * Liste les groupes de phase
  */
 export async function getPhaseGroups(
-  query: ListQuery<PhaseGroupFilters> = {}
+  query: ListQuery<PhaseGroupFilters> = {},
 ): Promise<PaginationResponse<PhaseGroup>> {
   try {
     const {
@@ -1317,7 +1364,7 @@ export async function getPhaseGroups(
  * Ajoute un participant à un groupe de phase
  */
 export async function addPhaseGroupParticipant(
-  participantData: NewPhaseGroupParticipant
+  participantData: NewPhaseGroupParticipant,
 ): Promise<PhaseGroupParticipant> {
   try {
     if (!participantData.groupId || !participantData.registrationId) {
@@ -1332,9 +1379,9 @@ export async function addPhaseGroupParticipant(
           eq(phaseGroupParticipants.groupId, participantData.groupId),
           eq(
             phaseGroupParticipants.registrationId,
-            participantData.registrationId
-          )
-        )
+            participantData.registrationId,
+          ),
+        ),
       )
       .limit(1);
 
@@ -1366,7 +1413,7 @@ export async function addPhaseGroupParticipant(
  */
 export async function updatePhaseGroupParticipant(
   id: string,
-  participantData: Partial<NewPhaseGroupParticipant>
+  participantData: Partial<NewPhaseGroupParticipant>,
 ): Promise<PhaseGroupParticipant> {
   try {
     const result = await db
@@ -1395,7 +1442,7 @@ export async function updatePhaseGroupParticipant(
  * Liste les participants de groupe de phase
  */
 export async function getPhaseGroupParticipants(
-  query: ListQuery<PhaseGroupParticipantFilters> = {}
+  query: ListQuery<PhaseGroupParticipantFilters> = {},
 ): Promise<PaginationResponse<PhaseGroupParticipant>> {
   try {
     const {
@@ -1407,7 +1454,7 @@ export async function getPhaseGroupParticipants(
 
     const whereConditions = buildPhaseGroupParticipantWhereConditions(
       filters,
-      options
+      options,
     );
 
     const participantsQuery = db
@@ -1463,7 +1510,7 @@ export async function getPhaseGroupParticipants(
  * Crée un nœud de bracket
  */
 export async function createBracketNode(
-  nodeData: NewBracketNode
+  nodeData: NewBracketNode,
 ): Promise<BracketNode> {
   try {
     if (!nodeData.phaseId) {
@@ -1494,7 +1541,7 @@ export async function createBracketNode(
  */
 export async function updateBracketNode(
   id: string,
-  nodeData: Partial<NewBracketNode>
+  nodeData: Partial<NewBracketNode>,
 ): Promise<BracketNode> {
   try {
     const result = await db
@@ -1523,7 +1570,7 @@ export async function updateBracketNode(
  * Liste les nœuds de bracket
  */
 export async function getBracketNodes(
-  query: ListQuery<BracketNodeFilters> = {}
+  query: ListQuery<BracketNodeFilters> = {},
 ): Promise<PaginationResponse<BracketNode>> {
   try {
     const {
@@ -1580,6 +1627,134 @@ export async function getBracketNodes(
   }
 }
 
+/**
+ * Avance automatiquement le gagnant dans l'arbre d'élimination (Bracket)
+ */
+export async function handleMatchProgression(match: Match) {
+  try {
+    if (!match.bracketNodeId || !match.winnerRegistrationId) return;
+
+    // 1. Get current node to find its parent
+    const currentNode = await db.query.bracketNodes.findFirst({
+      where: eq(bracketNodes.id, match.bracketNodeId),
+    });
+
+    if (!currentNode?.parentNodeId) return; // Finale ou pas de suite
+
+    // 2. Get parent node
+    const parentNode = await db.query.bracketNodes.findFirst({
+      where: eq(bracketNodes.id, currentNode.parentNodeId),
+    });
+
+    if (!parentNode) return;
+
+    // 3. Find the match associated with the parent node
+    const nextMatch = await db.query.matches.findFirst({
+      where: eq(matches.bracketNodeId, parentNode.id),
+    });
+
+    if (!nextMatch) return;
+
+    // 4. Determine slot in next match
+    const matchUpdateData: any = {};
+
+    // Logic: fill first empty slot
+    if (!nextMatch.participant1RegistrationId) {
+      matchUpdateData.participant1RegistrationId = match.winnerRegistrationId;
+    } else if (!nextMatch.participant2RegistrationId) {
+      matchUpdateData.participant2RegistrationId = match.winnerRegistrationId;
+    } else {
+      // Slot already occupied (maybe a manual correction was made)
+      return;
+    }
+
+    await db
+      .update(matches)
+      .set(matchUpdateData)
+      .where(eq(matches.id, nextMatch.id));
+  } catch (error) {
+    console.error("Match Progression failed:", error);
+  }
+}
+
+/**
+ * Met à jour les statistiques agrégées d'un participant pour toute l'édition.
+ */
+export async function updateEditionResultForParticipant(
+  registrationId: string,
+  editionId: string,
+) {
+  try {
+    // 1. Get all completed matches for this participant in this edition
+    const participantMatches = await db.query.matches.findMany({
+      where: and(
+        eq(matches.editionId, editionId),
+        eq(matches.status, "COMPLETED"),
+        or(
+          eq(matches.participant1RegistrationId, registrationId),
+          eq(matches.participant2RegistrationId, registrationId)
+        )
+      )
+    });
+
+    let wins = 0;
+    let losses = 0;
+    let draws = 0;
+    let scoreFor = 0;
+    let scoreAgainst = 0;
+
+    for (const m of participantMatches) {
+      const isP1 = m.participant1RegistrationId === registrationId;
+      const myScore = isP1 ? (m.score1 || 0) : (m.score2 || 0);
+      const oppScore = isP1 ? (m.score2 || 0) : (m.score1 || 0);
+
+      scoreFor += myScore;
+      scoreAgainst += oppScore;
+
+      if (m.winnerRegistrationId === registrationId) {
+        wins++;
+      } else if (m.winnerRegistrationId && m.winnerRegistrationId !== registrationId) {
+        losses++;
+      } else if (m.status === "COMPLETED" && m.score1 === m.score2) {
+        draws++;
+      }
+    }
+
+    // 2. Upsert edition_results
+    const existing = await db.query.editionResults.findFirst({
+      where: and(
+        eq(editionResults.editionId, editionId),
+        eq(editionResults.registrationId, registrationId)
+      )
+    });
+
+    const resultData = {
+      editionId,
+      registrationId,
+      matchesPlayed: participantMatches.length,
+      matchesWon: wins,
+      matchesLost: losses,
+      matchesDrawn: draws,
+      totalScore: scoreFor,
+      updatedAt: new Date(),
+      position: existing?.position || 0, // Keep existing position or 0
+    };
+
+    if (existing) {
+      await db.update(editionResults)
+        .set(resultData)
+        .where(eq(editionResults.id, existing.id));
+    } else {
+      await db.insert(editionResults).values({
+        ...resultData,
+        createdAt: new Date(),
+      });
+    }
+  } catch (error) {
+    console.error("Error updating edition result:", error);
+  }
+}
+
 // ============================================================================
 // MATCHES
 // ============================================================================
@@ -1596,6 +1771,58 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
       matchData.matchNumber === undefined
     ) {
       throw new Error("editionId, phaseId, round and matchNumber are required");
+    }
+
+    if (
+      matchData.participant1RegistrationId &&
+      matchData.participant2RegistrationId &&
+      matchData.participant1RegistrationId ===
+        matchData.participant2RegistrationId
+    ) {
+      throw new Error("Un participant ne peut pas jouer contre lui-même");
+    }
+
+    // Duplicate Check
+    if (
+      matchData.participant1RegistrationId &&
+      matchData.participant2RegistrationId
+    ) {
+      const p1 = matchData.participant1RegistrationId;
+      const p2 = matchData.participant2RegistrationId;
+
+      const filterConditions = [
+        eq(matches.editionId, matchData.editionId),
+        eq(matches.phaseId, matchData.phaseId),
+      ];
+
+      if (matchData.groupId)
+        filterConditions.push(eq(matches.groupId, matchData.groupId));
+      if (matchData.bracketNodeId)
+        filterConditions.push(
+          eq(matches.bracketNodeId, matchData.bracketNodeId),
+        );
+
+      const existingMatch = await db.query.matches.findFirst({
+        where: and(
+          ...filterConditions,
+          or(
+            and(
+              eq(matches.participant1RegistrationId, p1),
+              eq(matches.participant2RegistrationId, p2),
+            ),
+            and(
+              eq(matches.participant1RegistrationId, p2),
+              eq(matches.participant2RegistrationId, p1),
+            ),
+          ),
+        ),
+      });
+
+      if (existingMatch) {
+        throw new Error(
+          "Ce match existe déjà pour ces deux participants dans cette phase/groupe.",
+        );
+      }
     }
 
     const result = await db
@@ -1627,7 +1854,7 @@ export async function submitMatchResult(
   score1: number,
   score2: number,
   submittedByUserId: string,
-  proofUrl?: string
+  proofUrl?: string,
 ): Promise<Match> {
   try {
     const match = await db.query.matches.findFirst({
@@ -1645,8 +1872,18 @@ export async function submitMatchResult(
     };
 
     // Determine status and confirmations
-    const isParticipant1 = match.participant1RegistrationId && await isUserRegistered(submittedByUserId, match.participant1RegistrationId);
-    const isParticipant2 = match.participant2RegistrationId && await isUserRegistered(submittedByUserId, match.participant2RegistrationId);
+    const isParticipant1 =
+      match.participant1RegistrationId &&
+      (await isUserRegistered(
+        submittedByUserId,
+        match.participant1RegistrationId,
+      ));
+    const isParticipant2 =
+      match.participant2RegistrationId &&
+      (await isUserRegistered(
+        submittedByUserId,
+        match.participant2RegistrationId,
+      ));
 
     if (isParticipant1) {
       updateData.confirmedByParticipant1 = true;
@@ -1677,7 +1914,7 @@ export async function submitMatchResult(
  */
 export async function confirmMatchResult(
   id: string,
-  registrationId: string
+  registrationId: string,
 ): Promise<Match> {
   try {
     const match = await db.query.matches.findFirst({
@@ -1699,8 +1936,10 @@ export async function confirmMatchResult(
     }
 
     // If both confirmed, move to awaiting admin
-    if ((updateData.confirmedByParticipant1 || match.confirmedByParticipant1) &&
-      (updateData.confirmedByParticipant2 || match.confirmedByParticipant2)) {
+    if (
+      (updateData.confirmedByParticipant1 || match.confirmedByParticipant1) &&
+      (updateData.confirmedByParticipant2 || match.confirmedByParticipant2)
+    ) {
       updateData.status = "AWAITING_ADMIN_CONFIRMATION";
     }
 
@@ -1723,7 +1962,7 @@ export async function confirmMatchResult(
 export async function adminConfirmMatchResult(
   id: string,
   score1?: number,
-  score2?: number
+  score2?: number,
 ): Promise<Match> {
   try {
     const match = await db.query.matches.findFirst({
@@ -1767,6 +2006,19 @@ export async function adminConfirmMatchResult(
       await recalculateGroupStandings(updatedMatch.groupId);
     }
 
+    // Trigger auto-progression if it's a bracket match
+    if (updatedMatch.bracketNodeId && updatedMatch.winnerRegistrationId) {
+      await handleMatchProgression(updatedMatch as any);
+    }
+
+    // Sync cumulative edition results for both participants
+    if (updatedMatch.participant1RegistrationId) {
+        await updateEditionResultForParticipant(updatedMatch.participant1RegistrationId, updatedMatch.editionId);
+    }
+    if (updatedMatch.participant2RegistrationId) {
+        await updateEditionResultForParticipant(updatedMatch.participant2RegistrationId, updatedMatch.editionId);
+    }
+
     return updatedMatch;
   } catch (error) {
     console.error("Error admin confirming match result:", error);
@@ -1777,12 +2029,15 @@ export async function adminConfirmMatchResult(
 /**
  * Helper to check if a user is linked to a registration
  */
-async function isUserRegistered(userId: string, registrationId: string): Promise<boolean> {
+async function isUserRegistered(
+  userId: string,
+  registrationId: string,
+): Promise<boolean> {
   const reg = await db.query.editionRegistrations.findFirst({
     where: eq(editionRegistrations.id, registrationId),
     with: {
       member: true,
-    }
+    },
   });
   return reg?.member?.userId === userId;
 }
@@ -1795,7 +2050,7 @@ export async function updateMatchResult(
   score1: number,
   score2: number,
   winnerRegistrationId: string,
-  submittedByUserId: string
+  submittedByUserId: string,
 ): Promise<Match> {
   return adminConfirmMatchResult(id, score1, score2);
 }
@@ -1804,7 +2059,7 @@ export async function updateMatchResult(
  * Liste les matches avec filtres
  */
 export async function getMatches(
-  query: ListQuery<MatchFilters> = {}
+  query: ListQuery<MatchFilters> = {},
 ): Promise<PaginationResponse<Match>> {
   try {
     const {
@@ -1823,7 +2078,9 @@ export async function getMatches(
       orderBy: (matches, { asc, desc }) => {
         if (options.sortBy) {
           const sortField = options.sortBy as keyof Match;
-          return options.sortOrder === "desc" ? [desc(matches[sortField])] : [asc(matches[sortField])];
+          return options.sortOrder === "desc"
+            ? [desc(matches[sortField])]
+            : [asc(matches[sortField])];
         }
         return [desc(matches.createdAt)];
       },
@@ -1884,7 +2141,7 @@ export async function getMatches(
  * Crée une inscription à une édition
  */
 export async function createEditionRegistration(
-  registrationData: NewEditionRegistration
+  registrationData: NewEditionRegistration,
 ): Promise<EditionRegistration> {
   try {
     if (!registrationData.editionId || !registrationData.memberId) {
@@ -1897,8 +2154,8 @@ export async function createEditionRegistration(
       .where(
         and(
           eq(editionRegistrations.editionId, registrationData.editionId),
-          eq(editionRegistrations.memberId, registrationData.memberId)
-        )
+          eq(editionRegistrations.memberId, registrationData.memberId),
+        ),
       )
       .limit(1);
 
@@ -1930,7 +2187,7 @@ export async function createEditionRegistration(
  */
 export async function updateEditionRegistration(
   id: string,
-  registrationData: Partial<NewEditionRegistration>
+  registrationData: Partial<NewEditionRegistration>,
 ): Promise<EditionRegistration> {
   try {
     const result = await db
@@ -1946,7 +2203,10 @@ export async function updateEditionRegistration(
       throw new Error("Edition registration not found");
     }
 
-    revalidatePath(`/tournaments/[tournamentId]/editions/[editionId]/dashboard/participants`, 'page');
+    revalidatePath(
+      `/tournaments/[tournamentId]/editions/[editionId]/dashboard/participants`,
+      "page",
+    );
     return result[0];
   } catch (error) {
     console.error("Error updating edition registration:", error);
@@ -1961,7 +2221,7 @@ export async function updateEditionRegistration(
  * Liste les inscriptions à une édition avec support des relations
  */
 export async function getEditionRegistrations(
-  query: ListQuery<EditionRegistrationFilters> = {}
+  query: ListQuery<EditionRegistrationFilters> = {},
 ): Promise<PaginationResponse<any>> {
   try {
     const {
@@ -1973,7 +2233,7 @@ export async function getEditionRegistrations(
 
     const whereConditions = buildEditionRegistrationWhereConditions(
       filters,
-      options
+      options,
     );
 
     // If we have populates, we use the relational query API
@@ -1985,51 +2245,51 @@ export async function getEditionRegistrations(
         with: {
           member: options.populate.includes("member")
             ? {
-              with: {
-                user:
-                  options.populate.includes("member.user") ||
+                with: {
+                  user:
+                    options.populate.includes("member.user") ||
                     options.populate.includes("user")
-                    ? true
-                    : undefined,
-                team:
-                  options.populate.includes("member.team") ||
+                      ? true
+                      : undefined,
+                  team:
+                    options.populate.includes("member.team") ||
                     options.populate.includes("team")
-                    ? true
-                    : undefined,
-              },
-            }
+                      ? true
+                      : undefined,
+                },
+              }
             : undefined,
           payment:
             options.populate.includes("payment") ||
-              options.populate.includes("payments")
+            options.populate.includes("payments")
               ? {
-                with: {
-                  transaction: options.populate.includes(
-                    "payment.transaction"
-                  )
-                    ? true
-                    : undefined,
-                },
-              }
+                  with: {
+                    transaction: options.populate.includes(
+                      "payment.transaction",
+                    )
+                      ? true
+                      : undefined,
+                  },
+                }
               : undefined,
           edition: options.populate.includes("edition") ? true : undefined,
         },
         orderBy: options.sortBy
           ? options.sortOrder === "desc"
             ? [
-              desc(
-                editionRegistrations[
-                options.sortBy as keyof EditionRegistration
-                ]
-              ),
-            ]
+                desc(
+                  editionRegistrations[
+                    options.sortBy as keyof EditionRegistration
+                  ],
+                ),
+              ]
             : [
-              asc(
-                editionRegistrations[
-                options.sortBy as keyof EditionRegistration
-                ]
-              ),
-            ]
+                asc(
+                  editionRegistrations[
+                    options.sortBy as keyof EditionRegistration
+                  ],
+                ),
+              ]
           : [desc(editionRegistrations.registeredAt)],
       });
 
@@ -2100,6 +2360,75 @@ export async function getEditionRegistrations(
   }
 }
 
+/**
+ * Récupère les membres d'un tournoi qui ne sont PAS inscrits à l'édition donnée.
+ */
+export async function getTournamentMembersNotInEdition(
+  tournamentId: string,
+  editionId: string,
+  query: ListQuery<{}> = {},
+) {
+  try {
+    const { pagination = { page: 1, limit: 50 }, options = {} } = query;
+    const offset = (pagination.page - 1) * pagination.limit;
+
+    // Fetch members of the tournament
+    const membersQuery = db
+      .select({
+        member: tournamentMembers,
+        user: users,
+        team: teams,
+      })
+      .from(tournamentMembers)
+      .leftJoin(users, eq(tournamentMembers.userId, users.id))
+      .leftJoin(teams, eq(tournamentMembers.teamId, teams.id))
+      .where(eq(tournamentMembers.tournamentId, tournamentId));
+
+    // Fetch existing registrations for the edition
+    const registrationsQuery = db
+      .select({ memberId: editionRegistrations.memberId })
+      .from(editionRegistrations)
+      .where(eq(editionRegistrations.editionId, editionId));
+
+    const [membersData, registrationsData] = await Promise.all([
+      membersQuery,
+      registrationsQuery,
+    ]);
+
+    const registeredMemberIds = new Set(
+      registrationsData.map((r) => r.memberId),
+    );
+
+    // Filter members not registered
+    const unregisteredMembers = membersData.filter(
+      (m) => !registeredMemberIds.has(m.member.id),
+    );
+
+    // Manual Pagination (since we filtered in memory)
+    const total = unregisteredMembers.length;
+    const totalPages = Math.ceil(total / pagination.limit);
+    const paginatedMembers = unregisteredMembers.slice(
+      offset,
+      offset + pagination.limit,
+    );
+
+    return {
+      data: paginatedMembers,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages,
+        hasNext: pagination.page < totalPages,
+        hasPrev: pagination.page > 1,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting unregistered members:", error);
+    throw new Error("Failed to fetch unregistered members");
+  }
+}
+
 // ============================================================================
 // REGISTRATION PAYMENTS
 // ============================================================================
@@ -2108,7 +2437,7 @@ export async function getEditionRegistrations(
  * Crée un paiement d'inscription
  */
 export async function createRegistrationPayment(
-  paymentData: NewRegistrationPayment
+  paymentData: NewRegistrationPayment,
 ): Promise<RegistrationPayment> {
   try {
     if (!paymentData.registrationId || !paymentData.transactionId) {
@@ -2134,13 +2463,12 @@ export async function createRegistrationPayment(
   }
 }
 
-
 /**
  * Met à jour un paiement d'inscription
  */
 export async function updateRegistrationPayment(
   id: string,
-  paymentData: Partial<NewRegistrationPayment>
+  paymentData: Partial<NewRegistrationPayment>,
 ): Promise<RegistrationPayment> {
   try {
     const result = await db
@@ -2169,7 +2497,7 @@ export async function updateRegistrationPayment(
  * Liste les paiements d'inscription avec support des relations
  */
 export async function getRegistrationPayments(
-  query: ListQuery<RegistrationPaymentFilters> = {}
+  query: ListQuery<RegistrationPaymentFilters> = {},
 ): Promise<PaginationResponse<any>> {
   try {
     const {
@@ -2181,7 +2509,7 @@ export async function getRegistrationPayments(
 
     const whereConditions = buildRegistrationPaymentWhereConditions(
       filters,
-      options
+      options,
     );
 
     // If we have populates, we use the relational query API
@@ -2193,27 +2521,27 @@ export async function getRegistrationPayments(
         with: {
           registration: options.populate.includes("registration")
             ? {
-              with: {
-                member:
-                  options.populate.includes("registration.member") ||
+                with: {
+                  member:
+                    options.populate.includes("registration.member") ||
                     options.populate.includes("member")
-                    ? {
-                      with: {
-                        user:
-                          options.populate.includes("member.user") ||
-                            options.populate.includes("user")
-                            ? true
-                            : undefined,
-                      },
-                    }
-                    : undefined,
-                edition:
-                  options.populate.includes("registration.edition") ||
+                      ? {
+                          with: {
+                            user:
+                              options.populate.includes("member.user") ||
+                              options.populate.includes("user")
+                                ? true
+                                : undefined,
+                          },
+                        }
+                      : undefined,
+                  edition:
+                    options.populate.includes("registration.edition") ||
                     options.populate.includes("edition")
-                    ? true
-                    : undefined,
-              },
-            }
+                      ? true
+                      : undefined,
+                },
+              }
             : undefined,
           transaction: options.populate.includes("transaction")
             ? true
@@ -2222,19 +2550,19 @@ export async function getRegistrationPayments(
         orderBy: options.sortBy
           ? options.sortOrder === "desc"
             ? [
-              desc(
-                registrationPayments[
-                options.sortBy as keyof RegistrationPayment
-                ]
-              ),
-            ]
+                desc(
+                  registrationPayments[
+                    options.sortBy as keyof RegistrationPayment
+                  ],
+                ),
+              ]
             : [
-              asc(
-                registrationPayments[
-                options.sortBy as keyof RegistrationPayment
-                ]
-              ),
-            ]
+                asc(
+                  registrationPayments[
+                    options.sortBy as keyof RegistrationPayment
+                  ],
+                ),
+              ]
           : [desc(registrationPayments.paidAt)],
       });
 
@@ -2312,7 +2640,7 @@ export async function getRegistrationPayments(
  * Crée un résultat d'édition
  */
 export async function createEditionResult(
-  resultData: NewEditionResult
+  resultData: NewEditionResult,
 ): Promise<EditionResult> {
   try {
     if (
@@ -2329,8 +2657,8 @@ export async function createEditionResult(
       .where(
         and(
           eq(editionResults.editionId, resultData.editionId),
-          eq(editionResults.registrationId, resultData.registrationId)
-        )
+          eq(editionResults.registrationId, resultData.registrationId),
+        ),
       )
       .limit(1);
 
@@ -2362,7 +2690,7 @@ export async function createEditionResult(
  */
 export async function updateEditionResult(
   id: string,
-  resultData: Partial<NewEditionResult>
+  resultData: Partial<NewEditionResult>,
 ): Promise<EditionResult> {
   try {
     const result = await db
@@ -2391,7 +2719,7 @@ export async function updateEditionResult(
  * Liste les résultats d'édition
  */
 export async function getEditionResults(
-  query: ListQuery<EditionResultFilters> = {}
+  query: ListQuery<EditionResultFilters> = {},
 ): Promise<PaginationResponse<EditionResult>> {
   try {
     const {
@@ -2458,7 +2786,7 @@ export async function getEditionResults(
 
 export async function buildTournamentWhereConditions(
   filters: TournamentFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -2486,7 +2814,7 @@ export async function buildTournamentWhereConditions(
     conditions.push(eq(tournaments.visibility, filters.visibility));
   if (filters.requiresAccessCode !== undefined) {
     conditions.push(
-      eq(tournaments.requiresAccessCode, filters.requiresAccessCode)
+      eq(tournaments.requiresAccessCode, filters.requiresAccessCode),
     );
   }
   if (filters.themeId)
@@ -2496,36 +2824,36 @@ export async function buildTournamentWhereConditions(
     conditions.push(
       gte(
         tournaments.maxParticipantsPerEdition,
-        filters.maxParticipantsPerEditionMin
-      )
+        filters.maxParticipantsPerEditionMin,
+      ),
     );
   }
   if (filters.maxParticipantsPerEditionMax !== undefined) {
     conditions.push(
       lte(
         tournaments.maxParticipantsPerEdition,
-        filters.maxParticipantsPerEditionMax
-      )
+        filters.maxParticipantsPerEditionMax,
+      ),
     );
   }
   if (filters.totalParticipantsMin !== undefined) {
     conditions.push(
-      gte(tournaments.totalParticipants, filters.totalParticipantsMin)
+      gte(tournaments.totalParticipants, filters.totalParticipantsMin),
     );
   }
   if (filters.totalParticipantsMax !== undefined) {
     conditions.push(
-      lte(tournaments.totalParticipants, filters.totalParticipantsMax)
+      lte(tournaments.totalParticipants, filters.totalParticipantsMax),
     );
   }
   if (filters.totalPrizePoolMin !== undefined) {
     conditions.push(
-      gte(tournaments.totalPrizePool, String(filters.totalPrizePoolMin))
+      gte(tournaments.totalPrizePool, String(filters.totalPrizePoolMin)),
     );
   }
   if (filters.totalPrizePoolMax !== undefined) {
     conditions.push(
-      lte(tournaments.totalPrizePool, String(filters.totalPrizePoolMax))
+      lte(tournaments.totalPrizePool, String(filters.totalPrizePoolMax)),
     );
   }
   if (filters.viewCountMin !== undefined) {
@@ -2550,7 +2878,7 @@ export async function buildTournamentWhereConditions(
  */
 function buildTournamentEditionWhereConditions(
   filters: TournamentEditionFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -2573,65 +2901,65 @@ function buildTournamentEditionWhereConditions(
   }
   if (filters.entryFeeMin !== undefined) {
     conditions.push(
-      gte(tournamentEditions.entryFee, String(filters.entryFeeMin))
+      gte(tournamentEditions.entryFee, String(filters.entryFeeMin)),
     );
   }
   if (filters.entryFeeMax !== undefined) {
     conditions.push(
-      lte(tournamentEditions.entryFee, String(filters.entryFeeMax))
+      lte(tournamentEditions.entryFee, String(filters.entryFeeMax)),
     );
   }
   if (filters.locationType) {
     if (Array.isArray(filters.locationType)) {
       conditions.push(
-        inArray(tournamentEditions.locationType, filters.locationType)
+        inArray(tournamentEditions.locationType, filters.locationType),
       );
     } else {
       conditions.push(
-        eq(tournamentEditions.locationType, filters.locationType)
+        eq(tournamentEditions.locationType, filters.locationType),
       );
     }
   }
 
   if (filters.maxParticipantsMin !== undefined) {
     conditions.push(
-      gte(tournamentEditions.maxParticipants, filters.maxParticipantsMin)
+      gte(tournamentEditions.maxParticipants, filters.maxParticipantsMin),
     );
   }
   if (filters.maxParticipantsMax !== undefined) {
     conditions.push(
-      lte(tournamentEditions.maxParticipants, filters.maxParticipantsMax)
+      lte(tournamentEditions.maxParticipants, filters.maxParticipantsMax),
     );
   }
   if (filters.currentParticipantsMin !== undefined) {
     conditions.push(
       gte(
         tournamentEditions.currentParticipants,
-        filters.currentParticipantsMin
-      )
+        filters.currentParticipantsMin,
+      ),
     );
   }
   if (filters.currentParticipantsMax !== undefined) {
     conditions.push(
       lte(
         tournamentEditions.currentParticipants,
-        filters.currentParticipantsMax
-      )
+        filters.currentParticipantsMax,
+      ),
     );
   }
   if (filters.onlyAvailable === true) {
     conditions.push(
-      sql`${tournamentEditions.currentParticipants} < ${tournamentEditions.maxParticipants}`
+      sql`${tournamentEditions.currentParticipants} < ${tournamentEditions.maxParticipants}`,
     );
   }
   if (filters.prizePoolMin !== undefined) {
     conditions.push(
-      gte(tournamentEditions.prizePool, String(filters.prizePoolMin))
+      gte(tournamentEditions.prizePool, String(filters.prizePoolMin)),
     );
   }
   if (filters.prizePoolMax !== undefined) {
     conditions.push(
-      lte(tournamentEditions.prizePool, String(filters.prizePoolMax))
+      lte(tournamentEditions.prizePool, String(filters.prizePoolMax)),
     );
   }
   if (filters.viewCountMin !== undefined) {
@@ -2643,64 +2971,64 @@ function buildTournamentEditionWhereConditions(
 
   if (filters.startDateFrom) {
     conditions.push(
-      gte(tournamentEditions.startDate, new Date(filters.startDateFrom))
+      gte(tournamentEditions.startDate, new Date(filters.startDateFrom)),
     );
   }
   if (filters.startDateTo) {
     conditions.push(
-      lte(tournamentEditions.startDate, new Date(filters.startDateTo))
+      lte(tournamentEditions.startDate, new Date(filters.startDateTo)),
     );
   }
   if (filters.endDateFrom) {
     conditions.push(
-      gte(tournamentEditions.endDate, new Date(filters.endDateFrom))
+      gte(tournamentEditions.endDate, new Date(filters.endDateFrom)),
     );
   }
   if (filters.endDateTo) {
     conditions.push(
-      lte(tournamentEditions.endDate, new Date(filters.endDateTo))
+      lte(tournamentEditions.endDate, new Date(filters.endDateTo)),
     );
   }
   if (filters.registrationOpensFrom) {
     conditions.push(
       gte(
         tournamentEditions.registrationOpens,
-        new Date(filters.registrationOpensFrom)
-      )
+        new Date(filters.registrationOpensFrom),
+      ),
     );
   }
   if (filters.registrationOpensTo) {
     conditions.push(
       lte(
         tournamentEditions.registrationOpens,
-        new Date(filters.registrationOpensTo)
-      )
+        new Date(filters.registrationOpensTo),
+      ),
     );
   }
   if (filters.registrationDeadlineFrom) {
     conditions.push(
       gte(
         tournamentEditions.registrationDeadline,
-        new Date(filters.registrationDeadlineFrom)
-      )
+        new Date(filters.registrationDeadlineFrom),
+      ),
     );
   }
   if (filters.registrationDeadlineTo) {
     conditions.push(
       lte(
         tournamentEditions.registrationDeadline,
-        new Date(filters.registrationDeadlineTo)
-      )
+        new Date(filters.registrationDeadlineTo),
+      ),
     );
   }
   if (filters.createdFrom) {
     conditions.push(
-      gte(tournamentEditions.createdAt, new Date(filters.createdFrom))
+      gte(tournamentEditions.createdAt, new Date(filters.createdFrom)),
     );
   }
   if (filters.createdTo) {
     conditions.push(
-      lte(tournamentEditions.createdAt, new Date(filters.createdTo))
+      lte(tournamentEditions.createdAt, new Date(filters.createdTo)),
     );
   }
 
@@ -2712,7 +3040,7 @@ function buildTournamentEditionWhereConditions(
  */
 function buildTournamentMemberWhereConditions(
   filters: TournamentMemberFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -2746,30 +3074,30 @@ function buildTournamentMemberWhereConditions(
   if (filters.verificationLevel) {
     if (Array.isArray(filters.verificationLevel)) {
       conditions.push(
-        inArray(tournamentMembers.verificationLevel, filters.verificationLevel)
+        inArray(tournamentMembers.verificationLevel, filters.verificationLevel),
       );
     } else {
       conditions.push(
-        eq(tournamentMembers.verificationLevel, filters.verificationLevel)
+        eq(tournamentMembers.verificationLevel, filters.verificationLevel),
       );
     }
   }
   if (filters.statuses && filters.statuses.length > 0) {
     // Map string statuses to boolean values expected by isActive column
     const statusBooleans = filters.statuses.map(
-      (status) => status === "active"
+      (status) => status === "active",
     );
     conditions.push(inArray(tournamentMembers.isActive, statusBooleans));
   }
 
   if (filters.rankingPointsMin !== undefined) {
     conditions.push(
-      gte(tournamentMembers.rankingPoints, filters.rankingPointsMin)
+      gte(tournamentMembers.rankingPoints, filters.rankingPointsMin),
     );
   }
   if (filters.rankingPointsMax !== undefined) {
     conditions.push(
-      lte(tournamentMembers.rankingPoints, filters.rankingPointsMax)
+      lte(tournamentMembers.rankingPoints, filters.rankingPointsMax),
     );
   }
   if (filters.totalWinsMin !== undefined) {
@@ -2793,22 +3121,22 @@ function buildTournamentMemberWhereConditions(
 
   if (filters.joinedFrom) {
     conditions.push(
-      gte(tournamentMembers.joinedAt, new Date(filters.joinedFrom))
+      gte(tournamentMembers.joinedAt, new Date(filters.joinedFrom)),
     );
   }
   if (filters.joinedTo) {
     conditions.push(
-      lte(tournamentMembers.joinedAt, new Date(filters.joinedTo))
+      lte(tournamentMembers.joinedAt, new Date(filters.joinedTo)),
     );
   }
   if (filters.lastActiveFrom) {
     conditions.push(
-      gte(tournamentMembers.lastActive, new Date(filters.lastActiveFrom))
+      gte(tournamentMembers.lastActive, new Date(filters.lastActiveFrom)),
     );
   }
   if (filters.lastActiveTo) {
     conditions.push(
-      lte(tournamentMembers.lastActive, new Date(filters.lastActiveTo))
+      lte(tournamentMembers.lastActive, new Date(filters.lastActiveTo)),
     );
   }
 
@@ -2817,8 +3145,8 @@ function buildTournamentMemberWhereConditions(
       or(
         ilike(tournamentMembers.displayName, `%${filters.search}%`),
         ilike(tournamentMembers.gameTag, `%${filters.search}%`),
-        ilike(tournamentMembers.contactEmail, `%${filters.search}%`)
-      )
+        ilike(tournamentMembers.contactEmail, `%${filters.search}%`),
+      ),
     );
   }
 
@@ -2830,7 +3158,7 @@ function buildTournamentMemberWhereConditions(
  */
 function buildTournamentPhaseWhereConditions(
   filters: TournamentPhaseFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -2857,7 +3185,7 @@ function buildTournamentPhaseWhereConditions(
   }
   if (filters.isDoubleElimination !== undefined) {
     conditions.push(
-      eq(tournamentPhases.isDoubleElimination, filters.isDoubleElimination)
+      eq(tournamentPhases.isDoubleElimination, filters.isDoubleElimination),
     );
   }
   if (filters.isHidden !== undefined) {
@@ -2873,22 +3201,25 @@ function buildTournamentPhaseWhereConditions(
 
   if (filters.scheduledStartFrom) {
     conditions.push(
-      gte(tournamentPhases.scheduledStart, new Date(filters.scheduledStartFrom))
+      gte(
+        tournamentPhases.scheduledStart,
+        new Date(filters.scheduledStartFrom),
+      ),
     );
   }
   if (filters.scheduledStartTo) {
     conditions.push(
-      lte(tournamentPhases.scheduledStart, new Date(filters.scheduledStartTo))
+      lte(tournamentPhases.scheduledStart, new Date(filters.scheduledStartTo)),
     );
   }
   if (filters.scheduledEndFrom) {
     conditions.push(
-      gte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndFrom))
+      gte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndFrom)),
     );
   }
   if (filters.scheduledEndTo) {
     conditions.push(
-      lte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndTo))
+      lte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndTo)),
     );
   }
 
@@ -2900,7 +3231,7 @@ function buildTournamentPhaseWhereConditions(
  */
 function buildPhaseGroupWhereConditions(
   filters: PhaseGroupFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -2935,12 +3266,12 @@ function buildPhaseGroupWhereConditions(
   }
   if (filters.participantCountMin !== undefined) {
     conditions.push(
-      gte(phaseGroups.participantCount, filters.participantCountMin)
+      gte(phaseGroups.participantCount, filters.participantCountMin),
     );
   }
   if (filters.participantCountMax !== undefined) {
     conditions.push(
-      lte(phaseGroups.participantCount, filters.participantCountMax)
+      lte(phaseGroups.participantCount, filters.participantCountMax),
     );
   }
   if (filters.matchCountMin !== undefined) {
@@ -2958,7 +3289,7 @@ function buildPhaseGroupWhereConditions(
  */
 function buildPhaseGroupParticipantWhereConditions(
   filters: PhaseGroupParticipantFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -2967,7 +3298,7 @@ function buildPhaseGroupParticipantWhereConditions(
     conditions.push(eq(phaseGroupParticipants.groupId, filters.groupId));
   if (filters.registrationId)
     conditions.push(
-      eq(phaseGroupParticipants.registrationId, filters.registrationId)
+      eq(phaseGroupParticipants.registrationId, filters.registrationId),
     );
   if (filters.isSeeded !== undefined) {
     conditions.push(eq(phaseGroupParticipants.isSeeded, filters.isSeeded));
@@ -2978,22 +3309,22 @@ function buildPhaseGroupParticipantWhereConditions(
 
   if (filters.matchesPlayedMin !== undefined) {
     conditions.push(
-      gte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMin)
+      gte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMin),
     );
   }
   if (filters.matchesPlayedMax !== undefined) {
     conditions.push(
-      lte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMax)
+      lte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMax),
     );
   }
   if (filters.matchesWonMin !== undefined) {
     conditions.push(
-      gte(phaseGroupParticipants.matchesWon, filters.matchesWonMin)
+      gte(phaseGroupParticipants.matchesWon, filters.matchesWonMin),
     );
   }
   if (filters.matchesWonMax !== undefined) {
     conditions.push(
-      lte(phaseGroupParticipants.matchesWon, filters.matchesWonMax)
+      lte(phaseGroupParticipants.matchesWon, filters.matchesWonMax),
     );
   }
   if (filters.pointsMin !== undefined) {
@@ -3017,7 +3348,7 @@ function buildPhaseGroupParticipantWhereConditions(
  */
 function buildBracketNodeWhereConditions(
   filters: BracketNodeFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -3051,7 +3382,7 @@ function buildBracketNodeWhereConditions(
   if (filters.childPosition) {
     if (Array.isArray(filters.childPosition)) {
       conditions.push(
-        inArray(bracketNodes.childPosition, filters.childPosition)
+        inArray(bracketNodes.childPosition, filters.childPosition),
       );
     } else {
       conditions.push(eq(bracketNodes.childPosition, filters.childPosition));
@@ -3085,7 +3416,7 @@ function buildBracketNodeWhereConditions(
  */
 function buildMatchWhereConditions(
   filters: MatchFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -3104,15 +3435,21 @@ function buildMatchWhereConditions(
     conditions.push(eq(matches.matchCode, filters.matchCode));
   if (filters.participant1RegistrationId)
     conditions.push(
-      eq(matches.participant1RegistrationId, filters.participant1RegistrationId)
+      eq(
+        matches.participant1RegistrationId,
+        filters.participant1RegistrationId,
+      ),
     );
   if (filters.participant2RegistrationId)
     conditions.push(
-      eq(matches.participant2RegistrationId, filters.participant2RegistrationId)
+      eq(
+        matches.participant2RegistrationId,
+        filters.participant2RegistrationId,
+      ),
     );
   if (filters.winnerRegistrationId)
     conditions.push(
-      eq(matches.winnerRegistrationId, filters.winnerRegistrationId)
+      eq(matches.winnerRegistrationId, filters.winnerRegistrationId),
     );
   if (filters.submittedByUserId)
     conditions.push(eq(matches.submittedByUserId, filters.submittedByUserId));
@@ -3154,12 +3491,12 @@ function buildMatchWhereConditions(
 
   if (filters.scheduledTimeFrom) {
     conditions.push(
-      gte(matches.scheduledTime, new Date(filters.scheduledTimeFrom))
+      gte(matches.scheduledTime, new Date(filters.scheduledTimeFrom)),
     );
   }
   if (filters.scheduledTimeTo) {
     conditions.push(
-      lte(matches.scheduledTime, new Date(filters.scheduledTimeTo))
+      lte(matches.scheduledTime, new Date(filters.scheduledTimeTo)),
     );
   }
   if (filters.createdFrom) {
@@ -3177,7 +3514,7 @@ function buildMatchWhereConditions(
  */
 function buildEditionRegistrationWhereConditions(
   filters: EditionRegistrationFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -3193,11 +3530,14 @@ function buildEditionRegistrationWhereConditions(
   if (filters.registrationType) {
     if (Array.isArray(filters.registrationType)) {
       conditions.push(
-        inArray(editionRegistrations.registrationType, filters.registrationType)
+        inArray(
+          editionRegistrations.registrationType,
+          filters.registrationType,
+        ),
       );
     } else {
       conditions.push(
-        eq(editionRegistrations.registrationType, filters.registrationType)
+        eq(editionRegistrations.registrationType, filters.registrationType),
       );
     }
   }
@@ -3223,8 +3563,8 @@ function buildEditionRegistrationWhereConditions(
     conditions.push(
       eq(
         editionRegistrations.qualifiedFromPrevious,
-        filters.qualifiedFromPrevious
-      )
+        filters.qualifiedFromPrevious,
+      ),
     );
   }
 
@@ -3232,37 +3572,37 @@ function buildEditionRegistrationWhereConditions(
     conditions.push(
       gte(
         editionRegistrations.registrationFee,
-        String(filters.registrationFeeMin)
-      )
+        String(filters.registrationFeeMin),
+      ),
     );
   }
   if (filters.registrationFeeMax !== undefined) {
     conditions.push(
       lte(
         editionRegistrations.registrationFee,
-        String(filters.registrationFeeMax)
-      )
+        String(filters.registrationFeeMax),
+      ),
     );
   }
 
   if (filters.registeredFrom) {
     conditions.push(
-      gte(editionRegistrations.registeredAt, new Date(filters.registeredFrom))
+      gte(editionRegistrations.registeredAt, new Date(filters.registeredFrom)),
     );
   }
   if (filters.registeredTo) {
     conditions.push(
-      lte(editionRegistrations.registeredAt, new Date(filters.registeredTo))
+      lte(editionRegistrations.registeredAt, new Date(filters.registeredTo)),
     );
   }
   if (filters.checkedInFrom) {
     conditions.push(
-      gte(editionRegistrations.checkedInAt, new Date(filters.checkedInFrom))
+      gte(editionRegistrations.checkedInAt, new Date(filters.checkedInFrom)),
     );
   }
   if (filters.checkedInTo) {
     conditions.push(
-      lte(editionRegistrations.checkedInAt, new Date(filters.checkedInTo))
+      lte(editionRegistrations.checkedInAt, new Date(filters.checkedInTo)),
     );
   }
 
@@ -3274,38 +3614,38 @@ function buildEditionRegistrationWhereConditions(
  */
 function buildRegistrationPaymentWhereConditions(
   filters: RegistrationPaymentFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
   if (filters.id) conditions.push(eq(registrationPayments.id, filters.id));
   if (filters.registrationId)
     conditions.push(
-      eq(registrationPayments.registrationId, filters.registrationId)
+      eq(registrationPayments.registrationId, filters.registrationId),
     );
   if (filters.transactionId)
     conditions.push(
-      eq(registrationPayments.transactionId, filters.transactionId)
+      eq(registrationPayments.transactionId, filters.transactionId),
     );
   if (filters.paymentMethod) {
     if (Array.isArray(filters.paymentMethod)) {
       conditions.push(
-        inArray(registrationPayments.paymentMethod, filters.paymentMethod)
+        inArray(registrationPayments.paymentMethod, filters.paymentMethod),
       );
     } else {
       conditions.push(
-        eq(registrationPayments.paymentMethod, filters.paymentMethod)
+        eq(registrationPayments.paymentMethod, filters.paymentMethod),
       );
     }
   }
   if (filters.paymentProvider) {
     if (Array.isArray(filters.paymentProvider)) {
       conditions.push(
-        inArray(registrationPayments.paymentProvider, filters.paymentProvider)
+        inArray(registrationPayments.paymentProvider, filters.paymentProvider),
       );
     } else {
       conditions.push(
-        eq(registrationPayments.paymentProvider, filters.paymentProvider)
+        eq(registrationPayments.paymentProvider, filters.paymentProvider),
       );
     }
   }
@@ -3319,18 +3659,18 @@ function buildRegistrationPaymentWhereConditions(
 
   if (filters.amountMin !== undefined) {
     conditions.push(
-      gte(registrationPayments.amount, String(filters.amountMin))
+      gte(registrationPayments.amount, String(filters.amountMin)),
     );
   }
   if (filters.amountMax !== undefined) {
     conditions.push(
-      lte(registrationPayments.amount, String(filters.amountMax))
+      lte(registrationPayments.amount, String(filters.amountMax)),
     );
   }
 
   if (filters.paidFrom) {
     conditions.push(
-      gte(registrationPayments.paidAt, new Date(filters.paidFrom))
+      gte(registrationPayments.paidAt, new Date(filters.paidFrom)),
     );
   }
   if (filters.paidTo) {
@@ -3345,7 +3685,7 @@ function buildRegistrationPaymentWhereConditions(
  */
 function buildEditionResultWhereConditions(
   filters: EditionResultFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -3378,22 +3718,22 @@ function buildEditionResultWhereConditions(
   }
   if (filters.prizeAmountMin !== undefined) {
     conditions.push(
-      gte(editionResults.prizeAmount, String(filters.prizeAmountMin))
+      gte(editionResults.prizeAmount, String(filters.prizeAmountMin)),
     );
   }
   if (filters.prizeAmountMax !== undefined) {
     conditions.push(
-      lte(editionResults.prizeAmount, String(filters.prizeAmountMax))
+      lte(editionResults.prizeAmount, String(filters.prizeAmountMax)),
     );
   }
   if (filters.matchesPlayedMin !== undefined) {
     conditions.push(
-      gte(editionResults.matchesPlayed, filters.matchesPlayedMin)
+      gte(editionResults.matchesPlayed, filters.matchesPlayedMin),
     );
   }
   if (filters.matchesPlayedMax !== undefined) {
     conditions.push(
-      lte(editionResults.matchesPlayed, filters.matchesPlayedMax)
+      lte(editionResults.matchesPlayed, filters.matchesPlayedMax),
     );
   }
   if (filters.matchesWonMin !== undefined) {

@@ -60,17 +60,17 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
   // Fetch Matches
   const { data: matchesResPhase, isLoading: isLoadingPhaseMatches } = useMatchesByPhase(
     selectedPhaseId !== "all" ? selectedPhaseId : "",
-    selectedPhaseId !== "all" && selectedGroupId === "all"
+    selectedPhaseId !== "all" && selectedGroupId === "all" ? "true" : "false"
   );
 
   const { data: matchesResGroup, isLoading: isLoadingGroupMatches } = useMatchesByGroup(
     selectedGroupId !== "all" ? selectedGroupId : "",
-    selectedGroupId !== "all"
+    selectedGroupId !== "all" ? "true" : "false"
   );
 
   const matches = useMemo(() => {
-    if (selectedGroupId !== "all") return matchesResGroup?.data || [];
-    if (selectedPhaseId !== "all") return matchesResPhase?.data || [];
+    if (selectedGroupId !== "all") return matchesResGroup || [];
+    if (selectedPhaseId !== "all") return matchesResPhase || [];
     return [];
   }, [selectedPhaseId, selectedGroupId, matchesResPhase, matchesResGroup]);
 
@@ -90,7 +90,7 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
     <div className="space-y-6 container p-4 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Typography variant="h3" weight="bold">Calendrier des matchs</Typography>
-        
+
         <div className="flex items-center gap-3">
           <Select
             value={selectedPhaseId}

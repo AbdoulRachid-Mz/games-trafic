@@ -16,9 +16,10 @@ export interface Match {
   id: string;
   playerA?: Participant | null;
   playerB?: Participant | null;
-  scoreA?: number | null;
-  scoreB?: number | null;
-  winnerId?: string | null;
+  score1?: number | null;
+  score2?: number | null;
+  winnerRegistrationId?: string | null;
+  loserRegistrationId?: string | null;
   round: number;
   bracketNodeId?: string;
 }

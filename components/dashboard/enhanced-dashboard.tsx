@@ -482,11 +482,11 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
           )} />
         </div>
         {state === "expanded" && (
-          <div className="animate-in slide-in-from-left-2 duration-300">
+          <div className="animate-in slide-in-from-left-2 duration-300 min-w-0 flex-1">
             <Typography
               variant="h4"
               weight="bold"
-              className={getTextColor()}
+              className={cn("truncate", getTextColor())}
             >
               {title}
             </Typography>
@@ -494,6 +494,7 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
               <Typography
                 variant="caption1"
                 className={cn(
+                  "truncate",
                   (sidebarBgType === "gradient" || sidebarBgType === "glass")
                     ? isDark ? 'text-white/70' : "text-black"
                     : "text-muted-foreground"
@@ -506,6 +507,7 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
               <Typography
                 variant="caption1"
                 className={cn(
+                  "truncate",
                   (sidebarBgType === "gradient" || sidebarBgType === "glass")
                     ? !isDark ? "text-gray-400" : "text-white/70"
                     : "text-muted-foreground"
@@ -624,7 +626,7 @@ export function SidebarFooter({ user, className, sidebarBgType = "default" }: Si
                 getTextColor()
               )}
             >
-              {user?.username || "Utilisateur"}
+              {user?.username ? (user.username.length > 12 ? user.username.slice(0, 12) + "…" : user.username) : "Utilisateur"}
             </Typography>
             <div className="flex items-center gap-1">
               <Badge

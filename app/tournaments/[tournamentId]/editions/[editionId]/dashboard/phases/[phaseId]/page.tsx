@@ -49,9 +49,9 @@ export default async function PhaseDetailPage({ params }: PageProps) {
   const typeConf = phaseTypeConfig[phase?.phaseType || ""] || phaseTypeConfig.CUSTOM;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-3 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
             <Button variant="ghost" size="sm" className="h-7 px-2 -ml-2 hover:bg-transparent" asChild>
@@ -67,9 +67,9 @@ export default async function PhaseDetailPage({ params }: PageProps) {
       {/* Phase info card */}
       {phase && (
         <Card className="overflow-hidden border-border/50">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-              <div className="space-y-4">
+          <CardContent className="p-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-2">
                 {/* Type badge + status */}
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <Badge className={`${typeConf.bgColor} ${typeConf.color} border shadow-sm text-xs font-bold px-3 py-0.5`}>
@@ -87,7 +87,7 @@ export default async function PhaseDetailPage({ params }: PageProps) {
                 </div>
 
                 {/* Config details */}
-                <div className="flex items-center gap-6 text-sm text-muted-foreground flex-wrap font-medium">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap font-medium">
                   <span className="flex items-center gap-2">
                     <Settings2 className="h-4 w-4" /> Ordre de passage: {phase.order}
                   </span>
@@ -112,7 +112,7 @@ export default async function PhaseDetailPage({ params }: PageProps) {
 
       {/* Groups */}
       <Card className="border-border/50 shadow-sm">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b py-5 px-6">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b py-5 px-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Users className="h-5 w-5 text-primary" />
@@ -126,9 +126,9 @@ export default async function PhaseDetailPage({ params }: PageProps) {
           </div>
           <CreateGroupDialog phaseId={phaseId} nextOrder={groupsRes.data.length + 1} />
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-3">
           {groupsRes.data.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
+            <div className="text-center py-10 text-muted-foreground">
               <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
                 <Users className="h-8 w-8 opacity-20" />
               </div>
@@ -140,7 +140,7 @@ export default async function PhaseDetailPage({ params }: PageProps) {
           ) : (
             <div className="grid gap-4">
               {(groupsRes.data as PhaseGroup[]).map((group, idx) => (
-                <div key={group.id} className="group relative border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-primary/50 hover:bg-primary/5 transition-all">
+                <div key={group.id} className="group relative border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Typography variant="body-base" weight="bold">{group.name}</Typography>

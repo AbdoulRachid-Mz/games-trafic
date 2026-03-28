@@ -2,8 +2,8 @@ import { Match } from "./types";
 
 export function resolveMatch(match: Match): Match {
   if (
-    match.scoreA == null ||
-    match.scoreB == null ||
+    match.score1 == null ||
+    match.score2 == null ||
     !match.playerA ||
     !match.playerB
   ) {
@@ -11,12 +11,12 @@ export function resolveMatch(match: Match): Match {
   }
 
   const winner =
-    match.scoreA > match.scoreB
+    match.score1 > match.score2
       ? match.playerA
       : match.playerB;
 
   return {
     ...match,
-    winnerId: winner.id,
+    winnerRegistrationId: winner.id,
   };
 }

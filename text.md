@@ -1,1 +1,179 @@
-ok maintenant revenons aux gestion des éditions, et leurs tables liées dont phases, membres, groupes, bracketNodes et matches. tu m'as propose un prompt qu'on avait utilise et ca a marche mais jusqu'a présent ca reste encore beaucoup de choses a ajuster et a corriger. tout d'abord, on ne doit pas commencer sans avoir analyser tous les fichiers concernant les tournois: actions, schema, hooks, composants et pages et même les lib et utils lies. en suite, on fait les hooks de manière séparée pour les phases, groupes et brakect avec chacun un manager et des helpers pour des actions multiples et (aléatoire et manuel). on ajoute pour chaque table (dans son getter by id) des stats et context (des summay comme par ex dans édition et autres tables (les membres/participants élémines/non élémines, la performance globales, les matches (stats (termines/non terminés et autre status)et tout ce qu'il faut comme stats et important dans chaque niveau (table). après cela on passe a la correction des logique. d'abord chaque entite doit gerer a priorie ces tables enfants (dans leur page comme dans le dashboard des éditions, il y'a les sous page membres, phases, overview etc... pour les membres, on gère les membres de l'édition et pour l'ajout, on liste a partir des membres existant dans le tournoi. donc on fait deux liste: les membres de l'edition (donc ils doivent etre dans le tournoi de l'edition) et les membres du tournoi mais pas dans l'edition) et on ajoute des button pour ajouter dans l'edition (au niveau de chaque card du participant/membre) s'il n'est pas dans l'edition et retirer s'il est deja dans l'edition. dans tous les cas je veux on utilise les membres du tournoi (car chaque edition a ces membres) au niveau de retrait d'un membre dans une edition, on doit tenir compte des phases, groupes et bracket et meme les matches car un membre peut avoir des matches, ou etre deja dans un groupe. donc au niveau de retrait, on doit verifier s'il a deja des matches, ou est dans un braket, group (participant d'un groupe). ainsi on doit utiliser stats-carousel pour les stats de chaque ayant besoin. de meme pour chaque entite/page (comme phaseId), on peut gerer bien ses ou sa sous table directe (comme pour les phases, on gere les groupes et bracketNodes et matches, pour les groupes, on gere les bracketNodes et matches, pour les bracketNodes, on gere les matches et pour les matches, on gere les scores et resultats). et pour chaque table, on doit avoir un bouton pour ajouter, modifier, supprimer et voir les details (qui ouvre une page pour voir les details de l'entite et ses tables enfants). deja la plupart de ces logiques sont deja mise en place on a juste qu'a corriger ou bien mettre en place pour celles non existantes. les phases gerent uniquements les groupes avec possibilite de creation (d'aileurs pour toutes les entites) multiple selon la logique de l'entite; les groupes ont des participants (qui doivent etre ceux de l'edition), donc dans la page participants de chaque groupe, on liste (avec deux tabs) les participants deja selectionnes dans le groupe et les autres (qui sont dans l'edition mais pas le group avec possibilite ajouter dans le group et de l'autre cote button pour retirer comme on s'en est dit ci-haut) et c'est en fonction de ces participants qu'on cree les bracketnodes (ou rencontre et je veux les brackets peuvent etre generes automatiquement ou manuellement et selon la config (et aussi aller simple ou aller-retour, format du groupe) du group et les participants dispo dans le groupe pas l'edition). une rencontre peut contenir plusieurs matches et dans la gestion de chaque bracket aussi on fait comme dans le groupe, on ajoute la gestion multiple (bulk action/composent) (ajoute des matches/suppression/ et meme une modification multiple) on affiche bien les stats de chaque entite. un autre probleme que j'ai rencontre est qu'on peut cree plusieurs matches pour les meme participants, ca peut etre bon parfois je veux qu'on alerte avant la creation. on ajoute des standings pour editions (surtout cote client dans la page editionId dans le tab classment), pour group et pour bracket dans les page dashboard edition. les champs d'ordres doivent etre calcules en backend donc on enleve ca dans les formulaires de creation.  
+Objectif :
+Refactoriser et optimiser la page des game-clips pour obtenir une expérience ultra fluide, similaire aux stories/reels des grandes apps (Instagram, TikTok, Facebook, WhatsApp).
+
+---
+
+1. ANALYSE INITIALE
+
+Analyser tous les fichiers liés :
+- game-clip-reel.tsx
+- game-clip-player.tsx
+- game-clip-viewer-modal.tsx
+- game-clip-creation-dialog.tsx
+- client-page.tsx
+- hook useGameClips
+- gestion du state + navigation + events
+
+Identifier clairement :
+- Les causes de re-render inutiles
+- Les problèmes de synchronisation (pause/play / navigation)
+- Les problèmes liés aux animations / transitions
+- Les conflits entre state local et global
+
+---
+
+2. PROBLÈMES À CORRIGER
+
+A. PERFORMANCE & FLUIDITÉ
+- Page globalement non optimisée (trop de re-renders, timers, effets)
+- Saccades lors du scroll vertical (translateY)
+- Mauvaise gestion du “activeIndex”
+- Mauvaise utilisation des timers (setInterval / setTimeout)
+
+Objectif :
+→ Scroll ultra fluide (60fps constant)
+→ Aucun lag ou freeze
+→ Optimisation mémoire + CPU
+
+---
+
+B. PROBLÈMES VISUELS (JANK / SURSAUTS)
+- Sursaut du premier clip
+- Sursauts lors du changement de clip
+- Progress bars instables (surtout premier élément)
+- Effet “jump” au lieu de transition fluide
+
+Objectif :
+→ Transitions smooth (type TikTok)
+→ Utiliser animations GPU (transform + opacity uniquement)
+→ Précharger les clips suivants
+
+---
+
+C. PROBLÈMES DE LECTURE (CRITIQUE)
+
+1. Pause ne fonctionne pas correctement :
+- Le bouton pause ne stoppe pas réellement la vidéo
+- Le player continue de jouer en background
+- Le play relance avec un saut (désynchronisation)
+
+2. Conflit entre :
+- isPaused (global)
+- localPaused
+- isPlaying
+
+Objectif :
+→ Source de vérité unique pour le playback
+→ Pause RÉELLE (video.pause() + freeze timers)
+→ Reprise propre sans jump
+
+---
+
+D. VITESSE & TIMING DES CLIPS
+- Clips/images passent trop rapidement
+- Pas d’animation entre les images
+- Mauvaise perception utilisateur
+
+Objectif :
+→ Timing naturel (comme stories Instagram)
+→ Animations fluides entre images
+→ Progress bar parfaitement synchronisée
+
+---
+
+E. INTERACTIONS UTILISATEUR
+
+1. Commentaires :
+- Le clip doit se mettre en pause automatiquement quand :
+  → section commentaires ouverte
+  → input focus
+  → utilisateur en train d’écrire
+
+2. Navigation :
+- Scroll trop sensible / brutal
+- Mauvaise gestion du wheel / touch
+
+Objectif :
+→ UX naturelle et contrôlée
+→ Bloquer navigation pendant transitions
+→ Gérer correctement gestures (swipe)
+
+---
+
+F. INFINITE SCROLL + SHUFFLE
+
+Problème :
+- Pas de vraie boucle fluide
+- Fin des clips mal gérée
+
+Objectif :
+→ Quand dernier clip atteint :
+   - soit fetch next page
+   - soit shuffle + restart depuis le début
+→ Expérience infinie sans coupure
+→ Aucun écran vide
+
+---
+
+G. UI / UX FIXES
+
+- Le bouton “create clip” apparaît parfois en double
+- Mauvais placement du bouton retour
+
+Objectif :
+→ Ajouter bouton “back” en haut à gauche (fixe)
+→ Supprimer celui dans le player
+→ Corriger duplication create button
+
+---
+
+3. AMÉLIORATIONS ARCHITECTURALES (TRÈS IMPORTANT)
+
+- Séparer clairement :
+  → logique de navigation (reel)
+  → logique de playback (player)
+  → logique UI
+
+- Centraliser :
+  → état de lecture (play/pause)
+  → état actif (clip courant)
+
+- Utiliser :
+  → useRef pour éviter re-renders inutiles
+  → memo / useMemo / useCallback correctement
+  → requestAnimationFrame au lieu de setInterval si nécessaire
+
+- Précharger :
+  → clip suivant et précédent
+
+---
+
+4. COMPORTEMENT ATTENDU (RÉFÉRENCE)
+
+Le résultat final doit être équivalent à :
+- TikTok / Instagram Reels / WhatsApp Status
+
+Donc :
+- Scroll vertical ultra fluide
+- Zéro sursaut
+- Pause instantanée et fiable
+- Reprise sans bug
+- Transitions propres
+- Lecture automatique maîtrisée
+- UX naturelle et intuitive
+
+---
+
+5. BONUS (SI POSSIBLE)
+
+- Ajouter inertie naturelle au scroll
+- Ajouter easing sur transitions
+- Améliorer perception du progress (plus smooth)
+- Optimiser mobile en priorité
+
+---
+
+IMPORTANT :
+Ne pas faire de patch rapide.
+→ Faire une vraie refonte propre et scalable.
+→ Priorité absolue : fluidité + stabilité + UX.

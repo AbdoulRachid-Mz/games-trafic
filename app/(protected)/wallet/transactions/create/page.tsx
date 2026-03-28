@@ -213,11 +213,7 @@ function CreateTransactionContent({
           searchParams.get("paymentProvider") ||
           searchParams.get("paymentAccountId");
 
-        let customInitialStep: number | null = null;
-
         if ((type === "DEPOSIT" || type === "WITHDRAWAL") && hasPaymentDetails) {
-          const stepIndex = config.steps.indexOf("AMOUNT_INPUT");
-          customInitialStep = stepIndex >= 0 ? stepIndex : 0;
           
           newData.metadata = {
             ...newData.metadata,
@@ -271,13 +267,11 @@ function CreateTransactionContent({
         setTransactionData(newData);
 
         // Calculer les étapes initiales
-        const initialStepIndex = customInitialStep !== null 
-          ? customInitialStep 
-          : getInitialStepForType(
-              type,
-              config,
-              !!newData.targetId || !!newData.recipientWalletId
-            );
+        const initialStepIndex = getInitialStepForType(
+          type,
+          config,
+          !!newData.targetId || !!newData.recipientWalletId
+        );
         setCurrentStep(initialStepIndex);
       }
 

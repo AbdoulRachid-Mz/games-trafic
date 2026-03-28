@@ -139,7 +139,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     const hasVisited = typeof window !== "undefined" ? localStorage.getItem("gt_welcome_visited") : null;
-    
+
     if (!hasVisited && !isWelcomePath) {
       router.replace("/welcome");
     } else {
@@ -218,6 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
     }
   }, [maintenanceMode, isAdmin, isInitialized, resolved, pathname, router]);
+
 
   // Show loading during initialization
   if (!isInitialized || !welcomeChecked) {

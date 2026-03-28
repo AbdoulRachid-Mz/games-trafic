@@ -16,7 +16,8 @@ import { EditionParticipantsList } from "./edition-participants-list";
 import { EditionPhasesView } from "./edition-phases-view";
 import { EditionJoinDialog } from "./edition-join-dialog";
 import { EditionPaymentDialog } from "./edition-payment-dialog";
-import { StandingsTable } from "./standings-table";
+import { EditionStandingsTab } from "./edition-standings-tab";
+import { EditionMatchesTab } from "./edition-matches-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
@@ -33,23 +34,7 @@ interface EditionPageContentProps {
   tournament: Tournament;
   edition: TournamentEditionWithRelations;
   phases: TournamentPhase[];
-  standings?: Array<{
-    groupId: string;
-    groupName: string;
-    rows: Array<{
-      registrationId: string;
-      points: number;
-      matchesPlayed: number;
-      matchesWon: number;
-      matchesDrawn: number;
-      matchesLost: number;
-      scoreFor: number;
-      scoreAgainst: number;
-      scoreDifference: number;
-      position?: number;
-      qualified?: boolean;
-    }>;
-  }>;
+  activePhaseId?: string;
   currentUserMember?: TournamentMember & { team?: Team };
   currentUserRegistration?: EditionRegistrationWithRelations;
   isOrganizer?: boolean;
@@ -59,7 +44,7 @@ export function EditionPageContent({
   tournament,
   edition,
   phases,
-  standings = [],
+  activePhaseId,
   currentUserMember,
   currentUserRegistration,
   isOrganizer = false,
@@ -277,34 +262,9 @@ export function EditionPageContent({
               </TabsContent>
 
               <TabsContent value="standings" className="mt-6 space-y-4">
-                {/* Toggle between group standings and global edition standings */}
-                {standings.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={standingsMode === "group" ? "default" : "outline"}
-                      onClick={() => setStandingsMode("group")}
-                    >
-                      Par groupe
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={standingsMode === "edition" ? "default" : "outline"}
-                      onClick={() => setStandingsMode("edition")}
-                    >
-                      Classement global
-                    </Button>
-                  </div>
-                )}
-                <StandingsTable
-                  groups={standings}
-                  registrations={edition.registrations}
-                  title={
-                    standingsMode === "edition"
-                      ? "Classement global de l'édition"
-                      : "Classement par groupe"
-                  }
-                  mode={standingsMode}
+                <EditionStandingsTab
+                  activePhaseId={activePhaseId}
+                  registrations={edition.registrations || []}
                   currentRegistrationId={currentUserRegistration?.id}
                 />
               </TabsContent>
@@ -332,15 +292,11 @@ export function EditionPageContent({
               </TabsContent>
 
               <TabsContent value="matches" className="mt-6">
-                <div className="bg-card border rounded-xl p-12 text-center space-y-4">
-                  <Typography variant="h4" weight="bold">Liste des matches</Typography>
-                  <Typography variant="body-sm" theme="muted">Suivez les résultats en direct et consultez l&apos;historique des matches.</Typography>
-                  <Button variant="default" asChild>
-                    <a href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}>
-                      Voir tous les matches
-                    </a>
-                  </Button>
-                </div>
+                 <EditionMatchesTab 
+                   activePhaseId={activePhaseId}
+                   currentUserId={user?.id}
+                   isAdmin={isOrganizer}
+                 />
               </TabsContent>
 
               <TabsContent value="members" className="mt-6">

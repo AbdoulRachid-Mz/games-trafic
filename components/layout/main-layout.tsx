@@ -71,7 +71,7 @@ export function MainLayout({
       {showOnTap && <OnTapPopup />}
 
       {/* Top bar */}
-      {(topMiddle && !shouldExcludeContainer) && (
+      {(topMiddle) && (
         <TopMiddle
           onToggleSidebar={() => setLeftOpen((v) => !v)}
           onToggleRightBar={() => setRightOpen((v) => !v)}
@@ -85,7 +85,7 @@ export function MainLayout({
       )}
 
       {/* LEFT BAR — toujours Sheet */}
-      {leftBar && !shouldExcludeContainer && (
+      {leftBar && (
         <Sheet open={leftOpen} onOpenChange={setLeftOpen}>
           <SheetTitle className="hidden" />
           <SheetContent side="left" className="w-80 p-0 border-r bg-background">
@@ -100,7 +100,7 @@ export function MainLayout({
       )}
 
       {/* RIGHT BAR — toujours Sheet */}
-      {rightBar && !shouldExcludeContainer && (
+      {rightBar && (
         <Sheet open={rightOpen} onOpenChange={setRightOpen}>
           <SheetContent
             side="right"
@@ -140,12 +140,12 @@ export function MainLayout({
           </div>
         </Suspense>
 
-        {footer && !shouldExcludeContainer && <Footer />}
+        {footer && <Footer />}
       </main>
 
 
       {/* Floating Action Button avec dock */}
-      {!shouldExcludeContainer && (floatingActions.length > 0 || floatingDockLinks.length > 0) && (
+      {(floatingActions.length > 0 || floatingDockLinks.length > 0) && (
         <FloatingActionButton
           actions={floatingActions.map((a) =>
             a.id === "qr-scanner"
@@ -167,7 +167,7 @@ export function MainLayout({
       </Dialog>
 
       {/* AI assistant */}
-      {/* {!shouldExcludeContainer && showAIAssistant && <AIAssistant />} */}
+      {showAIAssistant && <AIAssistant />}
     </div>
   );
 }

@@ -371,10 +371,10 @@ export async function addEditionParticipantAction(data: {
 
     revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/participants`);
 
-    return { success: true, registration };
-  } catch (error) {
+    return { success: true, registrationId: registration.id };
+  } catch (error: any) {
     console.error("Add participant failed", error);
-    throw error;
+    return { success: false, error: error.message || "Erreur inconnue" };
   }
 }
 

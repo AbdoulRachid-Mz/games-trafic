@@ -45,6 +45,22 @@ export function generateRoundRobinMatches(
   return matches;
 }
 
+export function generateGroupMatches(
+  participants: any[],
+  opts?: { returnType?: "single" | "double" }
+) {
+  const matches = opts?.returnType === "double" 
+    ? generateHomeAwayMatches(participants)
+    : generateRoundRobinMatches(participants);
+    
+  // Map .playerA to .participant1 to match the expected output
+  return matches.map((m) => ({
+    ...m,
+    participant1: m.playerA,
+    participant2: m.playerB,
+  }));
+}
+
 export function generateEliminationMatches(
   participants: Participant[],
   currentRound: number

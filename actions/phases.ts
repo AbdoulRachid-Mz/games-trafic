@@ -953,6 +953,48 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
       throw new Error('editionId and phaseId are required');
     }
 
+    if (
+      matchData.participant1RegistrationId &&
+      matchData.participant2RegistrationId &&
+      matchData.participant1RegistrationId === matchData.participant2RegistrationId
+    ) {
+      throw new Error("Un participant ne peut pas jouer contre lui-même");
+    }
+
+    // Duplicate Check
+    if (matchData.participant1RegistrationId && matchData.participant2RegistrationId) {
+      const p1 = matchData.participant1RegistrationId;
+      const p2 = matchData.participant2RegistrationId;
+      
+      const filterConditions = [
+        eq(matches.editionId, matchData.editionId),
+        eq(matches.phaseId, matchData.phaseId),
+      ];
+      
+      if (matchData.groupId) filterConditions.push(eq(matches.groupId, matchData.groupId));
+      if (matchData.bracketNodeId) filterConditions.push(eq(matches.bracketNodeId, matchData.bracketNodeId));
+
+      const existingMatch = await db.query.matches.findFirst({
+        where: and(
+          ...filterConditions,
+          or(
+            and(
+              eq(matches.participant1RegistrationId, p1),
+              eq(matches.participant2RegistrationId, p2)
+            ),
+            and(
+              eq(matches.participant1RegistrationId, p2),
+              eq(matches.participant2RegistrationId, p1)
+            )
+          )
+        )
+      });
+      
+      if (existingMatch) {
+         throw new Error("Ce match existe déjà pour ces deux participants dans cette phase/groupe.");
+      }
+    }
+
     const result = await db
       .insert(matches)
       .values({
@@ -1442,3 +1484,72 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
     throw error;
   }
 }
+
+import { generateGroupMatches } from "@/lib/tournaments/match.generator";
+// import { generateSingleEliminationBracket } from "@/lib/tournaments/bracket.generator";
+
+export async function generatePhaseMatches(phaseId: string, config?: { forceRecreate?: boolean; groupId?: string }) {
+  try {
+    const phase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, phaseId),
+      with: {
+        groups: {
+          with: {
+            participants: true
+          }
+        }
+      }
+    });
+
+    if (!phase) throw new Error("Phase not found");
+
+    if (config?.forceRecreate) {
+      if (config.groupId) {
+        await db.delete(matches).where(and(eq(matches.groupId, config.groupId), eq(matches.status, "PENDING")));
+      } else {
+        await db.delete(matches).where(and(eq(matches.phaseId, phaseId), eq(matches.status, "PENDING")));
+      }
+    }
+
+    const createdMatches = [];
+
+    if (phase.phaseType === "GROUP_STAGE" && phase.groups) {
+      const groupsToProcess = config?.groupId ? phase.groups.filter((g: any) => g.id === config.groupId) : phase.groups;
+      
+      for (const group of groupsToProcess) {
+        const participants = group.participants || [];
+        if (participants.length < 2) continue;
+        
+        // Use generator from match.generator
+        const generated = generateGroupMatches(participants.map((p: any) => ({
+           id: p.registrationId
+        })), { returnType: "single" }); // using single round robin as default
+        
+        for (const [index, m] of generated.entries()) {
+             const mData = {
+               phaseId: phase.id,
+               groupId: group.id,
+               participant1RegistrationId: m.participant1?.id,
+               participant2RegistrationId: m.participant2?.id,
+               matchNumber: index + 1,
+               status: "PENDING" as const,
+               round: 1,
+               createdAt: new Date(),
+               updatedAt: new Date(),
+             };
+             
+             const res = await db.insert(matches).values(mData as any).returning();
+             createdMatches.push(res[0]);
+        }
+      }
+    } else if (phase.phaseType === "ELIMINATION") {
+       // Bracket generation logic here based on logic
+    }
+
+    return { success: true, count: createdMatches.length };
+  } catch (error) {
+    console.error("Failed to generate matches", error);
+    throw error;
+  }
+}
+
