@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
-import { getTournamentPhases } from "@/actions/tournaments";
+import { getTournamentPhases } from "@/actions/phases";
 import { getPhaseGroups } from "@/actions/phases";
 import Link from "next/link";
 import { Settings2, Users, Swords, ChevronLeft } from "lucide-react";

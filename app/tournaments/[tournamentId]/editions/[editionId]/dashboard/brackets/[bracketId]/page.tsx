@@ -4,15 +4,20 @@ import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { getBracketNodeById, updateBracketNode, getPhaseGroupParticipants } from "@/actions/phases";
-import { getEditionRegistrations, getMatches, createMatch } from "@/actions/tournaments";
-import { updateMatch, deleteMatch } from "@/actions/phases";
+import { getBracketNodeById, getPhaseGroupParticipants } from "@/actions/phases";
+import { getEditionRegistrations, getMatches } from "@/actions/tournaments";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import type { BracketNode, PhaseGroupParticipant, EditionRegistration, Match } from "@/database/schema";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ChevronLeft, Plus, Swords, Clock, CheckCircle, XCircle, Pause, Settings2 } from "lucide-react";
+import { ChevronLeft, Swords, Clock, CheckCircle, XCircle, Pause, Settings2 } from "lucide-react";
+import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
+import { CreateMatchDialog } from "@/components/pages/tournaments/edition-detail/create-match-dialog";
+import { UpdateMatchDialog } from "@/components/pages/tournaments/edition-detail/update-match-dialog";
+import { deleteMatch } from "@/actions/phases";
+import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 
 interface PageProps {
   params: Promise<{
@@ -59,38 +64,6 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
     pagination: { page: 1, limit: 100 },
   });
 
-  async function updateNodeAction(formData: FormData) {
-    "use server";
-    const nodeCode = ((formData.get("nodeCode") as string) || "").trim();
-    const round = Number(formData.get("round") || 1);
-    const matchNumber = Number(formData.get("matchNumber") || 1);
-    const bracketType = (formData.get("bracketType") as string) || "UPPER";
-    await updateBracketNode(bracketId, { nodeCode, round, matchNumber, bracketType } as any);
-    revalidatePath(`${basePath}/brackets/${bracketId}`);
-  }
-
-  async function createMatchAction(formData: FormData) {
-    "use server";
-    const participant1RegistrationId = (formData.get("p1") as string) || "";
-    const participant2RegistrationId = (formData.get("p2") as string) || "";
-    const round = Number(formData.get("round") || node?.round || 1);
-    const matchNumber = Number(formData.get("matchNumber") || node?.matchNumber || 1);
-    const scheduledTime = formData.get("scheduledTime") ? new Date(formData.get("scheduledTime") as string) : undefined;
-    const formatOpt = (formData.get("format") as string) || "BEST_OF_1";
-    await createMatch({
-      editionId,
-      phaseId: node?.phaseId || "",
-      groupId: node?.groupId || null as any,
-      bracketNodeId: bracketId,
-      round,
-      matchNumber,
-      participant1RegistrationId,
-      participant2RegistrationId,
-      scheduledTime,
-      metadata: { format: formatOpt },
-    } as any);
-    revalidatePath(`${basePath}/brackets/${bracketId}`);
-  }
 
   const bracketTypeColor: Record<string, string> = {
     UPPER: "bg-blue-100 text-blue-700 border-blue-200",
@@ -140,31 +113,16 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
                   {(matchesRes.data as Match[]).length} match(s) associé(s)
                 </Typography>
               </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">Modifier le nœud</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Modifier le nœud</DialogTitle>
-                  </DialogHeader>
-                  <form action={updateNodeAction} className="space-y-3">
-                    <input name="nodeCode" defaultValue={node.nodeCode || ""} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" placeholder="Code du nœud (ex: QF1)" />
-                    <div className="grid grid-cols-2 gap-3">
-                      <input name="round" type="number" min={1} defaultValue={node.round || 1} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" placeholder="Round" />
-                      <input name="matchNumber" type="number" min={1} defaultValue={node.matchNumber || 1} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" placeholder="Match #" />
-                    </div>
-                    <select name="bracketType" defaultValue={node.bracketType || "UPPER"} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full">
-                      <option value="UPPER">Upper Bracket</option>
-                      <option value="LOWER">Lower Bracket</option>
-                      <option value="FINAL">Grand Final</option>
-                    </select>
-                    <DialogFooter>
-                      <Button type="submit">Enregistrer</Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                <UpdateBracketNodeDialog
+                  node={{
+                    id: bracketId,
+                    nodeCode: node.nodeCode,
+                    round: node.round,
+                    matchNumber: node.matchNumber,
+                    bracketType: node.bracketType,
+                  }}
+                  revalidatePath={`${basePath}/brackets/${bracketId}`}
+                />
             </div>
           </CardContent>
         </Card>
@@ -178,62 +136,21 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
             <CardTitle className="text-lg">Matchs liés</CardTitle>
             <Badge variant="secondary" className="text-xs">{(matchesRes.data as Match[]).length}</Badge>
           </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Créer un match</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nouveau match</DialogTitle>
-              </DialogHeader>
-              <form action={createMatchAction} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Joueur 1</label>
-                    <select name="p1" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full">
-                      {(groupParticipantsRes.data as PhaseGroupParticipant[]).map((p) => {
-                        const reg = (regsRes.data as EditionRegistration[]).find((r: any) => r.id === p.registrationId) as any;
-                        const name =
-                          reg?.member?.displayName ||
-                          reg?.member?.user?.username ||
-                          reg?.member?.team?.name ||
-                          "Joueur";
-                        return <option key={p.id} value={p.registrationId}>{name}</option>;
-                      })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Joueur 2</label>
-                    <select name="p2" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full">
-                      {(groupParticipantsRes.data as PhaseGroupParticipant[]).map((p) => {
-                        const reg = (regsRes.data as EditionRegistration[]).find((r: any) => r.id === p.registrationId) as any;
-                        const name =
-                          reg?.member?.displayName ||
-                          reg?.member?.user?.username ||
-                          reg?.member?.team?.name ||
-                          "Joueur";
-                        return <option key={p.id} value={p.registrationId}>{name}</option>;
-                      })}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input name="round" type="number" min={1} defaultValue={node?.round || 1} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" placeholder="Round" />
-                  <input name="matchNumber" type="number" min={1} defaultValue={node?.matchNumber || 1} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" placeholder="Match #" />
-                </div>
-                <input name="scheduledTime" type="datetime-local" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" />
-                <select name="format" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full">
-                  <option value="BEST_OF_1">Aller simple (BO1)</option>
-                  <option value="BEST_OF_3">BO3</option>
-                  <option value="BEST_OF_5">BO5</option>
-                  <option value="HOME_AWAY">Aller-retour</option>
-                </select>
-                <DialogFooter>
-                  <Button type="submit">Créer</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <CreateMatchDialog
+            editionId={editionId}
+            phaseId={node?.phaseId || ""}
+            groupId={node?.groupId || null}
+            bracketNodeId={bracketId}
+            participants={(groupParticipantsRes.data as PhaseGroupParticipant[]).map((p) => {
+              const reg = (regsRes.data as EditionRegistration[]).find((r: any) => r.id === p.registrationId) as any;
+              return {
+                registrationId: p.registrationId || "",
+                displayName: reg?.member?.displayName || reg?.member?.user?.username || reg?.member?.team?.name || "Joueur",
+              };
+            })}
+            defaultRound={node?.round || 1}
+            defaultMatchNumber={node?.matchNumber || 1}
+          />
         </CardHeader>
         <CardContent>
           {(matchesRes.data as Match[]).length === 0 ? (
@@ -285,40 +202,16 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 justify-end">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="text-xs h-7">Modifier</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Modifier le match</DialogTitle>
-                          </DialogHeader>
-                          <form action={async (formData: FormData) => {
-                            "use server";
-                            const score1 = formData.get("score1") ? Number(formData.get("score1")) : null;
-                            const score2 = formData.get("score2") ? Number(formData.get("score2")) : null;
-                            const scheduledTime = formData.get("scheduledTime") ? new Date(formData.get("scheduledTime") as string) : undefined;
-                            await updateMatch(m.id, { score1: score1 as any, score2: score2 as any, scheduledTime } as any);
-                            revalidatePath(`${basePath}/brackets/${bracketId}`);
-                          }} className="space-y-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1">
-                                <label className="text-xs text-muted-foreground mb-1 block">{name1}</label>
-                                <input name="score1" type="number" defaultValue={m.score1 ?? undefined} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full text-center font-bold" placeholder="0" />
-                              </div>
-                              <span className="text-xs text-muted-foreground pt-4">VS</span>
-                              <div className="flex-1">
-                                <label className="text-xs text-muted-foreground mb-1 block">{name2}</label>
-                                <input name="score2" type="number" defaultValue={m.score2 ?? undefined} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full text-center font-bold" placeholder="0" />
-                              </div>
-                            </div>
-                            <input name="scheduledTime" type="datetime-local" defaultValue={m.scheduledTime ? new Date(m.scheduledTime).toISOString().slice(0, 16) : ""} className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" />
-                            <DialogFooter>
-                              <Button type="submit">Enregistrer</Button>
-                            </DialogFooter>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                      <UpdateMatchDialog
+                        match={{
+                          id: m.id,
+                          score1: m.score1,
+                          score2: m.score2,
+                          scheduledTime: m.scheduledTime,
+                        }}
+                        p1Name={name1}
+                        p2Name={name2}
+                      />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive text-xs h-7">Supprimer</Button>

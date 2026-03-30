@@ -20,7 +20,10 @@ export default function GlobalError({
               Une erreur inattendue s'est produite. Veuillez réessayer.
             </p>
             <button
-              onClick={() => reset()}
+              onClick={() => {
+                reset();
+                window.location.reload();
+              }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
             >
               Réessayer

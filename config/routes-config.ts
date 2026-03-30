@@ -29,6 +29,7 @@ export interface RouteConfig {
   hideFloatingActions?: boolean; // Nouveau: cacher FAB
   dockLinks?: DockLinkConfig[];
   showOnTap?: boolean;
+  priority?: number;
 }
 
 export interface FABAction {

@@ -162,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Resolve route
   const resolved = useMemo(() => {
     if (!isInitialized) return null;
-    return resolveRoute(initialPath, userRoles);
+    return resolveRoute(pathname, userRoles);
   }, [initialPath, userRoles, isInitialized]);
 
   // Initialize app
@@ -260,6 +260,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+
   // Normal layout
   return (
     <>
@@ -283,19 +284,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       <MainLayout
-        breadcrumbs={resolved?.topMiddle.enabled}
-        footer={resolved?.footer.enabled}
-        topMiddle={resolved?.topMiddle.enabled}
-        leftBar={resolved?.leftBar.enabled}
-        rightBar={resolved?.rightBar.enabled}
+        breadcrumbs={resolved?.topMiddle?.enabled}
+        footer={resolved?.footer?.enabled}
+        topMiddle={resolved?.topMiddle?.enabled}
+        leftBar={resolved?.leftBar?.enabled}
+        rightBar={resolved?.rightBar?.enabled}
         navigationLinks={resolved?.navigationLinks}
-        floatingActions={resolved?.fabActions.actions || []}
+        floatingActions={resolved?.fabActions?.actions || []}
         floatingActiveActionId={resolved?.activeFabActionId as string}
         maintenanceMode={maintenanceMode}
-        showAIAssistant={resolved?.aiAssistant.enabled}
-        hideTopMiddleOnScroll={resolved?.topMiddle.hideOnScroll}
-        breadcrumbItems={resolved?.topMiddle.breadcrumbs || []}
-        floatingDockLinks={resolved?.floatingDock.links || []}
+        showAIAssistant={resolved?.aiAssistant?.enabled}
+        hideTopMiddleOnScroll={resolved?.topMiddle?.hideOnScroll}
+        breadcrumbItems={resolved?.topMiddle?.breadcrumbs || []}
+        floatingDockLinks={resolved?.floatingDock?.links || []}
         shouldExcludeContainer={resolved?.layout !== "public"}
         showOnTap={resolved?.showOnTap}
       >

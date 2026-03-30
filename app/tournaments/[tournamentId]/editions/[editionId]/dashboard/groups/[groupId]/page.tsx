@@ -36,9 +36,6 @@ import {
   createPhaseGroupParticipant,
   deletePhaseGroupParticipant,
   getBracketNodes,
-  createBracketNode,
-  updateBracketNode,
-  deleteBracketNode,
   recalculateGroupStandings,
 } from "@/actions/phases";
 import { getEditionRegistrations, createMatch } from "@/actions/tournaments";
@@ -73,6 +70,12 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/edition-detail/generate-group-matches-dialog";
+import { CreateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/create-bracket-node-dialog";
+import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
+import { UpdatePhaseGroupDialog } from "@/components/pages/tournaments/edition-detail/update-phase-group-dialog";
+import { deleteBracketNode } from "@/actions/phases";
+import { QuicKAction } from "./quick-acions";
 
 interface PageProps {
   params: Promise<{
@@ -132,57 +135,6 @@ export default async function GroupDetailPage({ params }: PageProps) {
     );
   }
 
-  async function generateGroupMatchesAction(formData: FormData) {
-    "use server";
-    const format = (formData.get("format") as string) || "SINGLE";
-    const list = await getPhaseGroupParticipants({
-      filters: { groupId },
-      pagination: { page: 1, limit: 500 },
-    });
-    const items = list.data as PhaseGroupParticipant[];
-    const regIds = items
-      .map((p) => p.registrationId)
-      .filter(Boolean) as string[];
-    let counter = 1;
-    for (let i = 0; i < regIds.length; i++) {
-      for (let j = i + 1; j < regIds.length; j++) {
-        if (format === "HOME_AWAY") {
-          await createMatch({
-            editionId,
-            phaseId: group?.phaseId || "",
-            groupId,
-            round: 1,
-            matchNumber: counter++,
-            participant1RegistrationId: regIds[i],
-            participant2RegistrationId: regIds[j],
-            metadata: { format: "HOME_AWAY", leg: 1 },
-          } as any);
-          await createMatch({
-            editionId,
-            phaseId: group?.phaseId || "",
-            groupId,
-            round: 1,
-            matchNumber: counter++,
-            participant1RegistrationId: regIds[j],
-            participant2RegistrationId: regIds[i],
-            metadata: { format: "HOME_AWAY", leg: 2 },
-          } as any);
-        } else {
-          await createMatch({
-            editionId,
-            phaseId: group?.phaseId || "",
-            groupId,
-            round: 1,
-            matchNumber: counter++,
-            participant1RegistrationId: regIds[i],
-            participant2RegistrationId: regIds[j],
-            metadata: { format: "BEST_OF_1" },
-          } as any);
-        }
-      }
-    }
-    revalidatePath(basePath);
-  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -223,46 +175,21 @@ export default async function GroupDetailPage({ params }: PageProps) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Generate matches */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-1.5">
-                <Swords className="h-4 w-4" /> Générer matchs
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Générer les matchs du groupe</DialogTitle>
-                <DialogDescription>
-                  Tous les participants seront opposés.
-                </DialogDescription>
-              </DialogHeader>
-              <form action={generateGroupMatchesAction} className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Format</label>
-                  <select
-                    name="format"
-                    className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full"
-                  >
-                    <option value="SINGLE">Aller simple</option>
-                    <option value="HOME_AWAY">Aller-retour</option>
-                  </select>
-                </div>
-                <DialogFooter>
-                  <Button type="submit">
-                    <Swords className="mr-2 h-4 w-4" /> Générer
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+        {/* <div className="flex items-center gap-2">
+     
+          <GenerateGroupMatchesDialog
+            groupId={groupId}
+            editionId={editionId}
+            phaseId={group?.phaseId || ""}
+          />
 
           <Button variant="outline" className="gap-1.5" asChild>
             <Link href={`${basePath}/organize`}>
               <Settings className="h-4 w-4" /> Organiser les Nœuds
             </Link>
           </Button>
+
+          {group && <UpdatePhaseGroupDialog group={group} />}
 
           <Button variant="outline" asChild>
             <Link
@@ -271,7 +198,14 @@ export default async function GroupDetailPage({ params }: PageProps) {
               <ArrowLeft className="h-4 w-4 mr-1" /> Retour
             </Link>
           </Button>
-        </div>
+        </div> */}
+        <QuicKAction
+          basePath={basePath}
+          groupId={groupId}
+          editionId={editionId}
+          group={group}
+          tournamentId={tournamentId}
+        />
       </div>
 
       {/* ─── Standings Table ────────────────────────────────────────────── */}
@@ -407,101 +341,11 @@ export default async function GroupDetailPage({ params }: PageProps) {
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <RefreshCcw className="h-4 w-4 text-primary" /> Nœuds de bracket
             </CardTitle>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 shadow-sm border-primary/20 bg-primary/5 hover:bg-primary/10"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Nouveau
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Nouveau nœud de bracket</DialogTitle>
-                </DialogHeader>
-                <form
-                  action={async (formData: FormData) => {
-                    "use server";
-                    const nodeCode =
-                      ((formData.get("nodeCode") as string) || "").trim() ||
-                      `G${group?.order}-N${Date.now()}`;
-                    const round = Number(formData.get("round") || 1);
-                    const matchNumber = Number(
-                      formData.get("matchNumber") || 1,
-                    );
-                    const bracketType =
-                      (formData.get("bracketType") as string) || "UPPER";
-                    await createBracketNode({
-                      phaseId: group?.phaseId || "",
-                      groupId,
-                      nodeCode,
-                      round,
-                      matchNumber,
-                      bracketType,
-                    } as any);
-                    revalidatePath(basePath);
-                  }}
-                  className="space-y-4 pt-4"
-                >
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">
-                      Code d'identification
-                    </label>
-                    <input
-                      name="nodeCode"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      placeholder="ex: U1-1"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">
-                        Round
-                      </label>
-                      <input
-                        name="round"
-                        type="number"
-                        min={1}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        defaultValue={1}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">
-                        Match #
-                      </label>
-                      <input
-                        name="matchNumber"
-                        type="number"
-                        min={1}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        defaultValue={1}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1">
-                      Position Bracket
-                    </label>
-                    <select
-                      name="bracketType"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="UPPER">Upper Bracket (WB)</option>
-                      <option value="LOWER">Lower Bracket (LB)</option>
-                      <option value="FINAL">Grand Final</option>
-                    </select>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" className="w-full">
-                      Créer le nœud
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <CreateBracketNodeDialog
+              phaseId={group?.phaseId || ""}
+              groupId={groupId}
+              groupOrder={group?.order || 0}
+            />
           </CardHeader>
           <CardContent className="pt-4 flex-1">
             <BracketNodesList
@@ -578,85 +422,16 @@ async function BracketNodesList({
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 justify-end">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs font-semibold hover:bg-primary/10"
-                >
-                  Modifier
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Modifier le nœud</DialogTitle>
-                </DialogHeader>
-                <form
-                  action={async (formData: FormData) => {
-                    "use server";
-                    const nodeCode = (
-                      (formData.get("nodeCode") as string) || ""
-                    ).trim();
-                    const round = Number(
-                      formData.get("round") || node.round || 1,
-                    );
-                    const matchNumber = Number(
-                      formData.get("matchNumber") || node.matchNumber || 1,
-                    );
-                    const bracketType =
-                      (formData.get("bracketType") as string) ||
-                      node.bracketType ||
-                      "UPPER";
-                    await updateBracketNode(node.id, {
-                      nodeCode,
-                      round,
-                      matchNumber,
-                      bracketType,
-                    } as any);
-                    revalidatePath(basePath);
-                  }}
-                  className="space-y-4 pt-4"
-                >
-                  <input
-                    name="nodeCode"
-                    defaultValue={node.nodeCode || ""}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="Code du nœud"
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      name="round"
-                      type="number"
-                      min={1}
-                      defaultValue={node.round || 1}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    />
-                    <input
-                      name="matchNumber"
-                      type="number"
-                      min={1}
-                      defaultValue={node.matchNumber || 1}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <select
-                    name="bracketType"
-                    defaultValue={node.bracketType || "UPPER"}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="UPPER">Upper</option>
-                    <option value="LOWER">Lower</option>
-                    <option value="FINAL">Final</option>
-                  </select>
-                  <DialogFooter>
-                    <Button type="submit" className="w-full">
-                      Enregistrer les modifications
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <UpdateBracketNodeDialog
+              node={{
+                id: node.id,
+                nodeCode: node.nodeCode,
+                round: node.round,
+                matchNumber: node.matchNumber,
+                bracketType: node.bracketType,
+              }}
+              revalidatePath={basePath}
+            />
             <Button
               size="sm"
               variant="outline"

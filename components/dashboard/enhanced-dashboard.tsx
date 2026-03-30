@@ -185,6 +185,14 @@ export function SidebarItem({
   const getIconStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
+        return cn(
+          "p-1.5 rounded-lg transition-all duration-300",
+          isActive
+            ? "bg-yellow-400/20 text-yellow-400"
+            : isDark
+              ? "group-hover:bg-white/10 text-white/70 group-hover:text-white"
+              : "group-hover:bg-black/5 text-foreground/70 group-hover:text-foreground"
+        )
       case "glass":
         return cn(
           "p-1.5 rounded-lg transition-all duration-300",
@@ -482,13 +490,15 @@ export function SidebarHeader({ title, subtitle, user, className, sidebarBgType 
           )} />
         </div>
         {state === "expanded" && (
-          <div className="animate-in slide-in-from-left-2 duration-300 min-w-0 flex-1">
+          <div className="animate-in slide-in-from-left-2 duration-300 min-w-0 flex-1 m">
             <Typography
               variant="h4"
               weight="bold"
               className={cn("truncate", getTextColor())}
+              hasTooltip
+              tooltipContent={title}
             >
-              {title}
+              {title.length > 15 ? title.slice(0, 15) : title}
             </Typography>
             {subtitle && (
               <Typography
@@ -678,7 +688,7 @@ export function DashboardHeader({
       className
     )}>
       <div className="flex items-center gap-4">
-        {/* {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />} */}
+        {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />}
         <div>
           <Typography variant="h5" weight="semibold">
             {title}
@@ -706,7 +716,7 @@ export function DashboardHeader({
           </Button>
         )}
         {togglerComponent && <ThemeToggle />}
-        {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />}
+        {/* {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />} */}
       </div>
     </header>
   )

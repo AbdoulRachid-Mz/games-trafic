@@ -17,23 +17,12 @@ import {
   DashboardHeader,
   SidebarContainer,
 } from "@/components/dashboard/enhanced-dashboard";
-import { Separator } from "@/components/ui/separator";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import {
   LayoutDashboard,
-  Users,
-  Trophy,
-  Settings,
+  Users, Settings,
   Swords,
   Wallet,
-  ListTree,
+  ListTree
 } from "lucide-react";
 import { useActiveRoute } from "@/hooks/use-active-route";
 
@@ -108,12 +97,18 @@ export default function EditionDashboardLayout({
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/settings`,
       icon: Settings,
     },
+    {
+      title: "Organisation",
+      url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/organize`,
+      icon: Settings,
+    },
   ];
 
   const editionOverview = navData.filter(i =>
     i.url.endsWith(`/tournaments/${tournamentId}/editions/${editionId}/dashboard`) ||
     i.url.endsWith(`/phases`) ||
-    i.url.endsWith(`/matches`)
+    i.url.endsWith(`/matches`) ||
+    i.url.endsWith(`/organize`)
   );
   const editionManage = navData.filter(i =>
     i.url.endsWith(`/participants`) ||
@@ -122,7 +117,7 @@ export default function EditionDashboardLayout({
   );
 
   const EditionSidebar = (
-    <SidebarContainer sidebarBgType="gradient">
+    <SidebarContainer sidebarBgType="default">
       <SidebarHeader
         title={edition?.name || "Édition"}
         subtitle="Tableau de bord"
@@ -130,28 +125,28 @@ export default function EditionDashboardLayout({
           username: "Organisateur",
           level: "Edition",
         }}
-        sidebarBgType="gradient"
+        sidebarBgType="default"
       />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <SidebarGroup label="Vue d'ensemble" sidebarBgType="gradient">
+        <SidebarGroup label="Vue d'ensemble" sidebarBgType="default">
           {editionOverview.map((item) => (
             <SidebarItem
               key={item.title}
               {...item}
               isActive={isActive(item.url, item.url.endsWith(`/dashboard`))}
-              sidebarBgType="gradient"
+              sidebarBgType="default"
             />
           ))}
         </SidebarGroup>
 
-        <SidebarGroup label="Organisation" sidebarBgType="gradient">
+        <SidebarGroup label="Organisation" sidebarBgType="default">
           {editionManage.map((item) => (
             <SidebarItem
               key={item.title}
               {...item}
               isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
+              sidebarBgType="default"
             />
           ))}
         </SidebarGroup>
@@ -163,7 +158,7 @@ export default function EditionDashboardLayout({
           profileImage: undefined,
           status: "online",
         }}
-        sidebarBgType="gradient"
+        sidebarBgType="default"
       />
     </SidebarContainer>
   );

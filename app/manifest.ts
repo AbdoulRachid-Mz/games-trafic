@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Games-Trafics",
-    short_name: "GTC",
+    short_name: "GT",
     description:
       "Acheter, vendre, échanger et jouer. La marketplace gaming complète.",
 

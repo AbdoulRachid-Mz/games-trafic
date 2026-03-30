@@ -7,7 +7,15 @@ import {
 import { getTournamentEditionWithRelations } from "@/actions/editions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { Users, Trophy, Activity, Calendar, GitBranch, ArrowRight, UserCheck, ShieldAlert } from "lucide-react";
+import {
+  Users,
+  Trophy,
+  Activity,
+  Calendar,
+  GitBranch,
+  UserCheck,
+  ShieldAlert,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { notFound } from "next/navigation";
@@ -18,6 +26,8 @@ import { cn } from "@/lib/utils";
 import { StatsCard } from "@/components/ui/stats-card";
 import Image from "next/image";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { CalendarCogIcon } from "@/components/icons/calendar-cog";
+import { ArrowRightIcon } from "@/components/icons/arrow-right";
 
 interface PageProps {
   params: Promise<{
@@ -96,13 +106,21 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
           <Typography variant="h3" weight="bold" className="tracking-tight">
             Vue d'ensemble
           </Typography>
-          <Typography variant="body-sm" theme="muted" className="flex items-center gap-2 mt-1">
+          <Typography
+            variant="body-sm"
+            theme="muted"
+            className="flex items-center gap-2 mt-1"
+          >
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Tableau de bord de l'édition {edition.name || `#${edition.editionNumber}`}
+            Tableau de bord de l'édition{" "}
+            {edition.name || `#${edition.editionNumber}`}
           </Typography>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="px-3 py-1 font-medium bg-background">
+          <Badge
+            variant="outline"
+            className="px-3 py-1 font-medium bg-background"
+          >
             {edition.status}
           </Badge>
           <Button size="sm" asChild>
@@ -110,6 +128,16 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
               Voir la page publique
             </Link>
           </Button>
+          {/* link to organisation page */}
+          {edition.phases && edition.phases.length < 1 && (
+            <Button size="sm" variant="default" asChild>
+              <Link
+                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/organize`}
+              >
+                Organiser <CalendarCogIcon className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -120,11 +148,17 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
           value: stat.value,
           icon: <stat.icon />,
           variant:
-            stat.color === "text-blue-500" ? "primary" :
-              stat.color === "text-amber-500" ? "warning" :
-                stat.color === "text-purple-500" ? "secondary" :
-                  stat.color === "text-emerald-500" ? "success" : "default",
-          className: "min-w-full md:min-w-[250px] lg:flex-1 p-1 border-secondary border-2 bg-secondary/20",
+            stat.color === "text-blue-500"
+              ? "primary"
+              : stat.color === "text-amber-500"
+                ? "warning"
+                : stat.color === "text-purple-500"
+                  ? "secondary"
+                  : stat.color === "text-emerald-500"
+                    ? "success"
+                    : "default",
+          className:
+            "min-w-full md:min-w-[250px] lg:flex-1 p-1 border-secondary border-2 bg-secondary/20",
           bgType: "solid",
           description: stat.description,
         }))}
@@ -148,8 +182,10 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
               </CardTitle>
             </div>
             <Button variant="ghost" size="sm" className="text-xs h-8" asChild>
-              <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants`}>
-                Tout voir <ArrowRight className="ml-1 h-3 w-3" />
+              <Link
+                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants`}
+              >
+                Tout voir <ArrowRightIcon className="ml-1 h-3 w-3" />
               </Link>
             </Button>
           </CardHeader>
@@ -157,7 +193,9 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
             {registrationsResponse.data.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Users className="h-10 w-10 text-muted/30 mb-3" />
-                <Typography variant="body-sm" theme="muted">Aucune inscription pour le moment</Typography>
+                <Typography variant="body-sm" theme="muted">
+                  Aucune inscription pour le moment
+                </Typography>
               </div>
             ) : (
               <div className="space-y-1">
@@ -169,9 +207,16 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 relative rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
                         {reg.member?.avatar ? (
-                          <Image src={reg.member.avatar || '/icons/avatar-2-128.png'} fill alt={`avatar image - ${reg.member?.displayName}`}  className="h-full w-full object-cover" />
+                          <Image
+                            src={reg.member.avatar || "/icons/avatar-2-128.png"}
+                            fill
+                            alt={`avatar image - ${reg.member?.displayName}`}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
-                          reg.member?.displayName?.substring(0, 2).toUpperCase() || "??"
+                          reg.member?.displayName
+                            ?.substring(0, 2)
+                            .toUpperCase() || "??"
                         )}
                       </div>
                       <div>
@@ -179,7 +224,8 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                           {reg.member?.displayName || "Utilisateur"}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Inscrit {formatDistanceToNow(new Date(reg.registeredAt), {
+                          Inscrit{" "}
+                          {formatDistanceToNow(new Date(reg.registeredAt), {
                             addSuffix: true,
                             locale: fr,
                           })}
@@ -192,7 +238,7 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
                           "text-[10px] px-2 py-0.5 font-medium",
                           reg.feePaid
                             ? "bg-emerald-500/10 text-emerald-600 border-emerald-200"
-                            : "bg-amber-500/10 text-amber-600 border-amber-200"
+                            : "bg-amber-500/10 text-amber-600 border-amber-200",
                         )}
                         variant="outline"
                       >
@@ -216,21 +262,36 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {phasesResponse.data.length === 0 ? (
+              {(phasesResponse.data.length === 0 || edition.phases?.length === 0) ? (
                 <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
                   <div className="flex gap-3">
                     <Activity className="h-5 w-5 text-amber-500 shrink-0" />
                     <div>
-                      <Typography variant="body-sm" weight="bold" className="text-amber-700 leading-tight">
+                      <Typography
+                        variant="body-sm"
+                        weight="bold"
+                        className="text-amber-700 leading-tight"
+                      >
                         Structure manquante
                       </Typography>
-                      <Typography variant="caption1" className="text-amber-600/80 mt-1">
-                        Définissez les phases (éliminations, poules) pour lancer le tournoi.
+                      <Typography
+                        variant="caption1"
+                        className="text-amber-600/80 mt-1"
+                      >
+                        Définissez les phases (éliminations, poules) pour lancer
+                        le tournoi.
                       </Typography>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="w-full bg-white hover:bg-amber-50 text-amber-600 border-amber-200" asChild>
-                    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-white hover:bg-amber-50 text-amber-600 border-amber-200"
+                    asChild
+                  >
+                    <Link
+                      href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`}
+                    >
                       Configurer les phases
                     </Link>
                   </Button>
@@ -245,9 +306,16 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
               )}
 
               <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-1">
-                <Typography variant="caption1" weight="bold" className="text-primary uppercase tracking-wider">Note Rapide</Typography>
+                <Typography
+                  variant="caption1"
+                  weight="bold"
+                  className="text-primary uppercase tracking-wider"
+                >
+                  Note Rapide
+                </Typography>
                 <Typography variant="body-sm" theme="muted">
-                  Pensez à vérifier les paiements avant de valider l'arbre final.
+                  Pensez à vérifier les paiements avant de valider l'arbre
+                  final.
                 </Typography>
               </div>
             </CardContent>

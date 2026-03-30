@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, GitBranch, AlertCircle, ArrowUp, ArrowDown, Settings2, Trash2, Zap, Eye, ArrowRight } from "lucide-react";
 import { TournamentPhase } from "@/database/schema";
-import { getTournamentPhases } from "@/actions/tournaments";
+import { getTournamentPhases } from "@/actions/phases";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { CreatePhaseDialog } from "@/components/pages/tournaments/edition-detail/create-phase-dialog";
@@ -51,7 +51,6 @@ export default async function DashboardPhasesPage({ params }: PageProps) {
     filters: { editionId },
     options: { sortBy: "order", sortOrder: "asc", includeInactive: true },
   });
-
   const phases = phasesResponse.data;
 
   return (

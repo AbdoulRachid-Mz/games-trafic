@@ -323,7 +323,25 @@ export async function deletePhaseGroupParticipant(id: string): Promise<void> {
     }
   } catch (error) {
     console.error("Error deleting phase group participant:", error);
-    throw new Error("Failed to delete phase group participant");
+    throw new Error('Failed to delete phase group participant');
+  }
+}
+
+/**
+ * Supprime plusieurs participants de groupe par leurs IDs
+ */
+export async function bulkDeletePhaseGroupParticipants(
+  ids: string[]
+): Promise<void> {
+  try {
+    if (ids.length === 0) return;
+
+    await db
+      .delete(phaseGroupParticipants)
+      .where(inArray(phaseGroupParticipants.id, ids));
+  } catch (error) {
+    console.error('Error bulk deleting phase group participants:', error);
+    throw new Error('Failed to bulk delete phase group participants');
   }
 }
 
@@ -621,6 +639,33 @@ export async function createTournamentPhase(
 }
 
 /**
+ * Crée plusieurs phases de tournoi en une seule transaction
+ */
+export async function bulkCreateTournamentPhases(
+  phasesData: NewTournamentPhase[]
+): Promise<TournamentPhase[]> {
+  try {
+    if (phasesData.length === 0) return [];
+    
+    const result = await db
+      .insert(tournamentPhases)
+      .values(
+        phasesData.map((p) => ({
+          ...p,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+      )
+      .returning();
+
+    return result;
+  } catch (error) {
+    console.error('Error bulk creating tournament phases:', error);
+    throw new Error('Failed to bulk create tournament phases');
+  }
+}
+
+/**
  * Met à jour une phase de tournoi
  */
 export async function updateTournamentPhase(
@@ -704,6 +749,33 @@ export async function createPhaseGroup(groupData: NewPhaseGroup): Promise<PhaseG
       throw error;
     }
     throw new Error('Failed to create phase group');
+  }
+}
+
+/**
+ * Crée plusieurs groupes de phase en une seule transaction
+ */
+export async function bulkCreatePhaseGroups(
+  groupsData: NewPhaseGroup[]
+): Promise<PhaseGroup[]> {
+  try {
+    if (groupsData.length === 0) return [];
+
+    const result = await db
+      .insert(phaseGroups)
+      .values(
+        groupsData.map((g) => ({
+          ...g,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+      )
+      .returning();
+
+    return result;
+  } catch (error) {
+    console.error('Error bulk creating phase groups:', error);
+    throw new Error('Failed to bulk create phase groups');
   }
 }
 
@@ -797,6 +869,33 @@ export async function createPhaseGroupParticipant(
 }
 
 /**
+ * Crée plusieurs participants de groupe en une seule transaction
+ */
+export async function bulkCreatePhaseGroupParticipants(
+  participantsData: NewPhaseGroupParticipant[]
+): Promise<PhaseGroupParticipant[]> {
+  try {
+    if (participantsData.length === 0) return [];
+
+    const result = await db
+      .insert(phaseGroupParticipants)
+      .values(
+        participantsData.map((p) => ({
+          ...p,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+      )
+      .returning();
+
+    return result;
+  } catch (error) {
+    console.error('Error bulk creating phase group participants:', error);
+    throw new Error('Failed to bulk create phase group participants');
+  }
+}
+
+/**
  * Met à jour un participant de groupe
  */
 export async function updatePhaseGroupParticipant(
@@ -882,6 +981,33 @@ export async function createBracketNode(
       throw error;
     }
     throw new Error('Failed to create bracket node');
+  }
+}
+
+/**
+ * Crée plusieurs nœuds de bracket en une seule transaction
+ */
+export async function bulkCreateBracketNodes(
+  nodesData: NewBracketNode[]
+): Promise<BracketNode[]> {
+  try {
+    if (nodesData.length === 0) return [];
+
+    const result = await db
+      .insert(bracketNodes)
+      .values(
+        nodesData.map((n) => ({
+          ...n,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+      )
+      .returning();
+
+    return result;
+  } catch (error) {
+    console.error('Error bulk creating bracket nodes:', error);
+    throw new Error('Failed to bulk create bracket nodes');
   }
 }
 
@@ -1011,6 +1137,33 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
       throw error;
     }
     throw new Error('Failed to create match');
+  }
+}
+
+/**
+ * Crée plusieurs matchs en une seule transaction
+ */
+export async function bulkCreateMatches(
+  matchesData: NewMatch[]
+): Promise<Match[]> {
+  try {
+    if (matchesData.length === 0) return [];
+
+    const result = await db
+      .insert(matches)
+      .values(
+        matchesData.map((m) => ({
+          ...m,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+      )
+      .returning();
+
+    return result;
+  } catch (error) {
+    console.error('Error bulk creating matches:', error);
+    throw new Error('Failed to bulk create matches');
   }
 }
 

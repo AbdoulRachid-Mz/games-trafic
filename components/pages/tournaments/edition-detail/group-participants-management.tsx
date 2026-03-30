@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useMemo } from "react";
 import { 
   Card, 
   CardContent, 
   CardHeader, 
   CardTitle, 
-  CardDescription 
+  CardDescription,
+  CardFooter
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Table, 
   TableBody, 
   TableCell, 
-  TableHead, 
-  TableHeader, 
   TableRow 
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,18 +23,21 @@ import {
   UserMinus, 
   Search, 
   Loader2, 
-  ArrowRightLeft,
-  CheckCircle2
+  CheckCircle2,
+  Save,
+  Undo2,
+  MoveRight,
+  MoveLeft
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { 
-  createPhaseGroupParticipant, 
-  deletePhaseGroupParticipant 
+  bulkCreatePhaseGroupParticipants, 
+  bulkDeletePhaseGroupParticipants 
 } from "@/actions/phases";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface GroupParticipantsManagementProps {
   groupId: string;
@@ -54,233 +56,239 @@ export function GroupParticipantsManagement({
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   
-  // IDs of participants already in the group
-  const groupParticipantRegIds = groupParticipants.map(p => p.registrationId);
+  // Draft State
+  const [draftAddIds, setDraftAddIds] = useState<Set<string>>(new Set());
+  const [draftRemoveIds, setDraftRemoveIds] = useState<Set<string>>(new Set());
+
+  // Derived State
+  const currentGroupParticipantIds = useMemo(() => new Set(groupParticipants.map(p => p.registrationId)), [groupParticipants]);
   
-  // Filter registered edition participants NOT in the group
-  const availableParticipants = allEditionRegistrations.filter(
-    reg => !groupParticipantRegIds.includes(reg.id) &&
-    (reg.member?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     reg.member?.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Participants to show on the left (Available)
+  const availableList = useMemo(() => {
+    return allEditionRegistrations.filter(reg => {
+      const isCurrentlyInGroup = currentGroupParticipantIds.has(reg.id);
+      const isDraftAdded = draftAddIds.has(reg.id);
+      const isDraftRemoved = groupParticipants.find(p => p.registrationId === reg.id && draftRemoveIds.has(p.id));
+      
+      // Show if: (Not in group AND not draft added) OR (In group AND draft removed)
+      if (isCurrentlyInGroup && !isDraftRemoved) return false;
+      if (!isCurrentlyInGroup && isDraftAdded) return false;
 
-  const [selectedAvailable, setSelectedAvailable] = useState<string[]>([]);
-  const [selectedInGroup, setSelectedInGroup] = useState<string[]>([]);
-
-  const handleAddSelected = () => {
-    startTransition(async () => {
-      try {
-        for (const regId of selectedAvailable) {
-          await createPhaseGroupParticipant({ groupId, registrationId: regId } as any);
-        }
-        toast.success(`${selectedAvailable.length} participant(s) ajouté(s) au groupe.`);
-        setSelectedAvailable([]);
-        router.refresh();
-      } catch (error) {
-        toast.error("Erreur lors de l'ajout des participants.");
-      }
+      const nameMatch = reg.member?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        reg.member?.user?.username?.toLowerCase().includes(searchQuery.toLowerCase());
+      return nameMatch;
     });
+  }, [allEditionRegistrations, currentGroupParticipantIds, draftAddIds, draftRemoveIds, groupParticipants, searchQuery]);
+
+  // Participants to show on the right (Group)
+  const groupList = useMemo(() => {
+    // Start with current group participants minus draft removals
+    const base = groupParticipants.filter(p => !draftRemoveIds.has(p.id))
+      .map(p => {
+        const reg = allEditionRegistrations.find(r => r.id === p.registrationId);
+        return { ...p, reg, isDraft: false };
+      });
+    
+    // Add draft additions
+    const added = Array.from(draftAddIds).map(regId => {
+      const reg = allEditionRegistrations.find(r => r.id === regId);
+      return { id: `draft-${regId}`, registrationId: regId, reg, isDraft: true };
+    });
+
+    return [...base, ...added];
+  }, [groupParticipants, draftRemoveIds, draftAddIds, allEditionRegistrations]);
+
+  const toggleAdd = (regId: string) => {
+    const next = new Set(draftAddIds);
+    if (next.has(regId)) next.delete(regId);
+    else {
+      // If it was in draftRemoveIds (indirectly via registrationId), remove it from there
+      const p = groupParticipants.find(p => p.registrationId === regId && draftRemoveIds.has(p.id));
+      if (p) setDraftRemoveIds(prev => {
+        const n = new Set(prev);
+        n.delete(p.id);
+        return n;
+      });
+      else next.add(regId);
+    }
+    setDraftAddIds(next);
   };
 
-  const handleRemoveSelected = () => {
+  const toggleRemove = (pId: string, regId: string) => {
+    if (pId.startsWith('draft-')) {
+      setDraftAddIds(prev => {
+        const n = new Set(prev);
+        n.delete(regId);
+        return n;
+      });
+    } else {
+      setDraftRemoveIds(prev => {
+        const n = new Set(prev);
+        if (n.has(pId)) n.delete(pId);
+        else n.add(pId);
+        return n;
+      });
+    }
+  };
+
+  const hasChanges = draftAddIds.size > 0 || draftRemoveIds.size > 0;
+
+  const handleSave = () => {
     startTransition(async () => {
       try {
-        for (const participantId of selectedInGroup) {
-          await deletePhaseGroupParticipant(participantId);
+        // 1. Bulk Delete
+        if (draftRemoveIds.size > 0) {
+          await bulkDeletePhaseGroupParticipants(Array.from(draftRemoveIds));
         }
-        toast.success(`${selectedInGroup.length} participant(s) retiré(s) du groupe.`);
-        setSelectedInGroup([]);
+
+        // 2. Bulk Create
+        if (draftAddIds.size > 0) {
+          await bulkCreatePhaseGroupParticipants(
+            Array.from(draftAddIds).map(regId => ({
+              groupId,
+              registrationId: regId,
+            } as any))
+          );
+        }
+
+        toast.success("Modifications enregistrées !");
+        setDraftAddIds(new Set());
+        setDraftRemoveIds(new Set());
         router.refresh();
       } catch (error) {
-        toast.error("Erreur lors du retrait des participants.");
+        toast.error("Erreur lors de la mise à jour massive.");
       }
     });
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      {/* List 1: Available in Edition */}
-      <Card className="border-none shadow-md overflow-hidden bg-muted/20">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" /> Disponibles dans l'Édition
-              </CardTitle>
-              <CardDescription className="text-[10px]">
-                Inscrits à l'édition mais pas encore dans ce groupe.
-              </CardDescription>
-            </div>
-            {selectedAvailable.length > 0 && (
-              <Button 
-                size="sm" 
-                onClick={handleAddSelected} 
-                disabled={isPending}
-                className="h-8 gap-1.5 animate-in slide-in-from-right-4 duration-300"
-              >
-                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
-                Ajouter ({selectedAvailable.length})
-              </Button>
-            )}
-          </div>
-          <div className="relative mt-2">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un participant..."
-              className="pl-9 h-9 text-xs"
+    <div className="space-y-6">
+      {/* Control Bar */}
+      <div className="flex items-center justify-between bg-card p-4 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-4 flex-1 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Filtrer les participants..." 
+              className="pl-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-        </CardHeader>
-        <CardContent className="p-0 border-t">
-          <div className="max-h-[400px] overflow-y-auto">
-            <Table>
-              <TableBody>
-                {availableParticipants.length === 0 ? (
-                  <TableRow>
-                    <TableCell className="text-center py-10 text-muted-foreground text-xs italic">
-                      Aucun participant disponible trouvé.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  availableParticipants.map((reg) => (
-                    <TableRow key={reg.id} className="hover:bg-primary/5 transition-colors group">
-                      <TableCell className="w-10 pl-4">
-                        <Checkbox 
-                          checked={selectedAvailable.includes(reg.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) setSelectedAvailable([...selectedAvailable, reg.id]);
-                            else setSelectedAvailable(selectedAvailable.filter(id => id !== reg.id));
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="py-2.5">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-7 w-7 border">
-                            <AvatarImage src={reg.member?.user?.profileImage || ""} />
-                            <AvatarFallback className="text-[10px]">{reg.member?.displayName?.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-semibold leading-tight">
-                              {reg.member?.displayName || reg.member?.user?.username || "Joueur"}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {reg.member?.team?.name || "Individuel"}
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 w-7 p-0"
-                          onClick={() => {
-                            setSelectedAvailable([reg.id]);
-                            handleAddSelected();
-                          }}
-                        >
-                          <UserPlus className="h-3.5 w-3.5 text-primary" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="flex items-center gap-3">
+          {hasChanges && (
+            <Button variant="ghost" size="sm" onClick={() => { setDraftAddIds(new Set()); setDraftRemoveIds(new Set()); }} className="text-muted-foreground font-bold">
+              <Undo2 className="h-4 w-4 mr-2" /> Annuler
+            </Button>
+          )}
+          <Button 
+            disabled={!hasChanges || isPending} 
+            onClick={handleSave}
+            className={cn("font-bold gap-2 shadow-lg transition-all", hasChanges ? "bg-primary shadow-primary/20" : "")}
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-white" />}
+            Enregistrer les modifications ({draftAddIds.size + draftRemoveIds.size})
+          </Button>
+        </div>
+      </div>
 
-      {/* List 2: Members in Group */}
-      <Card className="border-none shadow-md overflow-hidden bg-card">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" /> Membres du Groupe ({groupParticipants.length})
-              </CardTitle>
-              <CardDescription className="text-[10px]">
-                Participants actuellement assignés à ce groupe.
-              </CardDescription>
-            </div>
-            {selectedInGroup.length > 0 && (
-              <Button 
-                size="sm" 
-                variant="destructive"
-                onClick={handleRemoveSelected} 
-                disabled={isPending}
-                className="h-8 gap-1.5 animate-in slide-in-from-left-4 duration-300"
-              >
-                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />}
-                Retirer ({selectedInGroup.length})
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 border-t">
-          <div className="max-h-[400px] overflow-y-auto">
-            <Table>
-              <TableBody>
-                {groupParticipants.length === 0 ? (
-                  <TableRow>
-                    <TableCell className="text-center py-12 text-muted-foreground text-xs italic">
-                      Ce groupe est vide. Ajoutez des participants depuis la liste de gauche.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  groupParticipants.map((p) => {
-                    const reg = allEditionRegistrations.find(r => r.id === p.registrationId);
-                    return (
-                      <TableRow key={p.id} className="hover:bg-destructive/5 transition-colors group">
-                        <TableCell className="w-10 pl-4">
-                          <Checkbox 
-                            checked={selectedInGroup.includes(p.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedInGroup([...selectedInGroup, p.id]);
-                              else setSelectedInGroup(selectedInGroup.filter(id => id !== p.id));
-                            }}
-                          />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        {/* Available List */}
+        <Card className="border-none shadow-xl bg-muted/30">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+               <Users className="h-4 w-4 text-primary" /> Disponibles ({availableList.length})
+            </CardTitle>
+            <CardDescription className="text-[10px]">Cliquez sur un participant pour l'ajouter au draft.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t bg-card/50">
+            <div className="max-h-[500px] overflow-y-auto">
+              <Table>
+                <TableBody>
+                  {availableList.length === 0 ? (
+                    <TableRow>
+                      <TableCell className="text-center py-20 text-muted-foreground text-xs italic">Aucun participant disponible</TableCell>
+                    </TableRow>
+                  ) : (
+                    availableList.map((reg) => (
+                      <TableRow key={reg.id} className="hover:bg-primary/5 cursor-pointer group" onClick={() => toggleAdd(reg.id)}>
+                        <TableCell className="py-3 pl-6">
+                           <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                                <AvatarImage src={reg.member?.user?.profileImage || ""} />
+                                <AvatarFallback className="bg-primary/10 text-primary font-bold">{reg.member?.displayName?.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold leading-tight">{reg.member?.displayName || reg.member?.user?.username}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter mt-1">ID: {reg.id.slice(0,8)}</span>
+                              </div>
+                           </div>
                         </TableCell>
-                        <TableCell className="py-2.5">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-7 w-7 border">
-                              <AvatarImage src={reg?.member?.user?.profileImage || ""} />
-                              <AvatarFallback className="text-[10px]">{reg?.member?.displayName?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold leading-tight">
-                                {reg?.member?.displayName || reg?.member?.user?.username || "Joueur"}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                Pos: {p.position || "N/A"} • Pts: {p.points || 0}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right pr-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 w-7 p-0 hover:bg-destructive/10"
-                            onClick={() => {
-                              setSelectedInGroup([p.id]);
-                              handleRemoveSelected();
-                            }}
-                          >
-                            <UserMinus className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
+                        <TableCell className="text-right pr-6">
+                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-primary border border-primary/20">
+                              <MoveRight className="h-4 w-4" />
+                           </div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Group List */}
+        <Card className="border-none shadow-xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+               <CheckCircle2 className="h-4 w-4 text-green-500" /> Membres du Groupe ({groupList.length})
+            </CardTitle>
+            <CardDescription className="text-[10px]">Les nouveaux membres (draft) apparaissent en couleur.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 border-t">
+            <div className="max-h-[500px] overflow-y-auto">
+              <Table>
+                <TableBody>
+                  {groupList.length === 0 ? (
+                    <TableRow>
+                      <TableCell className="text-center py-20 text-muted-foreground text-xs italic">Groupe vide</TableCell>
+                    </TableRow>
+                  ) : (
+                    groupList.map((p) => (
+                      <TableRow key={p.id} className={cn("hover:bg-destructive/5 cursor-pointer group", p.isDraft && "bg-emerald-50/50")} onClick={() => toggleRemove(p.id, p.registrationId)}>
+                        <TableCell className="py-3 pl-6">
+                           <div className="flex items-center gap-3">
+                              <Avatar className={cn("h-10 w-10 border-2 border-background shadow-sm", p.isDraft && "ring-2 ring-emerald-500 ring-offset-2")}>
+                                <AvatarImage src={p.reg?.member?.user?.profileImage || ""} />
+                                <AvatarFallback className="font-bold">{p.reg?.member?.displayName?.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold leading-tight">{p.reg?.member?.displayName || p.reg?.member?.user?.username}</span>
+                                  {p.isDraft && <Badge className="bg-emerald-500 text-[8px] h-3.5 px-1">NOUVEAU</Badge>}
+                                </div>
+                                <span className={cn("text-[10px] mt-1 font-mono tracking-tighter", p.isDraft ? "text-emerald-600 font-bold" : "text-muted-foreground")}>
+                                  {p.isDraft ? "À AJOUTER" : `Pts: ${p.points || 0} • Pos: ${p.position || "N/A"}`}
+                                </span>
+                              </div>
+                           </div>
+                        </TableCell>
+                        <TableCell className="text-right pr-6">
+                           <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-destructive border border-destructive/20">
+                              <MoveLeft className="h-4 w-4" />
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -8,8 +8,8 @@ import {
 } from "@/database/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getTournamentEditionWithRelations, getEditionActivePhase } from "@/actions/editions";
-import { getTournamentById, getTournamentEditionById, getTournamentMembers, getTournamentPhases } from "@/actions/tournaments";
-import { getPhaseGroups, getPhaseGroupParticipants } from "@/actions/phases";
+import { getTournamentById, getTournamentEditionById, getTournamentMembers } from "@/actions/tournaments";
+import { getPhaseGroups, getPhaseGroupParticipants, getTournamentPhases } from "@/actions/phases";
 import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,6 +57,7 @@ export default async function EditionPage({ params }: PageProps) {
     options: { sortBy: "order", sortOrder: "asc" },
   });
   const phases = phasesResponse.data || edition.phases;
+  console.log("phasesResponse", phases)
 
   // Removed server-side standings load to use Client Component independent loading.
 
@@ -107,7 +108,7 @@ export default async function EditionPage({ params }: PageProps) {
       {/* Free badge */}
       {isFree && (
         <div className="max-w-md mx-auto text-center">
-          <Badge className="bg-green-600 text-white text-lg px-6 py-2 font-black uppercase tracking-wider">
+          <Badge className="bg-primary text-white text-lg px-6 py-2 font-black uppercase tracking-wider">
             🎉 GRATUIT — Inscription libre
           </Badge>
         </div>
@@ -140,7 +141,7 @@ export default async function EditionPage({ params }: PageProps) {
       {/* Paid confirmation */}
       {!isFree && isRegistered && hasPaid && (
         <div className="max-w-md mx-auto text-center">
-          <Badge className="bg-green-600 text-white text-sm px-4 py-1.5">
+          <Badge className="bg-primary text-white text-sm px-4 py-1.5">
             ✅ Paiement confirmé
           </Badge>
         </div>
