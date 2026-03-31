@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { FilterBar } from "@/components/admin/filter-bar";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { StatCard } from "@/components/admin/stat-card";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { ResponsiveFilters } from "@/components/shared/responsive-filters";
 import {
   Select,
   SelectContent,
@@ -57,6 +59,7 @@ import {
   MoreVertical,
   ArrowUpRight,
   ArrowDownLeft,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -281,83 +284,75 @@ export default function AdminTransactionsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Stats Section */}
+      <StatsCarousel mode="auto">
         <StatCard
           title="Total Transactions"
           value={stats?.total || 0}
           icon={CreditCard}
-          description="Toutes opérations"
+          iconClassName="bg-blue-500/10 text-blue-500"
         />
         <StatCard
           title="Complétées"
           value={stats?.completed || 0}
           icon={TrendingUp}
-          description="Transactions réussies"
+          iconClassName="bg-green-500/10 text-green-500"
         />
         <StatCard
           title="En Attente"
           value={stats?.pending || 0}
-          icon={Wallet}
-          description="À traiter"
+          icon={Clock}
+          iconClassName="bg-amber-500/10 text-amber-500"
         />
         <StatCard
           title="Volume Total"
-          value={`${parseFloat(stats?.totalAmount?.toString() || "0").toFixed(
-            0
-          )} GTC`}
+          value={`${parseFloat(stats?.totalAmount?.toString() || "0").toFixed(0)} GTC`}
           icon={Wallet}
-          description={`${parseFloat(
-            stats?.totalFees?.toString() || "0"
-          ).toFixed(0)} GTC frais`}
+          iconClassName="bg-purple-500/10 text-purple-500"
         />
-      </div>
+      </StatsCarousel>
 
       {/* Filters */}
-      <Card className="bg-card/40 backdrop-blur-xl border-border/50">
-        <CardContent className="p-6">
-          <FilterBar
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            placeholder="Rechercher par ID ou description..."
-            hasActiveFilters={typeFilter !== "all" || statusFilter !== "all"}
-            onClearFilters={() => {
-              setTypeFilter("all");
-              setStatusFilter("all");
-              setSearchQuery("");
-            }}
-          >
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px] rounded-xl">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="DEPOSIT">Dépôt</SelectItem>
-                <SelectItem value="WITHDRAWAL">Retrait</SelectItem>
-                <SelectItem value="TRANSFER">Transfert</SelectItem>
-                <SelectItem value="PURCHASE">Achat</SelectItem>
-                <SelectItem value="BONUS">Bonus</SelectItem>
-                <SelectItem value="REFUND">Remboursement</SelectItem>
-              </SelectContent>
-            </Select>
+      <ResponsiveFilters
+        searchTerm={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Rechercher par ID ou description..."
+        activeFiltersCount={(typeFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0)}
+        onReset={() => {
+          setTypeFilter("all");
+          setStatusFilter("all");
+          setSearchQuery("");
+        }}
+      >
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px] rounded-xl">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les types</SelectItem>
+            <SelectItem value="DEPOSIT">Dépôt</SelectItem>
+            <SelectItem value="WITHDRAWAL">Retrait</SelectItem>
+            <SelectItem value="TRANSFER">Transfert</SelectItem>
+            <SelectItem value="PURCHASE">Achat</SelectItem>
+            <SelectItem value="BONUS">Bonus</SelectItem>
+            <SelectItem value="REFUND">Remboursement</SelectItem>
+          </SelectContent>
+        </Select>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] rounded-xl">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="PENDING">En attente</SelectItem>
-                <SelectItem value="PROCESSING">En cours</SelectItem>
-                <SelectItem value="COMPLETED">Complété</SelectItem>
-                <SelectItem value="FAILED">Échoué</SelectItem>
-                <SelectItem value="REFUNDED">Remboursé</SelectItem>
-              </SelectContent>
-            </Select>
-          </FilterBar>
-        </CardContent>
-      </Card>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px] rounded-xl">
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="PENDING">En attente</SelectItem>
+            <SelectItem value="PROCESSING">En cours</SelectItem>
+            <SelectItem value="COMPLETED">Complété</SelectItem>
+            <SelectItem value="FAILED">Échoué</SelectItem>
+            <SelectItem value="REFUNDED">Remboursé</SelectItem>
+          </SelectContent>
+        </Select>
+      </ResponsiveFilters>
 
       {/* Transactions Table */}
       <Card className="bg-card/40 backdrop-blur-xl border-border/50">

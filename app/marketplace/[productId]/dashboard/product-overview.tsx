@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { StatCard } from "@/components/admin/stat-card";
 
 interface ProductOverviewProps {
     product: any;
@@ -58,26 +60,18 @@ export function ProductOverview({ product, productId }: ProductOverviewProps) {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatsCarousel mode="auto">
                 {stats.map((stat, i) => (
-                    <Card key={i} className="border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden group hover:border-primary/50 transition-colors rounded-[2rem]">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{stat.title}</CardTitle>
-                            <div className={cn("p-2 rounded-xl bg-muted group-hover:bg-primary/10 transition-colors", stat.color.replace("text-", "bg-").replace("500", "500/10"))}>
-                                <stat.icon className={cn("h-4 w-4", stat.color)} />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-3xl font-black italic">{stat.value}</div>
-                            <div className="flex items-center mt-1 text-xs text-green-500 font-bold">
-                                <TrendingUp className="w-3 h-3 mr-1" />
-                                {stat.change}
-                                <span className="text-muted-foreground ml-2 font-normal">v.s mois dernier</span>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <StatCard
+                        key={i}
+                        title={stat.title}
+                        value={stat.value}
+                        icon={stat.icon}
+                        trend={{ value: parseInt(stat.change), label: "v.s mois dernier" }}
+                        iconClassName={cn("bg-muted group-hover:bg-primary/10 transition-colors", stat.color.replace("text-", "bg-").replace("500", "500/10"))}
+                    />
                 ))}
-            </div>
+            </StatsCarousel>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
                 <Card className="lg:col-span-4 border-border/50 bg-card/30 backdrop-blur-sm rounded-[2.5rem]">

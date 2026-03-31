@@ -10,6 +10,7 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { Store, ShoppingBag, Trophy, CreditCard } from "lucide-react";
 import { getUserStats } from "@/actions/user-stats";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 export default function DashboardPage() {
   const { user } = useAuthContext();
@@ -67,8 +68,8 @@ export default function DashboardPage() {
         </Typography>
       </motion.div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Section with Carousel */}
+      <StatsCarousel mode="auto">
         <StatsCard
           title="Boutiques"
           value={stats?.overview.total_shops ?? 0}
@@ -108,7 +109,7 @@ export default function DashboardPage() {
           trend="up"
           delay={0.3}
         />
-      </div>
+      </StatsCarousel>
 
       {/* Quick Actions */}
       <motion.div

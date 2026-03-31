@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterBar } from "@/components/admin/filter-bar";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { StatCard } from "@/components/admin/stat-card";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { ResponsiveFilters } from "@/components/shared/responsive-filters";
 import {
   Table,
   TableBody,
@@ -408,69 +410,56 @@ export default function AdminRequestsPage() {
         </div>
       </div>
 
-      <Card className="bg-card/40 backdrop-blur-xl border-border/50">
-        <CardContent className="p-4">
-          <FilterBar
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            placeholder="Rechercher par ID, méthode ou fournisseur..."
-            hasActiveFilters={statusFilter !== "PENDING"}
-            onClearFilters={() => {
-              setStatusFilter("PENDING");
-              setSearchQuery("");
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <Label>Statut</Label>
-              <select
-                className="border rounded-md px-2 py-1 text-sm bg-background"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="PENDING">En attente</option>
-                <option value="APPROVED">Approuvées</option>
-                <option value="REJECTED">Rejetées</option>
-                <option value="COMPLETED">Terminées</option>
-                <option value="all">Tous</option>
-              </select>
-            </div>
-          </FilterBar>
-        </CardContent>
-      </Card>
+      <ResponsiveFilters
+        searchTerm={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Rechercher par ID, méthode ou fournisseur..."
+        activeFiltersCount={statusFilter !== "PENDING" ? 1 : 0}
+        onReset={() => {
+          setStatusFilter("PENDING");
+          setSearchQuery("");
+        }}
+      >
+        <select
+          className="border rounded-md px-3 py-2 text-sm bg-background h-10 w-[180px]"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="PENDING">En attente</option>
+          <option value="APPROVED">Approuvées</option>
+          <option value="REJECTED">Rejetées</option>
+          <option value="COMPLETED">Terminées</option>
+          <option value="all">Tous</option>
+        </select>
+      </ResponsiveFilters>
 
-      {/* Statistiques avec carousel mobile */}
-      <div className="relative group">
-        <div className="flex overflow-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
-          <StatCard
-            title="Total Demandes"
-            value={stats?.total || 0}
-            icon={AlertCircle}
-            color="blue"
-            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
-          />
-          <StatCard
-            title="En attente"
-            value={stats?.pending || 0}
-            icon={Clock}
-            color="yellow"
-            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
-          />
-          <StatCard
-            title="Complétées"
-            value={stats?.completed || 0}
-            icon={CheckCircle}
-            color="green"
-            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
-          />
-          <StatCard
-            title="Montant Total"
-            value={`${Number(stats?.totalAmount || 0).toLocaleString()} GTC`}
-            icon={Wallet}
-            color="purple"
-            className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1"
-          />
-        </div>
-      </div>
+      {/* Stats Section */}
+      <StatsCarousel mode="auto">
+        <StatCard
+          title="Total Demandes"
+          value={stats?.total || 0}
+          icon={AlertCircle}
+          iconClassName="bg-blue-500/10 text-blue-500"
+        />
+        <StatCard
+          title="En attente"
+          value={stats?.pending || 0}
+          icon={Clock}
+          iconClassName="bg-amber-500/10 text-amber-500"
+        />
+        <StatCard
+          title="Complétées"
+          value={stats?.completed || 0}
+          icon={CheckCircle}
+          iconClassName="bg-green-500/10 text-green-500"
+        />
+        <StatCard
+          title="Montant Total"
+          value={`${Number(stats?.totalAmount || 0).toLocaleString()} GTC`}
+          icon={Wallet}
+          iconClassName="bg-purple-500/10 text-purple-500"
+        />
+      </StatsCarousel>
 
       {/* Tabs */}
       <Tabs

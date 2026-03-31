@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { FilterBar } from "@/components/admin/filter-bar";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { StatCard } from "@/components/admin/stat-card";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { ResponsiveFilters } from "@/components/shared/responsive-filters";
 import {
   Select,
   SelectContent,
@@ -268,65 +270,59 @@ export default function AdminOrdersPage() {
         </Typography>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Stats Section */}
+      <StatsCarousel mode="auto">
         <StatCard
           title="Total Commandes"
           value={stats.total}
           icon={ShoppingBag}
-          description="Toutes commandes"
+          iconClassName="bg-blue-500/10 text-blue-500"
         />
         <StatCard
           title="En Attente"
           value={stats.pending}
           icon={Clock}
-          description="À traiter"
+          iconClassName="bg-amber-500/10 text-amber-500"
         />
         <StatCard
           title="Validées Boutique"
           value={stats.accepted}
           icon={CheckCircle}
-          description="En attente Admin"
+          iconClassName="bg-green-500/10 text-green-500"
         />
         <StatCard
           title="Finalisées"
           value={stats.completed}
           icon={CheckCircle}
-          description="Terminées"
+          iconClassName="bg-primary/10 text-primary"
         />
-      </div>
+      </StatsCarousel>
 
-      {/* Filters */}
-      <Card className="bg-card/40 backdrop-blur-xl border-border/50">
-        <CardContent className="p-6">
-          <FilterBar
-            searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
-            placeholder="Rechercher par ID, produit ou acheteur..."
-            hasActiveFilters={statusFilter !== "all"}
-            onClearFilters={() => {
-              setStatusFilter("all");
-              setSearchQuery("");
-            }}
-          >
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] rounded-xl">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="PENDING">En attente</SelectItem>
-                <SelectItem value="ACCEPTED_BY_SHOP">Validé par Boutique</SelectItem>
-                <SelectItem value="COMPLETED">Terminé</SelectItem>
-                <SelectItem value="REJECTED_BY_ADMIN">Rejeté Admin</SelectItem>
-                <SelectItem value="REJECTED_BY_SHOP">Rejeté Boutique</SelectItem>
-                <SelectItem value="CANCELLED">Annulé</SelectItem>
-              </SelectContent>
-            </Select>
-          </FilterBar>
-
-        </CardContent>
-      </Card>
+      <ResponsiveFilters
+        searchTerm={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Rechercher par ID, produit ou acheteur..."
+        activeFiltersCount={statusFilter !== "all" ? 1 : 0}
+        onReset={() => {
+          setStatusFilter("all");
+          setSearchQuery("");
+        }}
+      >
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px] rounded-xl">
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="PENDING">En attente</SelectItem>
+            <SelectItem value="ACCEPTED_BY_SHOP">Validé par Boutique</SelectItem>
+            <SelectItem value="COMPLETED">Terminé</SelectItem>
+            <SelectItem value="REJECTED_BY_ADMIN">Rejeté Admin</SelectItem>
+            <SelectItem value="REJECTED_BY_SHOP">Rejeté Boutique</SelectItem>
+            <SelectItem value="CANCELLED">Annulé</SelectItem>
+          </SelectContent>
+        </Select>
+      </ResponsiveFilters>
 
       {/* Orders Table */}
       <Card className="bg-card/40 backdrop-blur-xl border-border/50">

@@ -25,6 +25,7 @@ import {
   DollarSign,
   Store,
 } from "lucide-react";
+import { StatCard } from "@/components/admin/stat-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -105,25 +106,25 @@ export default function AdminProductsPage() {
           title="Total Produits"
           value={stats.total}
           icon={Package}
-          color="blue"
+          iconClassName="bg-blue-500/10 text-blue-500"
         />
         <StatCard
           title="Prix Moyen"
           value={formatCurrency(stats.averagePrice || 0, "GTC")}
           icon={DollarSign}
-          color="green"
+          iconClassName="bg-green-500/10 text-green-500"
         />
         <StatCard
           title="Produits Vendus"
           value={stats.sold}
           icon={CheckCircle}
-          color="purple"
+          iconClassName="bg-purple-500/10 text-purple-500"
         />
         <StatCard
           title="En vedette"
           value={stats.featured}
           icon={TrendingUp}
-          color="amber"
+          iconClassName="bg-amber-500/10 text-amber-500"
         />
       </>
     );
@@ -270,25 +271,3 @@ export default function AdminProductsPage() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, color }: any) {
-  const colorClasses: any = {
-    blue: "bg-blue-500/10 text-blue-500",
-    green: "bg-green-500/10 text-green-500",
-    amber: "bg-amber-500/10 text-amber-500",
-    purple: "bg-purple-500/10 text-purple-500",
-  };
-
-  return (
-    <Card className="min-w-[200px] flex-shrink-0 snap-center lg:flex-1">
-      <CardContent className="p-4 flex items-center gap-4">
-        <div className={cn("p-3 rounded-xl", colorClasses[color])}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground uppercase">{title}</div>
-          <div className="text-xl font-bold">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

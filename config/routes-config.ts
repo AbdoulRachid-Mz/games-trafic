@@ -168,6 +168,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     requireAdmin: true,
     styleGroup: "admin",
     showOnTap: false,
+    priority: 100
   },
 
   // =============================================
@@ -205,6 +206,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     showAIAssistant: false,
     styleGroup: "dashboard",
     showOnTap: false,
+    priority: 100
   },
   {
     path: [
@@ -1015,7 +1017,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   // CONFIGURATION PAR DÉFAUT
   // =============================================
   {
-    path: "/**",
+    path: "/",
     name: "Default",
     breadcrumbs: true,
     footer: true,
@@ -1025,7 +1027,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     floatingActions: true,
     showAIAssistant: true,
-    hideTopMiddleOnScroll: false,
+    hideTopMiddleOnScroll: true,
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: false },
       {

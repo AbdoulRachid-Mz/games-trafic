@@ -1,5 +1,3 @@
-// @/components/shared/stats-card-carousel.tsx
-
 "use client"
 
 import * as React from "react"
@@ -8,6 +6,8 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
 } from "@/components/ui/carousel"
 import { StatsCard } from "@/components/ui/stats-card"
 import { useScreenSize } from "@/hooks/use-screen"
@@ -15,10 +15,11 @@ import { useScreenSize } from "@/hooks/use-screen"
 type StatsItem = React.ComponentProps<typeof StatsCard>
 
 interface StatsCarouselProps {
-  data: StatsItem[]
+  data?: StatsItem[]
+  children?: React.ReactNode
+
   className?: string
 
-  // nombre d'items visibles
   itemsPerView?: {
     mobile?: number
     md?: number
@@ -26,11 +27,23 @@ interface StatsCarouselProps {
     xl?: number
   }
 
-  gap?: number // gap entre items
+  gap?: number
+
+  // 🔥 NEW
+  withNavButtons?: boolean
+  mode?: "carousel" | "grid" | "auto"
+  dragFree?: boolean
+  loop?: boolean
+  showScrollbar?: boolean
+
+  // fallback skeleton
+  loading?: boolean
+  skeletonCount?: number
 }
 
 export function StatsCarousel({
   data,
+  children,
   className,
   itemsPerView = {
     mobile: 1,
@@ -39,8 +52,15 @@ export function StatsCarousel({
     xl: 4,
   },
   gap = 12,
+  withNavButtons = false,
+  showScrollbar = false,
+  mode = "carousel",
+  dragFree = true,
+  loop = false,
+  loading = false,
+  skeletonCount = 4,
 }: StatsCarouselProps) {
-  const { isMobile, isTablet, isDesktop, isXLargeScreen, is2XLargeScreen } =
+  const { isMobile, isTablet, isDesktop, isXLargeScreen } =
     useScreenSize()
 
   const getItemsPerView = () => {
@@ -51,38 +71,86 @@ export function StatsCarousel({
   }
 
   const itemsCount = getItemsPerView()
-
-  // largeur dynamique
   const basis = `${100 / itemsCount}%`
 
-  return (
-    <Carousel
-      opts={{
-        align: "start",
-        dragFree: true, // 👈 swipe fluide
-      }}
-      className={cn("w-full", className)}
-    >
-      <CarouselContent
+  // 🔥 AUTO MODE
+  const shouldUseCarousel =
+    mode === "carousel" ||
+    (mode === "auto" && (isMobile || (data?.length ?? 0) > itemsCount))
+
+  // 🔥 CONTENT BUILDER
+  const renderItems = () => {
+    if (loading) {
+      return Array.from({ length: skeletonCount }).map((_, i) => (
+        <div
+          key={i}
+          className="h-24 w-full animate-pulse rounded-xl bg-muted"
+        />
+      ))
+    }
+
+    if (children) return children
+
+    return data?.map((item, index) => (
+      <StatsCard
+        key={index}
+        {...item}
+        className={cn("w-full h-full", item.className)}
+      />
+    ))
+  }
+
+  // 🔥 GRID MODE
+  if (!shouldUseCarousel) {
+    return (
+      <div
+        className={cn("grid w-full", className)}
         style={{
           gap: `${gap}px`,
+          gridTemplateColumns: `repeat(${itemsCount}, minmax(0, 1fr))`,
         }}
       >
-        {data.map((item, index) => (
-          <CarouselItem
-            key={index}
-            style={{
-              flex: `0 0 ${basis}`,
-              maxWidth: basis,
-            }}
-          >
-            <StatsCard
-              {...item}
-              className={cn("w-full h-full", item.className)}
-            />
-          </CarouselItem>
-        ))}
-      </CarouselContent>
-    </Carousel>
+        {renderItems()}
+      </div>
+    )
+  }
+
+  // 🔥 CAROUSEL MODE
+  return (
+    <div className={cn("relative w-full", className)}>
+      <Carousel
+        opts={{
+          align: "start",
+          dragFree,
+          loop,
+        }}
+      >
+        <CarouselContent
+          style={{
+            gap: `${gap}px`,
+          }}
+        >
+          {React.Children.map(renderItems(), (child, index) => (
+            <CarouselItem
+              key={index}
+              style={{
+                flex: `0 0 ${basis}`,
+                maxWidth: basis,
+              }}
+            >
+              {child}
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+
+        {/* 🔥 NAV BUTTONS */}
+        {withNavButtons && (
+          <>
+            <CarouselPrevious className="left-[-10px]" />
+            <CarouselNext className="right-[-10px]" />
+          </>
+        )}
+      </Carousel>
+    </div>
   )
 }

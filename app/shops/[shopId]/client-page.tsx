@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 import { InteractionButton } from "@/components/shared/interaction-button";
 import { getShopById, getPopularShops } from "@/actions/shops";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -424,37 +425,38 @@ export function ShopPageContent() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Section with Carousel */}
       <div className="container mx-auto p-3">
-        <div className="overflow-x-auto w-full">
-          <div className="flex gap-3 justify-center items-center min-w-max">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex-1 max-md:min-w-[150px]"
-              >
-                <Card className="h-full  hover:shadow-md p-2 transition-all">
-                  <CardContent className="p-2 text-center">
-                    <div
-                      className={`p-2 rounded-full ${stat.color}/10 inline-flex mb-2`}
-                    >
-                      <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                    </div>
-                    <Typography variant="h5" weight="bold" className="mb-1">
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="caption1" theme="muted">
-                      {stat.label}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        <StatsCarousel mode="auto">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="h-full"
+            >
+              <Card className="h-full hover:shadow-md transition-all border-border/50 bg-card/40 backdrop-blur-xl">
+                <CardContent className="p-4 text-center flex flex-col items-center justify-center h-full">
+                  <div
+                    className={cn(
+                      "p-3 rounded-2xl inline-flex mb-3 transition-transform duration-300 group-hover:scale-110",
+                      `${stat.color.replace('text-', 'bg-')}/10`
+                    )}
+                  >
+                    <stat.icon className={cn("h-6 w-6", stat.color)} />
+                  </div>
+                  <Typography variant="h3" weight="bold" className="mb-1">
+                    {stat.value}
+                  </Typography>
+                  <Typography variant="caption1" theme="muted" className="uppercase tracking-wider font-medium">
+                    {stat.label}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </StatsCarousel>
       </div>
 
       {/* Main Content */}

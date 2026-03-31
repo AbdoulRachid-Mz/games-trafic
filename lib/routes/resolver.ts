@@ -1,5 +1,4 @@
 // @/lib/routes/resolver.ts
-
 import {
   ROUTE_CONFIG,
   type RouteConfig,
@@ -41,99 +40,201 @@ const ICON_MAP: Record<string, any> = {
   admin: Shield,
   games: Gamepad2,
   gameClips: Video,
+  clips: Video,
+  swords: Gamepad2,
+  transactions: Wallet,
+  history: Package,
+  claims: Bell,
 };
 
-// Compiled route with compiled regex patterns and score
+// Type pour les routes compilées
 type CompiledRoute = RouteConfig & {
   _patterns: RegExp[];
   _score: number;
+  _specificity: number; // Nombre de segments non-wildcard
   _index: number;
 };
 
-// Compile routes once at module load
+/**
+ * Calcule la spécificité d'une route (plus de segments = plus spécifique)
+ */
+function calculateSpecificity(path: string): number {
+  const cleanPath = path.replace(/\/+$/, "").replace(/^\//, "");
+  if (cleanPath === "") return 0;
+
+  const segments = cleanPath.split("/");
+  let score = 0;
+
+  for (const segment of segments) {
+    if (segment === "**") {
+      score += 0; // wildcard universel
+    } else if (segment === "*") {
+      score += 0.5; // wildcard simple
+    } else if (segment.startsWith("[") && segment.endsWith("]")) {
+      score += 1; // paramètre dynamique
+    } else {
+      score += 2; // segment statique
+    }
+  }
+
+  return score;
+}
+
+/**
+ * Compile les routes une fois au chargement du module
+ */
 function compileRoutes(configs: RouteConfig[]): CompiledRoute[] {
   return configs.map((config, index) => {
     const paths = Array.isArray(config.path) ? config.path : [config.path];
-    const patterns = paths.map((path) => {
-      const pattern = path
-        .replace(/\/+$/, "")
-        .replace(/\[[^\]]+\]/g, "[^/]+")
-        .replace(/\*\*/g, ".*")
-        .replace(/\*/g, "[^/]*");
-      return new RegExp(`^${pattern}$`);
-    });
+    const patterns: RegExp[] = [];
+    let maxSpecificity = 0;
 
-    // Score = priority + specificity
-    const score =
-      (config.priority || 0) * 100 +
-      Math.max(...paths.map((p) => p.split("/").length)) -
-      (paths.some((p) => p.includes("*")) ? 1 : 0);
+    for (const path of paths) {
+      // Nettoyer le path
+      const cleanPath = path.replace(/\/+$/, "").replace(/^\//, "");
+
+      // Calculer la spécificité
+      const specificity = calculateSpecificity(path);
+      maxSpecificity = Math.max(maxSpecificity, specificity);
+
+      // Créer le pattern regex
+      let pattern = path
+        .replace(/\/+$/, "")
+        .replace(/\[([^\]]+)\]/g, "([^/]+)") // [param] -> capture group
+        .replace(/\*\*/g, ".*") // ** -> n'importe quoi (y compris /)
+        .replace(/\*/g, "[^/]*"); // * -> n'importe quoi sauf /
+
+      // Échapper les caractères spéciaux
+      pattern = pattern.replace(/[-\/\\^$+?.()|[\]{}]/g, (char) => {
+        if (char === "/") return "\\/";
+        if (char === "-") return "\\-";
+        return `\\${char}`;
+      });
+
+      patterns.push(new RegExp(`^${pattern}$`));
+    }
+
+    // Calculer le score final
+    // Priorité * 1000 + spécificité
+    const score = (config.priority || 0) * 1000 + maxSpecificity;
 
     return {
       ...config,
       _patterns: patterns,
       _score: score,
+      _specificity: maxSpecificity,
       _index: index,
     };
   });
 }
 
-// Match a pathname against compiled routes
+/**
+ * Trouve la route qui correspond le mieux au pathname
+ */
 function matchRoute(
   pathname: string,
   routes: CompiledRoute[],
 ): CompiledRoute | null {
   const cleanPath = pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
   let best: CompiledRoute | null = null;
+  let bestScore = -1;
 
   for (const route of routes) {
-    const matched = route._patterns.some((regex) => regex.test(cleanPath));
-    if (!matched) continue;
-    if (!best) {
-      best = route;
-      continue;
+    // Vérifier si le pathname correspond à un des patterns
+    let matched = false;
+    for (const regex of route._patterns) {
+      if (regex.test(cleanPath)) {
+        matched = true;
+        break;
+      }
     }
-    if (route._score > best._score) {
+
+    if (!matched) continue;
+
+    // Comparer les scores
+    if (route._score > bestScore) {
+      bestScore = route._score;
       best = route;
+    } else if (route._score === bestScore && best) {
+      // En cas d'égalité, prendre le plus spécifique
+      if (route._specificity > best._specificity) {
+        best = route;
+      }
     }
   }
+
+  // Debug log (optionnel, à activer en développement)
+  if (process.env.NODE_ENV === "development") {
+    console.log("[RouteResolver] Match:", {
+      pathname: cleanPath,
+      matched: best?.name,
+      score: bestScore,
+    });
+  }
+
   return best;
 }
 
-// Resolve layout simply
+/**
+ * Résout le layout en fonction de la configuration
+ * ✅ FIX: excludeLayout = true retourne TOUJOURS "none"
+ */
 function resolveLayout(config: RouteConfig): "none" | "public" | "dashboard" | "admin" {
-  if (config.excludeLayout) {
-    if (config.styleGroup === "admin") return "admin";
+  // Si excludeLayout est true, on retourne "none" quel que soit styleGroup
+  if (config.excludeLayout === true) {
     return "none";
   }
-  if (config.styleGroup === "dashboard") return "dashboard";
+
+  // Sinon, on utilise styleGroup pour déterminer le layout
+  if (config.styleGroup === "dashboard") {
+    return "dashboard";
+  }
+
+  if (config.styleGroup === "admin") {
+    return "admin";
+  }
+
   return "public";
 }
 
-// Check access cleanly
-function checkAccess(config: RouteConfig, user: OriginalUserRoles) {
-  if (config.requireAdmin && (!user.isAuthenticated || !user.isAdmin)) {
-    return { ok: false, redirectTo: "/" };
+/**
+ * Vérifie les droits d'accès
+ */
+function checkAccess(config: RouteConfig, user: OriginalUserRoles): { ok: boolean; redirectTo?: string; reason?: string } {
+  // Admin check (priorité max)
+  if (config.requireAdmin === true) {
+    if (!user.isAuthenticated || !user.isAdmin) {
+      return { ok: false, redirectTo: "/", reason: "ADMIN_REQUIRED" };
+    }
   }
-  if (config.requireAuth && !user.isAuthenticated) {
-    return { ok: false, redirectTo: "/sign-in" };
+
+  // Auth check
+  if (config.requireAuth === true && !user.isAuthenticated) {
+    return { ok: false, redirectTo: "/sign-in", reason: "AUTH_REQUIRED" };
   }
-  if (config.guestOnly && user.isAuthenticated) {
-    return { ok: false, redirectTo: "/profile" };
+
+  // Guest only (redirige les utilisateurs connectés)
+  if (config.guestOnly === true && user.isAuthenticated) {
+    return { ok: false, redirectTo: "/profile", reason: "ALREADY_AUTHENTICATED" };
   }
+
   return { ok: true };
 }
 
-// Generate floating dock links
+/**
+ * Génère les liens du dock flottant
+ */
 function generateFloatingDockLinks(
-  currentPath: string,
   routeConfig: RouteConfig,
   userRoles: OriginalUserRoles,
 ): NavItem[] {
-  if (routeConfig.hideFloatingActions || routeConfig.floatingActions === false) {
+  // Si floatingActions est explicitement false, on ne montre pas le dock
+  if (routeConfig.floatingActions === false) {
     return [];
   }
-  if (routeConfig.dockLinks?.length) {
+
+  // Si dockLinks est défini, on l'utilise
+  if (routeConfig.dockLinks && routeConfig.dockLinks.length > 0) {
     return routeConfig.dockLinks
       .filter((link) => {
         if (link.requireAuth && !userRoles.isAuthenticated) return false;
@@ -146,31 +247,61 @@ function generateFloatingDockLinks(
         requireAuth: link.requireAuth ?? false,
       }));
   }
+
   return [];
 }
 
-// Generate FAB actions
+/**
+ * Génère les actions du FAB
+ */
 function generateFabActions(
   routeConfig: RouteConfig,
   userRoles: OriginalUserRoles,
 ): FabAction[] {
-  if (routeConfig.hideFloatingActions || !routeConfig.fabActions) {
+  // Si floatingActions est false, pas de FAB
+  if (routeConfig.floatingActions === false) {
     return [];
   }
-  return (routeConfig.fabActions || []).filter((action) => {
-    if (action.requiresAuth && !userRoles.isAuthenticated) return false;
-    if (action.requiresAdmin && !userRoles.isAdmin) return false;
-    if (action.requireWallet && !userRoles.hasWallet) return false;
-    return true;
-  }) as FabAction[];
+
+  // Si hideFloatingActions est true, pas de FAB
+  if (routeConfig.hideFloatingActions === true) {
+    return [];
+  }
+
+  if (!routeConfig.fabActions || routeConfig.fabActions.length === 0) {
+    return [];
+  }
+
+  return routeConfig.fabActions
+    .filter((action) => {
+      if (action.requiresAuth && !userRoles.isAuthenticated) return false;
+      if (action.requiresAdmin && !userRoles.isAdmin) return false;
+      if (action.requireWallet && !userRoles.hasWallet) return false;
+      return true;
+    })
+    .map((action) => ({
+      ...action,
+      type: action.type || "button",
+    })) as FabAction[];
 }
 
-// Generate breadcrumbs
-function generateBreadcrumbs(pathname: string): Array<{ name: string; path: string }> {
+/**
+ * Génère le breadcrumb
+ */
+function generateBreadcrumbs(
+  pathname: string,
+  routeConfig: RouteConfig,
+): Array<{ name: string; path: string }> {
+  // Si breadcrumbs est false, on retourne un tableau vide
+  if (routeConfig.breadcrumbs === false) {
+    return [];
+  }
+
   const normalizedPath =
     pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
   const parts = normalizedPath.split("/").filter((p) => p);
-  const breadcrumbs = [{ name: "Accueil", path: "/" }];
+  const breadcrumbs: Array<{ name: string; path: string }> = [{ name: "Accueil", path: "/" }];
+
   let currentPath = "";
   for (const part of parts) {
     currentPath += `/${part}`;
@@ -182,101 +313,143 @@ function generateBreadcrumbs(pathname: string): Array<{ name: string; path: stri
       });
     }
   }
+
   return breadcrumbs;
 }
 
-// Precompile routes at module load
+// Précompilation des routes
 const COMPILED_ROUTES = compileRoutes(ROUTE_CONFIG);
 
-// Main resolver function
+function isInternalPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/icons") ||
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/fonts") ||
+    pathname.startsWith("/public") ||
+    pathname.startsWith("/.well-known") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/sw.js" ||
+    pathname === "/manifest.webmanifest"
+  );
+}
+
+/**
+ * Route par défaut en cas d'échec
+ */
+const DEFAULT_ROUTE: ResolvedRoute = {
+  pathname: "",
+  name: "Default",
+  layout: "public",
+  requireAuth: false,
+  requireAdmin: false,
+  hasAccess: true,
+  navigationLinks: true,
+  topMiddle: {
+    enabled: true,
+    hideOnScroll: false,
+    breadcrumbs: [],
+  },
+  breadcrumbs: true,
+  leftBar: {
+    enabled: true,
+    requireAuth: false,
+  },
+  rightBar: {
+    enabled: false,
+    requireAuth: false,
+  },
+  footer: {
+    enabled: true,
+  },
+  floatingDock: {
+    enabled: false,
+    links: [],
+  },
+  fabActions: {
+    enabled: false,
+    actions: [],
+  },
+  aiAssistant: {
+    enabled: true,
+  },
+  showOnTap: false,
+};
+
+/**
+ * Résout une route à partir du pathname et des rôles utilisateur
+ */
 export function resolveRoute(
   pathname: string,
   userRoles: OriginalUserRoles,
 ): ResolvedRoute {
-  const route = matchRoute(pathname, COMPILED_ROUTES);
-  if (!route) {
+
+  // ✅ IGNORE NEXT INTERNALS
+  if (isInternalPath(pathname)) {
     return {
+      ...DEFAULT_ROUTE,
       pathname,
-      name: "Not Found",
-      layout: "public",
-      requireAuth: false,
-      requireAdmin: false,
-      hasAccess: true,
-      navigationLinks: true,
-      topMiddle: {
-        enabled: true,
-        hideOnScroll: false,
-        breadcrumbs: [],
-      },
-      breadcrumbs: false,
-      leftBar: {
-        enabled: true,
-        requireAuth: false,
-      },
-      rightBar: {
-        enabled: false,
-        requireAuth: false,
-      },
-      footer: {
-        enabled: true,
-      },
-      floatingDock: {
-        enabled: false,
-        links: [],
-      },
-      fabActions: {
-        enabled: false,
-        actions: [],
-      },
-      aiAssistant: {
-        enabled: true,
-      },
-      showOnTap: false,
-    } as ResolvedRoute;
+      layout: "none", // ⚠️ très important
+    };
+  }
+
+  const route = matchRoute(pathname, COMPILED_ROUTES);
+
+  if (!route) {
+    console.warn(`[RouteResolver] No route found for: ${pathname}`);
+    return {
+      ...DEFAULT_ROUTE,
+      pathname,
+    };
   }
 
   const access = checkAccess(route, userRoles);
   const layout = resolveLayout(route);
+  const normalizedPath = pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
 
-  const normalizedPath =
-    pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
-
-  const floatingDockLinks = generateFloatingDockLinks(normalizedPath, route, userRoles);
+  const floatingDockLinks = generateFloatingDockLinks(route, userRoles);
   const fabActions = generateFabActions(route, userRoles);
-  const breadcrumbs = generateBreadcrumbs(normalizedPath);
+  const breadcrumbs = generateBreadcrumbs(normalizedPath, route);
+
+  // Déterminer si le dock est enabled
+  const dockEnabled = floatingDockLinks.length > 0 && route.floatingActions !== false;
+
+  // Déterminer si le FAB est enabled
+  const fabEnabled = fabActions.length > 0 && route.floatingActions !== false && !route.hideFloatingActions;
 
   return {
     pathname: normalizedPath,
     name: route.name,
     layout,
-    requireAuth: route.requireAuth || false,
-    requireAdmin: route.requireAdmin || false,
+    requireAuth: route.requireAuth === true,
+    requireAdmin: route.requireAdmin === true,
     hasAccess: access.ok,
     redirectTo: access.redirectTo,
     navigationLinks: route.navigationLinks !== false,
     topMiddle: {
       enabled: route.topMiddle !== false,
-      hideOnScroll: route.hideTopMiddleOnScroll || false,
-      breadcrumbs: route.breadcrumbs !== false ? breadcrumbs : [],
+      hideOnScroll: route.hideTopMiddleOnScroll === true,
+      breadcrumbs,
     },
     breadcrumbs: route.breadcrumbs !== false,
     leftBar: {
       enabled: route.leftBar !== false,
-      requireAuth: route.requireAuth || false,
+      requireAuth: route.requireAuth === true,
     },
     rightBar: {
       enabled: route.rightBar === true,
-      requireAuth: route.requireAuth || false,
+      requireAuth: route.requireAuth === true,
     },
     footer: {
       enabled: route.footer !== false,
     },
     floatingDock: {
-      enabled: floatingDockLinks.length > 0 && !route.hideFloatingActions,
+      enabled: dockEnabled,
       links: floatingDockLinks,
     },
     fabActions: {
-      enabled: fabActions.length > 0 && !route.hideFloatingActions,
+      enabled: fabEnabled,
       actions: fabActions,
     },
     activeFabActionId: route.activeFabActionId,
@@ -286,6 +459,62 @@ export function resolveRoute(
     },
     styleGroup: route.styleGroup,
   };
+}
+
+/**
+ * Fonction utilitaire pour trouver la configuration d'une route
+ */
+export function findRouteConfig(pathname: string): RouteConfig | null {
+  const route = matchRoute(pathname, COMPILED_ROUTES);
+  if (!route) return null;
+
+  // Retourner la config sans les propriétés internes
+  const { _patterns, _score, _specificity, _index, ...config } = route;
+  return config as RouteConfig;
+}
+
+/**
+ * Vérifie si une route doit exclure le layout
+ */
+export function shouldExcludeLayout(pathname: string): boolean {
+  const route = matchRoute(pathname, COMPILED_ROUTES);
+  if (!route) return false;
+  return route.excludeLayout === true;
+}
+
+/**
+ * Récupère les options de layout pour une route
+ */
+export function getLayoutOptions(pathname: string): Omit<RouteConfig, "path" | "name" | "requireAuth" | "requireAdmin" | "description" | "styleGroup"> | null {
+  const route = matchRoute(pathname, COMPILED_ROUTES);
+  if (!route) return null;
+
+  const { path, name, requireAuth, requireAdmin, description, styleGroup, ...layoutOptions } = route;
+  return layoutOptions;
+}
+
+/**
+ * Vérifie si l'utilisateur peut accéder à la route
+ */
+export function canAccessRoute(
+  pathname: string,
+  user: OriginalUserRoles,
+): { hasAccess: boolean; redirectTo?: string; reason?: string } {
+  const route = matchRoute(pathname, COMPILED_ROUTES);
+  if (!route) {
+    return { hasAccess: true };
+  }
+  const access = checkAccess(route, user);
+  return { hasAccess: access.ok, redirectTo: access.redirectTo, reason: access.reason };
+}
+
+/**
+ * Récupère les routes du menu
+ */
+export function getMenuRoutes(): RouteConfig[] {
+  return ROUTE_CONFIG.filter((config) => config.menu === true).sort(
+    (a, b) => (a.menuOrder || 99) - (b.menuOrder || 99)
+  );
 }
 
 

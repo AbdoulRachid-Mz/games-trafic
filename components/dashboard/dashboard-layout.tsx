@@ -15,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X,
   Sparkles,
   Bell,
 } from "lucide-react";
@@ -55,7 +54,6 @@ interface DashboardLayoutProps {
   mobileBreakpoint?: number;
   initialSidebarOpen?: boolean;
   sidebarBgType?: "gradient" | "glass" | "neuomorphic" | "solid" | "default";
-  // position of the sidebar toggle for desktop: 'edge' -> floating edge button, 'top' -> inside sidebar header
   togglePosition?: "edge" | "top";
   user?: {
     username?: string;
@@ -89,6 +87,9 @@ export function DashboardLayout({
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState(defaultTab);
   const router = useRouter();
+
+  // Helper pour détecter les variants "light" (gradient/glass)
+  const isVariantLight = sidebarBgType === "gradient" || sidebarBgType === "glass";
 
   // If the URL contains a `tab` query param and it matches a provided tab id, use it
   useEffect(() => {
@@ -142,49 +143,51 @@ export function DashboardLayout({
   const getSidebarStyles = () => {
     switch (sidebarBgType) {
       case "gradient":
-        return "bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white border-r border-white/20";
+        return "bg-gradient-to-br from-background via-muted to-background text-foreground border-r border-border";
       case "glass":
-        return "glass text-white border-r border-white/20 backdrop-blur-md";
+        return "bg-background/80 backdrop-blur-md text-foreground border-r border-border";
       case "neuomorphic":
-        return "bg-sidebar neomorphic text-foreground border-r";
+        return "bg-sidebar neomorphic text-foreground border-r border-border";
       case "solid":
-        return "bg-sidebar text-foreground border-r";
+        return "bg-sidebar text-foreground border-r border-border";
       case "default":
       default:
-        return "bg-sidebar text-foreground border-r";
+        return "bg-sidebar text-foreground border-r border-border";
     }
   };
 
   const getItemStyles = (isActive: boolean) => {
+    const baseStyles = "group relative overflow-hidden transition-all duration-300 p-3 rounded-lg cursor-pointer";
+    
     switch (sidebarBgType) {
       case "gradient":
         return cn(
-          "group relative overflow-hidden transition-all duration-300 p-3 rounded-lg",
-          "hover:scale-105 hover:shadow-lg cursor-pointer",
+          baseStyles,
+          "hover:scale-105 hover:shadow-lg",
           isActive
-            ? "bg-white/20 shadow-lg text-white backdrop-blur-sm"
-            : "hover:bg-white/10 text-white/80 hover:text-white"
+            ? "bg-primary/10 shadow-lg text-primary"
+            : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
         );
       case "glass":
         return cn(
-          "group relative overflow-hidden transition-all duration-300 p-3 rounded-lg",
-          "hover:scale-105 hover:shadow-lg cursor-pointer glass-shine",
+          baseStyles,
+          "hover:scale-105 hover:shadow-lg",
           isActive
-            ? "bg-white/20 shadow-lg text-white backdrop-blur-sm border border-white/20"
-            : "hover:bg-white/10 text-white/80 hover:text-white border border-transparent hover:border-white/10"
+            ? "bg-primary/10 shadow-lg text-primary backdrop-blur-sm border border-primary/20"
+            : "hover:bg-accent/50 text-muted-foreground hover:text-foreground border border-transparent hover:border-border"
         );
       case "neuomorphic":
         return cn(
-          "group relative overflow-hidden transition-all duration-300 p-3 rounded-lg",
-          "hover:scale-105 cursor-pointer neomorphic",
+          baseStyles,
+          "hover:scale-105 neomorphic",
           isActive
             ? "bg-primary/10 shadow-inner text-primary"
             : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
         );
       case "solid":
         return cn(
-          "group relative overflow-hidden transition-all duration-300 p-3 rounded-lg",
-          "hover:scale-105 hover:shadow-lg cursor-pointer",
+          baseStyles,
+          "hover:scale-105 hover:shadow-lg",
           isActive
             ? "bg-primary/10 shadow-md text-primary"
             : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -192,8 +195,8 @@ export function DashboardLayout({
       case "default":
       default:
         return cn(
-          "group relative overflow-hidden transition-all duration-300 p-3 rounded-lg",
-          "hover:scale-105 hover:shadow-lg cursor-pointer",
+          baseStyles,
+          "hover:scale-105 hover:shadow-lg",
           isActive
             ? "bg-primary text-primary-foreground shadow-md"
             : "hover:bg-accent text-accent-foreground hover:text-foreground"
@@ -202,25 +205,27 @@ export function DashboardLayout({
   };
 
   const getIconStyles = (isActive: boolean) => {
+    const baseStyles = "p-2 rounded-lg transition-all duration-300";
+    
     switch (sidebarBgType) {
       case "gradient":
       case "glass":
         return cn(
-          "p-2 rounded-lg transition-all duration-300",
+          baseStyles,
           isActive
-            ? "bg-white/20 text-yellow-400"
-            : "group-hover:bg-white/10 text-white/70 group-hover:text-white"
+            ? "bg-primary/10 text-primary"
+            : "group-hover:bg-accent/50 text-muted-foreground group-hover:text-foreground"
         );
       case "neuomorphic":
         return cn(
-          "p-2 rounded-lg transition-all duration-300",
+          baseStyles,
           isActive
             ? "bg-primary text-primary-foreground"
             : "group-hover:bg-primary/10 text-muted-foreground group-hover:text-foreground"
         );
       case "solid":
         return cn(
-          "p-2 rounded-lg transition-all duration-300",
+          baseStyles,
           isActive
             ? "bg-primary text-primary-foreground"
             : "group-hover:bg-primary/10 text-muted-foreground group-hover:text-foreground"
@@ -228,7 +233,7 @@ export function DashboardLayout({
       case "default":
       default:
         return cn(
-          "p-2 rounded-lg transition-all duration-300",
+          baseStyles,
           isActive
             ? "bg-primary text-primary-foreground"
             : "group-hover:bg-accent text-muted-foreground group-hover:text-foreground"
@@ -237,18 +242,7 @@ export function DashboardLayout({
   };
 
   const getTextColor = () => {
-    switch (sidebarBgType) {
-      case "gradient":
-      case "glass":
-        return "text-white";
-      case "neuomorphic":
-        return isDark ? "text-white" : "text-foreground";
-      case "solid":
-        return isDark ? "text-white" : "text-foreground";
-      case "default":
-      default:
-        return "text-foreground";
-    }
+    return "text-foreground";
   };
 
   if (isLoading) {
@@ -288,21 +282,21 @@ export function DashboardLayout({
             )}
           >
             <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between p-6 border-b border-white/20">
+              <div className="flex items-center justify-between p-6 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
                       "p-2 rounded-xl transition-all duration-300",
-                      sidebarBgType === "gradient" || sidebarBgType === "glass"
-                        ? "bg-white/20 backdrop-blur-sm"
+                      isVariantLight
+                        ? "bg-primary/10 backdrop-blur-sm"
                         : "bg-primary/10"
                     )}
                   >
                     <Sparkles
                       className={cn(
                         "h-6 w-6",
-                        sidebarBgType === "gradient" || sidebarBgType === "glass"
-                          ? "text-yellow-400"
+                        isVariantLight
+                          ? "text-primary"
                           : "text-primary"
                       )}
                     />
@@ -318,9 +312,9 @@ export function DashboardLayout({
                     <button
                       onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                       className={cn(
-                        "p-1 rounded-full hover:bg-white/10 transition-colors",
-                        sidebarBgType === "gradient" || sidebarBgType === "glass"
-                          ? "bg-white/10 text-white"
+                        "p-1 rounded-full hover:bg-accent transition-colors",
+                        isVariantLight
+                          ? "bg-accent/50 text-foreground"
                           : "bg-primary/10 text-primary"
                       )}
                     >
@@ -334,8 +328,8 @@ export function DashboardLayout({
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                   className={cn(
                     "absolute -right-3 top-6 rounded-full p-1 z-20 transition-colors",
-                    sidebarBgType === "gradient" || sidebarBgType === "glass"
-                      ? "bg-white/20 text-white hover:bg-white/30"
+                    isVariantLight
+                      ? "bg-accent text-foreground hover:bg-accent/80"
                       : "bg-primary text-primary-foreground hover:bg-primary/90"
                   )}
                 >
@@ -372,19 +366,17 @@ export function DashboardLayout({
                                       <Typography
                                         variant="body-sm"
                                         weight="medium"
-                                        className={cn("truncate", getTextColor())}
+                                        className={cn(
+                                          "truncate",
+                                          isActive ? "text-primary" : "text-foreground"
+                                        )}
                                       >
                                         {tab.label}
                                       </Typography>
                                       {tab.description && (
                                         <Typography
                                           variant="caption2"
-                                          className={cn(
-                                            "text-xs",
-                                            sidebarBgType === "gradient" || sidebarBgType === "glass"
-                                              ? "text-white/60"
-                                              : "text-muted-foreground"
-                                          )}
+                                          className="text-xs text-muted-foreground"
                                         >
                                           {tab.description}
                                         </Typography>
@@ -392,13 +384,8 @@ export function DashboardLayout({
                                     </div>
                                     {tab.badge && (
                                       <Badge
-                                        variant="secondary"
-                                        className={cn(
-                                          "text-xs px-1.5 py-0.5",
-                                          sidebarBgType === "gradient" || sidebarBgType === "glass"
-                                            ? "bg-yellow-400/20 text-yellow-300 border-yellow-400/30"
-                                            : ""
-                                        )}
+                                        variant={isActive ? "default" : "secondary"}
+                                        className="text-xs px-1.5 py-0.5"
                                       >
                                         {tab.badge}
                                       </Badge>
@@ -428,14 +415,14 @@ export function DashboardLayout({
                 <div
                   className={cn(
                     "p-4 border-t",
-                    sidebarBgType === "gradient" || sidebarBgType === "glass" ? "border-white/20" : "border-border"
+                    isVariantLight ? "border-border" : "border-border"
                   )}
                 >
                   <div
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-xl",
-                      sidebarBgType === "gradient" || sidebarBgType === "glass"
-                        ? "bg-white/10 backdrop-blur-sm border border-white/20"
+                      isVariantLight
+                        ? "bg-muted/50 backdrop-blur-sm border border-border"
                         : "bg-muted"
                     )}
                   >
@@ -444,7 +431,7 @@ export function DashboardLayout({
                       <AvatarFallback
                         className={cn(
                           "text-xs",
-                          sidebarBgType === "gradient" || sidebarBgType === "glass" ? "bg-white/20 text-white" : ""
+                          isVariantLight ? "bg-primary/10 text-primary" : "bg-muted-foreground/20"
                         )}
                       >
                         {user.username?.charAt(0)?.toUpperCase() || "U"}
@@ -452,17 +439,13 @@ export function DashboardLayout({
                     </Avatar>
                     {isSidebarOpen && (
                       <div className="flex-1 min-w-0">
-                        <Typography variant="body-sm" weight="medium" className={cn("truncate", getTextColor())}>
+                        <Typography variant="body-sm" weight="medium" className="truncate text-foreground">
                           {user.username || "Utilisateur"}
                         </Typography>
                         {user.level && (
                           <Typography
                             variant="caption2"
-                            className={cn(
-                              sidebarBgType === "gradient" || sidebarBgType === "glass"
-                                ? "text-white/60"
-                                : "text-muted-foreground"
-                            )}
+                            className="text-muted-foreground"
                           >
                             Niveau {user.level}
                           </Typography>
@@ -483,21 +466,21 @@ export function DashboardLayout({
           <SheetContent side="left" className="p-0" showCloseButton>
             <div className={cn("h-full", getSidebarStyles())}>
               <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between p-6 border-b border-white/20">
+                <div className="flex items-center justify-between p-6 border-b border-border">
                   <div className="flex items-center gap-3">
                     <div
                       className={cn(
                         "p-2 rounded-xl transition-all duration-300",
-                        sidebarBgType === "gradient" || sidebarBgType === "glass"
-                          ? "bg-white/20 backdrop-blur-sm"
+                        isVariantLight
+                          ? "bg-primary/10 backdrop-blur-sm"
                           : "bg-primary/10"
                       )}
                     >
                       <Sparkles
                         className={cn(
                           "h-6 w-6",
-                          sidebarBgType === "gradient" || sidebarBgType === "glass"
-                            ? "text-yellow-400"
+                          isVariantLight
+                            ? "text-primary"
                             : "text-primary"
                         )}
                       />
@@ -529,24 +512,26 @@ export function DashboardLayout({
                               <tab.icon size={20} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <Typography variant="body-sm" weight="medium" className={cn("truncate", getTextColor())}>
+                              <Typography
+                                variant="body-sm"
+                                weight="medium"
+                                className={cn(
+                                  "truncate",
+                                  isActive ? "text-primary" : "text-foreground"
+                                )}
+                              >
                                 {tab.label}
                               </Typography>
                               {tab.description && (
                                 <Typography
                                   variant="caption2"
-                                  className={cn(
-                                    "text-xs",
-                                    sidebarBgType === "gradient" || sidebarBgType === "glass"
-                                      ? "text-white/60"
-                                      : "text-muted-foreground"
-                                  )}
+                                  className="text-xs text-muted-foreground"
                                 >
                                   {tab.description}
                                 </Typography>
                               )}
                             </div>
-                            {tab.badge && <Badge variant="secondary">{tab.badge}</Badge>}
+                            {tab.badge && <Badge variant={isActive ? "default" : "secondary"}>{tab.badge}</Badge>}
                           </div>
                         </div>
                       );

@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { ResultDialog } from "@/components/shared/result-dialog";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { StatCard } from "@/components/admin/stat-card";
 import { Claim } from "@/database/schema";
 
 export default function ClientClaimsPage() {
@@ -200,6 +201,29 @@ export default function ClientClaimsPage() {
     setIsProcessDialogOpen(true);
   };
 
+  const renderStats = () => (
+    <>
+      <StatCard
+        title="Total Réclamations"
+        value={total}
+        icon={FileText}
+        iconClassName="bg-primary/10 text-primary"
+      />
+      <StatCard
+        title="En attente"
+        value={data.filter((c: any) => c.status === "PENDING").length}
+        icon={Clock}
+        iconClassName="bg-amber-500/10 text-amber-500"
+      />
+      <StatCard
+        title="Résolues"
+        value={data.filter((c: any) => c.status === "RESOLVED").length}
+        icon={CheckCircle}
+        iconClassName="bg-green-500/10 text-green-500"
+      />
+    </>
+  );
+
   return (
     <>
       <EntityList
@@ -222,6 +246,7 @@ export default function ClientClaimsPage() {
         onViewModeChange={setViewMode}
         onRefresh={onRefresh}
         onAdd={() => router.push("/admin/claims/create")}
+        renderStats={renderStats}
         onDelete={(item) => {
           setSelectedClaim(item);
           setIsDeleteDialogOpen(true);

@@ -1,69 +1,38 @@
-import { Metadata } from "next"
-import { notFound } from "next/navigation"
-import { getGameItemById } from "@/actions/games"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Typography } from "@/components/ui/typography"
-import { TransactionQRCode } from "@/components/shared/qr-code"
-import { encodeTransactionQR } from "@/utils/qr-utils"
+// @/app/games/[itemId]/page.tsx
+import React, { Suspense } from "react";
+import { getGameItemById } from "@/actions/games";
+import { GameItemDetail } from "@/components/pages/games/game-item-detail";
+import { notFound } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { GameItemWithRelations } from "@/database/schema";
 
-interface PageProps {
-  params: Promise<{ itemId: string }>
+interface GameItemPageProps {
+  params: Promise<{ itemId: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { itemId } = await params
-  const item = await getGameItemById(itemId)
-  return {
-    title: item ? `${item.name} | Item de jeu` : "Item introuvable",
-    description: item?.description || "Détails de l'item de jeu",
-  }
-}
-
-export default async function GameItemPage({ params }: PageProps) {
-  const { itemId } = await params
-  const item = await getGameItemById(itemId)
+async function GameItemContent({ itemId }: { itemId: string }) {
+  const item = await getGameItemById(itemId);
 
   if (!item) {
-    notFound()
+    notFound();
   }
 
-  const price = parseFloat(item.priceGtc || "0")
+  return <GameItemDetail item={item as GameItemWithRelations} />;
+}
+
+export default async function GameItemPage({ params }: GameItemPageProps) {
+  const { itemId } = await params;
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="font-black italic uppercase tracking-tighter">{item.name}</span>
-            <span className="text-sm font-bold">{price} GTC</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {item.description && (
-            <Typography variant="body-base" className="text-muted-foreground">
-              {item.description}
-            </Typography>
-          )}
-          <div className="flex flex-col items-center gap-2">
-            <Typography variant="h4" className="font-black italic uppercase tracking-tighter">
-              Achat Direct
-            </Typography>
-            <Typography variant="caption1" theme="muted">
-              Scannez pour acheter cet item
-            </Typography>
-            <TransactionQRCode
-              data={encodeTransactionQR({
-                t: "GAME_ITEM_PURCHASE",
-                id: item.id,
-                a: price,
-                m: { name: item.name, gameId: item.gameId }
-              })}
-              label={item.name}
-              className="shadow-none border-none p-0 bg-transparent"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 text-primary animate-spin" />
+          <p className="text-sm font-black uppercase tracking-widest text-muted-foreground animate-pulse">Chargement de l'item...</p>
+        </div>
+      </div>
+    }>
+      <GameItemContent itemId={itemId} />
+    </Suspense>
+  );
 }

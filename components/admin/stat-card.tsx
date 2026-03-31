@@ -101,12 +101,12 @@ export function StatCard({
             </div>
             <div
               className={cn(
-                "p-3 rounded-xl bg-primary/10",
+                "p-3 rounded-xl bg-primary/10 flex items-center justify-center",
                 iconClassName,
                 isMobile && "p-2"
               )}
             >
-              <Icon className={cn("h-6 w-6 text-primary", isMobile && "h-5 w-5")} />
+              <Icon className={cn("h-6 w-6 text-primary", isMobile && "h-5 w-5", iconClassName?.includes("text-") && "text-current")} />
             </div>
           </div>
         </CardContent>

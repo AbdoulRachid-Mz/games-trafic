@@ -2,17 +2,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  MessageSquare, 
-  X, 
-  Send, 
-  Bot, 
-  Loader2,
-  ChevronRight,
-  CheckCircle,
-  HelpCircle,
-  Sparkles
+import {
+  Send,
+  Bot,
+  Loader2, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getGuideById, getGuideSteps } from "@/actions/guides";
+import { getGuideSteps } from "@/actions/guides";
 
 interface Message {
   id: string;

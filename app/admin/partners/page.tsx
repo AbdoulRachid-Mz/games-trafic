@@ -4,11 +4,12 @@
 import { Metadata } from "next";
 import type { Partner } from "@/database/schema";
 import { Badge } from "@/components/ui/badge";
-import { Building2, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, ExternalLink, CheckCircle2, XCircle, Award, Users } from "lucide-react";
 import Image from "next/image";
 import { EntityList } from "@/components/shared/entity-list";
 import { useEntityList } from "@/hooks/use-entity-list";
 import { useRouter } from "next/navigation";
+import { StatCard } from "@/components/admin/stat-card";
 
 export default function PartnersAdminPage() {
   const router = useRouter();
@@ -30,6 +31,29 @@ export default function PartnersAdminPage() {
     defaultLimit: 20,
   });
 
+  const renderStats = () => (
+    <>
+      <StatCard
+        title="Total Partners"
+        value={total}
+        icon={Building2}
+        iconClassName="bg-primary/10 text-primary"
+      />
+      <StatCard
+        title="Partenaires Actifs"
+        value={partners.filter((p: Partner) => p.status === "ACTIVE").length}
+        icon={CheckCircle2}
+        iconClassName="bg-green-500/10 text-green-500"
+      />
+      <StatCard
+        title="Niveau Premium"
+        value={partners.filter((p: Partner) => (p.slug || "").includes("premium")).length}
+        icon={Award}
+        iconClassName="bg-amber-500/10 text-amber-500"
+      />
+    </>
+  );
+
   return (
     <div className="container py-8">
       <EntityList<Partner>
@@ -50,6 +74,7 @@ export default function PartnersAdminPage() {
         entityType="partners"
         loading={loading}
         onAdd={() => router.push("/admin/partners/create")}
+        renderStats={renderStats}
         renderTableHeader={() => (
           <tr>
             <th className="px-4 py-3 text-left text-sm font-medium">Partner</th>

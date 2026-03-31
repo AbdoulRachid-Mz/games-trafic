@@ -6,8 +6,9 @@ import { useEntityList } from "@/hooks/use-entity-list";
 import { getBlogs, deleteBlog, toggleBlogStatus } from "@/actions/blogs";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
-import { FileText, Eye, EyeOff } from "lucide-react";
+import { FileText, Eye, EyeOff, FileEdit, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/admin/stat-card";
 import { toast } from "sonner";
 import { ResultDialog } from "@/components/shared/result-dialog";
 import { useRouter } from "next/navigation";
@@ -90,6 +91,29 @@ export default function BlogsAdminPage() {
     }
   };
 
+  const renderStats = () => (
+    <>
+      <StatCard
+        title="Total Blogs"
+        value={total}
+        icon={FileText}
+        iconClassName="bg-primary/10 text-primary"
+      />
+      <StatCard
+        title="Articles Actifs"
+        value={data.filter((b: any) => b.isActive).length}
+        icon={CheckCircle}
+        iconClassName="bg-green-500/10 text-green-500"
+      />
+      <StatCard
+        title="Articles Inactifs"
+        value={data.filter((b: any) => !b.isActive).length}
+        icon={XCircle}
+        iconClassName="bg-muted/10 text-muted-foreground"
+      />
+    </>
+  );
+
   return (
     <>
       <EntityList
@@ -117,6 +141,7 @@ export default function BlogsAdminPage() {
           setSelectedBlog(item);
           setIsDeleteDialogOpen(true);
         }}
+        renderStats={renderStats}
         sortOptions={[
           { key: "createdAt-desc", label: "Date (Récent)", direction: "desc" },
           { key: "createdAt-asc", label: "Date (Ancien)", direction: "asc" },

@@ -139,7 +139,7 @@ export default async function GroupDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-6">
+      <div className="flex flex-col flex-wrap sm:flex-row items-start sm:items-center justify-between gap-4 border-b pb-6">
         <div className="space-y-1.5">
           <div className="flex items-center gap-3 flex-wrap">
             <Typography variant="h2" weight="bold" className="tracking-tight">
@@ -174,8 +174,17 @@ export default async function GroupDetailPage({ params }: PageProps) {
               </span>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link
+                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${group?.phaseId}`}
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+              </Link>
+            </Button>
+          </div>
         </div>
-        {/* <div className="flex items-center gap-2">
+       <div className="flex items-center gap-2 w-full">
      
           <GenerateGroupMatchesDialog
             groupId={groupId}
@@ -191,21 +200,21 @@ export default async function GroupDetailPage({ params }: PageProps) {
 
           {group && <UpdatePhaseGroupDialog group={group} />}
 
-          <Button variant="outline" asChild>
+          {/* <Button variant="outline" asChild>
             <Link
               href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${group?.phaseId}`}
             >
               <ArrowLeft className="h-4 w-4 mr-1" /> Retour
             </Link>
-          </Button>
-        </div> */}
-        <QuicKAction
+          </Button> */}
+        </div>
+        {/* <QuicKAction
           basePath={basePath}
           groupId={groupId}
           editionId={editionId}
           group={group}
           tournamentId={tournamentId}
-        />
+        /> */}
       </div>
 
       {/* ─── Standings Table ────────────────────────────────────────────── */}

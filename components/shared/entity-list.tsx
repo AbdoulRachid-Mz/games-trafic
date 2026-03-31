@@ -45,6 +45,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { ResponsiveFilters } from "@/components/shared/responsive-filters";
+import { useScreenSize } from "@/hooks/use-screen";
 
 // Types génériques
 export interface EntityListProps<T> {
@@ -161,8 +164,13 @@ export function EntityList<T>({
   tableClassName,
   isPlaceholderData,
 }: EntityListProps<T> & { isPlaceholderData?: boolean }) {
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const { isMobile } = useScreenSize();
   const totalPages = Math.ceil(total / limit);
+
+  // Compter les filtres actifs (excluant limit et sortBy/Order)
+  const activeFiltersCount = Object.entries(filters).filter(([key, value]) => 
+    value !== undefined && value !== "all" && !["limit", "sortBy", "sortOrder"].includes(key)
+  ).length;
 
   // Filtres par défaut selon le type d'entité
   const getDefaultFilters = () => {
@@ -627,123 +635,65 @@ export function EntityList<T>({
         </div>
       </div>
 
-      {/* Statistiques avec défilement horizontal sur mobile */}
+      {/* Statistiques adaptatives */}
       {showStats && renderStats && (
-        <div className="relative group">
-          <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
-            {renderStats()}
-          </div>
-        </div>
+        <StatsCarousel mode="auto">
+          {renderStats()}
+        </StatsCarousel>
       )}
 
-      {/* Barre de recherche et filtres */}
-      <Card className="p-3">
-        <CardContent className="p-3">
-          <div className="space-y-4">
-            {/* Barre de recherche */}
-            {showSearch && (
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder={`Rechercher des ${title.toLowerCase()}...`}
-                  value={searchTerm}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+      {/* Barre de recherche et filtres responsive */}
+      <ResponsiveFilters
+        title={`Filtres ${title}`}
+        showSearch={showSearch}
+        searchTerm={searchTerm}
+        onSearchChange={onSearchChange}
+        searchPlaceholder={`Rechercher des ${title.toLowerCase()}...`}
+        activeFiltersCount={activeFiltersCount}
+        onReset={onResetFilters}
+      >
+        {allFilters.map((filter) => (
+          <div key={filter.key} className="space-y-2">
+            {!isMobile && (
+              <label className="text-xs font-medium text-muted-foreground ml-1">
+                {filter.label}
+              </label>
             )}
-
-            {/* Filtres de base */}
-            {showFilters && allFilters.length > 0 && (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {allFilters.slice(0, 3).map((filter) => (
-                    <div key={filter.key} className="min-w-[180px]">
-                      {renderFilterInput(filter)}
-                    </div>
-                  ))}
-
-                  {allFilters.length > 3 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setShowAdvancedFilters(!showAdvancedFilters)
-                      }
-                    >
-                      <Filter className="h-4 w-4 mr-2" />
-                      Plus de filtres
-                      {showAdvancedFilters ? (
-                        <ChevronUp className="h-4 w-4 ml-2" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 ml-2" />
-                      )}
-                    </Button>
-                  )}
-
-                  {onResetFilters && (
-                    <Button variant="ghost" size="sm" onClick={onResetFilters}>
-                      <X className="h-4 w-4 mr-2" />
-                      Réinitialiser
-                    </Button>
-                  )}
-                </div>
-
-                {/* Filtres avancés */}
-                {showAdvancedFilters && allFilters.length > 3 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
-                    {allFilters.slice(3).map((filter, index) => (
-                      <div key={`${filter.key}-${index}`}>
-                        <label className="text-sm font-medium mb-2 block">
-                          {filter.label}
-                        </label>
-                        {renderFilterInput(filter)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Options de tri */}
-            {sortOptions.length > 0 && (
-              <div className="flex items-center gap-2 pt-4 border-t">
-                <span className="text-sm font-medium">Trier par:</span>
-                <Tabs
-                  value={filters.sortBy || sortOptions[0]?.key}
-                  onValueChange={(value) =>
-                    onFilterChange({ ...filters, sortBy: value })
-                  }
-                >
-                  <TabsList>
-                    {sortOptions.map((option) => (
-                      <TabsTrigger key={option.key} value={option.key}>
-                        {option.label}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    onFilterChange({
-                      ...filters,
-                      sortOrder: filters.sortOrder === "asc" ? "desc" : "asc",
-                    })
-                  }
-                >
-                  {filters.sortOrder === "asc" ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            )}
+            {renderFilterInput(filter)}
           </div>
-        </CardContent>
-      </Card>
+        ))}
+        
+        {sortOptions.length > 0 && (
+          <div className="flex items-center gap-2 pt-2 md:pt-0">
+            <Typography variant="caption2" weight="medium" className="md:hidden">Trier par :</Typography>
+            <Select
+              value={filters.sortBy || sortOptions[0]?.key}
+              onValueChange={(value) => onFilterChange({ ...filters, sortBy: value })}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.key} value={option.key}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onFilterChange({ 
+                ...filters, 
+                sortOrder: filters.sortOrder === "asc" ? "desc" : "asc" 
+              })}
+            >
+              {filters.sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        )}
+      </ResponsiveFilters>
 
       {/* Contenu principal */}
       <Card className="p-3">

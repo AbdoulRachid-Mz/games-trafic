@@ -22,6 +22,8 @@ import {
   MoreVertical,
   TrendingDown,
 } from "lucide-react";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { StatCard } from "@/components/admin/stat-card";
 import {
   Card,
   CardContent,
@@ -148,52 +150,6 @@ export default function ShopOverviewPage() {
     }
   };
 
-  const StatCard = ({
-    title,
-    value,
-    change,
-    icon: Icon,
-    color = "primary",
-  }: any) => {
-    const isPositive = change >= 0;
-
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className={`p-3 rounded-lg bg-${color}/10`}>
-              <Icon className={`h-6 w-6 text-${color}`} />
-            </div>
-            <Badge
-              variant={isPositive ? "default" : "destructive"}
-              className="gap-1"
-            >
-              {isPositive ? (
-                <ArrowUpRight className="h-3 w-3" />
-              ) : (
-                <ArrowDownRight className="h-3 w-3" />
-              )}
-              {Math.abs(change)}%
-            </Badge>
-          </div>
-
-          <Typography variant="h3" weight="bold" className="mb-1">
-            {typeof value === "number" ? value.toLocaleString() : value}
-          </Typography>
-          <Typography variant="body-sm" theme="muted">
-            {title}
-          </Typography>
-
-          <div className="mt-4 pt-4 border-t">
-            <Typography variant="caption2" theme="muted">
-              vs période précédente
-            </Typography>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
   if (loading) {
     return <OverviewSkeleton />;
   }
@@ -272,50 +228,43 @@ export default function ShopOverviewPage() {
       </div>
 
       {/* Stats principales */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6"
-      >
+      <StatsCarousel mode="auto">
         <StatCard
           title="Revenus totaux"
           value={`${stats.revenue.current} GTC`}
-          change={stats.revenue.change}
+          trend={{ value: stats.revenue.change, label: "vs période précédente" }}
           icon={DollarSign}
-          color="green"
+          iconClassName="bg-green-500/10 text-green-500"
         />
         <StatCard
           title="Dépenses totales"
           value={`${stats.expenses.current} GTC`}
-          change={stats.expenses.change}
+          trend={{ value: stats.expenses.change, label: "vs période précédente" }}
           icon={TrendingDown}
-          color="red"
+          iconClassName="bg-red-500/10 text-red-500"
         />
-
         <StatCard
           title="Commandes"
           value={stats.orders.current}
-          change={stats.orders.change}
+          trend={{ value: stats.orders.change, label: "vs période précédente" }}
           icon={ShoppingBag}
-          color="blue"
+          iconClassName="bg-blue-500/10 text-blue-500"
         />
-
         <StatCard
           title="Produits actifs"
           value={stats.products.current}
-          change={stats.products.change}
+          trend={{ value: stats.products.change, label: "vs période précédente" }}
           icon={Package}
-          color="purple"
+          iconClassName="bg-purple-500/10 text-purple-500"
         />
-
         <StatCard
           title="Visiteurs"
           value={stats.visitors.current}
-          change={stats.visitors.change}
+          trend={{ value: stats.visitors.change, label: "vs période précédente" }}
           icon={Users}
-          color="amber"
+          iconClassName="bg-amber-500/10 text-amber-500"
         />
-      </motion.div>
+      </StatsCarousel>
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50">
         <CardHeader>

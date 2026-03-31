@@ -14,15 +14,18 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 import {
   Bell,
+  BellRing,
   CheckCheck,
   Store,
   Trophy,
   Plus,
   Users,
   Globe,
+  Trash2,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/admin/stat-card";
 import {
   Dialog,
   DialogContent,
@@ -181,6 +184,29 @@ export default function NotificationsPage() {
     setLinkUrl("");
   };
 
+  const renderStats = () => (
+    <>
+      <StatCard
+        title="Total Notifications"
+        value={total}
+        icon={Bell}
+        iconClassName="bg-primary/10 text-primary"
+      />
+      <StatCard
+        title="Non lues"
+        value={data.filter((n: any) => !n.read).length}
+        icon={Bell}
+        iconClassName="bg-amber-500/10 text-amber-500"
+      />
+      <StatCard
+        title="Système"
+        value={data.filter((n: any) => n.type === "SYSTEM").length}
+        icon={CheckCheck}
+        iconClassName="bg-green-500/10 text-green-500"
+      />
+    </>
+  );
+
   return (
     <>
       <EntityList
@@ -203,6 +229,7 @@ export default function NotificationsPage() {
         onViewModeChange={setViewMode}
         onRefresh={onRefresh}
         onAdd={() => setIsCreateOpen(true)}
+        renderStats={renderStats}
         onDelete={(item) => {
           setSelectedNotification(item);
           setIsDeleteOpen(true);

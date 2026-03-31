@@ -26,7 +26,14 @@ export const QuicKAction = ({basePath, groupId, editionId, group, tournamentId}:
       url: `${basePath}/organize`,
       icon: Settings,
       child: (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full">
+          <Button variant="outline" asChild>
+            <Link
+              href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${group?.phaseId}`}
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+            </Link>
+          </Button>
           {/* Generate matches */}
           <GenerateGroupMatchesDialog
             groupId={groupId}
@@ -42,13 +49,6 @@ export const QuicKAction = ({basePath, groupId, editionId, group, tournamentId}:
 
           {group && <UpdatePhaseGroupDialog group={group} />}
 
-          <Button variant="outline" asChild>
-            <Link
-              href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${group?.phaseId}`}
-            >
-              <ArrowLeft className="h-4 w-4 mr-1" /> Retour
-            </Link>
-          </Button>
         </div>
       )
     },
@@ -64,7 +64,7 @@ export const QuicKAction = ({basePath, groupId, editionId, group, tournamentId}:
     }
 
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 w-full">
         {firstTwo}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

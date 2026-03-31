@@ -12,7 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
-import { Pin, Megaphone, Newspaper, RefreshCw, Plus } from "lucide-react";
+import { Pin, Megaphone, Newspaper, RefreshCw, Plus, CheckCircle } from "lucide-react";
 import { Announcement } from "@/database/schema";
 import {
   Dialog,
@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ResultDialog } from "@/components/shared/result-dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { StatCard } from "@/components/admin/stat-card";
 
 export default function AnnouncementsPage() {
   const router = useRouter();
@@ -202,6 +203,29 @@ export default function AnnouncementsPage() {
     }
   };
 
+  const renderStats = () => (
+    <>
+      <StatCard
+        title="Total Annonces"
+        value={total}
+        icon={Megaphone}
+        iconClassName="bg-primary/10 text-primary"
+      />
+      <StatCard
+        title="Épinglées"
+        value={data.filter((a: Announcement) => a.isPinned).length}
+        icon={Pin}
+        iconClassName="bg-amber-500/10 text-amber-500"
+      />
+      <StatCard
+        title="Actives"
+        value={data.filter((a: Announcement) => a.isActive).length}
+        icon={CheckCircle}
+        iconClassName="bg-green-500/10 text-green-500"
+      />
+    </>
+  );
+
   const handleTogglePin = async (announcement: Announcement) => {
     try {
       await updateAnnouncement(announcement.id, {
@@ -249,6 +273,7 @@ export default function AnnouncementsPage() {
         onViewModeChange={setViewMode}
         onRefresh={onRefresh}
         onAdd={() => setIsCreateOpen(true)}
+        renderStats={renderStats}
         onEdit={(item: Announcement) => openEditDialog(item)}
         onDelete={(item: Announcement) => {
           setSelectedAnnouncement(item);

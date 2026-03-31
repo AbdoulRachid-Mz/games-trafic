@@ -2,6 +2,7 @@
 "use client";
 
 import { EntityList } from "@/components/shared/entity-list";
+import { cn } from "@/lib/utils";
 // import { UserCard } from "@/components/shared/entity-cards/user-card";
 import { useEntityList } from "@/hooks/use-entity-list";
 import { User } from "@/database/schema";
@@ -218,27 +219,25 @@ export default function UsersPage() {
     ];
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <>
         {stats.map((stat, index) => (
-          <Card key={index} className="hover:shadow-md p-3 transition-shadow">
-            <CardContent className="p-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body-sm" theme="muted" className="mb-1">
-                    {stat.label}
-                  </Typography>
-                  <Typography variant="h3" weight="bold">
-                    {stat.value}
-                  </Typography>
-                </div>
-                <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
+          <Card key={index} className="hover:shadow-md transition-shadow h-full">
+            <CardContent className="p-4 flex items-center justify-between h-full">
+              <div>
+                <Typography variant="body-sm" theme="muted" className="mb-1">
+                  {stat.label}
+                </Typography>
+                <Typography variant="h3" weight="bold">
+                  {stat.value}
+                </Typography>
+              </div>
+              <div className={cn("p-3 rounded-lg shrink-0 ml-4", stat.bgColor)}>
+                <stat.icon className={cn("h-6 w-6", stat.color)} />
               </div>
             </CardContent>
           </Card>
         ))}
-      </div>
+      </>
     );
   };
 

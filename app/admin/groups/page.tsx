@@ -16,15 +16,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import { 
-  Users, 
-  Search, 
-  MoreVertical, 
-  Trash2, 
   RefreshCw,
   Globe,
   Lock,
-  MessageSquare
+  MessageSquare,
+  Users2,
+  ShieldCheck,
+  Users,
+  MoreVertical,
+  Trash2
 } from "lucide-react";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { StatCard } from "@/components/admin/stat-card";
+import { ResponsiveFilters } from "@/components/shared/responsive-filters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,50 +94,35 @@ export default function AdminGroupsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Groupes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600">Publics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats?.public || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-amber-600">Privés</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats?.private || 0}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsCarousel mode="auto">
+        <StatCard
+          title="Total Groupes"
+          value={stats?.total || 0}
+          icon={Users2}
+          iconClassName="bg-primary/10 text-primary"
+        />
+        <StatCard
+          title="Publics"
+          value={stats?.public || 0}
+          icon={Globe}
+          iconClassName="bg-blue-500/10 text-blue-500"
+        />
+        <StatCard
+          title="Privés"
+          value={stats?.private || 0}
+          icon={Lock}
+          iconClassName="bg-amber-500/10 text-amber-500"
+        />
+      </StatsCarousel>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Communautés</CardTitle>
-              <CardDescription>Liste de tous les groupes créés par les utilisateurs</CardDescription>
-            </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un groupe..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
+        <CardHeader className="pb-0 border-b-0">
+          <ResponsiveFilters
+            searchTerm={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Rechercher un groupe..."
+            onReset={() => setSearch("")}
+          />
         </CardHeader>
         <CardContent>
           <Table>

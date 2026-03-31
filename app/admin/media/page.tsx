@@ -16,17 +16,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import {
+  ExternalLink,
+  HardDrive,
+  CheckCircle,
+  PlayCircle,
   FileIcon,
   ImageIcon,
-  VideoIcon,
-  MusicIcon,
-  Search,
   MoreVertical,
-  Trash2,
+  MusicIcon,
   RefreshCw,
-  ExternalLink,
-  HardDrive
+  Trash2,
+  VideoIcon
 } from "lucide-react";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { StatCard } from "@/components/admin/stat-card";
+import { ResponsiveFilters } from "@/components/shared/responsive-filters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -109,58 +113,41 @@ export default function AdminMediaPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Fichiers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600">Images</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats?.images || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-purple-600">Vidéos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{stats?.videos || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Autres</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats?.other || 0}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsCarousel mode="auto">
+        <StatCard
+          title="Total Fichiers"
+          value={stats?.total || 0}
+          icon={HardDrive}
+          iconClassName="bg-primary/10 text-primary"
+        />
+        <StatCard
+          title="Images"
+          value={stats?.images || 0}
+          icon={ImageIcon}
+          iconClassName="bg-blue-500/10 text-blue-500"
+        />
+        <StatCard
+          title="Vidéos"
+          value={stats?.videos || 0}
+          icon={PlayCircle}
+          iconClassName="bg-purple-500/10 text-purple-500"
+        />
+        <StatCard
+          title="Autres"
+          value={stats?.other || 0}
+          icon={FileIcon}
+          iconClassName="bg-muted/10 text-muted-foreground"
+        />
+      </StatsCarousel>
 
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Fichiers stockés</CardTitle>
-              <CardDescription>Consultez tous les médias chargés par les utilisateurs</CardDescription>
-            </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un fichier..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
+        <CardHeader className="pb-0 border-b-0">
+          <ResponsiveFilters
+            searchTerm={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Rechercher un fichier..."
+            onReset={() => setSearch("")}
+          />
         </CardHeader>
         <CardContent>
           <Table>

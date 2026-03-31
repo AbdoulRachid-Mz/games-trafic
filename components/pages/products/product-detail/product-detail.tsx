@@ -28,6 +28,8 @@ import {
   LayoutDashboard,
   MoreVertical,
   Settings,
+  Eye,
+  ListFilter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -58,6 +60,7 @@ import {
 import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 interface ProductDetailProps {
   productId: string;
@@ -582,42 +585,73 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                 <Typography variant="h5" weight="semibold" className="mb-4">
                   Détails du compte
                 </Typography>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Typography variant="caption2" theme="muted">Type de compte</Typography>
-                    <Typography variant="body-sm">Premium Gaming</Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Plateforme</Typography>
-                    <Typography variant="body-sm">{currentProduct.platform || "Non spécifié"}</Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Niveau</Typography>
-                    <Typography variant="body-sm">{currentProduct.accountLevel || "N/A"}</Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Rang</Typography>
-                    <Typography variant="body-sm">{currentProduct.accountRank || "N/A"}</Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Date d'ajout</Typography>
-                    <Typography variant="body-sm">
-                      {currentProduct.createdAt && format(new Date(currentProduct.createdAt), "dd/MM/yyyy", { locale: fr })}
-                    </Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Vues</Typography>
-                    <Typography variant="body-sm">{currentProduct.stats?.viewCount || currentProduct.viewCount || 0}</Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Commandes</Typography>
-                    <Typography variant="body-sm">{currentProduct.stats?.orderCount || 0}</Typography>
-                  </div>
-                  <div>
-                    <Typography variant="caption2" theme="muted">Favoris</Typography>
-                    <Typography variant="body-sm">{currentProduct.stats?.likeCount || 0}</Typography>
-                  </div>
-                </div>
+                
+                {/* Product Stats/Info Carousel */}
+                <StatsCarousel 
+                  mode="auto" 
+                  itemsPerView={{ mobile: 2, md: 3, lg: 4, xl: 7 }}
+                  className="mb-6"
+                >
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold mb-1">Plateforme</Typography>
+                      <Badge variant="outline" className="font-semibold">{currentProduct.platform || "Non spécifié"}</Badge>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold mb-1">Niveau</Typography>
+                      <Typography variant="h4" weight="bold">{currentProduct.accountLevel || "N/A"}</Typography>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold mb-1">Rang</Typography>
+                      <Typography variant="h4" weight="bold" className="text-primary">{currentProduct.accountRank || "N/A"}</Typography>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold mb-1">Date</Typography>
+                      <Typography variant="body-sm" weight="medium">
+                         {currentProduct.createdAt && format(new Date(currentProduct.createdAt), "dd/MM/yyyy", { locale: fr })}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Eye className="h-3 w-3 text-muted-foreground" />
+                        <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold">Vues</Typography>
+                      </div>
+                      <Typography variant="h4" weight="bold">{currentProduct.stats?.viewCount || currentProduct.viewCount || 0}</Typography>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <div className="flex items-center gap-1 mb-1">
+                        <ListFilter className="h-3 w-3 text-muted-foreground" />
+                        <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold">Ventes</Typography>
+                      </div>
+                      <Typography variant="h4" weight="bold">{currentProduct.stats?.orderCount || 0}</Typography>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="h-full bg-card/50 border-border/50">
+                    <CardContent className="p-3 text-center flex flex-col items-center justify-center h-full">
+                      <div className="flex items-center gap-1 mb-1">
+                        <Heart className="h-3 w-3 text-muted-foreground" />
+                        <Typography variant="caption2" theme="muted" className="uppercase tracking-wider font-bold">Favoris</Typography>
+                      </div>
+                      <Typography variant="h4" weight="bold">{currentProduct.stats?.likeCount || 0}</Typography>
+                    </CardContent>
+                  </Card>
+                </StatsCarousel>
 
                 <Separator className="my-4" />
                 {/* Included Content */}

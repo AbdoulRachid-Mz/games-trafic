@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { EntityList } from "@/components/shared/entity-list";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/admin/stat-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
@@ -272,77 +273,33 @@ export default function AdminGamesPage() {
     );
   };
 
+  const renderStats = () => (
+    <>
+      <StatCard
+        title="Total Jeux"
+        value={total}
+        icon={Gamepad2}
+        iconClassName="bg-primary/10 text-primary"
+      />
+
+      <StatCard
+        title="Jeux Actifs"
+        value={games.filter((g: Game) => g.isActive).length}
+        icon={CheckCircle}
+        iconClassName="bg-green-500/10 text-green-500"
+      />
+
+      <StatCard
+        title="Mise en avant"
+        value={games.filter((g: Game) => g.featured).length}
+        icon={TrendingUp}
+        iconClassName="bg-amber-500/10 text-amber-500"
+      />
+    </>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-primary/10 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/20 rounded-xl">
-                <Gamepad2 className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <Typography
-                  variant="caption1"
-                  theme="muted"
-                  className="uppercase"
-                >
-                  Total Jeux
-                </Typography>
-                <Typography variant="h3" weight="bold">
-                  {total}
-                </Typography>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-success/10 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-success/20 rounded-xl">
-                <CheckCircle className="h-6 w-6 text-success" />
-              </div>
-              <div>
-                <Typography
-                  variant="caption1"
-                  theme="muted"
-                  className="uppercase"
-                >
-                  Jeux Actifs
-                </Typography>
-                <Typography variant="h3" weight="bold">
-                  {games.filter((g: Game) => g.isActive).length}
-                </Typography>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-amber-500/10 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-500/20 rounded-xl">
-                <TrendingUp className="h-6 w-6 text-amber-500" />
-              </div>
-              <div>
-                <Typography
-                  variant="caption1"
-                  theme="muted"
-                  className="uppercase"
-                >
-                  Mise en avant
-                </Typography>
-                <Typography variant="h3" weight="bold">
-                  {games.filter((g: Game) => g.featured).length}
-                </Typography>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Main List */}
       <EntityList
         title="Gestion des Jeux"
@@ -365,6 +322,7 @@ export default function AdminGamesPage() {
         renderCard={renderGameCard}
         renderTableRow={renderGameRow}
         renderTableHeader={renderTableHeader}
+        renderStats={renderStats}
       />
 
       {/* Details Dialog */}

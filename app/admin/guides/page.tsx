@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { useEntityList } from "@/hooks/use-entity-list";
+import { StatCard } from "@/components/admin/stat-card";
 import { useDeleteGuide, useRestoreGuide } from "@/hooks/use-guides";
 import {
   Dialog,
@@ -243,58 +244,31 @@ export default function AdminGuidesPage() {
 
   // Rendu des statistiques
   const renderStats = () => {
-    const activeGuides = guides.filter((g: any) => g.isActive).length;
-    const guidesWithSteps = guides.filter((g: any) => g.steps?.length > 0).length;
-    const totalViews = guides.reduce((sum: number, g: any) => sum + (g.viewCount || 0), 0);
+    const activeGuides = guides?.filter((g: any) => g.isActive).length || 0;
+    const guidesWithSteps = guides?.filter((g: any) => g.steps?.length > 0).length || 0;
+    const totalViews = guides?.reduce((sum: number, g: any) => sum + (g.viewCount || 0), 0) || 0;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="p-3">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Typography variant="h4" weight="bold">
-                  {activeGuides}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Guides actifs
-                </Typography>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500/30" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="p-3">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Typography variant="h4" weight="bold">
-                  {guidesWithSteps}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Avec étapes
-                </Typography>
-              </div>
-              <BookOpen className="h-8 w-8 text-blue-500/30" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="p-3">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Typography variant="h4" weight="bold">
-                  {totalViews}
-                </Typography>
-                <Typography variant="body-sm" theme="muted">
-                  Vues totales
-                </Typography>
-              </div>
-              <TrendingUp className="h-8 w-8 text-primary/30" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <StatCard
+          title="Guides Actifs"
+          value={activeGuides}
+          icon={CheckCircle}
+          iconClassName="bg-green-500/10 text-green-500"
+        />
+        <StatCard
+          title="Avec étapes"
+          value={guidesWithSteps}
+          icon={BookOpen}
+          iconClassName="bg-blue-500/10 text-blue-500"
+        />
+        <StatCard
+          title="Vues totales"
+          value={totalViews}
+          icon={TrendingUp}
+          iconClassName="bg-primary/10 text-primary"
+        />
+      </>
     );
   };
 

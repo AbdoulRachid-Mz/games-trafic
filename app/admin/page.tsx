@@ -81,6 +81,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useScreenSize } from "@/hooks/use-screen";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<any>(null);
@@ -255,40 +256,33 @@ export default function AdminOverviewPage() {
           )}
         </div>
 
-        {/* Tab: Utilisateurs */}
         <TabsContent value="users" className="space-y-6">
-          <div className="relative group">
-            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+          <StatsCarousel mode="auto">
               <StatCard
                 title="Total"
                 value={stats?.total_users || 0}
                 icon={Users}
                 description="Inscrits sur la plateforme"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Actifs"
                 value={stats?.active_users || 0}
                 icon={Activity}
                 description="Comptes activés"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Vérifiés"
                 value={stats?.verified_users || 0}
                 icon={ShieldCheck}
                 description="Email vérifié"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="VIP"
                 value={stats?.vip_users || 0}
                 icon={Award}
                 description="Abonnements actifs"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
-            </div>
-          </div>
+          </StatsCarousel>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-card/40 backdrop-blur-xl border-border/50">
@@ -323,40 +317,33 @@ export default function AdminOverviewPage() {
           </div>
         </TabsContent>
 
-        {/* Tab: Commerce */}
         <TabsContent value="commerce" className="space-y-6">
-          <div className="relative group">
-            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+          <StatsCarousel mode="auto">
               <StatCard
                 title="Boutiques"
                 value={stats?.total_shops || 0}
                 icon={Store}
                 description={`${stats?.active_shops || 0} actives`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Produits"
                 value={stats?.total_products || 0}
                 icon={Package}
                 description={`${stats?.active_products || 0} en ligne`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Vendus"
                 value={stats?.sold_products || 0}
                 icon={CheckCircle}
                 description="Items transférés"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Commandes"
                 value={stats?.total_orders || 0}
                 icon={ShoppingCart}
                 description="Volume total"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
-            </div>
-          </div>
+          </StatsCarousel>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-card/40 backdrop-blur-xl border-border/50">
@@ -395,40 +382,33 @@ export default function AdminOverviewPage() {
           </div>
         </TabsContent>
 
-        {/* Tab: Finances (Wallets) */}
         <TabsContent value="finances" className="space-y-6">
-          <div className="relative group">
-            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+          <StatsCarousel mode="auto">
               <StatCard
                 title="Solde Global"
                 value={formatCurrency(stats?.total_wallet_balance || 0, "GTC")}
                 icon={Wallet}
                 description="Total dans les wallets"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Transactions"
                 value={stats?.total_transactions || 0}
                 icon={Activity}
                 description="Nombre total d'opérations"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Volume"
                 value={formatCurrency(stats?.total_transaction_volume || 0, "GTC")}
                 icon={TrendingUp}
                 description="Volume d'échange total"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Moyenne / Tx"
                 value={formatCurrency(detailedStats.finances?.summary?.avg_amount || 0, "GTC")}
                 icon={DollarSign}
                 description="Montant moyen"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
-            </div>
-          </div>
+          </StatsCarousel>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-card/40 backdrop-blur-xl border-border/50">
@@ -464,40 +444,33 @@ export default function AdminOverviewPage() {
           </div>
         </TabsContent>
 
-        {/* Tab: Tournois */}
         <TabsContent value="tournaments" className="space-y-6">
-          <div className="relative group">
-            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+          <StatsCarousel mode="auto">
               <StatCard
                 title="Tournois"
                 value={stats?.total_tournaments || 0}
                 icon={Trophy}
                 description={`${stats?.active_tournaments || 0} actifs`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Éditions"
                 value={stats?.total_editions || 0}
                 icon={Calendar}
                 description="Total des événements"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Matchs"
                 value={stats?.total_matches || 0}
                 icon={Sword}
                 description="Disputés sur la plateforme"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Cashprize Total"
                 value={formatCurrency(stats?.total_prize_pool || 0, "GTC")}
                 icon={Coins}
                 description="Distribué aux gagnants"
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
-            </div>
-          </div>
+          </StatsCarousel>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-card/40 backdrop-blur-xl border-border/50">
@@ -536,40 +509,33 @@ export default function AdminOverviewPage() {
           </div>
         </TabsContent>
 
-        {/* Tab: Général */}
         <TabsContent value="general" className="space-y-6">
-          <div className="relative group">
-            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar scroll-smooth snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+          <StatsCarousel mode="auto">
               <StatCard
                 title="Utilisateurs"
                 value={stats?.total_users || 0}
                 icon={Users}
                 description={`${stats?.active_users || 0} actifs • ${stats?.vip_users || 0} VIP`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Boutiques"
                 value={stats?.total_shops || 0}
                 icon={ShoppingBag}
                 description={`${stats?.active_shops || 0} actives`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Produits"
                 value={stats?.total_products || 0}
                 icon={Package}
                 description={`${stats?.active_products || 0} actifs • ${stats?.sold_products || 0} vendus`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
               <StatCard
                 title="Commandes"
                 value={stats?.orders || 0}
                 icon={ShoppingCart}
                 description={`${orderStats?.completed || 0} complétées • ${orderStats?.cancelled || 0} annulées`}
-                className="min-w-[240px] flex-shrink-0 snap-center lg:min-w-0"
               />
-            </div>
-          </div>
+          </StatsCarousel>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-card/40 backdrop-blur-xl border-border/50">

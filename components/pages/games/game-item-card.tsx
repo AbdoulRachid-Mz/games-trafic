@@ -77,7 +77,8 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
     >
       <Card className="h-full overflow-hidden border-border/60 bg-card/40 backdrop-blur-xl transition-all duration-300 shadow-sm hover:shadow-2xl hover:shadow-primary/10 rounded-[2rem] flex flex-col group">
         <CardContent className="p-0 flex-1">
-          {/* Media Section */}
+          <Link href={`/games/${item.id}`} className="block h-full group/link">
+            {/* Media Section */}
           <div className="relative aspect-[4/3] overflow-hidden bg-muted/30">
             {item.icon ? (
               <div className="relative">
@@ -194,10 +195,11 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
                 >
                   {item.game?.name?.split(' ')[0]} <ChevronRight className="h-3 w-3" />
                 </Link>
-              </div>
             </div>
           </div>
-        </CardContent>
+        </div>
+      </Link>
+    </CardContent>
 
         <CardFooter className="p-6 pt-0">
           <Button
@@ -212,10 +214,10 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
             disabled={item.availability !== "AVAILABLE"}
           >
             <Link
-              href={item.availability === "AVAILABLE" ? `/wallet/transactions/create?type=GAME_ITEM_PURCHASE&itemId=${item.id}` : "#"}
+              href={`/games/${item.id}`}
             >
-              Récupérer l'item
-              <ShoppingCart className="ml-2.5 h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              Voir les détails
+              <ChevronRight className="ml-2.5 h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </Button>
         </CardFooter>
