@@ -186,7 +186,7 @@ function resolveLayout(config: RouteConfig): "none" | "public" | "dashboard" | "
   }
 
   // Sinon, on utilise styleGroup pour déterminer le layout
-  if (config.styleGroup === "dashboard") {
+  if (config.styleGroup === "dashboard" || config.styleGroup === "chat" || config.styleGroup === "wallet" || config.styleGroup === "profile") {
     return "dashboard";
   }
 

@@ -117,7 +117,7 @@ export function useConversation(
   userId1: string,
   userId2: string,
   pagination?: { page: number; limit: number },
-  enabled = true
+  enabled: boolean = true
 ) {
   return useQuery({
     queryKey: messageKeys.conversation(userId1, userId2),
@@ -137,7 +137,7 @@ export function useConversation(
 export function useGroupMessages(
   groupId: string,
   pagination?: { page: number; limit: number },
-  enabled = true
+  enabled: boolean = true
 ) {
   return useQuery({
     queryKey: messageKeys.group(groupId),

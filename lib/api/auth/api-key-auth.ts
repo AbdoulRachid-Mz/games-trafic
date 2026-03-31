@@ -9,6 +9,8 @@ export interface APIKeyAuthResult {
   user?: typeof users.$inferSelect;
   apiKey?: typeof apiKeys.$inferSelect;
   error?: string;
+  rateLimitPerHour?: number;
+  rateLimitPerDay?: number;
 }
 
 export interface GenerateKeyOptions {
@@ -19,6 +21,8 @@ export interface GenerateKeyOptions {
   expiresIn?: number; // ms
   allowedIps?: string[];
   allowedOrigins?: string[];
+  rateLimitPerHour?: number;
+  rateLimitPerDay?: number;
 }
 
 export class APIKeyAuth {
@@ -56,6 +60,8 @@ export class APIKeyAuth {
       permissions: options.permissions || [],
       allowedIps: options.allowedIps || [],
       allowedOrigins: options.allowedOrigins || [],
+      rateLimitPerHour: options.rateLimitPerHour || 1000,
+      rateLimitPerDay: options.rateLimitPerDay || 10000,
       expiresAt,
       status: 'ACTIVE',
     }).returning();
@@ -124,7 +130,12 @@ export class APIKeyAuth {
       })
       .where(eq(apiKeys.id, apiKey.id));
 
-    return { ...apiKey, user };
+    return { 
+      ...apiKey, 
+      user,
+      rateLimitPerHour: apiKey.rateLimitPerHour,
+      rateLimitPerDay: apiKey.rateLimitPerDay
+    };
   }
 
   /**

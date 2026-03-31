@@ -4,10 +4,40 @@ import { groups, groupMembers, type Group, type NewGroup, type GroupMember, type
 import { eq, and, or, like, ilike, inArray, desc, asc, sql, count, isNull, gte, lte } from 'drizzle-orm';
 import { type GroupFilters, type GroupMemberFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { createNotification } from '@/actions/notifications';
+import { getUserById } from '@/actions/users';
+import { revalidatePath } from 'next/cache';
 
 // ============================================================================
 // QUERIES - Lecture des données
 // ============================================================================
+
+/**
+ * Envoie une demande pour rejoindre un groupe privé
+ */
+export async function requestJoinGroup(groupId: string, userId: string) {
+  try {
+    const group = await getGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+
+    const user = await getUserById(userId);
+    if (!user) throw new Error('User not found');
+
+    // Envoyer la notification au créateur du groupe
+    await createNotification({
+      userId: group.creatorId,
+      title: 'Demande d\'adhésion au groupe',
+      message: `${user.username || user.fullName} souhaite rejoindre votre groupe "${group.name}".`,
+      type: 'GROUP_JOIN_REQUEST',
+      linkUrl: `/chats/groups/${groupId}?requestUser=${userId}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error requesting group join:', error);
+    return { success: false, error: 'Failed to send join request' };
+  }
+}
 
 /**
  * Récupère un groupe par son ID avec relations optionnelles
@@ -259,27 +289,36 @@ export async function getGroupMembers(
       buildGroupMemberWhereConditions(filters, options)
     );
 
-    const membersQuery = db
-      .select()
-      .from(groupMembers)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof GroupMember;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      membersQuery.orderBy(sortOrder(groupMembers[sortField]));
-    } else {
-      membersQuery.orderBy(asc(groupMembers.joinedAt));
-    }
+    const membersData = await db.query.groupMembers.findMany({
+      where: (gm, { eq, and }) =>
+        and(eq(gm.groupId, groupId), buildGroupMemberWhereConditions(filters, options)),
+      limit: pagination.limit,
+      offset,
+      orderBy: (gm, { desc, asc }) => {
+        if (options.sortBy) {
+          const sortOrder = options.sortOrder === "desc" ? desc : asc;
+          return [sortOrder(gm[options.sortBy as keyof typeof gm] as any)];
+        }
+        return [asc(gm.joinedAt)];
+      },
+      with: {
+        user: {
+          columns: {
+            id: true,
+            username: true,
+            fullName: true,
+            profileImage: true,
+          },
+        },
+      },
+    });
 
     const countQuery = db
       .select({ count: count() })
       .from(groupMembers)
       .where(whereConditions);
 
-    const [membersData, totalResult] = await Promise.all([membersQuery, countQuery]);
+    const [totalResult] = await Promise.all([countQuery]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);

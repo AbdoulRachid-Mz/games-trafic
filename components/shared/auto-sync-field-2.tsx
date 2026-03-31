@@ -1,3 +1,4 @@
+// components/shared/auto-sync-field-2.tsx
 "use client";
 
 import { useState, useEffect, useRef, useCallback, ReactNode } from "react";

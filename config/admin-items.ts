@@ -34,6 +34,7 @@ import {
   LifeBuoy,
   AlertCircle,
   Image,
+  Key,
 } from "lucide-react";
 
 // ============================================================================
@@ -394,6 +395,37 @@ export const superAdminRoutes: AdminRoute[] = [
     ],
   },
 
+  // Gestion des APIs
+  {
+    id: "api-management",
+    label: "API & Accès",
+    path: "/admin/api/keys",
+    icon: Database,
+    description: "Gérer les clés API et les accès",
+    requiredLevel: 'A',
+    isSystem: true,
+    children: [
+      {
+        id: "api-keys",
+        label: "Clés API",
+        path: "/admin/api/keys",
+        icon: Key,
+        description: "Gérer les jetons d'accès",
+        requiredLevel: 'A',
+        isSystem: true,
+      },
+      {
+        id: "api-logs",
+        label: "Logs API",
+        path: "/admin/api/logs",
+        icon: Activity,
+        description: "Surveillance des requêtes",
+        requiredLevel: 'A',
+        isSystem: true,
+      },
+    ],
+  },
+
   // Logs et traces
   {
     id: "logs",
@@ -562,7 +594,7 @@ export function getAdminRouteGroups(level: 'A' | 'B' | 'C'): Array<{
       label: "Configuration",
       icon: Settings,
       routes: routes.filter(r =>
-        ['categories', 'services', 'system', 'settings', 'database', 'logs', 'advanced'].includes(r.id)
+        ['categories', 'services', 'system', 'settings', 'database', 'logs', 'api-management', 'advanced'].includes(r.id)
       ),
     },
   ];

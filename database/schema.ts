@@ -2143,6 +2143,10 @@ export const apiKeys = pgTable('api_keys', {
   allowedIps: text('allowed_ips').array().default([]),
   allowedOrigins: text('allowed_origins').array().default([]),
 
+  // Limites
+  rateLimitPerHour: integer('rate_limit_per_hour').default(1000),
+  rateLimitPerDay: integer('rate_limit_per_day').default(10000),
+
   // Stats
   lastUsedAt: timestamp('last_used_at'),
   lastUsedIp: text('last_used_ip'),

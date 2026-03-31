@@ -1,21 +1,11 @@
+// @/app/chats/[chatId]/page.tsx
+//Type 'boolean | null | undefined' is not assignable to type 'boolean | undefined'.
 
-## Error Type
-Runtime TypeError
-
-## Error Message
-Cannot read properties of undefined (reading 'enabled')
+++ @/app/chats/[chatId]/page.tsx
+This comparison appears to be unintentional because the types '"dashboard" | "admin" | "public" | undefined' and '"none"' have no overlap.ts(2367)
+const resolved: ResolvedRoute | null
 
 
-    at AppShell (components\layout\app-shell.tsx:286:32)
-    at RootLayout (app\layout.tsx:61:21)
+++ check ts after.
 
-## Code Frame
-  284 |
-  285 |       <MainLayout
-> 286 |         breadcrumbs={resolved?.topMiddle.enabled}
-      |                                ^
-  287 |         footer={resolved?.footer.enabled}
-  288 |         topMiddle={resolved?.topMiddle.enabled}
-  289 |         leftBar={resolved?.leftBar.enabled}
 
-Next.js version: 16.1.6 (Webpack)

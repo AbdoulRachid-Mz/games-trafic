@@ -15,6 +15,7 @@ import {
   getGroupMemberByUserAndGroup,
   getGroupMemberStats,
   checkGroupPermission,
+  requestJoinGroup,
 } from '@/actions/groups';
 import type { Group, GroupMember, NewGroup } from '@/database/schema';
 import type { GroupFilters, GroupMemberFilters, ListQuery, PaginationResponse } from '@/types/api';
@@ -195,6 +196,16 @@ export function useLeaveGroup() {
       queryClient.invalidateQueries({ queryKey: groupKeys.members(groupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.membership(userId, groupId) });
       queryClient.invalidateQueries({ queryKey: [...groupKeys.members(groupId), 'stats'] });
+    },
+  });
+}
+export function useRequestJoinGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, userId }: { groupId: string; userId: string }) =>
+      requestJoinGroup(groupId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: groupKeys.all });
     },
   });
 }

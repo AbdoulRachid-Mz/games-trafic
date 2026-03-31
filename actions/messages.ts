@@ -6,11 +6,14 @@ import {
   type NewMessage,
   users,
   groups,
+  groupMembers,
   shops,
   posts,
   products,
   MessageWithRelations,
+  EntityType,
 } from "@/database/schema";
+import { type Conversation, type ChatId } from "@/types/chat";
 import {
   eq,
   and,
@@ -80,6 +83,190 @@ export async function getMessageById(
   } catch (error) {
     console.error("Error getting message by ID:", error);
     throw new Error("Failed to fetch message");
+  }
+}
+
+/**
+ * Récupère les conversations d'un utilisateur
+ */
+export async function getConversationsForUser(
+  userId: string,
+): Promise<Conversation[]> {
+  try {
+    // 1. Trouver les groupes de l'utilisateur
+    const userGroups = await db
+      .select({ groupId: groupMembers.groupId })
+      .from(groupMembers)
+      .where(eq(groupMembers.userId, userId));
+
+    const groupIds = userGroups.map((ug) => ug.groupId);
+
+    // 2. Trouver tous les messages récents liés à l'utilisateur (DM ou Groupes dont il est membre)
+    const recentMessages = await db.query.messages.findMany({
+      where: (m, { or, eq, inArray, and }) =>
+        and(
+          eq(m.isDeleted, false),
+          or(
+            eq(m.senderId, userId),
+            eq(m.recipientId, userId),
+            groupIds.length > 0 ? inArray(m.groupId, groupIds) : undefined,
+          ),
+        ),
+      orderBy: (m, { desc }) => [desc(m.createdAt)],
+      limit: 200,
+      with: {
+        sender: {
+          columns: {
+            id: true,
+            username: true,
+            fullName: true,
+            profileImage: true,
+          },
+        },
+        recipient: {
+          columns: {
+            id: true,
+            username: true,
+            fullName: true,
+            profileImage: true,
+          },
+        },
+        group: true,
+      },
+    });
+
+    // 3. Organiser en conversations uniques
+    const conversationMap = new Map<string, Conversation>();
+
+    for (const msg of recentMessages) {
+      let chatId: string;
+      let entityType: any;
+      let entityId: string;
+      let entityData: any;
+
+      if (msg.groupId) {
+        chatId = `group:${msg.groupId}`;
+        entityType = "group";
+        entityId = msg.groupId;
+        entityData = msg.group;
+      } else if (msg.recipientId && msg.recipientId !== userId) {
+        chatId = `user:${msg.recipientId}`;
+        entityType = "user";
+        entityId = msg.recipientId;
+        entityData = msg.recipient;
+      } else if (msg.senderId && msg.senderId !== userId) {
+        chatId = `user:${msg.senderId}`;
+        entityType = "user";
+        entityId = msg.senderId;
+        entityData = msg.sender;
+      } else {
+        continue;
+      }
+
+      if (!conversationMap.has(chatId)) {
+        conversationMap.set(chatId, {
+          chatId: chatId as any,
+          entityType,
+          entityId,
+          entity: { type: entityType, data: entityData } as any,
+          lastMessage: msg as any,
+          lastMessageTime: msg.createdAt || undefined,
+          unreadCount: 0,
+        });
+      }
+    }
+
+    return Array.from(conversationMap.values());
+  } catch (error) {
+    console.error("Error getting conversations:", error);
+    return [];
+  }
+}
+
+/**
+ * Récupère les commentaires d'une entité avec relations (auteurs, réponses)
+ */
+export async function getEntityComments(
+  entityId: string,
+  entityType: EntityType,
+  pagination: { page: number; limit: number } = { page: 1, limit: 20 },
+): Promise<PaginationResponse<MessageWithRelations>> {
+  try {
+    const offset = (pagination.page - 1) * pagination.limit;
+
+    const data = await db.query.messages.findMany({
+      where: (m, { and, or, eq, isNull }) =>
+        and(
+          or(
+            and(eq(m.entityId, entityId), eq(m.entityType, entityType)),
+            // Fallback for specific columns
+            entityType.toUpperCase() === "PRODUCT" ? eq(m.productId, entityId) : undefined,
+            entityType.toUpperCase() === "SHOP" ? eq(m.shopId, entityId) : undefined,
+            entityType.toUpperCase() === "POST" ? eq(m.postId, entityId) : undefined,
+            entityType.toUpperCase() === "TOURNAMENT" ? eq(m.tournamentId, entityId) : undefined,
+            entityType.toUpperCase() === "EDITION" ? eq(m.editionId, entityId) : undefined,
+            entityType.toUpperCase() === "USER" ? eq(m.userId, entityId) : undefined,
+            entityType.toUpperCase() === "GAMECLIP" ? eq(m.gameClipId, entityId) : undefined,
+            entityType.toUpperCase() === "GROUP" ? eq(m.groupId, entityId) : undefined,
+          ),
+          isNull(m.parentMessageId),
+          eq(m.isDeleted, false),
+        ),
+      orderBy: (m, { desc }) => [desc(m.createdAt)],
+      limit: pagination.limit,
+      offset,
+      with: {
+        sender: {
+          columns: {
+            id: true,
+            username: true,
+            fullName: true,
+            profileImage: true,
+          },
+        },
+        replies: {
+          with: {
+            sender: {
+              columns: {
+                id: true,
+                username: true,
+                fullName: true,
+                profileImage: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const totalRes = await db
+      .select({ count: count() })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.entityId, entityId),
+          eq(messages.entityType, entityType),
+          isNull(messages.parentMessageId),
+          eq(messages.isDeleted, false),
+        ),
+      );
+
+    const total = totalRes[0].count;
+
+    return {
+      data: data as any,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages: Math.ceil(total / pagination.limit),
+        hasNext: pagination.page < Math.ceil(total / pagination.limit),
+        hasPrev: pagination.page > 1,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting entity comments:", error);
+    throw new Error("Failed to fetch comments");
   }
 }
 
@@ -387,11 +574,27 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
     }
 
     // ---------------------------------------------------
+    
+    // Auto-populate specific ID columns based on entityType/entityId
+    const finalData = { ...messageData };
+    if (messageData.entityType && messageData.entityId) {
+      const type = messageData.entityType.toUpperCase();
+      const id = messageData.entityId;
+      
+      if (type === 'PRODUCT') finalData.productId = id;
+      else if (type === 'SHOP') finalData.shopId = id;
+      else if (type === 'POST') finalData.postId = id;
+      else if (type === 'TOURNAMENT') finalData.tournamentId = id;
+      else if (type === 'EDITION') finalData.editionId = id;
+      else if (type === 'USER') finalData.userId = id;
+      else if (type === 'GAMECLIP') finalData.gameClipId = id;
+      else if (type === 'GROUP') finalData.groupId = id;
+    }
 
     const result = await db
       .insert(messages)
       .values({
-        ...messageData,
+        ...finalData,
         createdAt: new Date(),
       })
       .returning();

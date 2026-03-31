@@ -3,6 +3,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useMemo } from "react";
+import { getConversationsForUser } from "@/actions/messages";
 import type { Conversation, ConversationFilter, ChatId } from "@/types/chat";
 import {
   sortConversationsByTime,
@@ -29,17 +30,11 @@ export function useConversations(userId: string | undefined) {
 
   /**
    * Fetch conversations from server
-   * TODO: Implement actual API call
    */
   const fetchConversations = useCallback(async (): Promise<Conversation[]> => {
     if (!userId) return [];
 
-    // TODO: Replace with actual API call
-    // const response = await fetch(`/api/chats/conversations?userId=${userId}`);
-    // return response.json();
-
-    // Placeholder: return empty array
-    return [];
+    return await getConversationsForUser(userId);
   }, [userId]);
 
   /**

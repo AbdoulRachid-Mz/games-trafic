@@ -25,9 +25,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { Skeleton } from "@/components/ui/skeleton";
+import { useUserById } from "@/hooks/use-users";
+import { useGroupById, useGroupMembers } from "@/hooks/use-groupes";
+import { useAuthContext } from "@/contexts/auth-context";
+import { useMessages } from "@/hooks/use-messages";
+
 function ChatDetailContent() {
   const params = useParams();
   const router = useRouter();
+  const { user: currentUser } = useAuthContext();
   const chatId = params.chatId as string;
 
   const parsed = parseChatId(chatId);
@@ -38,13 +45,42 @@ function ChatDetailContent() {
 
   const isGroup = parsed.type === "group";
 
-  // Mock data - replace with actual API calls
-  const entityName = isGroup ? "Sample Group" : "John Doe";
-  const entityAvatar = null;
-  const initials = getInitials(entityName);
-  const memberCount = isGroup ? 5 : undefined;
+  // Fetch entity data
+  const { data: userData, isLoading: userLoading } = useUserById(
+    !isGroup && parsed.id ? parsed.id : undefined
+  );
+  const { data: groupData, isLoading: groupLoading } = useGroupById(
+    isGroup ? parsed.id : "",
+    { populate: ["members"] }
+  );
+  const { data: membersData } = useGroupMembers(isGroup ? parsed.id : "", {
+    pagination: { page: 1, limit: 1 },
+  });
+
+  // Fetch shared media (messages with images)
+  const { data: mediaMessages } = useMessages(
+    {
+      filters: isGroup 
+        ? { groupId: parsed.id } 
+        : { 
+            senderId: currentUser?.id || "",
+            recipientId: parsed.id
+          },
+      pagination: { page: 1, limit: 50 }
+    },
+    !!parsed.id
+  );
+
+  const isLoading = isGroup ? groupLoading : userLoading;
+  const entity = isGroup ? groupData : userData;
+  const entityName = isGroup ? groupData?.name : (userData?.username || userData?.fullName) || "Unknown";
+  const entityAvatar = isGroup ? groupData?.image : userData?.profileImage;
+  const initials = getInitials(entityName || "");
+  const memberCount = isGroup ? (membersData?.pagination?.total || 0) : undefined;
   const isMuted = false;
-  const sharedMedia = []; // Mock shared media
+  
+  // Filter messages that have images
+  const sharedMedia = mediaMessages?.data?.filter((m: any) => m.images && m.images.length > 0) || [];
 
   const handleBack = () => {
     router.back();
@@ -65,6 +101,28 @@ function ChatDetailContent() {
   const handleViewMedia = () => {
     toast.info("Media gallery coming soon");
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--chat-background)] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Skeleton className="h-24 w-24 rounded-full mx-auto" />
+          <Skeleton className="h-6 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!entity) {
+    return (
+      <div className="min-h-screen bg-[var(--chat-background)] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-xl font-bold text-[var(--chat-text)]">Not Found</h1>
+          <Button onClick={() => router.push("/chats")}>Back to Chats</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--chat-background)]">

@@ -9,7 +9,7 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { AnnouncementDialog } from "@/components/announcements/announcement-dialog";
 import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 import { resolveRoute } from "@/lib/routes/resolver";
-import type { UserRoles } from "@/types/routes";
+import type { UserRoles, ResolvedRoute } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { useSearchParams } from "next/navigation";
@@ -160,10 +160,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   // Resolve route
-  const resolved = useMemo(() => {
+  const resolved = useMemo<ResolvedRoute | null>(() => {
     if (!isInitialized) return null;
     return resolveRoute(pathname, userRoles);
-  }, [initialPath, userRoles, isInitialized]);
+  }, [pathname, userRoles, isInitialized]);
 
   // Initialize app
   useEffect(() => {
@@ -284,11 +284,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       <MainLayout
-        breadcrumbs={resolved?.topMiddle?.enabled}
-        footer={resolved?.footer?.enabled}
-        topMiddle={resolved?.topMiddle?.enabled}
-        leftBar={resolved?.leftBar?.enabled}
-        rightBar={resolved?.rightBar?.enabled}
+        breadcrumbs={resolved?.topMiddle?.enabled ?? true}
+        footer={resolved?.footer?.enabled ?? true}
+        topMiddle={resolved?.topMiddle?.enabled ?? true}
+        leftBar={resolved?.leftBar?.enabled ?? true}
+        rightBar={resolved?.rightBar?.enabled ?? false}
         navigationLinks={resolved?.navigationLinks}
         floatingActions={resolved?.fabActions?.actions || []}
         floatingActiveActionId={resolved?.activeFabActionId as string}
@@ -297,7 +297,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         hideTopMiddleOnScroll={resolved?.topMiddle?.hideOnScroll}
         breadcrumbItems={resolved?.topMiddle?.breadcrumbs || []}
         floatingDockLinks={resolved?.floatingDock?.links || []}
-        shouldExcludeContainer={resolved?.layout !== "public"}
+        shouldExcludeContainer={(resolved as ResolvedRoute | null)?.layout === "none"}
         showOnTap={resolved?.showOnTap}
       >
         {children}

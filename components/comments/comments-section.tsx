@@ -12,7 +12,7 @@ import { CommentList } from "./comment-list";
 import { Typography } from "@/components/ui/typography";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { EntityType } from "@/database/schema";
-import { getMessages } from "@/actions/messages";
+import { getEntityComments } from "@/actions/messages";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -21,7 +21,6 @@ interface CommentsSectionProps {
   entityType: EntityType;
   title?: string;
   className?: string;
-  
 }
 
 export function CommentsSection({
@@ -43,25 +42,14 @@ export function CommentsSection({
   } = useInfiniteQuery({
     queryKey: ["comments", entityType, entityId],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await getMessages({
-        filters: {
-          entityId,
-          entityType,
-          isOpenToPublic: true,
-        },
-        options: {
-          sortBy: "createdAt",
-          sortOrder: "desc",
-          populate: ["sender", "replies.sender"],
-        },
-        pagination: {
-          limit: 20,
-          page: pageParam,
-        },
+      const res = await getEntityComments(entityId, entityType, {
+        limit: 20,
+        page: pageParam as number,
       });
+      
       return {
         comments: res.data,
-        nextPage: res.pagination.hasNext ? pageParam + 1 : undefined,
+        nextPage: res.pagination.hasNext ? (pageParam as number) + 1 : undefined,
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
