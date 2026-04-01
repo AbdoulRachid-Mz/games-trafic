@@ -102,10 +102,10 @@ export function TournamentPageContent() {
   const { isSmallScreen, isLargeScreen } = useScreenSize();
 
   const [tournament, setTournament] = useState<TournamentWithRelations | null>(
-    null
+    null,
   );
   const [similarTournaments, setSimilarTournaments] = useState<Tournament[]>(
-    []
+    [],
   );
   const [members, setMembers] = useState<TournamentMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,7 +129,7 @@ export function TournamentPageContent() {
     setIsLoading(true);
     try {
       const data = await getTournamentById(tournamentId, {
-        populate: ["organizer", "editions", "theme", "members"],
+        populate: ["organizer", "editions", "members"],
       });
       setTournament(data as TournamentWithRelations);
       if (data?.members) {
@@ -410,7 +410,7 @@ export function TournamentPageContent() {
                       {format(
                         new Date(upcomingEdition.startDate),
                         "d MMMM yyyy",
-                        { locale: fr }
+                        { locale: fr },
                       )}
                     </span>
                   </div>
@@ -451,7 +451,7 @@ export function TournamentPageContent() {
                     className="gap-2 max-md:flex-1"
                     onClick={() =>
                       router.push(
-                        `/tournaments/${tournamentId}/dashboard/editions`
+                        `/tournaments/${tournamentId}/dashboard/editions`,
                       )
                     }
                   >
@@ -467,7 +467,9 @@ export function TournamentPageContent() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/tournaments/${tournamentId}/dashboard/settings`)
+                          router.push(
+                            `/tournaments/${tournamentId}/dashboard/settings`,
+                          )
                         }
                       >
                         <Settings className="h-4 w-4 mr-2" />
@@ -475,7 +477,9 @@ export function TournamentPageContent() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/tournaments/${tournamentId}/dashboard/members`)
+                          router.push(
+                            `/tournaments/${tournamentId}/dashboard/members`,
+                          )
                         }
                       >
                         <Users2 className="h-4 w-4 mr-2" />
@@ -550,7 +554,10 @@ export function TournamentPageContent() {
       <div className="container mx-auto p-2">
         <div className="overflow-x-auto w-full">
           <StatsCarousel
-            data={stats.map(s => ({ ...s, icon: <s.icon className="h-5 w-5" /> }))}
+            data={stats.map((s) => ({
+              ...s,
+              icon: <s.icon className="h-5 w-5" />,
+            }))}
             itemsPerView={{
               mobile: 1,
               lg: 3,
@@ -832,8 +839,7 @@ export function TournamentPageContent() {
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
-                        <Trophy className="h-5 w-5" />
-                        À propos du tournoi
+                        <Trophy className="h-5 w-5" />À propos du tournoi
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -990,7 +996,7 @@ export function TournamentPageContent() {
                                   {format(
                                     new Date(tournament.createdAt),
                                     "d MMMM yyyy",
-                                    { locale: fr }
+                                    { locale: fr },
                                   )}
                                 </Typography>
                               </div>
@@ -1054,7 +1060,7 @@ export function TournamentPageContent() {
                         className="gap-2"
                         onClick={() =>
                           router.push(
-                            `/tournaments/${tournamentId}/dashboard/editions`
+                            `/tournaments/${tournamentId}/dashboard/editions`,
                           )
                         }
                       >
@@ -1072,7 +1078,11 @@ export function TournamentPageContent() {
                         edition={edition}
                         showDetails={false}
                         tournamentId={tournamentId}
-                        onView={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}`)}
+                        onView={() =>
+                          router.push(
+                            `/tournaments/${tournamentId}/editions/${edition.id}`,
+                          )
+                        }
                       />
                     ))}
                   </div>
@@ -1091,7 +1101,7 @@ export function TournamentPageContent() {
                         <ChevronRight
                           className={cn(
                             "h-4 w-4 transition-transform",
-                            showAllEditions && "rotate-90"
+                            showAllEditions && "rotate-90",
                           )}
                         />
                       </Button>
@@ -1145,7 +1155,7 @@ export function TournamentPageContent() {
                           variant="outline"
                           onClick={() =>
                             router.push(
-                              `/tournaments/${tournamentId}/members/manage`
+                              `/tournaments/${tournamentId}/members/manage`,
                             )
                           }
                         >
@@ -1161,7 +1171,7 @@ export function TournamentPageContent() {
                       "gap-4",
                       memberViewMode === "grid"
                         ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                        : "flex flex-col gap-4"
+                        : "flex flex-col gap-4",
                     )}
                   >
                     {displayedMembers.map((member) => (
@@ -1189,7 +1199,7 @@ export function TournamentPageContent() {
                         <ChevronRight
                           className={cn(
                             "h-4 w-4 transition-transform",
-                            showAllMembers && "rotate-90"
+                            showAllMembers && "rotate-90",
                           )}
                         />
                       </Button>
@@ -1316,7 +1326,11 @@ export function TournamentPageContent() {
                 </Typography>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {similarTournaments.map((t) => (
-                    <TournamentCard showDetails={false} key={t.id} tournament={t} />
+                    <TournamentCard
+                      showDetails={false}
+                      key={t.id}
+                      tournament={t}
+                    />
                   ))}
                 </div>
               </div>

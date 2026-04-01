@@ -179,10 +179,7 @@ export default function ShopProductsPage() {
         </div>
         
         <Button 
-          onClick={() => {
-            setSelectedProduct(null);
-            setIsDialogOpen(true);
-          }}
+          onClick={() => router.push(`/shops/${params.shopId}/dashboard/products/create`)}
           className="gap-2"
         >
           <Plus className="h-4 w-4" />

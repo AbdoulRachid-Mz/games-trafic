@@ -61,7 +61,7 @@ export function TournamentCard({
   showStats = true,
   showActions = true,
   showFollowButton = true,
-  showLikeButton = true,
+  showLikeButton = false,
   onView,
   onJoin,
   className,

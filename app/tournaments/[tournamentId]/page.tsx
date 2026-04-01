@@ -3,7 +3,6 @@ import { TournamentPageContent, TournamentSkeleton } from "./client-page";
 
 // mise en cache de la page
 
-
 // Page principale avec Suspense
 export default function TournamentPage() {
   return (

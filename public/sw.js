@@ -21,12 +21,12 @@ const IMAGE_PATTERNS = [
 const ESSENTIAL_RESOURCES = [
   "/",
   "/offline",
-  "/icon-192x192.png",
-  "/icon-512x512.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
   "/manifest.webmanifest",
 
   // 🖼️ fallback image offline
-  "/images/image-offline.png",
+  "/icons/offline.png",
 
   // Fonts
   "/fonts/"
@@ -295,8 +295,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: notificationData.body || "Vous avez une nouvelle notification",
-    icon: "/icon-192x192.png",
-    badge: "/icon-192x192.png",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
     image: notificationData.image,
     data: { 
       url: notificationData.url || "/",

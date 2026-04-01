@@ -45,7 +45,7 @@ export function MembershipRequestDialog({
   const [formData, setFormData] = useState({
     displayName: user?.username || user?.fullName || "",
     gameTag: "",
-    contactPhone: "",
+    contactPhone: `${user?.countryCode}${user?.phoneNumber}` || "",
     gameLevel: "",
     gameRank: "",
     notes: "",
@@ -86,7 +86,7 @@ export function MembershipRequestDialog({
             <CardContent className="p-3 flex items-center gap-3">
               {tournament.profileImage ? (
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={tournament.profileImage} />
+                  <AvatarImage src={tournament.profileImage || "/icons/avatar.png"} />
                   <AvatarFallback><Trophy className="h-5 w-5" /></AvatarFallback>
                 </Avatar>
               ) : (

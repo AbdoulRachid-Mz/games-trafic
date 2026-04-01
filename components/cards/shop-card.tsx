@@ -67,7 +67,7 @@ export function ShopCard({
   showStats = true,
   showActions = true,
   showFollowButton = true,
-  showLikeButton = true,
+  showLikeButton = false,
   showQuickActions = true,
   onView,
   onFollow,

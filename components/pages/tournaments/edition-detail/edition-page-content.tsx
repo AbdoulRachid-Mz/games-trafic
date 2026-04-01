@@ -29,6 +29,7 @@ import { CommentsSection } from "@/components/comments/comments-section";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import { Users, Target, Trophy, Calendar, Wallet } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
+import Link from "next/link";
 
 interface EditionPageContentProps {
   tournament: Tournament;
@@ -284,9 +285,9 @@ export function EditionPageContent({
                   <Typography variant="h4" weight="bold">Calendrier des matches</Typography>
                   <Typography variant="body-sm" theme="muted">Consultez les dates et heures de tous les matches de l&apos;édition.</Typography>
                   <Button variant="default" asChild>
-                    <a href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
+                    <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
                       Ouvrir le calendrier complet
-                    </a>
+                    </Link>
                   </Button>
                 </div>
               </TabsContent>
@@ -323,9 +324,9 @@ export function EditionPageContent({
                 </div>
               </div>
               <Button variant="outline" className="w-full mt-6" asChild>
-                <a href={`/tournaments/${tournament.id}`}>
+                <Link href={`/tournaments/${tournament.id}`}>
                   Voir le tournoi principal
-                </a>
+                </Link>
               </Button>
             </div>
           </div>

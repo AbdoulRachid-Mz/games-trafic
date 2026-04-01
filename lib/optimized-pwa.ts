@@ -108,7 +108,7 @@ export function usePWA() {
                 if (Notification.permission === "granted") {
                   new Notification("Games Trafics - Mise à jour disponible", {
                     body: "Une nouvelle version est disponible. Cliquez pour mettre à jour.",
-                    icon: "/icon-192x192.png",
+                    icon: "/icons/icon-192.png",
                     tag: "update-available",
                   });
                 }
