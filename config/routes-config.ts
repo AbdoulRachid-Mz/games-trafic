@@ -62,9 +62,24 @@ export interface DockLinkConfig {
 export const defaultDockLinks: DockLinkConfig[] = [
   { href: "/", label: "Accueil", icon: "home", requireAuth: false },
   { href: "/games", label: "Jeux", icon: "swords", requireAuth: false },
-  { href: "/game-clips", label: "Clips", icon: "gameClips", requireAuth: false },
-  { href: "/marketplace", label: "Boutique", icon: "marketplace", requireAuth: false },
-  { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: false },
+  {
+    href: "/game-clips",
+    label: "Clips",
+    icon: "gameClips",
+    requireAuth: false,
+  },
+  {
+    href: "/marketplace",
+    label: "Boutique",
+    icon: "marketplace",
+    requireAuth: false,
+  },
+  {
+    href: "/tournaments",
+    label: "Tournois",
+    icon: "tournaments",
+    requireAuth: false,
+  },
   { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
 ];
 
@@ -77,7 +92,13 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   // ROUTES SANS LAYOUT (PRIORITÉ MAX)
   // =============================================
   {
-    path: ["/sign-in", "/sign-up", "/forgot-password", "/reset-password", "/auth/**"],
+    path: [
+      "/sign-in",
+      "/sign-up",
+      "/forgot-password",
+      "/reset-password",
+      "/auth/**",
+    ],
     name: "Authentification",
     excludeLayout: true,
     requireAuth: false,
@@ -118,7 +139,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     requireAdmin: true,
     styleGroup: "admin",
     showOnTap: false,
-    priority: 100
+    priority: 100,
   },
 
   // =============================================
@@ -150,7 +171,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     showAIAssistant: false,
     styleGroup: "dashboard",
     showOnTap: false,
-    priority: 100
+    priority: 100,
   },
 
   // =============================================
@@ -182,10 +203,30 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     dockLinks: [
       { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
-      { href: "/wallet/transactions", label: "Transactions", icon: "transactions", requireAuth: true },
-      { href: "/wallet/transactions/history", label: "Historique", icon: "history", requireAuth: true },
-      { href: "/wallet/claims", label: "Réclamations", icon: "claims", requireAuth: true },
-      { href: "/wallet/settings", label: "Paramètres", icon: "settings", requireAuth: true },
+      {
+        href: "/wallet/transactions",
+        label: "Transactions",
+        icon: "transactions",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/transactions/history",
+        label: "Historique",
+        icon: "history",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/claims",
+        label: "Réclamations",
+        icon: "claims",
+        requireAuth: true,
+      },
+      {
+        href: "/wallet/settings",
+        label: "Paramètres",
+        icon: "settings",
+        requireAuth: true,
+      },
     ],
     floatingActions: true,
     fabActions: [
@@ -216,14 +257,34 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: true },
       { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
-      { href: "/chats", label: "Messagerie", icon: "communities", requireAuth: true },
+      {
+        href: "/chats",
+        label: "Messagerie",
+        icon: "communities",
+        requireAuth: true,
+      },
       { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: true },
-      { href: "/tournaments", label: "Tournois", icon: "tournaments", requireAuth: true },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: true,
+      },
     ],
     floatingActions: true,
     fabActions: [
-      { id: "goto-market", label: "Découvrir", type: "link", url: "/marketplace" },
-      { id: "create-shop", label: "Créer une boutique", type: "link", url: "/shops/create" },
+      {
+        id: "goto-market",
+        label: "Découvrir",
+        type: "link",
+        url: "/marketplace",
+      },
+      {
+        id: "create-shop",
+        label: "Créer une boutique",
+        type: "link",
+        url: "/shops/create",
+      },
     ],
   },
 
@@ -241,10 +302,33 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     floatingActions: true,
     fabActions: [
-      { id: "goto-market", label: "Découvrir", type: "link", url: "/marketplace" },
-      { id: "qr-scanner", label: "Scanner QR", type: "link", url: "/wallet/transactions/qr", requireWallet: true },
-      { id: "create-shop", label: "Créer une boutique", type: "link", url: "/shops/create", requiresAuth: true },
-      { id: "create-tournament", label: "Créer un tournoi", type: "link", url: "/tournaments/create", requiresAuth: true },
+      {
+        id: "goto-market",
+        label: "Découvrir",
+        type: "link",
+        url: "/marketplace",
+      },
+      {
+        id: "qr-scanner",
+        label: "Scanner QR",
+        type: "link",
+        url: "/wallet/transactions/qr",
+        requireWallet: true,
+      },
+      {
+        id: "create-shop",
+        label: "Créer une boutique",
+        type: "link",
+        url: "/shops/create",
+        requiresAuth: true,
+      },
+      {
+        id: "create-tournament",
+        label: "Créer un tournoi",
+        type: "link",
+        url: "/tournaments/create",
+        requiresAuth: true,
+      },
     ],
     dockLinks: defaultDockLinks,
     activeFabActionId: "goto-market",
@@ -330,7 +414,66 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     hideFloatingActions: true,
     breadcrumbs: false,
-    dockLinks: defaultDockLinks,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: true },
+      {
+        href: "/tournaments",
+        label: "Tournois",
+        icon: "tournaments",
+        requireAuth: true,
+      },
+      {
+        href: "/tournaments/[tournamentId]/members",
+        label: "Membres",
+        icon: "tournaments",
+        requireAuth: true,
+      },
+      {
+        href: "/tournaments/[tournamentId]/editions",
+        label: "Éditions",
+        icon: "tournaments",
+        requireAuth: true,
+      },
+    ],
+  },
+  //detail edition
+  {
+    path: [
+      "/tournaments/[tournamentId]/editions/[editionId]",
+      "/tournaments/[tournamentId]/editions/[editionId]/**",
+    ],
+    name: "Détail Édition",
+    breadcrumbs: false,
+    footer: true,
+    topMiddle: true,
+    leftBar: true,
+    rightBar: true,
+    navigationLinks: true,
+    hideFloatingActions: true,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: true },
+      { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
+      {
+        href: "/chats",
+        label: "Messagerie",
+        icon: "communities",
+        requireAuth: true,
+      },
+      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: true },
+      {
+        href: "/tournaments/[tournamentId]/editions/[editionId]/matches",
+        label: "edition matches",
+        icon: "tournaments",
+        requireAuth: true,
+      },
+      {
+        href: "/tournaments/[tournamentId]/editions/[editionId]/calendar",
+        label: "edition calendar",
+        icon: "tournaments",
+        requireAuth: true,
+      },
+      // { href: "/tournaments/[tournamentId]/editions/[editionId]/standings", label: "edition standings", icon: "tournaments", requireAuth: true },
+    ],
   },
   {
     path: ["/themes", "/themes/**"],

@@ -23,12 +23,12 @@ export const tournamentEditionItems = [
     icon: Calendar,
     description: "Gérer les éditions du tournoi",
   },
-  {
-    title: "Créer une édition",
-    url: "/tournaments/[tournamentId]/dashboard/editions/create",
-    icon: Calendar,
-    description: "Créer une nouvelle édition",
-  },
+  // {
+  //   title: "Créer une édition",
+  //   url: "/tournaments/[tournamentId]/dashboard/editions/create",
+  //   icon: Calendar,
+  //   description: "Créer une nouvelle édition",
+  // },
 ];
 
 export const tournamentMemberItems = [

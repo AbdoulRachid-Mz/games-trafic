@@ -91,37 +91,62 @@ function compileRoutes(configs: RouteConfig[]): CompiledRoute[] {
 
     for (const path of paths) {
       // Special handling for root path
-      let pattern = path;
-
       if (path === "/") {
-        // Root path should match exactly "/"
         patterns.push(/^\/$/);
         maxSpecificity = Math.max(maxSpecificity, 0);
         continue;
       }
 
-      // Nettoyer le path
-      const cleanPath = path.replace(/\/+$/, "").replace(/^\//, "");
-
-      // Calculer la spécificité
       const specificity = calculateSpecificity(path);
       maxSpecificity = Math.max(maxSpecificity, specificity);
 
-      // Créer le pattern regex
-      pattern = path
-        .replace(/\/+$/, "")
-        .replace(/\[([^\]]+)\]/g, "([^/]+)")
-        .replace(/\*\*/g, ".*")
-        .replace(/\*/g, "[^/]*");
+      // Build regex pattern step by step
+      let regexPattern = "^";
 
-      // Échapper les caractères spéciaux
-      pattern = pattern.replace(/[-\/\\^$+?.()|[\]{}]/g, (char) => {
-        if (char === "/") return "\\/";
-        if (char === "-") return "\\-";
-        return `\\${char}`;
-      });
+      // Split the path into segments
+      const segments = path.split("/");
 
-      patterns.push(new RegExp(`^${pattern}$`));
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+
+        if (i === 0 && segment === "") {
+          // Leading slash
+          regexPattern += "\\/";
+          continue;
+        }
+
+        if (segment === "") continue;
+
+        // Add slash before segment (except first)
+        if (i > 0 && segments[i - 1] !== "") {
+          regexPattern += "\\/";
+        }
+
+        // Handle different segment types
+        if (segment === "**") {
+          regexPattern += ".*";
+        } else if (segment === "*") {
+          regexPattern += "[^/]*";
+        } else if (segment.startsWith("[") && segment.endsWith("]")) {
+          // Dynamic parameter
+          regexPattern += "([^/]+)";
+        } else {
+          // Static segment - escape special regex characters
+          const escapedSegment = segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          regexPattern += escapedSegment;
+        }
+      }
+
+      regexPattern += "$";
+
+      try {
+        patterns.push(new RegExp(regexPattern));
+      } catch (error) {
+        console.error(
+          `[RouteResolver] Invalid regex pattern for path: ${path}`,
+          error,
+        );
+      }
     }
 
     const score = (config.priority || 0) * 1000 + maxSpecificity;
@@ -377,6 +402,13 @@ function isInternalPath(pathname: string): boolean {
     pathname.startsWith("/fonts") ||
     pathname.startsWith("/public") ||
     pathname.startsWith("/.well-known") ||
+    pathname.startsWith("/screenshots") || // Add this
+    pathname.startsWith("/uploads") || // Add this
+    pathname.endsWith(".png") || // Add this
+    pathname.endsWith(".jpg") || // Add this
+    pathname.endsWith(".jpeg") || // Add this
+    pathname.endsWith(".svg") || // Add this
+    pathname.endsWith(".webp") || // Add this
     pathname === "/favicon.ico" ||
     pathname === "/sw.js" ||
     pathname === "/manifest.webmanifest"

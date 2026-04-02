@@ -25,11 +25,11 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
           <motion.div
             animate={{
               rotate: 360,
-              scale: [1, 1.1, 1]
+              scale: [1, 1.1, 1],
             }}
             transition={{
               rotate: { duration: 2, repeat: Infinity, ease: "linear" },
-              scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
+              scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" },
             }}
             className="w-24 h-24 mx-auto mb-6 relative"
           >
@@ -85,12 +85,12 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
               className="h-2 w-2 rounded-full bg-primary/30"
               animate={{
                 scale: [1, 1.5, 1],
-                opacity: [0.3, 1, 0.3]
+                opacity: [0.3, 1, 0.3],
               }}
               transition={{
                 duration: 1.5,
                 repeat: Infinity,
-                delay: i * 0.2
+                delay: i * 0.2,
               }}
             />
           ))}
@@ -112,7 +112,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     isVip,
     refreshUser,
   } = useAuthContext();
-  const { data: profile } = useUserProfile({ mode: "partial", relations: ["wallet"] });
+  const { data: profile } = useUserProfile({
+    mode: "partial",
+    relations: ["wallet"],
+  });
 
   const {
     settings,
@@ -138,7 +141,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const hasVisited = typeof window !== "undefined" ? localStorage.getItem("gt_welcome_visited") : null;
+    const hasVisited =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gt_welcome_visited")
+        : null;
 
     if (!hasVisited && !isWelcomePath) {
       router.replace("/welcome");
@@ -156,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       userId: user?.id,
       hasWallet: !!profile?.wallet?.id || (user as any)?.hasWallet || false,
     }),
-    [isAuthenticated, isAdmin, isVip, user?.id, profile?.wallet?.id]
+    [isAuthenticated, isAdmin, isVip, user?.id, profile?.wallet?.id],
   );
 
   // Resolve route
@@ -210,15 +216,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Handle maintenance mode
   useEffect(() => {
     if (maintenanceMode && !isAdmin && isInitialized) {
-      const isPublicRoute =
-        resolved && !resolved.requireAuth && !resolved.requireAdmin;
+      const isPublicRoute = resolved
+        ? !resolved.requireAuth && !resolved.requireAdmin
+        : false;
 
       if (!isPublicRoute && pathname !== "/maintenance") {
         router.push("/maintenance");
       }
     }
   }, [maintenanceMode, isAdmin, isInitialized, resolved, pathname, router]);
-
 
   // Show loading during initialization
   if (!isInitialized || !welcomeChecked) {
@@ -235,8 +241,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  if (!resolved) {
+    return <LoadingScreen message="Chargement..." />;
+  }
+
   // Special layout routes
-  if (resolved?.layout === "none") {
+  if (resolved && resolved?.layout === "none") {
     return (
       <>
         {maintenanceMode && (
@@ -260,13 +270,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-
   // Normal layout
   return (
     <>
       <AnimatePresence mode="wait">
         {maintenanceMode && (
-          <MaintenanceBanner key="maintenance" message={maintenanceMessage} isAdmin={isAdmin} />
+          <MaintenanceBanner
+            key="maintenance"
+            message={maintenanceMessage}
+            isAdmin={isAdmin}
+          />
         )}
 
         {showAnnouncements && unreadAnnouncements.length > 0 && (
@@ -284,11 +297,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       <MainLayout
-        breadcrumbs={resolved?.topMiddle?.enabled ?? true}
-        footer={resolved?.footer?.enabled ?? true}
-        topMiddle={resolved?.topMiddle?.enabled ?? true}
-        leftBar={resolved?.leftBar?.enabled ?? true}
-        rightBar={resolved?.rightBar?.enabled ?? false}
+        breadcrumbs={resolved?.topMiddle.enabled}
+        footer={resolved?.footer.enabled}
+        topMiddle={resolved?.topMiddle.enabled}
+        leftBar={resolved?.leftBar.enabled}
+        rightBar={resolved?.rightBar.enabled}
         navigationLinks={resolved?.navigationLinks}
         floatingActions={resolved?.fabActions?.actions || []}
         floatingActiveActionId={resolved?.activeFabActionId as string}
@@ -297,7 +310,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         hideTopMiddleOnScroll={resolved?.topMiddle?.hideOnScroll}
         breadcrumbItems={resolved?.topMiddle?.breadcrumbs || []}
         floatingDockLinks={resolved?.floatingDock?.links || []}
-        shouldExcludeContainer={(resolved as ResolvedRoute | null)?.layout === "none"}
+        shouldExcludeContainer={resolved?.layout === "none"}
         showOnTap={resolved?.showOnTap}
       >
         {children}

@@ -66,7 +66,7 @@ export default function TournamentDashboardLayout({
     ...navData.overviewItems,
     ...navData.editionItems,
     ...navData.memberItems,
-    ...navData.matchItems,
+    // ...navData.matchItems,
     ...navData.settingsItems,
   ];
 

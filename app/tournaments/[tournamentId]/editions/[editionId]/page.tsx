@@ -57,7 +57,7 @@ export default async function EditionPage({ params }: PageProps) {
     options: { sortBy: "order", sortOrder: "asc" },
   });
   const phases = phasesResponse.data || edition.phases;
-  console.log("phasesResponse", phases)
+  // console.log("phasesResponse", phases)
 
   // Removed server-side standings load to use Client Component independent loading.
 
