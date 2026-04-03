@@ -27,11 +27,19 @@ import {
   MoveRight,
   LayoutGrid,
   Zap,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { bulkCreateTournamentPhases } from "@/actions/phases";
+import { organizeEditionStructure } from "@/actions/phases";
 import { cn } from "@/lib/utils";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 
 type DraftPhase = {
   name: string;
@@ -73,6 +81,14 @@ export function OrganizeWizardClient({
   const [selectedRegIds, setSelectedRegIds] = useState<string[]>(
     edition?.registrations?.map((r: any) => r.id) || [],
   );
+
+  // Auto-init state
+  const [autoInit, setAutoInit] = useState(true);
+  const [groupsSize, setGroupsSize] = useState(4);
+
+  const maxParticipants = edition?.maxParticipants || 0;
+  const currentParticipantsCount = selectedRegIds.length;
+  const isOverLimit = maxParticipants > 0 && currentParticipantsCount > maxParticipants;
 
   const existingPhasesCount = edition?.phases?.length || 0;
   const hasExistingPhases = existingPhasesCount > 0;
@@ -129,26 +145,31 @@ export function OrganizeWizardClient({
 
     startTransition(async () => {
       try {
-        await bulkCreateTournamentPhases(
+        await organizeEditionStructure(
+          editionId,
           phasesToCreate.map((p, idx) => ({
             ...p,
-            editionId,
             order: idx + existingPhasesCount,
             isActive: idx === 0 && !hasExistingPhases,
             isCompleted: false,
             isHidden: false,
             isDeleted: false,
-          } as any))
+          })),
+          selectedRegIds,
+          {
+            autoInitializeFirstPhase: autoInit,
+            groupsSize: groupsSize
+          }
         );
 
-        toast.success("Structure du tournoi générée avec succès !");
+        toast.success("Structure et participants configurés avec succès !");
         
         setTimeout(() => {
           router.push(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`);
           router.refresh();
         }, 1000);
-      } catch (error) {
-        toast.error("Erreur lors de la création structurelle.");
+      } catch (error: any) {
+        toast.error(error.message || "Erreur lors de l'organisation.");
       }
     });
   };
@@ -294,10 +315,17 @@ export function OrganizeWizardClient({
               </div>
             )}
 
-            <div className="pt-4 border-t border-primary/10">
-              <div className="flex items-center justify-between mb-4">
+            <div className="pt-4 border-t border-primary/10 space-y-4">
+              <div className="flex items-center justify-between">
                  <Label className="font-bold text-xs uppercase tracking-wider text-primary">Stratégie Participants</Label>
-                 <Badge variant="outline" className="text-[10px]">{selectedRegIds.length} sélectionnés</Badge>
+                 <div className="flex items-center gap-2">
+                    {maxParticipants > 0 && (
+                      <Badge variant={isOverLimit ? "destructive" : "outline"} className="text-[10px]">
+                        Capacité: {currentParticipantsCount}/{maxParticipants}
+                      </Badge>
+                    )}
+                    <Badge variant="secondary" className="text-[10px]">{currentParticipantsCount} sélectionnés</Badge>
+                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Button
@@ -320,19 +348,70 @@ export function OrganizeWizardClient({
                   <CheckCircle2 className="h-4 w-4" /> Manuel
                 </Button>
               </div>
+
+              {/* Propagation Options */}
+              <div className="bg-primary/5 rounded-lg p-3 border border-primary/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="autoInit" 
+                      checked={autoInit} 
+                      onCheckedChange={(v) => setAutoInit(!!v)} 
+                    />
+                    <Label htmlFor="autoInit" className="text-xs font-bold cursor-pointer">
+                      Initialiser la Phase 1
+                    </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-[10px] max-w-[200px]">
+                            Crée automatiquement les groupes et assigne les participants sélectionnés à la première phase.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+
+                {autoInit && (
+                  <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground shrink-0">Taille Groupes</Label>
+                    <input 
+                      type="number"
+                      min={2}
+                      max={64}
+                      className="bg-background border rounded px-2 h-6 w-16 text-xs text-center font-bold"
+                      value={groupsSize}
+                      onChange={(e) => setGroupsSize(parseInt(e.target.value) || 4)}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <Button
-              className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20 gap-3"
-              disabled={isPending || (mode === "MANUAL" && draftPhases.length === 0)}
+              className={cn(
+                "w-full h-14 text-lg font-bold shadow-lg gap-3",
+                isOverLimit ? "bg-destructive hover:bg-destructive" : "shadow-primary/20"
+              )}
+              disabled={isPending || (mode === "MANUAL" && draftPhases.length === 0) || isOverLimit}
               onClick={handleSaveOrganize}
             >
               {isPending ? (
                 <RefreshCw className="w-6 h-6 animate-spin" />
+              ) : isOverLimit ? (
+                <AlertCircle className="w-6 h-6" />
               ) : (
                 <Play className="w-6 h-6" />
               )}
-              {isPending ? "Création en cours..." : "Sauvegarder & Générer"}
+              {isPending 
+                ? "Actions en cours..." 
+                : isOverLimit 
+                  ? "Limite dépassée" 
+                  : "Sauvegarder & Déployer"}
             </Button>
           </CardContent>
         </Card>

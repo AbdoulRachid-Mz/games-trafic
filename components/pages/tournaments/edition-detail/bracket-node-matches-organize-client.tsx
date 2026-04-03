@@ -65,8 +65,11 @@ export function BracketNodeMatchesOrganizeClient({
   const [isPending, startTransition] = useTransition();
   
   // Selection state
-  const [p1, setP1] = useState<string>("");
-  const [p2, setP2] = useState<string>("");
+  const nodeParticipants = (node?.config as any)?.participants || [];
+  const hasNodeParticipants = nodeParticipants.length > 0;
+
+  const [p1, setP1] = useState<string>(nodeParticipants[0] || "");
+  const [p2, setP2] = useState<string>(nodeParticipants[1] || "");
   const [matchCount, setMatchCount] = useState<string>("1");
   const [format, setFormat] = useState<string>("BEST_OF_1");
 
@@ -165,11 +168,18 @@ export function BracketNodeMatchesOrganizeClient({
                   <SelectValue placeholder="Choisir P1" />
                 </SelectTrigger>
                 <SelectContent>
-                  {groupParticipants.map(pg => (
-                    <SelectItem key={pg.registrationId} value={pg.registrationId}>
-                      {getName(pg.registrationId)}
-                    </SelectItem>
-                  ))}
+                  {groupParticipants
+                    .filter((pg: any) => !hasNodeParticipants || nodeParticipants.includes(pg.registrationId))
+                    .map((pg: any) => (
+                      <SelectItem key={pg.registrationId} value={pg.registrationId}>
+                        <div className="flex items-center gap-2">
+                           {getName(pg.registrationId)}
+                           {nodeParticipants.includes(pg.registrationId) && (
+                             <Badge variant="secondary" className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none">Propagé</Badge>
+                           )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -187,11 +197,18 @@ export function BracketNodeMatchesOrganizeClient({
                   <SelectValue placeholder="Choisir P2" />
                 </SelectTrigger>
                 <SelectContent>
-                  {groupParticipants.map(pg => (
-                    <SelectItem key={pg.registrationId} value={pg.registrationId}>
-                      {getName(pg.registrationId)}
-                    </SelectItem>
-                  ))}
+                  {groupParticipants
+                    .filter((pg: any) => !hasNodeParticipants || nodeParticipants.includes(pg.registrationId))
+                    .map((pg: any) => (
+                      <SelectItem key={pg.registrationId} value={pg.registrationId}>
+                        <div className="flex items-center gap-2">
+                           {getName(pg.registrationId)}
+                           {nodeParticipants.includes(pg.registrationId) && (
+                             <Badge variant="secondary" className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none">Propagé</Badge>
+                           )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

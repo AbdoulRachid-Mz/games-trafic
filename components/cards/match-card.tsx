@@ -120,9 +120,16 @@ export function MatchCard({ match, currentUserId, isAdmin, onUpdate }: MatchCard
     return (
         <div className="group relative overflow-hidden rounded-xl border bg-card p-4 transition-all hover:shadow-md">
             <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" />
-                    {match.scheduledTime ? format(new Date(match.scheduledTime), "dd MMM, HH:mm", { locale: fr }) : "Non planifié"}
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                        <Clock className="h-3.5 w-3.5" />
+                        {match.scheduledTime ? format(new Date(match.scheduledTime), "dd MMM, HH:mm", { locale: fr }) : "Non planifié"}
+                    </div>
+                    {match.round && (
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Round {match.round}
+                        </div>
+                    )}
                 </div>
                 {getStatusBadge()}
             </div>

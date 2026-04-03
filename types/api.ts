@@ -725,6 +725,7 @@ export interface PhaseGroupFilters extends BaseFilters {
 export interface PhaseGroupParticipantFilters extends BaseFilters {
   id?: string;
   groupId?: string;
+  phaseId?: string;
   registrationId?: string;
   matchesPlayedMin?: number;
   matchesPlayedMax?: number;
@@ -795,6 +796,7 @@ export interface MatchFilters extends BaseFilters {
   durationMax?: number;
   participant1RegistrationId?: string;
   participant2RegistrationId?: string;
+  memberRegistrationId?: string;
   score1Min?: number;
   score1Max?: number;
   score2Min?: number;

@@ -1,13 +1,27 @@
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { generatePhaseMatches as generateMatchesAction, getMatches } from "@/actions/phases";
+import { 
+  generatePhaseMatches as generateMatchesAction, 
+  getMatchesWithParticipants,
+  getEditionMatchStats
+} from "@/actions/phases";
+import type { MatchFilters, ListQuery } from "@/types/api";
 
-export function useMatchManager(phaseId: string) {
+export const matchManagerKeys = {
+  all: ["matches"] as const,
+  list: (filters: MatchFilters) => [...matchManagerKeys.all, "list", filters] as const,
+  stats: (editionId: string) => [...matchManagerKeys.all, "stats", editionId] as const,
+};
+
+/**
+ * useMatchManager — Orchestrateur des matchs
+ */
+export function useMatchManager(phaseId?: string) {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["matches", phaseId] });
-    queryClient.invalidateQueries({ queryKey: ["tournament-editions", "detail"] }); // Refresh everything
+    queryClient.invalidateQueries({ queryKey: matchManagerKeys.all });
+    queryClient.invalidateQueries({ queryKey: ["tournament-editions", "detail"] });
   };
 
   const generatePhaseMatches = useMutation({
@@ -35,35 +49,44 @@ export function useMatchManager(phaseId: string) {
 }
 
 /**
- * Hook pour récupérer les matchs par phase
+ * useMatchList — Récupération paginée et filtrée des matchs
+ * Supporte "Mes Matchs", par phase, par groupe, etc.
  */
-export function useMatchesByPhase(editionId: string, phaseId: string) {
+export function useMatchList(query: ListQuery<MatchFilters>) {
   return useQuery({
-    queryKey: ["matches", "phase", phaseId],
-    queryFn: async () => {
-      const response = await getMatches({
-        filters: { editionId, phaseId },
-        pagination: { limit: 100, page: 1 }
-      });
-      return response.data;
-    },
-    enabled: !!phaseId && !!editionId,
+    queryKey: matchManagerKeys.list(query.filters || {}),
+    queryFn: () => getMatchesWithParticipants(query),
+    staleTime: 1000 * 60, // 1 minute
   });
 }
 
 /**
- * Hook pour récupérer les matchs par groupe
+ * Hook pour les stats d'une édition
+ */
+export function useEditionMatchStats(editionId: string) {
+  return useQuery({
+    queryKey: matchManagerKeys.stats(editionId),
+    queryFn: () => getEditionMatchStats(editionId),
+    enabled: !!editionId,
+  });
+}
+
+/**
+ * @deprecated Use useMatchList instead
+ */
+export function useMatchesByPhase(editionId: string, phaseId: string) {
+  return useMatchList({
+    filters: { editionId, phaseId },
+    pagination: { limit: 100, page: 1 }
+  });
+}
+
+/**
+ * @deprecated Use useMatchList instead
  */
 export function useMatchesByGroup(editionId: string, groupId: string) {
-  return useQuery({
-    queryKey: ["matches", "group", groupId],
-    queryFn: async () => {
-      const response = await getMatches({
-        filters: { editionId, groupId },
-        pagination: { limit: 100, page: 1 }
-      });
-      return response.data;
-    },
-    enabled: !!groupId && !!editionId,
+  return useMatchList({
+    filters: { editionId, groupId },
+    pagination: { limit: 100, page: 1 }
   });
 }

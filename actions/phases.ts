@@ -50,6 +50,9 @@ import {
   type QueryOptions,
 } from '@/types/api';
 import { db } from '@/lib/db';
+import { generateGroupMatches, generateRoundRobinMatches } from '@/lib/tournaments/match.generator';
+import { revalidatePath } from 'next/cache';
+import { shuffle, chunk } from '@/lib/tournaments/utils';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -399,6 +402,66 @@ export async function getPhaseGroupParticipants(
   }
 }
 
+/**
+ * Récupère les classements complets d'une phase (groupes + participants calculés)
+ * Utilisé par EditionStandingsTab pour un affichage performant
+ */
+export async function getPhaseStandings(phaseId: string) {
+  try {
+    const groupsWithParticipants = await db.query.phaseGroups.findMany({
+      where: and(eq(phaseGroups.phaseId, phaseId), eq(phaseGroups.isDeleted, false)),
+      orderBy: [asc(phaseGroups.order)],
+      with: {
+        participants: {
+          orderBy: [desc(phaseGroupParticipants.points), asc(phaseGroupParticipants.position)],
+          with: {
+            registration: {
+              with: {
+                member: {
+                  with: {
+                    user: {
+                      columns: { id: true, username: true, fullName: true, profileImage: true, image: true }
+                    },
+                    team: {
+                      columns: { id: true, name: true, logo: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return groupsWithParticipants.map(group => ({
+      groupId: group.id,
+      groupName: group.name,
+      rows: (group.participants || []).map(p => ({
+        id: p.id,
+        registrationId: p.registrationId,
+        points: p.points ?? 0,
+        matchesPlayed: p.matchesPlayed ?? 0,
+        matchesWon: p.matchesWon ?? 0,
+        matchesDrawn: p.matchesDrawn ?? 0,
+        matchesLost: p.matchesLost ?? 0,
+        scoreFor: p.scoreFor ?? 0,
+        scoreAgainst: p.scoreAgainst ?? 0,
+        scoreDifference: (p.scoreFor ?? 0) - (p.scoreAgainst ?? 0),
+        position: p.position ?? undefined,
+        qualified: p.qualified ?? false,
+        displayName: p.registration?.member?.user?.username || p.registration?.member?.user?.fullName || "Anonyme",
+        avatar: p.registration?.member?.user?.profileImage || p.registration?.member?.user?.image,
+        teamName: p.registration?.member?.team?.name,
+        teamLogo: p.registration?.member?.team?.logo
+      }))
+    }));
+  } catch (error) {
+    console.error("Error fetching phase standings:", error);
+    throw error;
+  }
+}
+
 // ============================================================================
 // NŒUDS DE BRACKET
 // ============================================================================
@@ -601,6 +664,349 @@ export async function getMatches(
   } catch (error) {
     console.error('Error getting matches:', error);
     throw new Error('Failed to fetch matches');
+  }
+}
+
+
+export async function generatePhaseMatches(phaseId: string, config?: { forceRecreate?: boolean; groupId?: string }) {
+  try {
+    const phase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, phaseId),
+      with: {
+        groups: {
+          with: {
+            participants: true
+          }
+        }
+      }
+    });
+
+    if (!phase) throw new Error("Phase not found");
+
+    if (config?.forceRecreate) {
+      if (config.groupId) {
+        await db.delete(matches).where(and(eq(matches.groupId, config.groupId), eq(matches.status, "PENDING")));
+      } else {
+        await db.delete(matches).where(and(eq(matches.phaseId, phaseId), eq(matches.status, "PENDING")));
+      }
+    }
+
+    const createdMatches = [];
+
+    if (phase.phaseType === "GROUP_STAGE" && phase.groups) {
+      const groupsToProcess = config?.groupId ? phase.groups.filter((g: any) => g.id === config.groupId) : phase.groups;
+      
+      for (const group of groupsToProcess) {
+        const participants = group.participants || [];
+        if (participants.length < 2) continue;
+        
+        const generated = generateGroupMatches(participants.map((p: any) => ({
+           id: p.registrationId
+        })), { returnType: "single" });
+        
+        for (const [index, m] of generated.entries()) {
+             const mData = {
+               editionId: phase.editionId,
+               phaseId: phase.id,
+               groupId: group.id,
+               participant1RegistrationId: m.participant1?.id,
+               participant2RegistrationId: m.participant2?.id,
+               matchNumber: index + 1,
+               status: "PENDING" as const,
+               round: 1,
+               createdAt: new Date(),
+               updatedAt: new Date(),
+             };
+             
+             const res = await db.insert(matches).values(mData as any).returning();
+             createdMatches.push(res[0]);
+        }
+      }
+    } else if (phase.phaseType === "ELIMINATION") {
+      // Récupérer les participants depuis les groupes de la phase
+      const phaseGroupsList = phase.groups || [];
+      let allParticipants: string[] = [];
+      
+      for (const group of phaseGroupsList) {
+        const pts = (group.participants || [])
+          .filter((p: any) => !p.isEliminated)
+          .map((p: any) => p.registrationId);
+        allParticipants.push(...pts);
+      }
+      
+      // Fallback: récupérer les registrations de l'édition
+      if (allParticipants.length < 2) {
+        const registrations = await db.query.editionRegistrations.findMany({
+          where: eq(editionRegistrations.editionId, phase.editionId),
+        });
+        allParticipants = registrations.map(r => r.id);
+      }
+      
+      // Génération élimination directe (tirage aléatoire)
+      const shuffled = [...allParticipants].sort(() => Math.random() - 0.5);
+      let matchNum = 1;
+      
+      for (let i = 0; i < shuffled.length - 1; i += 2) {
+        const mData = {
+          editionId: phase.editionId,
+          phaseId: phase.id,
+          participant1RegistrationId: shuffled[i],
+          participant2RegistrationId: shuffled[i + 1],
+          matchNumber: matchNum++,
+          round: 1,
+          status: "PENDING" as const,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        const res = await db.insert(matches).values(mData as any).returning();
+        createdMatches.push(res[0]);
+      }
+    }
+
+    return { success: true, count: createdMatches.length };
+  } catch (error) {
+    console.error("Failed to generate matches", error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// ENRICHISSEMENT — Matchs avec participants hydratés
+// ============================================================================
+
+/**
+ * Récupère les matchs avec les participants enrichis (nom, avatar, member info)
+ * Résout le problème "À déterminer" dans l'UI
+ */
+export async function getMatchesWithParticipants(
+  query: ListQuery<MatchFilters> = {}
+): Promise<PaginationResponse<any>> {
+  try {
+    const { pagination = { page: 1, limit: 20 }, filters = {}, options = {} } = query;
+    const offset = (pagination.page - 1) * pagination.limit;
+
+    const whereConditions = buildMatchWhereConditions(filters, options);
+
+    const matchesData = await db.query.matches.findMany({
+      where: whereConditions,
+      limit: pagination.limit,
+      offset,
+      orderBy: options.sortBy === 'scheduledTime'
+        ? [asc(matches.scheduledTime)]
+        : options.sortBy === 'createdAt'
+        ? [desc(matches.createdAt)]
+        : [asc(matches.scheduledTime)],
+      with: {
+        participant1: {
+          with: {
+            member: {
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  }
+                },
+                team: {
+                  columns: {
+                    id: true,
+                    name: true,
+                    logo: true,
+                  }
+                },
+              }
+            }
+          }
+        },
+        participant2: {
+          with: {
+            member: {
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  }
+                },
+                team: {
+                  columns: {
+                    id: true,
+                    name: true,
+                    logo: true,
+                  }
+                },
+              }
+            }
+          }
+        },
+        phase: {
+          columns: { id: true, name: true, phaseType: true }
+        },
+        group: {
+          columns: { id: true, name: true }
+        },
+      }
+    });
+
+    const countResult = await db
+      .select({ count: count() })
+      .from(matches)
+      .where(whereConditions);
+
+    const total = countResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / pagination.limit);
+
+    return {
+      data: matchesData,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        totalPages,
+        hasNext: pagination.page < totalPages,
+        hasPrev: pagination.page > 1,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting matches with participants:', error);
+    throw new Error('Failed to fetch matches with participants');
+  }
+}
+
+/**
+ * Stats rapides pour les matchs d'une édition
+ */
+export async function getEditionMatchStats(editionId: string): Promise<{
+  total: number;
+  completed: number;
+  inProgress: number;
+  pending: number;
+  disputed: number;
+}> {
+  try {
+    const [totalRes, completedRes, inProgressRes, disputedRes] = await Promise.all([
+      db.select({ count: count() }).from(matches)
+        .where(and(eq(matches.editionId, editionId), eq(matches.isDeleted, false))),
+      db.select({ count: count() }).from(matches)
+        .where(and(eq(matches.editionId, editionId), eq(matches.status, 'COMPLETED'), eq(matches.isDeleted, false))),
+      db.select({ count: count() }).from(matches)
+        .where(and(eq(matches.editionId, editionId), eq(matches.status, 'IN_PROGRESS'), eq(matches.isDeleted, false))),
+      db.select({ count: count() }).from(matches)
+        .where(and(eq(matches.editionId, editionId), eq(matches.status, 'DISPUTED'), eq(matches.isDeleted, false))),
+    ]);
+
+    const total = totalRes[0]?.count ?? 0;
+    const completed = completedRes[0]?.count ?? 0;
+    const inProgress = inProgressRes[0]?.count ?? 0;
+    const disputed = disputedRes[0]?.count ?? 0;
+
+    return { total, completed, inProgress, pending: total - completed - inProgress - disputed, disputed };
+  } catch (error) {
+    console.error('Error getting edition match stats:', error);
+    throw new Error('Failed to fetch edition match stats');
+  }
+}
+
+/**
+ * Vérifier la capacité d'un groupe (participants actuels vs max configuré)
+ */
+export async function checkGroupCapacity(groupId: string): Promise<{
+  current: number;
+  max: number | null;
+  isFull: boolean;
+}> {
+  try {
+    const group = await db.query.phaseGroups.findFirst({
+      where: eq(phaseGroups.id, groupId),
+      with: { participants: true },
+    });
+    if (!group) throw new Error('Groupe introuvable');
+
+    const config = (group.config as any) || {};
+    const max: number | null = config.maxParticipants ?? null;
+    const current = group.participants.length;
+
+    return { current, max, isFull: max !== null && current >= max };
+  } catch (error) {
+    console.error('Error checking group capacity:', error);
+    throw error;
+  }
+}
+
+/**
+ * Générer les matchs depuis un bracket node (config.participants = registrationIds[])
+ */
+export async function generateBracketMatches(
+  bracketNodeId: string,
+  config?: { returnType?: 'single' | 'double'; forceRecreate?: boolean }
+): Promise<{ success: boolean; count: number }> {
+  try {
+    const node = await db.query.bracketNodes.findFirst({
+      where: eq(bracketNodes.id, bracketNodeId),
+      with: { phase: true, group: true },
+    });
+
+    if (!node) throw new Error('Bracket node introuvable');
+
+    const nodeMetadata = (node.metadata as any) || {};
+    const participantIds: string[] = nodeMetadata.participants || [];
+
+    if (participantIds.length < 2) {
+      throw new Error(`Le bracket doit avoir au moins 2 participants (actuellement ${participantIds.length})`);
+    }
+
+    // Valider que les participants appartiennent bien au groupe parent
+    if (node.groupId) {
+      const groupParticipants = await db.query.phaseGroupParticipants.findMany({
+        where: eq(phaseGroupParticipants.groupId, node.groupId),
+      });
+      const validIds = new Set(groupParticipants.map(p => p.registrationId));
+      const invalidIds = participantIds.filter(id => !validIds.has(id));
+      if (invalidIds.length > 0) {
+        throw new Error(`Participants invalides (non membres du groupe) : ${invalidIds.join(', ')}`);
+      }
+    }
+
+    if (config?.forceRecreate) {
+      await db.delete(matches).where(
+        and(eq(matches.bracketNodeId, bracketNodeId), eq(matches.status, 'PENDING'))
+      );
+    }
+
+    const generated = generateGroupMatches(
+      participantIds.map(id => ({ id })),
+      { returnType: config?.returnType ?? 'single' }
+    );
+
+    const createdMatches = [];
+    for (const [index, m] of generated.entries()) {
+      const mData = {
+        editionId: node.phase.editionId,
+        phaseId: node.phaseId,
+        groupId: node.groupId ?? undefined,
+        bracketNodeId: node.id,
+        participant1RegistrationId: m.participant1?.id,
+        participant2RegistrationId: m.participant2?.id,
+        matchNumber: index + 1,
+        round: node.round ?? 1,
+        status: 'PENDING' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const res = await db.insert(matches).values(mData as any).returning();
+      createdMatches.push(res[0]);
+    }
+
+    return { success: true, count: createdMatches.length };
+  } catch (error) {
+    console.error('Error generating bracket matches:', error);
+    throw error;
   }
 }
 
@@ -988,23 +1394,54 @@ export async function createBracketNode(
  * Crée plusieurs nœuds de bracket en une seule transaction
  */
 export async function bulkCreateBracketNodes(
-  nodesData: NewBracketNode[]
+  nodesData: (NewBracketNode & { editionId?: string })[]
 ): Promise<BracketNode[]> {
   try {
     if (nodesData.length === 0) return [];
 
-    const result = await db
-      .insert(bracketNodes)
-      .values(
-        nodesData.map((n) => ({
-          ...n,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }))
-      )
-      .returning();
+    return await db.transaction(async (tx) => {
+      const result = await tx
+        .insert(bracketNodes)
+        .values(
+          nodesData.map((n) => {
+            const { editionId, ...rest } = n;
+            return {
+              ...rest,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+          })
+        )
+        .returning();
 
-    return result;
+      // Check for automatic match generation if participants are in metadata
+      for (let i = 0; i < result.length; i++) {
+        const node = result[i];
+        const inputData = nodesData[i];
+        const metadata = (node.metadata as any) || {};
+        const participants = metadata.participants || [];
+        
+        if (participants.length >= 2 && inputData.editionId) {
+           // Generate matches for this node
+           await tx.insert(matches).values({
+              editionId: inputData.editionId,
+              phaseId: node.phaseId,
+              groupId: node.groupId,
+              bracketNodeId: node.id,
+              participant1RegistrationId: participants[0],
+              participant2RegistrationId: participants[1],
+              matchCode: `${node.nodeCode || 'BR'}-M1`,
+              status: 'PENDING',
+              round: node.round || 1,
+              matchNumber: node.matchNumber || 1,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+           });
+        }
+      }
+
+      return result;
+    });
   } catch (error) {
     console.error('Error bulk creating bracket nodes:', error);
     throw new Error('Failed to bulk create bracket nodes');
@@ -1189,7 +1626,21 @@ export async function updateMatch(
       .where(eq(matches.id, id))
       .returning();
 
-    return result[0];
+    const updatedMatch = result[0];
+
+    // Auto-check qualification and trigger standings recalculation
+    if (matchData.status === 'COMPLETED') {
+      if (updatedMatch.groupId) {
+        await recalculateGroupStandings(updatedMatch.groupId);
+      }
+      // Prochaine étape : Propagation automatique vers le bracket (Node) si applicable
+      if (updatedMatch.bracketNodeId) {
+         // Logique de progression vers le parent du bracket
+      }
+    }
+
+    revalidatePath(`/tournaments/editions/${updatedMatch.editionId}/dashboard`);
+    return updatedMatch;
   } catch (error) {
     console.error('Error updating match:', error);
     if (error instanceof Error) {
@@ -1343,6 +1794,13 @@ function buildPhaseGroupParticipantWhereConditions(
 
   if (filters.groupId) {
     conditions.push(eq(phaseGroupParticipants.groupId, filters.groupId));
+  }
+  if (filters.phaseId) {
+    const groupIdsForPhase = db
+      .select({ id: phaseGroups.id })
+      .from(phaseGroups)
+      .where(eq(phaseGroups.phaseId, filters.phaseId));
+    conditions.push(inArray(phaseGroupParticipants.groupId, groupIdsForPhase));
   }
   if (filters.registrationId) {
     conditions.push(eq(phaseGroupParticipants.registrationId, filters.registrationId));
@@ -1501,6 +1959,14 @@ function buildMatchWhereConditions(
   if (filters.participant2RegistrationId) {
     conditions.push(eq(matches.participant2RegistrationId, filters.participant2RegistrationId));
   }
+  if (filters.memberRegistrationId) {
+    conditions.push(
+      or(
+        eq(matches.participant1RegistrationId, filters.memberRegistrationId),
+        eq(matches.participant2RegistrationId, filters.memberRegistrationId)
+      )
+    );
+  }
   if (filters.score1Min !== undefined) {
     conditions.push(gte(matches.score1, filters.score1Min));
   }
@@ -1539,6 +2005,24 @@ function buildMatchWhereConditions(
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+/**
+ * Automate le nommage des rounds pour les phases à élimination directe
+ */
+export function getRoundName(round: number, totalRounds: number, matchesInRound: number): string {
+  if (round === totalRounds) return "Finale";
+  if (round === totalRounds - 1) return "1/2 Finale";
+  if (round === totalRounds - 2) return "1/4 Finale";
+  
+  // Naming based on match count (standard bracket)
+  if (matchesInRound === 1) return "Finale";
+  if (matchesInRound === 2) return "1/2 Finale";
+  if (matchesInRound === 4) return "1/4 Finale";
+  if (matchesInRound === 8) return "1/8 Finale";
+  if (matchesInRound === 16) return "1/16 Finale";
+  
+  return `Round ${round}`;
 }
 
 /**
@@ -1638,71 +2122,210 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
   }
 }
 
-import { generateGroupMatches } from "@/lib/tournaments/match.generator";
-// import { generateSingleEliminationBracket } from "@/lib/tournaments/bracket.generator";
-
-export async function generatePhaseMatches(phaseId: string, config?: { forceRecreate?: boolean; groupId?: string }) {
+/**
+ * Verrouille ou déverrouille un groupe
+ */
+export async function toggleGroupLock(groupId: string, isLocked: boolean) {
   try {
-    const phase = await db.query.tournamentPhases.findFirst({
-      where: eq(tournamentPhases.id, phaseId),
-      with: {
-        groups: {
-          with: {
-            participants: true
-          }
-        }
-      }
+    await db.update(phaseGroups)
+      .set({ isLocked, updatedAt: new Date() })
+      .where(eq(phaseGroups.id, groupId));
+    
+    revalidatePath(`/tournaments/dashboard`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error toggling group lock:", error);
+    throw new Error("Erreur lors du changement de verrouillage du groupe");
+  }
+}
+
+/**
+ * Marque un groupe comme terminé
+ */
+export async function finishGroup(groupId: string) {
+  try {
+    await recalculateGroupStandings(groupId);
+    
+    await db.update(phaseGroups)
+      .set({ isCompleted: true, isLocked: true, updatedAt: new Date() })
+      .where(eq(phaseGroups.id, groupId));
+    
+    revalidatePath(`/tournaments/dashboard`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error finishing group:", error);
+    throw new Error("Erreur lors de la clôture du groupe");
+  }
+}
+
+/**
+ * Bascule le statut d'une phase
+ */
+export async function togglePhaseStatus(phaseId: string, isActive: boolean) {
+  try {
+    await db.update(tournamentPhases)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(tournamentPhases.id, phaseId));
+    
+    revalidatePath(`/tournaments/dashboard`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error toggling phase status:", error);
+    throw new Error("Erreur lors du changement de statut de la phase");
+  }
+}
+
+/**
+ * Clôture une phase : verrouille tous les groupes et marque comme terminée
+ */
+export async function finishPhase(phaseId: string) {
+  try {
+    return await db.transaction(async (tx) => {
+      // 1. Marquer la phase
+      await tx.update(tournamentPhases)
+        .set({ isCompleted: true, isActive: false, updatedAt: new Date() })
+        .where(eq(tournamentPhases.id, phaseId));
+      
+      // 2. Verrouiller tous les groupes
+      await tx.update(phaseGroups)
+        .set({ isLocked: true, isCompleted: true, updatedAt: new Date() })
+        .where(eq(phaseGroups.id, phaseId));
+      
+      revalidatePath(`/tournaments/dashboard`);
+      return { success: true };
+    });
+  } catch (error) {
+    console.error("Error finishing phase:", error);
+    throw new Error("Erreur lors de la clôture de la phase");
+  }
+}
+
+/**
+ * Action centrale d'organisation d'une édition : création des phases, groupes et assignation des participants.
+ */
+export async function organizeEditionStructure(
+  editionId: string,
+  phasesData: any[],
+  participantRegIds: string[],
+  options: {
+    autoInitializeFirstPhase?: boolean;
+    groupsSize?: number;
+  } = {}
+) {
+  try {
+    const edition = await db.query.tournamentEditions.findFirst({
+      where: eq(tournamentEditions.id, editionId),
     });
 
-    if (!phase) throw new Error("Phase not found");
+    if (!edition) throw new Error("Édition introuvable");
 
-    if (config?.forceRecreate) {
-      if (config.groupId) {
-        await db.delete(matches).where(and(eq(matches.groupId, config.groupId), eq(matches.status, "PENDING")));
-      } else {
-        await db.delete(matches).where(and(eq(matches.phaseId, phaseId), eq(matches.status, "PENDING")));
-      }
+    // 1. Validation de la capacité
+    if (edition.maxParticipants && participantRegIds.length > edition.maxParticipants) {
+      throw new Error(`Limite de participants atteinte (${participantRegIds.length}/${edition.maxParticipants})`);
     }
 
-    const createdMatches = [];
+    return await db.transaction(async (tx) => {
+      // 2. Création des phases
+      const createdPhases = await tx
+        .insert(tournamentPhases)
+        .values(
+          phasesData.map((p, idx) => ({
+            ...p,
+            editionId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }))
+        )
+        .returning();
 
-    if (phase.phaseType === "GROUP_STAGE" && phase.groups) {
-      const groupsToProcess = config?.groupId ? phase.groups.filter((g: any) => g.id === config.groupId) : phase.groups;
+      const firstPhase = createdPhases[0];
       
-      for (const group of groupsToProcess) {
-        const participants = group.participants || [];
-        if (participants.length < 2) continue;
-        
-        // Use generator from match.generator
-        const generated = generateGroupMatches(participants.map((p: any) => ({
-           id: p.registrationId
-        })), { returnType: "single" }); // using single round robin as default
-        
-        for (const [index, m] of generated.entries()) {
-             const mData = {
-               phaseId: phase.id,
-               groupId: group.id,
-               participant1RegistrationId: m.participant1?.id,
-               participant2RegistrationId: m.participant2?.id,
-               matchNumber: index + 1,
-               status: "PENDING" as const,
-               round: 1,
-               createdAt: new Date(),
-               updatedAt: new Date(),
-             };
+      // 3. Initialisation automatique de la Phase 1 si demandée
+      if (options.autoInitializeFirstPhase && firstPhase && participantRegIds.length > 0) {
+        if (firstPhase.phaseType === 'GROUP_STAGE') {
+          const groupSize = options.groupsSize || 4;
+          const shuffled = shuffle(participantRegIds);
+          const groupsChunks = chunk(shuffled, groupSize);
+
+          for (let i = 0; i < groupsChunks.length; i++) {
+            const players = groupsChunks[i];
+            
+            // Créer le groupe
+            const [group] = await tx
+              .insert(phaseGroups)
+              .values({
+                phaseId: firstPhase.id,
+                name: `Groupe ${String.fromCharCode(65 + i)}`,
+                order: i,
+                participantCount: players.length,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+
+            // Assigner les participants au groupe
+            await tx
+              .insert(phaseGroupParticipants)
+              .values(
+                players.map((regId) => ({
+                  groupId: group.id,
+                  registrationId: regId,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                }))
+              );
+          }
+        } else if (firstPhase.phaseType === 'ELIMINATION') {
+           const shuffled = shuffle(participantRegIds);
+           const pairCount = Math.floor(shuffled.length / 2);
+           
+           for (let i = 0; i < pairCount; i++) {
+             const p1 = shuffled[i * 2];
+             const p2 = shuffled[i * 2 + 1];
              
-             const res = await db.insert(matches).values(mData as any).returning();
-             createdMatches.push(res[0]);
+             // Créer le nœud
+             const [node] = await tx
+               .insert(bracketNodes)
+               .values({
+                 phaseId: firstPhase.id,
+                 nodeCode: `R1-M${i + 1}`,
+                 round: 1,
+                 matchNumber: i + 1,
+                 bracketType: 'UPPER',
+                 order: i,
+                 metadata: {
+                   participants: [p1, p2],
+                   requiresMatch: true
+                 },
+                 createdAt: new Date(),
+                 updatedAt: new Date(),
+               })
+               .returning();
+
+             // Créer le match associé
+             await tx.insert(matches).values({
+                editionId,
+                phaseId: firstPhase.id,
+                bracketNodeId: node.id,
+                participant1RegistrationId: p1,
+                participant2RegistrationId: p2,
+                matchCode: `M${i + 1}`,
+                status: 'PENDING',
+                round: 1,
+                matchNumber: i + 1,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+             });
+           }
         }
       }
-    } else if (phase.phaseType === "ELIMINATION") {
-       // Bracket generation logic here based on logic
-    }
 
-    return { success: true, count: createdMatches.length };
-  } catch (error) {
-    console.error("Failed to generate matches", error);
-    throw error;
+      revalidatePath(`/tournaments/editions/${editionId}/dashboard`);
+      return { success: true, phaseCount: createdPhases.length };
+    });
+  } catch (error: any) {
+    console.error("Error organizing edition structure:", error);
+    throw new Error(error.message || "Échec de l'organisation structurelle");
   }
 }
 

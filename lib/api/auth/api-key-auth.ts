@@ -49,27 +49,36 @@ export class APIKeyAuth {
       ? new Date(Date.now() + options.expiresIn)
       : null;
 
-    // Créer la clé en base
-    const [apiKey] = await db.insert(apiKeys).values({
-      userId,
-      hash,
-      keyPrefix: prefix,
-      type: options.type,
-      name: options.name,
-      applicationName: options.applicationName,
-      permissions: options.permissions || [],
-      allowedIps: options.allowedIps || [],
-      allowedOrigins: options.allowedOrigins || [],
-      rateLimitPerHour: options.rateLimitPerHour || 1000,
-      rateLimitPerDay: options.rateLimitPerDay || 10000,
-      expiresAt,
-      status: 'ACTIVE',
-    }).returning();
+    try {
+      // Créer la clé en base
+      const [apiKey] = await db.insert(apiKeys).values({
+        userId,
+        hash,
+        keyPrefix: prefix,
+        type: options.type,
+        name: options.name,
+        applicationName: options.applicationName,
+        permissions: options.permissions || [],
+        allowedIps: options.allowedIps || [],
+        allowedOrigins: options.allowedOrigins || [],
+        rateLimitPerHour: options.rateLimitPerHour || 1000,
+        rateLimitPerDay: options.rateLimitPerDay || 10000,
+        expiresAt,
+        status: 'ACTIVE',
+      }).returning();
 
-    return {
-      ...apiKey,
-      key, // Retourner la clé brute UNE SEULE fois
-    };
+      if (!apiKey) {
+        throw new Error("Échec de la création de la clé API en base de données");
+      }
+
+      return {
+        ...apiKey,
+        key, // Retourner la clé brute UNE SEULE fois
+      };
+    } catch (error) {
+      console.error("Erreur génération clé API:", error);
+      throw error;
+    }
   }
 
   /**
@@ -77,10 +86,12 @@ export class APIKeyAuth {
    */
 
   static async validateKey(key: string, context: { ip?: string; origin?: string }) {
-    // Extract prefix from key to enable partition key lookup and protect against timing attacks
-    const underscoreIndex = key.indexOf('_', 3); // "gt_TYPE_"
-    if (underscoreIndex === -1) return null;
-    const prefix = key.slice(0, underscoreIndex + 1); // "gt_user_" | "gt_app_" | "gt_service_"
+    if (!key) return null;
+    
+    // Extract prefix from key to enable partition key lookup
+    const parts = key.split('_');
+    if (parts.length < 3) return null;
+    const prefix = `${parts[0]}_${parts[1]}_`; // "gt_user_" | "gt_app_" | "gt_service_"
 
     const hash = createHash('sha256').update(key).digest('hex');
 

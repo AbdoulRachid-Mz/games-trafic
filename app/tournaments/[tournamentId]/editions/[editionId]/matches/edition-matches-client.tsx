@@ -69,8 +69,8 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
   );
 
   const matches = useMemo(() => {
-    if (selectedGroupId !== "all") return matchesResGroup || [];
-    if (selectedPhaseId !== "all") return matchesResPhase || [];
+    if (selectedGroupId !== "all") return matchesResGroup?.data || [];
+    if (selectedPhaseId !== "all") return matchesResPhase?.data || [];
     return [];
   }, [selectedPhaseId, selectedGroupId, matchesResPhase, matchesResGroup]);
 

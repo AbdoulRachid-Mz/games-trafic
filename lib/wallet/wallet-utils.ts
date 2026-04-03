@@ -45,6 +45,13 @@ export class WalletUtils {
   }
 
   /**
+   * Vérifie si le hash correspond au PIN par défaut (123456)
+   */
+  static async isDefaultPin(hash: string): Promise<boolean> {
+    return await this.verifyPin("123456", hash);
+  }
+
+  /**
    * Génère une clé d'encryption unique basée sur l'ID utilisateur
    */
   static generateUserEncryptionKey(userId: string): string {
@@ -159,7 +166,6 @@ export class WalletUtils {
     }
 
     // Note: On vérifie l'existence du wallet dans l'action serveur
-
     return { canCreate: true };
   }
 

@@ -17,10 +17,11 @@ import { formatDate } from "@/lib/utils";
 
 interface Activity {
   id: string;
-  type: "shop" | "tournament" | "purchase" | "transaction";
-  title: string;
+  type: string;
+  title?: string;
+  action?: string;
   description: string;
-  timestamp: Date;
+  timestamp: Date | string;
   icon?: any;
   status?: "success" | "pending" | "failed";
 }
@@ -29,11 +30,14 @@ interface ActivityFeedProps {
   activities?: Activity[];
 }
 
-const activityIcons = {
+const activityIcons: Record<string, any> = {
   shop: Store,
   tournament: Trophy,
   purchase: ShoppingBag,
   transaction: CreditCard,
+  "sign-in": User,
+  "sign-out": User,
+  "register": User,
 };
 
 const statusColors = {
@@ -90,12 +94,16 @@ export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {displayActivities.map((activity, index) => {
-            const Icon = activityIcons[activity.type];
+            const Icon = activityIcons[activity.type] || Store;
             const statusColor = activity.status
               ? statusColors[activity.status]
               : "bg-gray-500";
+
+            const timestamp = activity.timestamp instanceof Date 
+                ? activity.timestamp 
+                : new Date(activity.timestamp);
 
             return (
               <motion.div
@@ -103,7 +111,7 @@ export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="flex items-start gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors"
+                className="flex items-start gap-4 p-2 rounded-lg hover:bg-muted/50 transition-colors"
               >
                 {/* Icon */}
                 <div className="relative">
@@ -124,7 +132,7 @@ export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
                     weight="semibold"
                     className="mb-1"
                   >
-                    {activity.title}
+                    {activity.title || activity.action || "Activité"}
                   </Typography>
                   <Typography
                     variant="caption2"
@@ -134,7 +142,7 @@ export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
                     {activity.description}
                   </Typography>
                   <Typography variant="caption2" theme="muted" className="mt-1">
-                    {formatDate(activity.timestamp)}
+                    {formatDate(timestamp)}
                   </Typography>
                 </div>
               </motion.div>

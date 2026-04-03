@@ -31,6 +31,7 @@ import {
   passkey,
 } from "@/database/schema";
 import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { WalletUtils } from "@/lib/wallet/wallet-utils";
 import {
   eq,
   and,
@@ -171,7 +172,8 @@ export async function getProfile(
             const w = res[0];
             if (w?.financialAccountId) {
               const balance = await getAccountBalance(w.financialAccountId);
-              return { ...w, balance: balance.toString() };
+              const isDefaultPin = await WalletUtils.isDefaultPin((w as any).pinHash || "");
+              return { ...w, balance: balance.toString(), isDefaultPin };
             }
             return w;
           }),
@@ -259,7 +261,8 @@ export async function getProfile(
           const w = res[0];
           if (w?.financialAccountId) {
             const balance = await getAccountBalance(w.financialAccountId);
-            return { ...w, balance: balance.toString() };
+            const isDefaultPin = await WalletUtils.isDefaultPin((w as any).pinHash || "");
+            return { ...w, balance: balance.toString(), isDefaultPin };
           }
           return w;
         });

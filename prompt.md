@@ -1,214 +1,386 @@
-🧠 PROMPT FINAL — CORRECTION FORMULAIRES + BULK + LOGIQUE TOURNOI AVANCÉE
 🎯 OBJECTIF
 
-Corriger et améliorer tous les formulaires de création (phases, groupes, bracketNodes, matches,edtition results) + les bulk components pour qu’ils soient :
+Refactoriser et corriger toute la gestion des phases, groupes, brackets (nodes) et matches pour garantir :
 
-cohérents avec la refactorisation actuelle
-alignés avec une vraie logique de tournoi
-capables de gérer :
-création manuelle
-génération automatique
-création progressive
-validation intelligente
+Cohérence stricte entre niveaux
+Respect des configurations parent/enfant
+Gestion intelligente des participants
+Création auto + manuelle fiable
+Progression automatique contrôlée
+UI/UX réaliste (niveau plateforme esport)
 
-⚠️ IMPORTANT :
-Ne pas recréer → adapter et enrichir l’existant
+⚠️ IMPORTANT
+Ne rien recréer inutilement → corriger, adapter et unifier l’existant
 
-1️⃣ 🔧 PROBLÈME PRINCIPAL
+1️⃣ 🔍 ANALYSE OBLIGATOIRE
 
-Les formulaires actuels :
+Avant toute modification, analyser :
 
-❌ ne tiennent pas compte des nouvelles relations
-❌ ne respectent pas la hiérarchie (édition → phase → groupe → bracket → match)
-❌ permettent des incohérences (doublons, participants invalides)
-❌ ne supportent pas correctement les bulk
-2️⃣ 🧩 NOUVELLE LOGIQUE GLOBALE
-👉 Chaque niveau DOIT dépendre de son parent direct :
-Entité	Source des participants
-Phase	Edition
-Groupe	Phase
-BracketNode	Groupe
-Match	BracketNode / Groupe
-edition results	
+hooks (tanstack)
+server actions
+components (forms + bulk)
+pages (edition / dashboard)
+utils (génération / logique)
 
-⚠️ RÈGLE CRITIQUE :
+👉 Identifier :
 
-❌ On ne récupère JAMAIS directement depuis l’édition si un parent existe
-✅ Toujours filtrer depuis le parent direct
+incohérences de hiérarchie
+mauvaise récupération des participants
+absence de validation métier
+logique de génération cassée
+2️⃣ 🧩 PRINCIPE FONDAMENTAL (CRITIQUE)
+🔗 CHAQUE NIVEAU DÉPEND DU PARENT
+Niveau	Source participants
+Edition	registrations
+Phase	édition / phase précédente
+Groupe	phase
+Bracket	groupe
+Match	bracket / groupe
+⚠️ RÈGLE ABSOLUE
 
-3️⃣ ⚙️ MODE DE GESTION (OBLIGATOIRE)
+❌ INTERDIT : utiliser les participants globaux
+✅ OBLIGATOIRE : utiliser ceux du niveau courant
 
-Ajouter dans TOUS les formulaires + bulk :
+3️⃣ ⚙️ VALIDATION PAR CONFIG PARENTE
 
-🎚️ Mode :
-1. AUTO
-l’utilisateur définit :
-nombre d’éléments
-type (round robin / elimination)
-le système génère automatiquement
-2. MANUEL
-l’utilisateur construit lui-même :
-via des cards dynamiques
-ajout/suppression libre
-4️⃣ 🧱 BULK COMPONENTS — NOUVELLE LOGIQUE
-📌 Comportement global
+Avant toute action (create / bulk / generate) :
 
-Chaque bulk doit permettre :
+Vérifier :
+type de phase (ROUND_ROBIN / ELIMINATION)
+config (nombre de qualifiés, matches, etc.)
+nombre de participants disponibles
+limite atteinte
+🎯 COMPORTEMENT
+SI limite atteinte :
+désactiver :
+bouton ajouter
+bouton générer
+bouton bulk
+4️⃣ 🎮 CORRECTION MATCHES (CRITIQUE)
+❌ Problème actuel
+participants = "À déterminer"
+✅ Solution
 
-➕ ajouter une card
-➖ supprimer une card
-🔁 modifier dynamiquement
-⚠️ validation temps réel
-📌 Création progressive
+Dans fetch matches :
 
-➡️ On ne crée PAS en base immédiatement
-➡️ On construit un state local (draft)
-➡️ On submit → création réelle
+➡️ JOIN OBLIGATOIRE :
 
-5️⃣ 🎮 CAS SPÉCIFIQUES PAR NIVEAU
-🧩 PHASES
-MODE AUTO :
-création automatique :
-ex: Group Stage + Knockout
+participant1 → registration → user/team
+participant2 → registration → user/team
+Résultat UI :
 
-👉 génère :
+👉 afficher :
 
-phase 1 (round robin)
-phase 2 (elimination)
-MODE MANUEL :
-ajouter plusieurs phases (cards)
-chaque card contient :
-nom
-type
-config
-les autres infos (dans la table phases de la base de données: schema.ts)
+nom joueur
+avatar
+tag
+5️⃣ 🧠 LOGIQUE BRACKETS AVEC PARTICIPANTS
+Problème :
 
-⚠️ validation :
+Pas de table participants pour brackets
 
-pas de doublon de nom
-🧩 GROUPES
-MODE AUTO :
-nombre de groupes basé sur participants
-distribution automatique
-MODE MANUEL :
-cards de groupes
-possibilité :
-nom personnalisé
-participants assignés
+✅ Solution
 
-⚠️ validation :
+👉 stocker participants dans :
 
-pas de groupes avec mêmes participants
-pas de noms dupliqués
-🧩 BRACKET NODES (TRÈS IMPORTANT)
+bracketNode.config = {
+  participants: registrationIds[]
+}
+⚙️ Règles :
+participants viennent du groupe parent
+un joueur ne peut être que dans un seul bracket du même groupe
+✅ Génération matches :
 
-👉 ici :
+basée uniquement sur :
 
-⚠️ un bracketNode = un sous-groupe de matches (pas juste un match)
+bracket.config.participants
+6️⃣ 🎲 GÉNÉRATION MATCHES (AUTO PRIORITAIRE)
+Priorité :
 
-MODE MANUEL :
-création de cards de bracketNodes
-chaque node contient :
-liste participants
-matches internes
-validation :
-pas de duplication de participants
-pas de nodes identiques
-🧩 MATCHES (CAS CRITIQUE)
-MODE MANUEL :
+👉 génération depuis bracketId
 
-Dans un bracketNode :
-
-👉 bouton ➕ "Ajouter match"
-
-comportement :
-crée une card vide
-auto-remplit :
-joueur 1 (random ou premier dispo)
-utilisateur choisit :
-joueur 2
-actions :
-modifier joueur 1
-modifier joueur 2
-supprimer match
-⚠️ VALIDATIONS OBLIGATOIRES :
-joueur1 ≠ joueur2
-match unique :
-(A vs B) interdit si déjà existant
-(B vs A) interdit aussi
-⚠️ ALERTES :
-duplication → warning immédiat
-participants invalides → blocage
-6️⃣ 🔁 LOGIQUE PAR FORMAT DE TOURNOI
+Types :
+aléatoire
+aller simple
+aller-retour
+Contraintes :
+pas de duplication
+équilibre des rencontres
+7️⃣ 🧩 LOGIQUE PAR FORMAT
 🟣 ROUND ROBIN
 
-👉 structure :
+Structure :
 
-1 phase
-plusieurs journées
-chaque journée :
+Phase unique
+Journées (Day 1, Day 2…)
+Chaque journée :
+plusieurs brackets
 plusieurs matches
 🔴 ELIMINATION
 
-👉 structure :
+Structure :
 
-arbre (bracket)
-nodes reliés
-progression automatique
+arbres (Upper / Lower / Final)
+🧠 Naming automatique (OBLIGATOIRE)
+Elimination :
+Round 1 → "1/16 finale"
+Round 2 → "1/8 finale"
+Quarter → "Quart de finale"
+Semi → "Demi-finale"
+Final → "Finale"
+8️⃣ 🧠 ORGANISATION D’UNE PHASE
 
-⚠️ Les formulaires doivent adapter leur UI selon :
+Lors de création :
 
-phaseType === "ROUND_ROBIN"
-phaseType === "ELIMINATION"
-7️⃣ 🎯 FILTRAGE DES PARTICIPANTS
-RÈGLE ABSOLUE :
-MATCH / NODE :
+Vérifier phase précédente :
 
-➡️ participants = uniquement ceux du groupe parent
+👉 filtrer participants :
 
-❌ INTERDIT :
-utiliser tous les participants de l’édition
-✅ OBLIGATOIRE :
-participants = groupParticipants
-8️⃣ ⚠️ GESTION DES DOUBLONS (GLOBAL)
+tous
+qualifiés
+éliminés
+⚙️ Config :
+nombre qualifiés
+distribution automatique
+9️⃣ 🔄 PROGRESSION AUTOMATIQUE
+À chaque résultat de match :
+vérifier :
+joueur a terminé ses matches ?
+est qualifié ?
+SI OUI :
 
-Ajouter un système global de détection :
+➡️ ouvrir dialog :
 
-Cas à détecter :
-match dupliqué
-node dupliqué
-groupe dupliqué
-phase dupliquée
+"Ce joueur est qualifié, l’envoyer à la phase suivante ?"
+
+SI CONFIRMÉ :
+
+➡️ ajout automatique dans phase suivante
+
+🔟 ✅ VALIDATION MATCH (ROLE)
+SI :
+organisateur
+co-organisateur
+
+👉 match = auto confirmé
+
+SINON :
+
+👉 système de confirmation classique
+
+11️⃣ 📊 STATUT DES NIVEAUX
+
+Ajouter boutons :
+
+✅ Terminer groupe
+✅ Terminer bracket
+✅ Terminer phase
+✅ Terminer édition
+Effets :
+lock modifications
+update standings
+update editionResults
+12️⃣ 📈 STANDINGS AVANCÉS
+Ajouter filtres dynamiques :
+par phase
+par groupe
+par bracket
 UX :
-warning visuel
-blocage si critique
-9️⃣ 🎨 UX À RESPECTER
+cascade :
+sélectionner phase
+sélectionner groupe
+sélectionner bracket
+13️⃣ 🧑‍💻 DASHBOARD — NOUVELLES PAGES
 
-Chaque bulk doit avoir :
+Ajouter :
 
-cards modernes
-ajout fluide
-suppression rapide
-feedback visuel
-🔟 🔥 AMÉLIORATIONS À AJOUTER (IMPORTANT)
+📍 /dashboard/edition/[id]/groups
+liste tous les groupes
+filtres
+📍 /dashboard/edition/[id]/brackets
+tous les nodes
+filtres avancés
+📍 /dashboard/edition/[id]/matches
+pagination
+filtres
+gestion
+📍 /dashboard/edition/[id]/matches/[matchId]
+accès :
+participant :
+saisir score
+organisateur :
+full contrôle
+14️⃣ ⚠️ COHÉRENCE BULK & FORM
 
-Tu peux enrichir avec :
+Tous doivent :
 
-✅ shuffle automatique des participants
-✅ génération intelligente :
-éviter répétitions
-équilibrer
-✅ prévisualisation avant submit
-✅ compteur dynamique :
-participants utilisés
-restants
-✅ RÉSULTAT FINAL ATTENDU
+respecter config parent
+respecter participants disponibles
+empêcher doublons
+désactiver actions si limite atteinte
+15️⃣ 🚫 RÈGLES CRITIQUES
+❌ interdit :
+joueur dans 2 brackets même groupe
+match dupliqué
+participant hors scope
+16️⃣ 🔥 AMÉLIORATIONS PROPOSÉES
+💡 Smart features :
+✅ shuffle intelligent
+✅ équilibrage auto
+✅ preview avant création
+✅ compteur dynamique
+💡 UX :
+badges (qualified / eliminated)
+progression visuelle
+loading states propres
+17️⃣ 🎯 RÉSULTAT FINAL
 
 Un système :
 
-propre
-flexible
+totalement cohérent
+robuste
 scalable
-réaliste (niveau esport pro)
-sans incohérences
-utilisable en manuel OU automatique
+réaliste (niveau esport)
+sans bugs de logique
+
+
+==========================volet 2====================
+🎯 Objectif
+
+Ajouter :
+
+Export des données clés d’une édition
+Priorisation UX des matches (mes matches)
+Pagination propre côté matches
+Structure extensible (PDF / CSV / JSON)
+📦 1. EXPORT DES DONNÉES (Edition)
+🔍 Scope
+
+Depuis la page editionId, ajouter un bouton :
+
+Exporter les données
+Dropdown :
+Export Participants
+Export Calendrier des matches
+Export complet (optionnel)
+📊 Données à exporter
+🧑 Participants (édition)
+Nom (displayName / teamName)
+GameTag
+Statut (checked-in, éliminé, qualifié)
+Stats :
+Matches joués
+Victoires / défaites
+Points
+Position (si dispo)
+⚔️ Matches (calendrier)
+MatchCode
+Phase / Groupe / Bracket
+Participants (nom + tag)
+Score
+Statut
+Date (scheduledTime)
+Round / Match number
+⚙️ Backend (actions)
+
+Créer :
+
+export async function exportEditionParticipants(editionId: string, format: 'csv' | 'json' | 'pdf')
+export async function exportEditionMatches(editionId: string, format: 'csv' | 'json' | 'pdf')
+📁 Format recommandé
+CSV (priorité)
+Simple à télécharger
+Compatible Excel
+JSON
+Pour API / debug
+PDF (option premium UX)
+Pour partage tournoi
+🧠 Logique
+Toujours enrichir avec :
+noms participants (join registrations → members)
+contexte (phase, groupe, bracket)
+Ne jamais retourner des IDs seuls
+🎮 2. PRIORISATION “MES MATCHES”
+📍 Dans tabs matches (editionId)
+🔝 Ordre d’affichage :
+Mes matches (prioritaires)
+Autres matches
+🧠 Détection “mes matches”
+match.participant1.userId === currentUser.id
+|| match.participant2.userId === currentUser.id
+🎨 UI
+Section séparée :
+🔥 Mes matches
+- liste (max 5 ou paginé)
+
+🌍 Tous les matches
+- liste classique
+⚡ Bonus UX
+Badge :
+YOU
+Highlight card (border primary)
+📄 3. PAGINATION MATCHES
+🎯 Page /matches
+⚙️ Backend
+getMatches({
+  editionId,
+  page = 1,
+  limit = 20,
+  filters
+})
+🔁 Réponse
+{
+  data: Match[],
+  total: number,
+  page: number,
+  totalPages: number
+}
+🧠 Frontend
+Chargement par lot : 20 matches
+Boutons :
+Suivant / Précédent
+ou infinite scroll (optionnel)
+📌 Important
+
+Toujours récupérer :
+
+participants (JOIN registrations → members)
+éviter “À déterminer” si data existe
+📊 4. AMÉLIORATION TAB MATCHES (editionId)
+🔁 Remplacer le vide actuel par :
+Stats rapides :
+Total matches
+Terminés
+En cours
+Liste :
+10 matches récents
+Bouton :
+Voir tous les matches
+🧠 5. COHÉRENCE GLOBALE
+⚠️ Règles
+Toujours hydrater :
+participants
+contexte (phase/group/bracket)
+Jamais afficher :
+IDs bruts
+"À déterminer" si données existent
+🚀 6. BONUS (RECOMMANDÉ)
+📥 Export depuis dashboard admin
+Export par :
+Phase
+Groupe
+Bracket
+📅 Export calendrier intelligent
+
+Tri par :
+
+ORDER BY scheduledTime ASC
+📊 Export standings
+Ajouter aussi :
+classement complet (édition / groupe / bracket)
+✅ RÉSULTAT ATTENDU
+Export pro (type e-sport platform)
+UX claire pour les joueurs
+Matches lisibles et priorisés
+Pagination performante
+Données exploitables (Excel / partage)

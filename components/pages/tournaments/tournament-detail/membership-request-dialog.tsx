@@ -101,10 +101,10 @@ export function MembershipRequestDialog({
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="displayName" className="flex items-center gap-2 text-xs">
-                <User className="h-3 w-3" /> Nom affiché *
+                <User className="h-3 w-3" /> Nom affiché / Pseudo *
               </Label>
               <Input
                 id="displayName"
@@ -116,52 +116,29 @@ export function MembershipRequestDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="gameTag" className="flex items-center gap-2 text-xs">
-                <Target className="h-3 w-3" /> ID de jeu *
-              </Label>
-              <Input
-                id="gameTag"
-                value={formData.gameTag}
-                onChange={(e) => handleChange("gameTag", e.target.value)}
-                placeholder="Ex: User#1234"
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="gameLevel" className="flex items-center gap-2 text-xs">
-                <Crown className="h-3 w-3" /> Niveau
-              </Label>
-              <Input
-                id="gameLevel"
-                value={formData.gameLevel}
-                onChange={(e) => handleChange("gameLevel", e.target.value)}
-                placeholder="Ex: Expert, Pro"
-                className="h-9"
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="contactPhone" className="flex items-center gap-2 text-xs">
-                <Phone className="h-3 w-3" /> Téléphone
+                <Phone className="h-3 w-3" /> Téléphone WhatsApp (Obligatoire) *
               </Label>
               <Input
                 id="contactPhone"
                 value={formData.contactPhone}
                 onChange={(e) => handleChange("contactPhone", e.target.value)}
-                placeholder="+33..."
+                placeholder="+225..."
                 className="h-9"
               />
+              {!formData.contactPhone && (
+                <p className="text-[10px] text-destructive">Le numéro est requis pour la coordination des matchs.</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes" className="text-xs">Notes (Optionnel)</Label>
+            <Label htmlFor="notes" className="text-xs">Message à l'organisateur (Optionnel)</Label>
             <Textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => handleChange("notes", e.target.value)}
-              placeholder="Expérience, équipe, etc."
+              placeholder="Pourquoi voulez-vous rejoindre ce tournoi ?"
               rows={2}
               className="resize-none"
             />
@@ -179,7 +156,7 @@ export function MembershipRequestDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !formData.displayName || !formData.gameTag}
+            disabled={submitting || !formData.displayName || !formData.contactPhone}
             className="h-9 px-8"
           >
             {submitting ? "Envoi..." : "Rejoindre"}

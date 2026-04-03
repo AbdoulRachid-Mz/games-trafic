@@ -15,11 +15,11 @@ export async function listAllApiKeys() {
   const session = await auth.api.getSession({
     headers: await headers()
   });
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
-  return await db
+  const result = await db
     .select({
       id: apiKeys.id,
       name: apiKeys.name,
@@ -38,6 +38,12 @@ export async function listAllApiKeys() {
     .from(apiKeys)
     .leftJoin(users, eq(users.id, apiKeys.userId))
     .orderBy(desc(apiKeys.createdAt));
+
+  return result.map(k => ({
+    ...k,
+    userName: k.userName || "Acteur Système",
+    name: k.name || `Clé ${k.type}`,
+  }));
 }
 
 /**
@@ -47,7 +53,7 @@ export async function createApiKey(userId: string, options: GenerateKeyOptions) 
   const session = await auth.api.getSession({
     headers: await headers()
   });
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
@@ -64,7 +70,7 @@ export async function revokeApiKey(keyId: string, reason: string) {
   const session = await auth.api.getSession({
     headers: await headers()
   });
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
@@ -81,7 +87,7 @@ export async function getApiLogs(limit = 100) {
   const session = await auth.api.getSession({
     headers: await headers()
   });
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!session?.user || session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 

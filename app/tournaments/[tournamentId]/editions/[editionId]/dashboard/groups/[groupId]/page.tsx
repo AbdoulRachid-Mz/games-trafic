@@ -1,3 +1,4 @@
+// @/app/tournaments/[tournamentId]/editions/[editionId]/dashboard/groups/[groupId]/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -94,7 +95,7 @@ export default async function GroupDetailPage({ params }: PageProps) {
 
   const group = (await getPhaseGroupById(groupId, {
     populate: ["phase"],
-  })) as PhaseGroup | null;
+  })) as any;
   const participantsRes = await getPhaseGroupParticipants({
     filters: { groupId },
     options: { sortBy: "points", sortOrder: "desc" },
@@ -108,6 +109,24 @@ export default async function GroupDetailPage({ params }: PageProps) {
 
   const participants = participantsRes.data as PhaseGroupParticipant[];
   const allRegs = regsRes.data as any[];
+
+  // Determine allowed registrations for this phase
+  let allowedRegs = allRegs;
+  const phaseConfig = (group?.phase as any)?.config || {};
+  const source = phaseConfig.participantSource || "EDITION";
+
+  if (source.startsWith("PHASE_")) {
+    const sourcePhaseId = source.replace("PHASE_", "");
+    // Fetch qualified from source phase
+    const sourceParticipants = await getPhaseGroupParticipants({
+        filters: { phaseId: sourcePhaseId, qualified: true },
+        pagination: { limit: 1000, page: 1 }
+    });
+    const qualifiedIds = (sourceParticipants.data as any[])
+        .map(p => p.registrationId);
+    
+    allowedRegs = allRegs.filter(r => qualifiedIds.includes(r.id));
+  }
 
   // Sort by points DESC, then goal diff, then goals scored
   const standings = [...participants].sort((a, b) => {
@@ -340,8 +359,9 @@ export default async function GroupDetailPage({ params }: PageProps) {
         <GroupParticipantsManagement
           groupId={groupId}
           editionId={editionId}
-          allEditionRegistrations={allRegs}
+          allEditionRegistrations={allowedRegs}
           groupParticipants={participants}
+          maxParticipants={group?.participantCount || 0}
         />
 
         {/* Bracket Nodes */}

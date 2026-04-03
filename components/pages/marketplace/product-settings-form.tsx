@@ -74,11 +74,11 @@ export function ProductSettingsForm({ product, decryptedPassword = "" }: Product
               placeholder="••••••••"
               type="input"
               className="bg-muted/10 p-4 rounded-3xl border border-border/50"
-              renderInput={({ value, onChange, disabled, placeholder }) => (
+              renderEdit={({ value, onChange, disabled, placeholder }) => (
                 <div className="relative">
                   <input
                     type="text"
-                    value={value}
+                    value={value as string}
                     onChange={(e) => onChange(e.target.value)}
                     disabled={disabled}
                     placeholder={placeholder}
@@ -102,22 +102,18 @@ export function ProductSettingsForm({ product, decryptedPassword = "" }: Product
           </CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="flex items-center justify-between p-4 bg-muted/10 rounded-3xl border border-border/50">
-                <div>
-                    <Typography variant="body-base" weight="semibold">
-                        Produit Public
-                    </Typography>
-                    <Typography variant="caption1" theme="muted">
-                        Si désactivé, seuls ceux ayant le lien direct pourront voir le produit.
-                    </Typography>
-                </div>
-                <Button 
-                    variant={isVisible ? "default" : "outline"}
-                    onClick={() => handleUpdateVisibility(!isVisible)}
-                    className="rounded-xl"
-                >
-                    {isVisible ? "Visible" : "Masqué"}
-                </Button>
+            <div className="p-4 bg-muted/10 rounded-3xl border border-border/50">
+                <AutoSyncField
+                    label="Produit Public"
+                    value={isVisible}
+                    type="switch"
+                    editMode="auto"
+                    onChange={handleUpdateVisibility}
+                    className="flex items-center justify-between"
+                />
+                <Typography variant="caption1" theme="muted" className="mt-2 ml-1">
+                    Si désactivé, seuls ceux ayant le lien direct pourront voir le produit.
+                </Typography>
             </div>
         </CardContent>
       </Card>

@@ -175,6 +175,25 @@ export function useEditionRegistrations(
   });
 }
 
+/**
+ * Retrouve la registration d'un utilisateur spécifique pour une édition
+ */
+export function useUserRegistration(editionId: string, userId?: string) {
+  return useQuery({
+    queryKey: ["edition-registration", editionId, userId],
+    queryFn: async () => {
+      if (!userId || !editionId) return null;
+      const res = await getEditionRegistrations({
+        filters: { editionId },
+        pagination: { page: 1, limit: 1000 },
+      });
+      // On cherche la registration qui correspond à l'utilisateur (via le member)
+      return res.data.find((r: any) => r.member?.userId === userId) || null;
+    },
+    enabled: !!editionId && !!userId,
+  });
+}
+
 export function useRegisterToEdition() {
   const queryClient = useQueryClient();
 

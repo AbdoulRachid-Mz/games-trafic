@@ -1,23 +1,12 @@
 "use client";
 
-import React from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { EntityList } from "@/components/shared/entity-list";
 import { useEntityList } from "@/hooks/use-entity-list";
 import { useScreenSize } from "@/hooks/use-screen";
-import { getShops } from "@/actions/shops";
 import { type Shop } from "@/database/schema";
-import {
-  Store,
-  ShoppingBag,
-  Eye,
-  ShieldCheck,
-  AlertCircle,
-  Plus,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -52,11 +41,12 @@ export default function ShopsDashboardPage() {
   });
 
   const renderShopCard = (s: Shop, index: number) => (
-    <ShopCard 
-        key={s.id}
-        shop={s as any} 
-        viewMode={viewMode === "grid" ? "grid" : "list"}
-        onView={() => router.push(`/dashboard/shops/${s.id}`)}
+    <ShopCard
+      key={s.id}
+      shop={s as any}
+      viewMode={viewMode === "grid" ? "grid" : "list"}
+      showDetails={false}
+      onView={() => router.push(`/shops/${s.id}`)}
     />
   );
 
@@ -75,10 +65,7 @@ export default function ShopsDashboardPage() {
             Gérez vos espaces de vente personnalisés
           </Typography>
         </div>
-        <Button
-          onClick={() => router.push("/dashboard/shops/create")}
-          className="gap-2"
-        >
+        <Button onClick={() => router.push("/shops/create")} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouvelle Boutique
         </Button>

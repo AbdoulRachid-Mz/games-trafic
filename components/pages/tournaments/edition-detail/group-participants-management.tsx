@@ -27,7 +27,8 @@ import {
   Save,
   Undo2,
   MoveRight,
-  MoveLeft
+  MoveLeft,
+  AlertCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ interface GroupParticipantsManagementProps {
   editionId: string;
   allEditionRegistrations: any[];
   groupParticipants: any[];
+  maxParticipants?: number;
 }
 
 export function GroupParticipantsManagement({
@@ -51,6 +53,7 @@ export function GroupParticipantsManagement({
   editionId,
   allEditionRegistrations,
   groupParticipants,
+  maxParticipants = 0,
 }: GroupParticipantsManagementProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -102,6 +105,12 @@ export function GroupParticipantsManagement({
     const next = new Set(draftAddIds);
     if (next.has(regId)) next.delete(regId);
     else {
+      // Check capacity
+      if (maxParticipants > 0 && groupList.length >= maxParticipants) {
+        toast.error(`Capacité maximale atteinte (${maxParticipants} participants).`);
+        return;
+      }
+      
       // If it was in draftRemoveIds (indirectly via registrationId), remove it from there
       const p = groupParticipants.find(p => p.registrationId === regId && draftRemoveIds.has(p.id));
       if (p) setDraftRemoveIds(prev => {
@@ -134,6 +143,12 @@ export function GroupParticipantsManagement({
   const hasChanges = draftAddIds.size > 0 || draftRemoveIds.size > 0;
 
   const handleSave = () => {
+    // Final capacity check
+    if (maxParticipants > 0 && groupList.length > maxParticipants) {
+        toast.error(`Capacité maximale dépassée (${groupList.length}/${maxParticipants}).`);
+        return;
+    }
+
     startTransition(async () => {
       try {
         // 1. Bulk Delete
@@ -196,12 +211,17 @@ export function GroupParticipantsManagement({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Available List */}
         <Card className="border-none shadow-xl bg-muted/30">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-               <Users className="h-4 w-4 text-primary" /> Disponibles ({availableList.length})
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                 <Users className="h-4 w-4 text-primary" /> Disponibles ({availableList.length})
+              </CardTitle>
+              {maxParticipants > 0 && (
+                <Badge variant={groupList.length >= maxParticipants ? "destructive" : "outline"} className="text-[10px]">
+                   Capacité: {groupList.length}/{maxParticipants}
+                </Badge>
+              )}
+            </div>
             <CardDescription className="text-[10px]">Cliquez sur un participant pour l'ajouter au draft.</CardDescription>
-          </CardHeader>
           <CardContent className="p-0 border-t bg-card/50">
             <div className="max-h-[500px] overflow-y-auto">
               <Table>

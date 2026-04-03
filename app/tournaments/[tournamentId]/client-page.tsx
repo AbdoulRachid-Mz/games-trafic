@@ -91,6 +91,10 @@ import {
   getTournamentMembers,
   getTournaments,
 } from "@/actions/tournaments";
+import {
+  useTournamentById,
+  useIsUserTournamentOrganizer,
+} from "@/hooks/use-tournaments";
 import { TournamentCard } from "@/components/cards/tournament-card";
 import { StatsCard } from "@/components/ui/stats-card";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
@@ -101,14 +105,15 @@ export function TournamentPageContent() {
   const { user, isAuthenticated } = useAuthContext();
   const { isSmallScreen, isLargeScreen } = useScreenSize();
 
-  const [tournament, setTournament] = useState<TournamentWithRelations | null>(
-    null,
+  const tournamentId = params.tournamentId as string;
+
+  // Optimized React Query Fetch
+  const { data: tournament, isLoading: isTournamentLoading } = useTournamentById(
+    tournamentId,
+    ["organizer", "editions", "members"]
   );
-  const [similarTournaments, setSimilarTournaments] = useState<Tournament[]>(
-    [],
-  );
-  const [members, setMembers] = useState<TournamentMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const [similarTournaments, setSimilarTournaments] = useState<Tournament[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [showAllEditions, setShowAllEditions] = useState(false);
   const [showAllMembers, setShowAllMembers] = useState(false);
@@ -117,43 +122,26 @@ export function TournamentPageContent() {
   const [showMembershipDialog, setShowMembershipDialog] = useState(false);
   const [memberViewMode, setMemberViewMode] = useState<"grid" | "list">("grid");
 
-  const tournamentId = params.tournamentId as string;
-
   useEffect(() => {
-    loadTournament();
-    loadSimilarTournaments();
-    checkMembership();
-  }, [tournamentId, user]);
-
-  const loadTournament = async () => {
-    setIsLoading(true);
-    try {
-      const data = await getTournamentById(tournamentId, {
-        populate: ["organizer", "editions", "members"],
-      });
-      setTournament(data as TournamentWithRelations);
-      if (data?.members) {
-        setMembers(data.members as TournamentMember[]);
-      }
-    } catch (error) {
-      console.error("Erreur chargement tournoi:", error);
-    } finally {
-      setIsLoading(false);
+    if (tournament) {
+      loadSimilarTournaments();
+      checkMembership();
     }
-  };
+  }, [tournament?.id, user?.id]);
 
   const loadSimilarTournaments = async () => {
+    if (!tournament) return;
     try {
       const res = await getTournaments({
         pagination: { page: 1, limit: 12 },
         filters: {
-          game: tournament?.game,
+          game: tournament.game,
           visibility: "PUBLIC",
           isDeleted: false,
         },
         options: { sortBy: "viewCount", sortOrder: "desc" },
       });
-      const similar = res.data.filter((t) => t.id !== tournamentId).slice(0, 8);
+      const similar = res.data.filter((t) => t.id !== tournament.id).slice(0, 8);
       setSimilarTournaments(similar);
     } catch (error) {
       console.error("Erreur chargement tournois similaires:", error);
@@ -161,11 +149,11 @@ export function TournamentPageContent() {
   };
 
   const checkMembership = async () => {
-    if (!user || !tournamentId) return;
+    if (!user || !tournament?.id) return;
 
     try {
       const res = await getTournamentMembers({
-        filters: { tournamentId, userId: user.id },
+        filters: { tournamentId: tournament.id, userId: user.id },
         pagination: { page: 1, limit: 1 },
       });
 
@@ -223,6 +211,8 @@ export function TournamentPageContent() {
     // },
   ];
   const editions = tournament?.editions || [];
+  const members = (tournament?.members as TournamentMember[]) || [];
+
 
   const displayedEditions = showAllEditions ? editions : editions.slice(0, 6);
   const displayedMembers = showAllMembers ? members : members.slice(0, 12);
@@ -268,7 +258,8 @@ export function TournamentPageContent() {
     router.push(`/tournaments/${tournamentId}/members/${memberId}`);
   };
 
-  if (isLoading) {
+
+  if (isTournamentLoading) {
     return <TournamentSkeleton />;
   }
 

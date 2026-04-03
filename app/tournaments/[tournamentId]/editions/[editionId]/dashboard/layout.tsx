@@ -22,7 +22,9 @@ import {
   Users, Settings,
   Swords,
   Wallet,
-  ListTree
+  ListTree,
+  LayoutGrid,
+  GitBranch
 } from "lucide-react";
 import { useActiveRoute } from "@/hooks/use-active-route";
 
@@ -83,6 +85,16 @@ export default function EditionDashboardLayout({
       icon: ListTree,
     },
     {
+      title: "Groupes",
+      url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups`,
+      icon: LayoutGrid,
+    },
+    {
+      title: "Brackets",
+      url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/brackets`,
+      icon: GitBranch,
+    },
+    {
       title: "Matchs",
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`,
       icon: Swords,
@@ -107,6 +119,8 @@ export default function EditionDashboardLayout({
   const editionOverview = navData.filter(i =>
     i.url.endsWith(`/tournaments/${tournamentId}/editions/${editionId}/dashboard`) ||
     i.url.endsWith(`/phases`) ||
+    i.url.endsWith(`/groups`) ||
+    i.url.endsWith(`/brackets`) ||
     i.url.endsWith(`/matches`) ||
     i.url.endsWith(`/organize`)
   );

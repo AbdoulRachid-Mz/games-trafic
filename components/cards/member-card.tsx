@@ -3,7 +3,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MoreHorizontal, Shield, User, Trophy, Mail, ShieldCheck, ShieldAlert, PenSquare, Eye } from "lucide-react";
+import {
+  MoreHorizontal,
+  Shield,
+  User,
+  Trophy,
+  Mail,
+  ShieldCheck,
+  ShieldAlert,
+  PenSquare,
+  Eye,
+  MessageSquare,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +54,7 @@ export function MemberCard({
   const isActive = member.isActive ?? true;
   const isBanned = member.isBanned ?? false;
   const isMe = member.userId === user?.id;
-  const { isMobile } = useScreenSize()
+  const { isMobile } = useScreenSize();
 
   // Helper to determine role color/icon
   const getRoleBadge = (role: string) => {
@@ -97,7 +108,9 @@ export function MemberCard({
               {!isActive && <Badge variant="secondary">INACTIVE</Badge>}
             </div>
             {member.contactEmail && (
-              <div className="text-xs text-muted-foreground">{member.contactEmail}</div>
+              <div className="text-xs text-muted-foreground">
+                {member.contactEmail}
+              </div>
             )}
           </div>
         </div>
@@ -109,7 +122,9 @@ export function MemberCard({
               size="sm"
               className={cn(
                 "gap-2 h-8",
-                role === "CO_ORGANIZER" ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20" : ""
+                role === "CO_ORGANIZER"
+                  ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
+                  : "",
               )}
               onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
             >
@@ -119,7 +134,9 @@ export function MemberCard({
                 <Shield className="h-4 w-4" />
               )}
               <span className="hidden sm:inline">
-                {role === "CO_ORGANIZER" ? "Co-organisateur" : "Nommer Co-organisateur"}
+                {role === "CO_ORGANIZER"
+                  ? "Co-organisateur"
+                  : "Nommer Co-organisateur"}
               </span>
             </Button>
           )}
@@ -151,7 +168,9 @@ export function MemberCard({
                   onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
                   disabled={!member.userId || isMe}
                 >
-                  {role === "CO_ORGANIZER" ? "Retirer co-organisateur" : "Nommer co-organisateur"}
+                  {role === "CO_ORGANIZER"
+                    ? "Retirer co-organisateur"
+                    : "Nommer co-organisateur"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {actions?.onDelete && (
@@ -198,7 +217,9 @@ export function MemberCard({
                   onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
                   disabled={!member.userId || isMe}
                 >
-                  {role === "CO_ORGANIZER" ? "Retirer co-organisateur" : "Nommer co-organisateur"}
+                  {role === "CO_ORGANIZER"
+                    ? "Retirer co-organisateur"
+                    : "Nommer co-organisateur"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -214,7 +235,10 @@ export function MemberCard({
 
         <div className="relative">
           <Avatar className="h-24 w-24 border-4 border-background shadow-xl scale-100 group-hover:scale-105 transition-transform duration-300">
-            <AvatarImage src={member.avatar || user?.profileImage || "/icons/avatar-2.png"} alt={member.displayName || user?.username || "User"} />
+            <AvatarImage
+              src={member.avatar || user?.profileImage || "/icons/avatar-2.png"}
+              alt={member.displayName || user?.username || "User"}
+            />
             <AvatarFallback className="text-2xl bg-primary/10 text-primary font-black italic">
               {(member.displayName || user?.username || "U")
                 .substring(0, 2)
@@ -222,7 +246,10 @@ export function MemberCard({
             </AvatarFallback>
           </Avatar>
           {isActive && (
-            <span className="absolute bottom-1 right-1 h-5 w-5 bg-green-500 border-4 border-background rounded-full shadow-sm" title="Actif" />
+            <span
+              className="absolute bottom-1 right-1 h-5 w-5 bg-green-500 border-4 border-background rounded-full shadow-sm"
+              title="Actif"
+            />
           )}
         </div>
 
@@ -232,7 +259,9 @@ export function MemberCard({
             title={member.displayName || user?.username || "Inconnu"}
           >
             {member.displayName || user?.username || "Inconnu"}
-            {isMe && <Badge className="ml-2 bg-primary text-[10px] h-4">Moi</Badge>}
+            {isMe && (
+              <Badge className="ml-2 bg-primary text-[10px] h-4">Moi</Badge>
+            )}
           </h3>
           <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
             <Mail className="w-3 h-3" />
@@ -242,7 +271,11 @@ export function MemberCard({
 
         <div className="flex flex-wrap gap-2 justify-center w-full min-h-[24px]">
           {getRoleBadge(role)}
-          {isBanned && <Badge variant="destructive" className="animate-pulse">BANNED</Badge>}
+          {isBanned && (
+            <Badge variant="destructive" className="animate-pulse">
+              BANNED
+            </Badge>
+          )}
           {member.team && (
             <Badge
               variant="outline"
@@ -255,26 +288,46 @@ export function MemberCard({
           )}
         </div>
 
-        <div className="grid grid-cols-1 w-full gap-2 mt-2 pt-4 border-t border-primary/10">
+        <div className="grid grid-cols-2 w-full gap-2 mt-2 pt-4 border-t border-primary/10">
           <Button
             variant="secondary"
             size="sm"
-            className="w-full font-bold h-9"
+            className="w-full font-bold h-9 bg-primary/5 hover:bg-primary/10 text-primary border-none"
             onClick={() => actions?.onViewProfile?.(member.id)}
           >
-            <Eye className="w-3 h-3" />
-            <span className="hidden md:inline">
-              Voir le profil
-            </span>
+            <Eye className="w-3 h-3 mr-2" />
+            Profil
           </Button>
+
+          {(member.contactPhone || user?.phoneNumber) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full font-bold h-9 border-green-500/20 hover:bg-green-500/10 text-green-600"
+              onClick={() => {
+                const phone =
+                  (member as any).contactPhone || (user as any)?.phoneNumber;
+                if (phone)
+                  window.open(
+                    `https://wa.me/${phone.replace(/[^0-9]/g, "")}`,
+                    "_blank",
+                  );
+              }}
+            >
+              <MessageSquare className="w-3 h-3 mr-2" />
+              WhatsApp
+            </Button>
+          )}
 
           {userDisplay === "organizer" && member.userId && !isMe && (
             <Button
               variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
               size="sm"
               className={cn(
-                "w-full font-bold h-9",
-                role === "CO_ORGANIZER" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : ""
+                "w-full font-bold h-9 col-span-2",
+                role === "CO_ORGANIZER"
+                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                  : "",
               )}
               onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
             >
@@ -283,7 +336,9 @@ export function MemberCard({
               ) : (
                 <Shield className="h-4 w-4 mr-2" />
               )}
-              {role === "CO_ORGANIZER" ? "Co-organisateur" : "Nommer Co-organisateur"}
+              {role === "CO_ORGANIZER"
+                ? "Co-organisateur"
+                : "Nommer Co-organisateur"}
             </Button>
           )}
 
@@ -291,13 +346,11 @@ export function MemberCard({
             <Button
               variant="outline"
               size="sm"
-              className="w-full font-bold h-9 bg-primary/5 border-primary/20 hover:bg-primary/10"
+              className="w-full font-bold h-9 col-span-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
               onClick={actions?.onManage!}
             >
-              <PenSquare className="w-3 h-3" />
-              <span className="md:inline hidden">
-                Gérer l&apos;équipe
-              </span>
+              <PenSquare className="w-3 h-3 mr-2" />
+              Gérer l&apos;équipe
             </Button>
           )}
         </div>
@@ -308,6 +361,6 @@ export function MemberCard({
           </div>
         )}
       </CardContent>
-    </Card >
+    </Card>
   );
 }

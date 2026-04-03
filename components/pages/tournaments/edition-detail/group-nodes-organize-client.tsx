@@ -31,6 +31,7 @@ interface GroupNodesOrganizeClientProps {
   groupId: string;
   phaseId: string;
   existingNodes: any[];
+  groupParticipants: any[];
 }
 
 type DraftNode = {
@@ -39,12 +40,14 @@ type DraftNode = {
   matchNumber: number;
   bracketType: "UPPER" | "LOWER";
   order: number;
+  participants: string[]; // registrationIds
 };
 
 export function GroupNodesOrganizeClient({
   groupId,
   phaseId,
   existingNodes,
+  groupParticipants,
 }: GroupNodesOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -69,6 +72,7 @@ export function GroupNodesOrganizeClient({
         matchNumber: idx + 1,
         bracketType: "UPPER",
         order: idx + 1,
+        participants: [],
       });
     }
     setDraftNodes([...draftNodes, ...newDrafts]);
@@ -89,6 +93,9 @@ export function GroupNodesOrganizeClient({
             ...n,
             phaseId,
             groupId,
+            config: {
+              participants: n.participants
+            }
           } as any))
         );
         toast.success(`${draftNodes.length} nœuds créés avec succès.`);
@@ -207,29 +214,76 @@ export function GroupNodesOrganizeClient({
               ) : (
                 <div className="divide-y max-h-[600px] overflow-y-auto">
                   {draftNodes.map((n, i) => (
-                    <div key={i} className="p-4 hover:bg-primary/5 transition-colors flex items-center justify-between animate-in fade-in slide-in-from-right-2 duration-200">
-                      <div className="flex items-center gap-4">
-                        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
-                          {n.nodeCode}
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                             <span className="text-sm font-bold">{n.nodeCode}</span>
-                             {isDuplicate(n.nodeCode) && (
-                               <Badge variant="destructive" className="h-4 text-[8px] px-1 font-bold">DOUBLON</Badge>
-                             )}
+                    <div key={i} className="p-4 hover:bg-primary/5 transition-colors space-y-4 animate-in fade-in slide-in-from-right-2 duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
+                            {n.nodeCode}
                           </div>
-                          <span className="text-[10px] text-muted-foreground uppercase tracking-tight font-mono">Round {n.round} • Match #{n.matchNumber}</span>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                               <span className="text-sm font-bold">{n.nodeCode}</span>
+                               {isDuplicate(n.nodeCode) && (
+                                 <Badge variant="destructive" className="h-4 text-[8px] px-1 font-bold">DOUBLON</Badge>
+                               )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-tight font-mono">Round {n.round} • Match #{n.matchNumber}</span>
+                          </div>
                         </div>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveDraft(i)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveDraft(i)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+
+                      <div className="grid grid-cols-2 gap-3 pl-12">
+                         <div className="space-y-1">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground">Joueur 1</label>
+                            <select 
+                              className="w-full h-8 text-[11px] bg-muted/50 border rounded px-2"
+                              value={n.participants[0] || ""}
+                              onChange={(e) => {
+                                const newDrafts = [...draftNodes];
+                                const p = [...(newDrafts[i].participants || [])];
+                                p[0] = e.target.value;
+                                newDrafts[i].participants = p;
+                                setDraftNodes(newDrafts);
+                              }}
+                            >
+                               <option value="">À déterminer</option>
+                               {groupParticipants.map(gp => (
+                                 <option key={gp.registrationId} value={gp.registrationId}>
+                                   {gp.registration?.member?.displayName || gp.registration?.member?.user?.username || "Joueur"}
+                                 </option>
+                               ))}
+                            </select>
+                         </div>
+                         <div className="space-y-1">
+                            <label className="text-[9px] font-bold uppercase text-muted-foreground">Joueur 2</label>
+                            <select 
+                              className="w-full h-8 text-[11px] bg-muted/50 border rounded px-2"
+                              value={n.participants[1] || ""}
+                              onChange={(e) => {
+                                const newDrafts = [...draftNodes];
+                                const p = [...(newDrafts[i].participants || [])];
+                                p[1] = e.target.value;
+                                newDrafts[i].participants = p;
+                                setDraftNodes(newDrafts);
+                              }}
+                            >
+                               <option value="">À déterminer</option>
+                               {groupParticipants.map(gp => (
+                                 <option key={gp.registrationId} value={gp.registrationId}>
+                                   {gp.registration?.member?.displayName || gp.registration?.member?.user?.username || "Joueur"}
+                                 </option>
+                               ))}
+                            </select>
+                         </div>
+                      </div>
                     </div>
                   ))}
                 </div>

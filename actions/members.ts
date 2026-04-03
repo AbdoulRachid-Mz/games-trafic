@@ -199,3 +199,40 @@ export async function getTournamentMembers(
         throw error;
     }
 }
+
+/**
+ * Récupère les inscriptions et stats d'un membre pour toutes les éditions d'un tournoi
+ */
+export async function getMemberStatsByEdition(memberId: string) {
+    try {
+        const stats = await db.query.editionRegistrations.findMany({
+            where: (t, { eq, and }) => and(eq(t.memberId, memberId), eq(t.isDeleted, false)),
+            with: {
+                edition: true,
+            },
+            orderBy: (t, { desc }) => [desc(t.registeredAt)],
+        });
+        return stats;
+    } catch (error) {
+        console.error("Error getting member edition stats:", error);
+        throw new Error("Failed to fetch edition stats");
+    }
+}
+
+/**
+ * Récupère tous les membres d'une équipe
+ */
+export async function getTeamMembers(teamId: string) {
+    try {
+        const members = await db.query.tournamentMembers.findMany({
+            where: (t, { eq, and }) => and(eq(t.teamId, teamId), eq(t.isDeleted, false)),
+            with: {
+                user: true,
+            },
+        });
+        return members;
+    } catch (error) {
+        console.error("Error getting team members:", error);
+        throw new Error("Failed to fetch team members");
+    }
+}

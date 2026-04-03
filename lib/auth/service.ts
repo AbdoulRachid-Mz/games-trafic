@@ -88,14 +88,14 @@ export class AuthService {
 
       // Vérifier si l'utilisateur est présent dans le résultat
       if ('user' in result && result.user?.id) {
-        // Créer le wallet par défaut
-        await createUserWallet({
-          userId: result.user.id,
-          pinHash: 'default', // to be hashed in production
-          isActive: false,
-          isLocked: false,
-          verificationStatus: 'PENDING',
-        });
+        // Créer le wallet par défaut avec le PIN 1234 et le bonus
+        try {
+          const { initializeUserWallet } = await import('@/actions/wallets');
+          await initializeUserWallet(result.user.id);
+        } catch (walletError) {
+          console.error('Error initializing wallet during signup:', walletError);
+          // On continue quand même car l'utilisateur est créé
+        }
 
         return {
           success: true,

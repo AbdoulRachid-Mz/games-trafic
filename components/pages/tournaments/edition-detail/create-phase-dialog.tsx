@@ -30,12 +30,14 @@ interface CreatePhaseDialogProps {
     editionId: string;
     tournamentId: string;
     nextOrder: number;
+    existingPhases?: any[];
 }
 
 export function CreatePhaseDialog({
     editionId,
     tournamentId,
     nextOrder,
+    existingPhases = [],
 }: CreatePhaseDialogProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -50,6 +52,7 @@ export function CreatePhaseDialog({
         const name = formData.get("name") as string;
         const type = formData.get("phaseType") as any;
         const isDoubleElimination = formData.get("isDoubleElimination") === "on";
+        const participantSource = formData.get("participantSource") as string;
 
         // Advanced data
         const groupsCount = parseInt(formData.get("groupsCount") as string) || 1;
@@ -68,6 +71,7 @@ export function CreatePhaseDialog({
                 order: nextOrder,
                 isDoubleElimination,
                 config: {
+                    participantSource,
                     groupsCount,
                     pointsPerWin,
                     pointsPerDraw,
@@ -109,7 +113,7 @@ export function CreatePhaseDialog({
                             <Input
                                 id="name"
                                 name="name"
-                                defaultValue={`Phase ${nextOrder}`}
+                                defaultValue={`Phase ${nextOrder + 1}`}
                                 required
                             />
                         </div>
@@ -131,6 +135,26 @@ export function CreatePhaseDialog({
                                 ))}
                             </select>
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="participantSource">Source des participants</Label>
+                        <select
+                            id="participantSource"
+                            name="participantSource"
+                            className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full"
+                            required
+                        >
+                            <option value="EDITION">Inscriptions Directes de l'Édition</option>
+                            {existingPhases.map((p) => (
+                                <option key={p.id} value={`PHASE_${p.id}`}>
+                                    Qualifiés de la phase : {p.name}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-[10px] text-muted-foreground italic">
+                            Définit d'où proviennent les joueurs/équipes pour cette étape.
+                        </p>
                     </div>
 
                     <div className="border rounded-lg p-4 bg-muted/30 space-y-4">

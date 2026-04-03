@@ -46,7 +46,7 @@ export default function TournamentsDashboardPage() {
     onRefresh,
   } = useEntityList<Tournament>({
     entityType: "tournaments",
-    defaultFilters: { creatorId: user?.id },
+    defaultFilters: { organizerId: user?.id },
     defaultLimit: isSmallScreen ? 12 : isMediumScreen ? 15 : 20,
     enabled: !!user?.id,
   });

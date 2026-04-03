@@ -16,6 +16,17 @@ import { toast } from "sonner";
 import { deleteEditionRegistrationAction, addEditionParticipantAction } from "@/actions/editions";
 import { useRouter } from "next/navigation";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import { Input } from "@/components/ui/input";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { FileDown, Search, Download, FileJson, FileText, FileSpreadsheet } from "lucide-react";
+import { exportToCSV, exportToJSON, exportToPDF } from "@/lib/utils/member-export-utils";
 
 export function ParticipantsManagementClient({
   editionId,
@@ -33,6 +44,29 @@ export function ParticipantsManagementClient({
   const [selectedUnregistered, setSelectedUnregistered] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredParticipants = participants.filter(p => {
+    const name = (p.member.displayName || p.member.user?.username || "").toLowerCase();
+    const team = (p.member.team?.name || "").toLowerCase();
+    return name.includes(search.toLowerCase()) || team.includes(search.toLowerCase());
+  });
+
+  const handleExport = (format: 'csv' | 'json' | 'pdf') => {
+    const exportData = {
+      appName: "Games Trafic",
+      appContact: "contact@gamestrafic.com | +225 0102030405",
+      editionName: "Édition de tournoi", // Idéalement passer le nom de l'édition
+      members: participants.map(p => ({
+        ...p.member,
+        joinedAt: p.registeredAt
+      }))
+    };
+
+    if (format === 'csv') exportToCSV(exportData);
+    if (format === 'json') exportToJSON(exportData);
+    if (format === 'pdf') exportToPDF(exportData);
+  };
 
   // Bulk Actions
   const handleBulkAdd = async () => {
@@ -87,13 +121,45 @@ export function ParticipantsManagementClient({
             <CardDescription>Joueurs inscrits et actifs dans cette édition.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher un joueur ou équipe..."
+                className="pl-9 h-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-2">
+                  <Download className="h-4 w-4" />
+                  Exporter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Format d'export</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleExport('pdf')} className="gap-2">
+                  <FileText className="h-4 w-4 text-red-500" /> PDF (Imprimable)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('csv')} className="gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-green-600" /> CSV (Excel)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('json')} className="gap-2">
+                  <FileJson className="h-4 w-4 text-amber-500" /> JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {selectedParticipants.length > 0 && (
               <ConfirmationDialog
                 title="Retirer les participants"
                 description={`Êtes-vous sûr de vouloir retirer les ${selectedParticipants.length} participant(s) sélectionné(s) ? S'ils ont des matchs ou font partie de groupes, l'action sera bloquée.`}
                 onConfirm={handleBulkRemove}
               >
-                 <Button variant="destructive" size="sm" disabled={isDeleting}>
+                 <Button variant="destructive" size="sm" disabled={isDeleting} className="h-9">
                     <Trash2 className="h-4 w-4 mr-2" />
                     Retirer ({selectedParticipants.length})
                  </Button>
@@ -116,20 +182,22 @@ export function ParticipantsManagementClient({
                   />
                 </TableHead>
                 <TableHead>Joueur</TableHead>
+                <TableHead>Équipe</TableHead>
+                <TableHead>Téléphone</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Paiement</TableHead>
                 <TableHead className="text-right px-6">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {participants.length === 0 ? (
+              {filteredParticipants.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                    Aucun participant pour le moment.
+                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                    Aucun participant trouvé pour cette recherche.
                   </TableCell>
                 </TableRow>
               ) : (
-                participants.map((reg) => (
+                filteredParticipants.map((reg) => (
                   <TableRow key={reg.id} className="hover:bg-muted/20">
                     <TableCell className="px-6">
                        <Checkbox 
@@ -152,6 +220,19 @@ export function ParticipantsManagementClient({
                           </span>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                       <div className="flex items-center gap-2 text-sm">
+                         <span className="max-w-[120px] truncate">
+                           {reg.member.team?.name || "Solo"}
+                         </span>
+                       </div>
+                    </TableCell>
+                    <TableCell>
+                       <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono">
+                         <Phone className="h-3 w-3" />
+                         {reg.member.contactPhone || reg.member.user?.phoneNumber || "N/A"}
+                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={reg.status === "REGISTERED" ? "secondary" : "default"}>

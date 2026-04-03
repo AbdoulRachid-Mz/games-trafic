@@ -18,12 +18,12 @@ import {
   TournamentEdition,
   TournamentEditionWithRelations,
 } from "@/database/schema";
-import { useForm, Controller } from "react-hook-form";
-import { useUpdateEdition, useDeleteEdition } from "@/hooks/use-editions";
+import { useDeleteEdition } from "@/hooks/use-editions";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { cn } from "@/lib/utils";
+import { Trash2, Calendar, Users, MapPin, Trophy, Bell, Zap, Info } from "lucide-react";
+import { AutoSyncField } from "@/components/shared/auto-sync-field";
+import { updateEdition } from "@/actions/editions";
+import { toast } from "sonner";
 
 interface EditionSettingsFormProps {
   edition: TournamentEditionWithRelations;
@@ -35,75 +35,28 @@ export function EditionSettingsForm({
   tournamentId,
 }: EditionSettingsFormProps) {
   const router = useRouter();
-  const updateDecoration = useUpdateEdition();
   const deleteMutation = useDeleteEdition();
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors, isDirty },
-  } = useForm({
-    defaultValues: {
-      name: edition.name || "",
-      slug: edition.editionSlug || "",
-      description: edition.description || "",
-      entryFee: edition.entryFee || 0,
-      maxParticipants: edition.maxParticipants || 64,
-      startDate: edition.startDate
-        ? new Date(edition.startDate).toISOString().split("T")[0]
-        : "",
-      endDate: edition.endDate
-        ? new Date(edition.endDate).toISOString().split("T")[0]
-        : "",
-      registrationDeadline: edition.registrationDeadline
-        ? new Date(edition.registrationDeadline).toISOString().split("T")[0]
-        : "",
-      locationType: edition.locationType || "ONLINE",
-      location: edition.location || "",
-      prizePool: edition.prizePool || 0,
-      prizeCurrency: edition.prizeCurrency || "GTC",
-      notificationsEnabled: edition.notificationsEnabled ?? true,
-      autoAdvance: edition.autoAdvance ?? true,
-      // @ts-ignore
-      config_checkinRequired: edition.editionConfig?.checkinRequired ?? false,
-      // @ts-ignore
-      config_autoStart: edition.editionConfig?.autoStart ?? true,
-      // @ts-ignore
-      config_seedMethod: edition.editionConfig?.seedMethod || "RANDOM",
-      // @ts-ignore
-      config_tiebreakerRules: JSON.stringify(edition.editionConfig?.tiebreakerRules || {}),
-    },
-  });
+  const handleUpdate = async (field: keyof TournamentEdition, value: any) => {
+    try {
+      await updateEdition(edition.id, { [field]: value });
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour");
+    }
+  };
 
-  const onSubmit = (data: any) => {
-    updateDecoration.mutate({
-      id: edition.id,
-      data: {
-        ...data,
-        editionSlug: data.slug,
-        entryFee: Number(data.entryFee),
-        maxParticipants: Number(data.maxParticipants),
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        registrationDeadline: new Date(data.registrationDeadline),
-        prizePool: Number(data.prizePool),
-        notificationsEnabled: Boolean(data.notificationsEnabled),
-        autoAdvance: Boolean(data.autoAdvance),
+  const handleConfigUpdate = async (key: string, value: any) => {
+    try {
+      const currentConfig = edition.editionConfig || {};
+      await updateEdition(edition.id, {
         editionConfig: {
-          checkinRequired: Boolean(data.config_checkinRequired),
-          autoStart: Boolean(data.config_autoStart),
-          seedMethod: data.config_seedMethod,
-          tiebreakerRules: (() => {
-            try {
-              return JSON.parse(data.config_tiebreakerRules || "{}");
-            } catch {
-              return {};
-            }
-          })(),
+          ...currentConfig,
+          [key]: value,
         },
-      },
-    });
+      });
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour de la configuration");
+    }
   };
 
   const handleDelete = () => {
@@ -119,222 +72,237 @@ export function EditionSettingsForm({
       });
     }
   };
+
   return (
-    <div className="space-y-6">
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Paramètres Généraux</CardTitle>
-            <CardDescription>
-              Modifiez les informations principales de l'édition.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nom de l'édition</Label>
-                <Input
-                  id="name"
-                  {...register("name")}
-                  placeholder={`Édition #${edition.editionNumber}`}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="slug">Slug de l'édition</Label>
-                <Input
-                  id="slug"
-                  {...register("slug")}
-                  placeholder={`Édition #${edition.editionSlug}`}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="maxParticipants">Participants Max</Label>
-                <Input
-                  id="maxParticipants"
-                  type="number"
-                  {...register("maxParticipants")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Date de début</Label>
-                <Input id="startDate" type="date" {...register("startDate")} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="endDate">Date de fin</Label>
-                <Input id="endDate" type="date" {...register("endDate")} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="registrationDeadline">
-                  Date limite d'inscription
-                </Label>
-                <Input
-                  id="registrationDeadline"
-                  type="date"
-                  {...register("registrationDeadline")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="entryFee">Frais d'inscription (GTC)</Label>
-                <Input
-                  id="entryFee"
-                  type="number"
-                  step="0.01"
-                  {...register("entryFee")}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Mettre 0 pour gratuit
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prizePool">Prix total (pool)</Label>
-                <Input id="prizePool" type="number" step="0.01" {...register("prizePool")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prizeCurrency">Devise des prix</Label>
-                <Input id="prizeCurrency" {...register("prizeCurrency")} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="locationType">Type de lieu</Label>
-                <select id="locationType" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" {...register("locationType")}>
-                  <option value="ONLINE">En ligne</option>
-                  <option value="VENUE">Présentiel</option>
-                  <option value="HYBRID">Hybride</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="location">Lieu</Label>
-                <Input id="location" {...register("location")} placeholder="Adresse ou URL" />
-              </div>
+    <div className="space-y-8">
+      {/* Informations Principales */}
+      <Card className="border-border/50 overflow-hidden">
+        <CardHeader className="bg-muted/30 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <Info className="h-5 w-5" />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                {...register("description")}
-                rows={4}
-              />
+            <div>
+              <CardTitle>Informations Générales</CardTitle>
+              <CardDescription>
+                Identité et visibilité de cette édition.
+              </CardDescription>
             </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <AutoSyncField<string>
+              label="Nom de l'édition"
+              value={edition.name || ""}
+              onChange={async (val: string) => { await handleUpdate("name", val); }}
+              placeholder="Ex: Spring Finals 2024"
+              helperText="Le nom public de cette édition."
+            />
+            <AutoSyncField<string>
+              label="Slug d'URL"
+              value={edition.editionSlug || ""}
+              onChange={async (val: string) => { await handleUpdate("editionSlug", val); }}
+              placeholder="spring-finals-2024"
+              helperText="Utilisé dans l'URL (ex: /editions/slug)"
+            />
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3 p-4 border rounded-xl">
-                <div className="font-medium">Notifications & Avancement</div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="notificationsEnabled">Notifications activées</Label>
-                  <Controller
-                    name="notificationsEnabled"
-                    control={control}
-                    render={({ field }) => (
-                      <Switch
-                        id="notificationsEnabled"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="autoAdvance">Avancement automatique</Label>
-                  <Controller
-                    name="autoAdvance"
-                    control={control}
-                    render={({ field }) => (
-                      <Switch
-                        id="autoAdvance"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 p-4 border rounded-xl">
-                <div className="font-medium">Configuration compétition</div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="config_checkinRequired">Check-in requis</Label>
-                  <Controller
-                    name="config_checkinRequired"
-                    control={control}
-                    render={({ field }) => (
-                      <Switch
-                        id="config_checkinRequired"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="config_autoStart">Démarrage auto</Label>
-                  <Controller
-                    name="config_autoStart"
-                    control={control}
-                    render={({ field }) => (
-                      <Switch
-                        id="config_autoStart"
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    )}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="config_seedMethod">Méthode de seed</Label>
-                  <select id="config_seedMethod" className="h-9 px-3 py-1 rounded-md border bg-background text-sm w-full" {...register("config_seedMethod")}>
-                    <option value="RANDOM">Aléatoire</option>
-                    <option value="RANKING">Classement</option>
-                    <option value="MANUAL">Manuel</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="config_tiebreakerRules">Règles de tiebreaker (JSON)</Label>
-                  <Textarea id="config_tiebreakerRules" rows={3} {...register("config_tiebreakerRules")} />
-                </div>
-              </div>
+          <AutoSyncField<string>
+            label="Description"
+            type="textarea"
+            value={edition.description || ""}
+            onChange={async (val: string) => { await handleUpdate("description", val); }}
+            placeholder="Détails, règles spécifiques, etc."
+          />
+        </CardContent>
+      </Card>
+
+      {/* Logistique & Planning */}
+      <Card className="border-border/50 overflow-hidden">
+        <CardHeader className="bg-muted/30 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500">
+              <Calendar className="h-5 w-5" />
             </div>
-          </CardContent>
-          <CardFooter className="border-t px-6 py-4 bg-muted/50 flex justify-end">
-            <Button
-              type="submit"
-              disabled={!isDirty || updateDecoration.isPending}
-            >
-              {updateDecoration.isPending
-                ? "Enregistrement..."
-                : "Enregistrer les modifications"}
-            </Button>
-          </CardFooter>
+            <div>
+              <CardTitle>Logistique & Planning</CardTitle>
+              <CardDescription>
+                Dates clés et limites de participants.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AutoSyncField<number>
+              label="Participants Max"
+              type="number"
+              value={edition.maxParticipants || 64}
+              onChange={(val) => handleUpdate("maxParticipants", val)}
+              icon={Users}
+            />
+            <AutoSyncField<string>
+                label="Type de lieu"
+                type="select"
+                value={edition.locationType || "ONLINE"}
+                options={[
+                    { label: "En ligne", value: "ONLINE" },
+                    { label: "Présentiel", value: "VENUE" },
+                    { label: "Hybride", value: "HYBRID" },
+                ]}
+                onChange={(val) => handleUpdate("locationType", val)}
+                icon={MapPin}
+            />
+            <AutoSyncField<string>
+                label="Lieu / URL"
+                value={edition.location || ""}
+                onChange={(val) => handleUpdate("location", val)}
+                placeholder="Ex: Paris ou Discord"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AutoSyncField<string>
+              label="Début"
+              type="date"
+              value={edition.startDate ? new Date(edition.startDate).toISOString().split('T')[0] : ""}
+              onChange={(val) => handleUpdate("startDate", new Date(val))}
+            />
+            <AutoSyncField<string>
+              label="Fin"
+              type="date"
+              value={edition.endDate ? new Date(edition.endDate).toISOString().split('T')[0] : ""}
+              onChange={(val) => handleUpdate("endDate", new Date(val))}
+            />
+            <AutoSyncField<string>
+              label="Date limite inscription"
+              type="date"
+              value={edition.registrationDeadline ? new Date(edition.registrationDeadline).toISOString().split('T')[0] : ""}
+              onChange={(val) => handleUpdate("registrationDeadline", new Date(val))}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Finance & Cashprize */}
+      <Card className="border-border/50 overflow-hidden">
+        <CardHeader className="bg-muted/30 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <Trophy className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle>Finance & Récompenses</CardTitle>
+              <CardDescription>
+                Frais d'entrée et dotation globale.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <AutoSyncField<number>
+              label="Frais d'inscription"
+              type="number"
+              value={Number(edition.entryFee) || 0}
+              onChange={async (val: number) => { await handleUpdate("entryFee", val); }}
+              helperText="Mettre 0 pour gratuit"
+            />
+            <AutoSyncField<number>
+              label="Cashprize Total"
+              type="number"
+              value={Number(edition.prizePool) || 0}
+              onChange={async (val: number) => { await handleUpdate("prizePool", val); }}
+            />
+            <AutoSyncField<string>
+              label="Devise"
+              value={edition.prizeCurrency || "GTC"}
+              onChange={(val) => handleUpdate("prizeCurrency", val)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Automatisation & Sécurité */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-border/50 overflow-hidden">
+            <CardHeader className="bg-muted/30 pb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-green-500/10 text-green-500">
+                        <Bell className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-base">Notifications & Flux</CardTitle>
+                </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+                <AutoSyncField<boolean>
+                    label="Notifications activées"
+                    type="switch"
+                    value={edition.notificationsEnabled ?? true}
+                    onChange={(val) => handleUpdate("notificationsEnabled", val)}
+                    helperText="Informer les joueurs des changements"
+                />
+                <AutoSyncField<boolean>
+                    label="Avancement automatique"
+                    type="switch"
+                    value={edition.autoAdvance ?? true}
+                    onChange={(val) => handleUpdate("autoAdvance", val)}
+                    helperText="Passer aux phases suivantes automatiquement"
+                />
+            </CardContent>
         </Card>
-      </form>
 
-      <Card className="border-red-500/20">
+        <Card className="border-border/50 overflow-hidden">
+            <CardHeader className="bg-muted/30 pb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
+                        <Zap className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-base">Configuration Matchs</CardTitle>
+                </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+                <AutoSyncField<boolean>
+                    label="Check-in requis"
+                    type="switch"
+                    value={(edition.editionConfig as any)?.checkinRequired ?? false}
+                    onChange={async (val: boolean) => { await handleConfigUpdate("checkinRequired", val); }}
+                />
+                <AutoSyncField<boolean>
+                    label="Démarrage auto"
+                    type="switch"
+                    value={(edition.editionConfig as any)?.autoStart ?? true}
+                    onChange={async (val: boolean) => { await handleConfigUpdate("autoStart", val); }}
+                />
+            </CardContent>
+        </Card>
+      </div>
+
+      {/* Zone de Danger */}
+      <Card className="border-red-500/20 bg-red-500/5">
         <CardHeader>
-          <CardTitle className="text-red-500">Zone de Danger</CardTitle>
-          <CardDescription>Actions irréversibles</CardDescription>
+          <div className="flex items-center gap-3 text-red-500">
+            <Trash2 className="h-5 w-5" />
+            <CardTitle>Zone de Danger</CardTitle>
+          </div>
+          <CardDescription>
+            Actions irréversibles concernant cette édition.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert variant="destructive" className="bg-red-500/10 border-none">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Supprimer l'édition</AlertTitle>
-            <AlertDescription>
-              Cela supprimera définitivement l'édition et toutes les données
-              associées (inscriptions, matchs, etc.).
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-        <CardFooter className="justify-end">
+          <p className="text-sm text-red-600/80 mb-4">
+            La suppression supprimera toutes les inscriptions, les matchs et les résultats associés.
+          </p>
           <Button
             variant="destructive"
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
+            className="w-full sm:w-auto"
           >
-            Supprimer l'édition
+            Supprimer définitivement l'édition
           </Button>
-        </CardFooter>
+        </CardContent>
       </Card>
     </div>
   );

@@ -17,15 +17,39 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAuthContext } from "@/contexts/auth-context";
-import { getOrderCredentialsForBuyer, getOrdersByBuyerId } from "@/actions/orders";
+import {
+  getOrderCredentialsForBuyer,
+  getOrdersByBuyerId,
+} from "@/actions/orders";
 import { getProductById, updateProduct } from "@/actions/products";
 import Image from "next/image";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { getShopsByOwner } from "@/actions/shops";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, CheckCircle2, Clock, XCircle, ShoppingBag, Package, Eye, EyeOff } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ShoppingCart,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  ShoppingBag,
+  Package,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type UiOrder = {
@@ -52,7 +76,10 @@ export default function MyPurchasesPage() {
   const [orders, setOrders] = useState<UiOrder[]>([]);
   const [showDetail, setShowDetail] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<UiOrder | null>(null);
-  const [credentials, setCredentials] = useState<{ login: string | null; password: string | null } | null>(null);
+  const [credentials, setCredentials] = useState<{
+    login: string | null;
+    password: string | null;
+  } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [orderProduct, setOrderProduct] = useState<any | null>(null);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
@@ -82,7 +109,7 @@ export default function MyPurchasesPage() {
             name = p.name;
             img = (p as any).featuredImage || undefined;
           }
-        } catch { }
+        } catch {}
         enriched.push({
           id: o.id,
           productId: o.productId,
@@ -185,9 +212,17 @@ export default function MyPurchasesPage() {
 
   const categorizedOrders = useMemo(() => {
     return {
-      pending: orders.filter((o) => ["PENDING", "ACCEPTED_BY_SHOP", "PROCESSING_BY_ADMIN"].includes(o.status)),
+      pending: orders.filter((o) =>
+        ["PENDING", "ACCEPTED_BY_SHOP", "PROCESSING_BY_ADMIN"].includes(
+          o.status,
+        ),
+      ),
       completed: orders.filter((o) => o.status === "COMPLETED"),
-      cancelled: orders.filter((o) => ["REJECTED_BY_SHOP", "REJECTED_BY_ADMIN", "CANCELLED"].includes(o.status)),
+      cancelled: orders.filter((o) =>
+        ["REJECTED_BY_SHOP", "REJECTED_BY_ADMIN", "CANCELLED"].includes(
+          o.status,
+        ),
+      ),
     };
   }, [orders]);
 
@@ -225,8 +260,13 @@ export default function MyPurchasesPage() {
             </TableRow>
           ) : (
             orderList.map((o) => (
-              <TableRow key={o.id} className="group hover:bg-primary/5 transition-colors border-border/50">
-                <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">{o.id.slice(0, 8)}…</TableCell>
+              <TableRow
+                key={o.id}
+                className="group hover:bg-primary/5 transition-colors border-border/50"
+              >
+                <TableCell className="font-mono text-[10px] text-muted-foreground uppercase">
+                  {o.id.slice(0, 8)}…
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -241,12 +281,15 @@ export default function MyPurchasesPage() {
                         <Package className="h-5 w-5 absolute inset-0 m-auto text-muted-foreground/50" />
                       )}
                     </div>
-                    <span className="font-bold text-sm line-clamp-1">{o.productName}</span>
+                    <span className="font-bold text-sm line-clamp-1">
+                      {o.productName}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="font-black text-primary">
-                    {o.amount.toLocaleString()} <span className="text-[10px]">GTC</span>
+                    {o.amount.toLocaleString()}{" "}
+                    <span className="text-[10px]">GTC</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm whitespace-nowrap">
@@ -290,14 +333,18 @@ export default function MyPurchasesPage() {
             </Typography>
           </div>
           <Typography variant="body-base" theme="muted" className="max-w-md">
-            Retrouvez ici l&apos;ensemble de vos transactions, accédez à vos comptes et gérez vos produits.
+            Retrouvez ici l&apos;ensemble de vos transactions, accédez à vos
+            comptes et gérez vos produits.
           </Typography>
         </div>
         <div className="flex items-center gap-4 bg-card/40 backdrop-blur-md p-4 rounded-2xl border border-border/50">
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Total Dépensé</span>
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              Total Dépensé
+            </span>
             <span className="text-2xl font-black text-primary">
-              {orders.reduce((acc, o) => acc + o.amount, 0).toLocaleString()} <span className="text-sm">GTC</span>
+              {orders.reduce((acc, o) => acc + o.amount, 0).toLocaleString()}{" "}
+              <span className="text-sm">GTC</span>
             </span>
           </div>
         </div>
@@ -306,20 +353,56 @@ export default function MyPurchasesPage() {
       <Tabs defaultValue="all" className="space-y-6">
         <div className="overflow-x-auto pb-1">
           <TabsList className="bg-muted/50 p-1 h-auto gap-1">
-            <TabsTrigger value="all" className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              Tous <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex items-center justify-center p-0">{orders.length}</Badge>
+            <TabsTrigger
+              value="all"
+              className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              Tous{" "}
+              <Badge
+                variant="secondary"
+                className="ml-1 h-5 min-w-5 flex items-center justify-center p-0"
+              >
+                {orders.length}
+              </Badge>
             </TabsTrigger>
-            <TabsTrigger value="pending" className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger
+              value="pending"
+              className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               <Clock className="h-3.5 w-3.5" />
-              En cours <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex items-center justify-center p-0">{categorizedOrders.pending.length}</Badge>
+              En cours{" "}
+              <Badge
+                variant="secondary"
+                className="ml-1 h-5 min-w-5 flex items-center justify-center p-0"
+              >
+                {categorizedOrders.pending.length}
+              </Badge>
             </TabsTrigger>
-            <TabsTrigger value="completed" className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger
+              value="completed"
+              className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Terminés <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex items-center justify-center p-0">{categorizedOrders.completed.length}</Badge>
+              Terminés{" "}
+              <Badge
+                variant="secondary"
+                className="ml-1 h-5 min-w-5 flex items-center justify-center p-0"
+              >
+                {categorizedOrders.completed.length}
+              </Badge>
             </TabsTrigger>
-            <TabsTrigger value="cancelled" className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger
+              value="cancelled"
+              className="gap-2 px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               <XCircle className="h-3.5 w-3.5" />
-              Annulés <Badge variant="secondary" className="ml-1 h-5 min-w-5 flex items-center justify-center p-0">{categorizedOrders.cancelled.length}</Badge>
+              Annulés{" "}
+              <Badge
+                variant="secondary"
+                className="ml-1 h-5 min-w-5 flex items-center justify-center p-0"
+              >
+                {categorizedOrders.cancelled.length}
+              </Badge>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -391,13 +474,19 @@ export default function MyPurchasesPage() {
               </SelectContent>
             </Select>
             {shops.length === 0 && (
-              <Button variant="outline" onClick={() => router.push("/shops/create")}>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/shops/create")}
+              >
                 Créer une boutique
               </Button>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPublishDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setPublishDialogOpen(false)}
+            >
               Annuler
             </Button>
             <Button
@@ -469,11 +558,15 @@ const DetailDialog = ({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between py-1 border-b border-border/30">
               <span className="text-muted-foreground">Montant</span>
-              <span className="font-bold text-primary">{order.amount.toLocaleString()} GTC</span>
+              <span className="font-bold text-primary">
+                {order.amount.toLocaleString()} GTC
+              </span>
             </div>
             <div className="flex justify-between py-1 border-b border-border/30">
               <span className="text-muted-foreground">Date</span>
-              <span className="font-semibold">{format(order.createdAt, "dd MMM yyyy", { locale: fr })}</span>
+              <span className="font-semibold">
+                {format(order.createdAt, "dd MMM yyyy", { locale: fr })}
+              </span>
             </div>
             <div className="flex justify-between py-1 border-b border-border/30 items-center">
               <span className="text-muted-foreground">Statut</span>
@@ -483,16 +576,22 @@ const DetailDialog = ({
 
           {/* Credentials */}
           <div className="space-y-2">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Identifiants du compte</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Identifiants du compte
+            </p>
             <div className="p-3 rounded-xl bg-muted/30 border border-border/50 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Login</span>
                 <span className="font-mono text-sm font-bold">
-                  {isLoadingCredentials ? "Chargement..." : credentials?.login || "—"}
+                  {isLoadingCredentials
+                    ? "Chargement..."
+                    : credentials?.login || "—"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Mot de passe</span>
+                <span className="text-sm text-muted-foreground">
+                  Mot de passe
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-sm font-bold">
                     {isLoadingCredentials
@@ -504,8 +603,17 @@ const DetailDialog = ({
                           : "—"}
                   </span>
                   {credentials?.password && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onTogglePassword}>
-                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={onTogglePassword}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                   )}
                 </div>

@@ -372,6 +372,26 @@ export async function createUserWallet(
 }
 
 /**
+ * Initialise un wallet avec un PIN par défaut (123456)
+ * Utilisé pour la création automatique après sign-up
+ */
+export async function initializeUserWallet(userId: string): Promise<UserWallet> {
+    try {
+        // PIN par défaut
+        const defaultPin = "123456";
+        const pinHash = await WalletUtils.hashPin(defaultPin);
+        
+        return await createUserWallet({
+            userId,
+            pinHash,
+        });
+    } catch (error) {
+        console.error('Error initializing wallet:', error);
+        throw error;
+    }
+}
+
+/**
  * Fonction publique pour créer un wallet
  */
 export async function createWalletServer(

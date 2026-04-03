@@ -25,9 +25,9 @@ export default async function BracketNodeOrganizePage({
   }>;
 }) {
   const { tournamentId, editionId, bracketId } = await params;
-  const node = await getBracketNodeById(bracketId, {
+  const node = (await getBracketNodeById(bracketId, {
     populate: ["phase", "group"],
-  });
+  })) as any;
   if (!node) notFound();
 
   const regsRes = await getEditionRegistrations({

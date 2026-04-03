@@ -43,6 +43,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
     is_active: boolean;
     verification_status: "PENDING" | "VERIFIED" | "REJECTED";
     failed_attempts: number;
+    is_default_pin: boolean;
   } | null>(null);
 
   // Vérifier l'état du wallet
@@ -57,8 +58,9 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
         hasWallet,
         is_locked: wallet?.isLocked ?? false,
         is_active: wallet?.isActive ?? false,
-        verification_status: wallet?.verificationStatus ?? "PENDING",
-        failed_attempts: wallet?.failedAttempts ?? 0,
+        verification_status: (wallet as any)?.verificationStatus ?? "PENDING",
+        failed_attempts: (wallet as any)?.failedAttempts ?? 0,
+        is_default_pin: (wallet as any)?.isDefaultPin ?? false,
       });
       setWalletCheckComplete(true);
     };
@@ -153,8 +155,38 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="max-w-6xl mx-auto"
+              className="max-w-6xl mx-auto space-y-6"
             >
+              {/* Security Warning for default PIN */}
+              {walletStatus?.is_default_pin && pathname !== "/wallet/settings" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    className="mb-6 overflow-hidden"
+                  >
+                    <Card className="bg-yellow-500/10 border-yellow-500/20">
+                        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 text-yellow-600 dark:text-yellow-500">
+                                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                                <div>
+                                    <Typography variant="body-sm" weight="bold">Sécurité : PIN par défaut détecté</Typography>
+                                    <Typography variant="caption1">Votre wallet utilise le code par défaut (123456). Pour protéger vos fonds, veuillez le changer dès maintenant.</Typography>
+                                </div>
+                            </div>
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10"
+                                onClick={() => router.push("/wallet/settings")}
+                            >
+                                <Lock className="h-4 w-4 mr-2" />
+                                Changer mon PIN
+                            </Button>
+                        </CardContent>
+                    </Card>
+                  </motion.div>
+              )}
+
               {children}
             </motion.div>
           </AnimatePresence>

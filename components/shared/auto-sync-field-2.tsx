@@ -7,6 +7,14 @@ import { Check, X, Loader2, Edit2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type FieldType = "input" | "textarea" | "select" | "switch" | "custom";
@@ -37,6 +45,7 @@ interface AutoSyncFieldProps<T = any> {
     disabled?: boolean;
     className?: string;
     containerClassName?: string;
+    options?: { label: string; value: string | number }[]; // Pour type="select"
 
     // Mode d'édition et déclenchement
     editMode?: EditMode;
@@ -100,6 +109,7 @@ export function AutoSyncField<T = string>({
     editButtonClassName,
     successDuration = 2000,
     autoFocus = true,
+    options = [],
 }: AutoSyncFieldProps<T>) {
     // États internes
     const [internalValue, setInternalValue] = useState(value);
@@ -277,6 +287,20 @@ export function AutoSyncField<T = string>({
                 </span>
             );
         }
+
+        if (type === "switch") {
+            return (
+                <div className="flex items-center gap-2">
+                    <Switch checked={!!value} disabled />
+                    <span className="text-sm">{value ? "Activé" : "Désactivé"}</span>
+                </div>
+            );
+        }
+
+        if (type === "select" && options.length > 0) {
+            const option = options.find(o => o.value === value);
+            return <span>{option?.label || String(value)}</span>;
+        }
         
         return <span>{String(value)}</span>;
     };
@@ -314,6 +338,44 @@ export function AutoSyncField<T = string>({
         switch (type) {
             case "textarea":
                 return <Textarea {...commonProps} className={cn("min-h-[80px]", commonProps.className)} />;
+            case "switch":
+                return (
+                    <div className="flex items-center gap-2 py-2">
+                        <Switch 
+                            checked={!!internalValue} 
+                            onCheckedChange={(checked) => {
+                                setInternalValue(checked as any);
+                                if (editMode === "auto") handleSave();
+                            }}
+                            disabled={disabled || loading}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                            {internalValue ? "Activé" : "Désactivé"}
+                        </span>
+                    </div>
+                );
+            case "select":
+                return (
+                    <Select 
+                        value={String(internalValue)} 
+                        onValueChange={(val) => {
+                            setInternalValue(val as any);
+                            if (editMode === "auto") handleSave();
+                        }}
+                        disabled={disabled || loading}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder={placeholder} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {options.map((opt) => (
+                                <SelectItem key={opt.value} value={String(opt.value)}>
+                                    {opt.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                );
             case "input":
             default:
                 return <Input {...commonProps} />;

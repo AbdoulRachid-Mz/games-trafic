@@ -294,6 +294,7 @@ export function EditionPageContent({
 
               <TabsContent value="matches" className="mt-6">
                  <EditionMatchesTab 
+                   editionId={edition.id}
                    activePhaseId={activePhaseId}
                    currentUserId={user?.id}
                    isAdmin={isOrganizer}
@@ -303,6 +304,7 @@ export function EditionPageContent({
               <TabsContent value="members" className="mt-6">
                 <EditionParticipantsList
                   participants={edition.registrations || []}
+                  editionId={edition.id}
                 />
               </TabsContent>
             </Tabs>

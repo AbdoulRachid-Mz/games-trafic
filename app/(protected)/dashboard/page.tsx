@@ -11,11 +11,13 @@ import { Store, ShoppingBag, Trophy, CreditCard } from "lucide-react";
 import { getUserStats } from "@/actions/user-stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { useScreenSize } from "@/hooks/use-screen";
 
 export default function DashboardPage() {
   const { user } = useAuthContext();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { isMobile } = useScreenSize();
 
   useEffect(() => {
     if (user?.id) {
@@ -69,7 +71,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Stats Section with Carousel */}
-      <StatsCarousel mode="auto">
+      <StatsCarousel mode={isMobile ? "carousel" : "auto"}>
         <StatsCard
           title="Boutiques"
           value={stats?.overview.total_shops ?? 0}
@@ -77,6 +79,7 @@ export default function DashboardPage() {
           change={12}
           changeLabel={`${stats?.shops.total_products ?? 0} produits`}
           trend="up"
+          className="border-2 border-l-primary border-r-secondary"
           delay={0}
         />
 
@@ -87,6 +90,7 @@ export default function DashboardPage() {
           change={8}
           changeLabel={`${stats?.products.sold ?? 0} vendus`}
           trend="up"
+          className="border-2 border-l-primary border-r-secondary"
           delay={0.1}
         />
 
@@ -97,6 +101,7 @@ export default function DashboardPage() {
           change={-3}
           changeLabel={`${stats?.tournaments.total_participants ?? 0} participants`}
           trend="down"
+          className="border-2 border-l-primary border-r-secondary"
           delay={0.2}
         />
 
@@ -107,6 +112,7 @@ export default function DashboardPage() {
           change={15}
           changeLabel={`${stats?.overview.total_transactions ?? 0} transactions`}
           trend="up"
+          className="border-2 border-l-primary border-r-secondary"
           delay={0.3}
         />
       </StatsCarousel>
@@ -120,13 +126,12 @@ export default function DashboardPage() {
         <QuickActions />
       </motion.div>
 
-      {/* Activity Feed */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
       >
-        <ActivityFeed />
+        <ActivityFeed activities={stats?.recent_activity} />
       </motion.div>
     </div>
   );

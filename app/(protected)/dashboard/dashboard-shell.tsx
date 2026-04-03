@@ -20,24 +20,25 @@ import {
   Bell,
   Star,
 } from "lucide-react";
+import { useAuthContext } from "@/contexts/auth-context";
 
 type DashboardShellProps = {
-  user: {
-    username?: string;
-    profileImage?: string;
-    level?: string;
-  };
   children: React.ReactNode;
 };
 
-export function DashboardShell({ user, children }: DashboardShellProps) {
+export function DashboardShell({ children }: DashboardShellProps) {
   const { isActive } = useActiveRoute();
+  const { user } = useAuthContext();
   const Sidebar = (
     <SidebarContainer sidebarBgType="gradient">
       <SidebarHeader
         title="Mon Espace"
         subtitle="Vue globale utilisateur"
-        user={user}
+        user={{
+          username: user?.username || "Utilisateur",
+          profileImage: user?.image || "/icons/avatar.png",
+          level: user?.level || "C",
+        }}
         sidebarBgType="gradient"
       />
 

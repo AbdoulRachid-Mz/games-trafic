@@ -1,202 +1,345 @@
+import { Metadata } from "next";
+import { getTournamentPhases, getMatches } from "@/actions/tournaments";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
-import { getTournamentPhases, getMatches } from "@/actions/tournaments";
-import { updateMatch, deleteMatch } from "@/actions/phases";
-import { revalidatePath } from "next/cache";
-import type { TournamentPhase, Match } from "@/database/schema";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { 
+  Swords, 
+  Calendar, 
+  Clock, 
+  Search, 
+  Filter, 
+  ArrowRight, 
+  ChevronLeft, 
+  ChevronRight,
+  User as UserIcon,
+  AlertCircle
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Trash2, Save, Clock, Swords } from "lucide-react";
-import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: "Gestion des Matchs - Dashboard",
+};
 
 interface PageProps {
   params: Promise<{
     tournamentId: string;
     editionId: string;
   }>;
+  searchParams: Promise<{
+    page?: string;
+    phaseId?: string;
+    status?: string;
+    search?: string;
+  }>;
 }
 
-function matchStatusBadge(status: string | null | undefined) {
-  switch (status) {
-    case "COMPLETED": return <Badge className="bg-green-600 text-white text-xs">Terminé</Badge>;
-    case "IN_PROGRESS": return <Badge className="bg-blue-600 text-white text-xs">En cours</Badge>;
-    case "CANCELLED": return <Badge variant="destructive" className="text-xs">Annulé</Badge>;
-    default: return <Badge variant="outline" className="text-xs">En attente</Badge>;
-  }
+function StatusBadge({ status }: { status: string | null | undefined }) {
+  const s = status || "PENDING";
+  return (
+    <Badge 
+      variant="outline" 
+      className={cn(
+        "text-[10px] uppercase font-bold",
+        s === "COMPLETED" && "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+        s === "IN_PROGRESS" && "bg-blue-500/10 text-blue-600 border-blue-200",
+        s === "PENDING_REVIEW" && "bg-amber-500/10 text-amber-600 border-amber-200",
+        s === "DISPUTED" && "bg-destructive/10 text-destructive border-destructive/20",
+        s === "PENDING" && "bg-muted text-muted-foreground border-border"
+      )}
+    >
+      {s === "COMPLETED" ? "Terminé" : 
+       s === "IN_PROGRESS" ? "En cours" : 
+       s === "PENDING_REVIEW" ? "A valider" :
+       s === "DISPUTED" ? "Litige" : "En attente"}
+    </Badge>
+  );
 }
 
-export default async function DashboardMatchesPage({ params }: PageProps) {
+export default async function MatchesDashboardPage({ params, searchParams }: PageProps) {
   const { tournamentId, editionId } = await params;
-  const basePath = `/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`;
+  const { page = "1", phaseId, status, search } = await searchParams;
+  
+  const currentPage = parseInt(page);
+  const limit = 20;
 
-  const phasesRes = await getTournamentPhases({
-    filters: { editionId },
-    options: { sortBy: "order", sortOrder: "asc" },
-    pagination: { page: 1, limit: 100 },
-  });
-  const phases = phasesRes.data as TournamentPhase[];
-  const activePhase = phases.find((p) => p.isActive) || phases[0];
+  // Fetch data
+  const [phasesRes, matchesRes] = await Promise.all([
+    getTournamentPhases({ filters: { editionId } }),
+    getMatches({
+      filters: { 
+        editionId, 
+        phaseId: phaseId || undefined,
+        statuses: status ? [status] as any : undefined,
+        search: search || undefined
+      },
+      pagination: { page: currentPage, limit },
+      options: { sortBy: "scheduledTime", sortOrder: "asc" }
+    })
+  ]);
 
-  const matchesRes = await getMatches({
-    filters: { editionId, phaseId: activePhase?.id },
-    options: { sortBy: "round", sortOrder: "asc" },
-    pagination: { page: 1, limit: 1000 },
-  });
-  const matches = matchesRes.data as Match[];
+  const phases = phasesRes.data || [];
+  const matches = matchesRes.data || [];
+  const { pagination } = matchesRes;
 
-  // Group matches by round
-  const matchesByRound = matches.reduce<Record<number, Match[]>>((acc, m) => {
-    const r = m.round ?? 0;
-    if (!acc[r]) acc[r] = [];
-    acc[r].push(m);
-    return acc;
-  }, {});
-  const rounds = Object.keys(matchesByRound).map(Number).sort((a, b) => a - b);
-
-  async function updateMatchAction(formData: FormData) {
-    "use server";
-    const id = (formData.get("id") as string) || "";
-    const score1 = formData.get("score1") ? Number(formData.get("score1")) : null;
-    const score2 = formData.get("score2") ? Number(formData.get("score2")) : null;
-    const scheduledTime = formData.get("scheduledTime") ? new Date(formData.get("scheduledTime") as string) : undefined;
-    await updateMatch(id, { score1: score1 as any, score2: score2 as any, scheduledTime } as any);
-    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`);
-  }
-
-  async function deleteMatchAction(formData: FormData) {
-    "use server";
-    const id = (formData.get("id") as string) || "";
-    await deleteMatch(id);
-    revalidatePath(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`);
-  }
+  const sp = await searchParams;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="space-y-1">
-          <Typography variant="h3" weight="bold">Gestion des matchs</Typography>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <Typography variant="h3" weight="bold">Gestion des Matchs</Typography>
           <Typography variant="body-sm" theme="muted">
-            Phase : {activePhase ? activePhase.name : "Aucune phase"} · {matches.length} match{matches.length > 1 ? "s" : ""}
+            {pagination.total} match{pagination.total > 1 ? "s" : ""} trouvé{pagination.total > 1 ? "s" : ""}
           </Typography>
         </div>
-        {/* Phase selector for future: could add tabs/select here */}
-        {phases.length > 1 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {phases.map((p) => (
-              <Badge key={p.id} variant={p.id === activePhase?.id ? "default" : "outline"} className="cursor-default">
-                {p.name}
-              </Badge>
+        
+        <div className="flex items-center gap-2">
+          {/* Quick Phase Filter Tabs */}
+          <div className="hidden lg:flex bg-muted p-1 rounded-lg border">
+            <Button 
+              variant={!phaseId ? "secondary" : "ghost"} 
+              size="sm" 
+              className="text-xs h-7"
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([k]) => k !== "phaseId" && k !== "page")) })}`}>
+                Tous
+              </Link>
+            </Button>
+            {phases.slice(0, 3).map(p => (
+              <Button 
+                key={p.id}
+                variant={phaseId === p.id ? "secondary" : "ghost"} 
+                size="sm" 
+                className="text-xs h-7"
+                asChild
+              >
+                <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), phaseId: p.id, page: "1" })}`}>
+                  {p.name}
+                </Link>
+              </Button>
             ))}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Matches by round */}
-      {matches.length === 0 ? (
-        <Card className="border-dashed border-2 bg-muted/20">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Swords className="h-12 w-12 text-muted-foreground mb-4" />
-            <Typography variant="h5" weight="bold" className="mb-2">Aucun match</Typography>
-            <Typography variant="body-sm" theme="muted" className="max-w-xs">
-              Générez les brackets depuis la page des phases pour créer automatiquement les matchs.
-            </Typography>
-          </CardContent>
-        </Card>
-      ) : (
-        rounds.map((round) => (
-          <Card key={round}>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Swords className="h-4 w-4" />
-                Round {round}
-                <Badge variant="secondary" className="ml-auto">{matchesByRound[round].length} match{matchesByRound[round].length > 1 ? "s" : ""}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {matchesByRound[round].map((m) => (
-                <div key={m.id} className="border rounded-lg p-3 sm:p-4">
-                  {/* Match info */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Typography variant="body-sm" weight="bold">Match {m.matchNumber}</Typography>
-                      {matchStatusBadge(m.status)}
-                      {m.scheduledTime && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(m.scheduledTime), "d MMM HH:mm", { locale: fr })}
-                        </span>
-                      )}
+      {/* Filters Bar */}
+      <Card className="bg-muted/50 border-none">
+        <CardContent className="p-4 flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input 
+              className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:ring-1 focus:ring-primary outline-none"
+              placeholder="Rechercher un participant..."
+              defaultValue={search}
+              //@ts-ignore
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = e.currentTarget.value;
+                  const url = new URL(window.location.href);
+                  if (val) url.searchParams.set("search", val);
+                  else url.searchParams.delete("search");
+                  url.searchParams.set("page", "1");
+                  window.location.href = url.pathname + url.search;
+                }
+              }}
+            />
+          </div>
+
+          <select 
+            className="h-10 px-3 rounded-md border border-input bg-background text-sm outline-none w-full sm:w-auto"
+            defaultValue={status || "ALL"}
+            //@ts-ignore
+            onChange={(e) => {
+              const val = e.target.value;
+              const url = new URL(window.location.href);
+              if (val === "ALL") url.searchParams.delete("status");
+              else url.searchParams.set("status", val);
+              url.searchParams.set("page", "1");
+              window.location.href = url.pathname + url.search;
+            }}
+          >
+            <option value="ALL">Tous les statuts</option>
+            <option value="PENDING">En attente</option>
+            <option value="IN_PROGRESS">En cours</option>
+            <option value="COMPLETED">Terminé</option>
+            <option value="PENDING_REVIEW">A valider</option>
+            <option value="DISPUTED">Litige</option>
+          </select>
+
+          {phaseId && (
+             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
+               <Link href="?">Réinitialiser</Link>
+             </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Matches List */}
+      <div className="space-y-4">
+        {matches.length === 0 ? (
+          <div className="py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
+            <AlertCircle className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+            <Typography variant="body-sm" theme="muted">Aucun match ne correspond à vos critères.</Typography>
+          </div>
+        ) : (
+          matches.map((match: any) => (
+            <Card key={match.id} className="group hover:border-primary/40 transition-all">
+              <CardContent className="p-0">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center">
+                  {/* Left: Info */}
+                  <div className="p-4 flex-1 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 border-b md:border-b-0 md:border-r border-border/50">
+                    <div className="w-24 shrink-0">
+                      <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
+                        {match.phase?.name || "Match"}
+                      </div>
+                      <div className="text-sm font-bold flex items-center gap-1.5">
+                        <Swords className="h-3.5 w-3.5 text-primary" />
+                        #{match.matchNumber}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <Calendar className="h-3 w-3" />
+                        {match.scheduledTime ? format(new Date(match.scheduledTime), "d MMMM yyyy", { locale: fr }) : "Non planifié"}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-medium">
+                        <Clock className="h-3 w-3" />
+                        {match.scheduledTime ? format(new Date(match.scheduledTime), "HH:mm") : "--:--"}
+                      </div>
+                    </div>
+
+                    <div className="ml-auto sm:ml-0">
+                      <StatusBadge status={match.status} />
                     </div>
                   </div>
 
-                  {/* Score update form - separate from delete */}
-                  <form action={updateMatchAction} className="mt-3">
-                    <input type="hidden" name="id" value={m.id} />
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          name="score1"
-                          type="number"
-                          defaultValue={m.score1 ?? undefined}
-                          className="h-9 px-2 py-1 rounded-md border bg-background text-sm w-full sm:w-20 text-center font-bold"
-                          placeholder="—"
-                        />
-                        <span className="text-xs font-bold text-muted-foreground">vs</span>
-                        <input
-                          name="score2"
-                          type="number"
-                          defaultValue={m.score2 ?? undefined}
-                          className="h-9 px-2 py-1 rounded-md border bg-background text-sm w-full sm:w-20 text-center font-bold"
-                          placeholder="—"
-                        />
+                  {/* Middle: Participants & Score */}
+                  <div className="p-4 md:p-6 flex-[2] bg-muted/5 group-hover:bg-primary/5 transition-colors">
+                    <div className="flex items-center justify-between gap-4 max-w-xl mx-auto">
+                      {/* P1 */}
+                      <div className="flex-1 flex flex-col items-center sm:flex-row sm:items-center gap-3 text-center sm:text-left min-w-0">
+                        <ParticipantAvatar participant={match.participant1} />
+                        <div className="truncate w-full">
+                          <div className="text-sm font-bold truncate">
+                            {match.participant1?.member?.displayName || match.participant1?.member?.user?.fullName || "À déterminer"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground truncate uppercase">
+                            {match.participant1?.member?.team?.name || "Joueur Solo"}
+                          </div>
+                        </div>
                       </div>
-                      <input
-                        name="scheduledTime"
-                        type="datetime-local"
-                        defaultValue={m.scheduledTime ? new Date(m.scheduledTime).toISOString().slice(0, 16) : ""}
-                        className="h-9 px-2 py-1 rounded-md border bg-background text-sm flex-1"
-                      />
-                      <div className="flex items-center gap-1.5">
-                        <Button type="submit" size="sm" variant="outline" className="gap-1">
-                          <Save className="h-3.5 w-3.5" /> Sauver
-                        </Button>
 
-                        {/* DELETE — separate form, NOT nested */}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive h-9 w-9 p-0">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Supprimer ce match ?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Match {m.matchNumber} (Round {m.round}) sera supprimé définitivement.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
-                              <form action={deleteMatchAction}>
-                                <input type="hidden" name="id" value={m.id} />
-                                <AlertDialogAction type="submit" className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Supprimer
-                                </AlertDialogAction>
-                              </form>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                      {/* Score */}
+                      <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-background rounded-lg border shadow-sm font-black text-lg min-w-20 justify-center">
+                        <span className={cn(match.score1 > match.score2 && "text-primary")}>{match.score1 ?? "-"}</span>
+                        <span className="text-muted-foreground/30 text-xs">VS</span>
+                        <span className={cn(match.score2 > match.score1 && "text-primary")}>{match.score2 ?? "-"}</span>
+                      </div>
+
+                      {/* P2 */}
+                      <div className="flex-1 flex flex-col-reverse items-center sm:flex-row sm:items-center gap-3 text-center sm:text-right min-w-0">
+                        <div className="truncate w-full">
+                          <div className="text-sm font-bold truncate">
+                             {match.participant2?.member?.displayName || match.participant2?.member?.user?.fullName || "À déterminer"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground truncate uppercase">
+                             {match.participant2?.member?.team?.name || "Joueur Solo"}
+                          </div>
+                        </div>
+                        <ParticipantAvatar participant={match.participant2} />
                       </div>
                     </div>
-                  </form>
+                  </div>
+
+                  {/* Right: Actions */}
+                  <div className="p-4 flex shrink-0 items-center justify-center border-t md:border-t-0 md:border-l border-border/50">
+                    <Button variant="outline" size="sm" className="h-9 gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all" asChild>
+                      <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
+                        Gérer <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-8">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            disabled={!pagination.hasPrev}
+            asChild
+          >
+            <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), page: (currentPage - 1).toString() })}`}>
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          
+          <div className="flex items-center gap-1">
+             {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(p => {
+               // Only show a limited number of pages if too many
+               if (pagination.totalPages > 7) {
+                 if (p !== 1 && p !== pagination.totalPages && Math.abs(p - currentPage) > 1) {
+                   if (p === 2 || p === pagination.totalPages - 1) return <span key={p} className="px-2">...</span>;
+                   return null;
+                 }
+               }
+               
+               return (
+                 <Button 
+                   key={p}
+                   variant={p === currentPage ? "default" : "outline"} 
+                   size="sm"
+                   className="w-9 h-9"
+                   asChild
+                 >
+                   <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), page: p.toString() })}`}>
+                     {p}
+                   </Link>
+                 </Button>
+               );
+             })}
+          </div>
+
+          <Button 
+            variant="outline" 
+            size="icon" 
+            disabled={!pagination.hasNext}
+            asChild
+          >
+            <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), page: (currentPage + 1).toString() })}`}>
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ParticipantAvatar({ participant }: { participant: any }) {
+  const name = participant?.member?.displayName || participant?.member?.user?.fullName || "?";
+  const image = participant?.member?.avatar || participant?.member?.user?.profileImage || participant?.member?.user?.image;
+  
+  return (
+    <div className="h-10 w-10 shrink-0 relative rounded-full bg-muted border-2 border-background shadow-sm flex items-center justify-center overflow-hidden">
+      {image ? (
+        <Image src={image} fill className="object-cover" alt={name} />
+      ) : (
+        <UserIcon className="h-5 w-5 text-muted-foreground/50" />
       )}
     </div>
   );

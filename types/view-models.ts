@@ -14,6 +14,8 @@ export type UserMini = {
   fullName: string | null;
   profileImage: string | null;
   isVip: boolean | null;
+  phoneNumber?: string | null;
+  countryCode?: string | null;
 };
 
 export type ShopMini = {
@@ -414,6 +416,8 @@ export const USER_MINI_COLUMNS = {
   fullName: true,
   profileImage: true,
   isVip: true,
+  phoneNumber: true,
+  countryCode: true,
 } as const;
 
 /** Columns to select for ShopMini */

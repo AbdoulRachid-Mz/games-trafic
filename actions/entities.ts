@@ -33,6 +33,26 @@ function isTable(val: any): val is PgTable<any> {
 function buildWhereConditions(table: any, filters: EntityQueryParams) {
   const conditions: any[] = [];
 
+  // Filtres d'identité (Propriétaire/Auteur)
+  if (filters.userId && table.userId) {
+    conditions.push(eq(table.userId, filters.userId));
+  }
+  if (filters.ownerId && table.ownerId) {
+    conditions.push(eq(table.ownerId, filters.ownerId));
+  }
+  if (filters.authorId && table.authorId) {
+    conditions.push(eq(table.authorId, filters.authorId));
+  }
+  if (filters.organizerId && table.organizerId) {
+    conditions.push(eq(table.organizerId, filters.organizerId));
+  }
+  if (filters.creatorId && table.creatorId) {
+    conditions.push(eq(table.creatorId, filters.creatorId));
+  }
+  if (filters.buyerId && table.buyerId) {
+    conditions.push(eq(table.buyerId, filters.buyerId));
+  }
+
   // Filtres de base
   if (filters.id && table.id) {
     conditions.push(eq(table.id, filters.id));

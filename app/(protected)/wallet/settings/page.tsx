@@ -14,6 +14,7 @@ import { Loader2, Lock, Unlock, Eye, EyeOff, Shield, CreditCard, DollarSign, His
 import { useState, useEffect } from 'react'
 import { getCurrentUserWallet, updateUserWallet, verifyWalletPin, toggleWalletLock } from '@/actions/wallets'
 import { UserWallet } from '@/database/schema'
+import { AutoSyncField } from '@/components/shared/auto-sync-field'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -200,22 +201,18 @@ const WalletSettingsPage = () => {
           <CardDescription>Protégez votre wallet avec des paramètres de sécurité</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="wallet-lock">Verrouiller le wallet</Label>
-              <p className="text-sm text-muted-foreground">
-                Empêche toutes les transactions
-              </p>
-            </div>
-            <Switch
-              id="wallet-lock"
-              checked={wallet.isLocked ?? undefined}
-              onCheckedChange={handleLockToggle}
-              disabled={updatingLock}
-            />
-          </div>
+          <AutoSyncField<boolean>
+            label="Verrouiller le wallet"
+            type="switch"
+            value={wallet.isLocked ?? false}
+            onChange={async (val: boolean) => {
+                await toggleWalletLock(wallet.id, val);
+                await loadWallet();
+            }}
+            helperText="Empêche toutes les transactions sortantes"
+          />
 
-          <Separator /> */}
+          <Separator />
 
           {/* PIN Change */}
           <div className="space-y-4">

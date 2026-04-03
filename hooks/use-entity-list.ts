@@ -1,7 +1,7 @@
 // hooks/use-entity-list.ts
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   useQuery,
@@ -79,6 +79,16 @@ export function useEntityList<T = any>({
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<EntityQueryParams>(defaultFilters);
   const [viewMode, setViewMode] = useState<"grid" | "list" | "table">("grid");
+
+  // Sync avec defaultFilters quand ils changent (utile quand user.id arrive en retard)
+  useEffect(() => {
+    if (Object.keys(defaultFilters).length > 0) {
+        setFilters(prev => ({
+            ...prev,
+            ...defaultFilters
+        }));
+    }
+  }, [JSON.stringify(defaultFilters)]);
 
   // Construction des paramètres de requête
   const queryParams = useMemo((): EntityQueryParams => {

@@ -118,6 +118,7 @@ export interface EntityListProps<T> {
   gridClassName?: string;
   listClassName?: string;
   tableClassName?: string;
+  statsMode?: "carousel" | "auto" | "grid";
 }
 
 export function EntityList<T>({
@@ -163,9 +164,12 @@ export function EntityList<T>({
   listClassName,
   tableClassName,
   isPlaceholderData,
+  statsMode = "auto",
 }: EntityListProps<T> & { isPlaceholderData?: boolean }) {
   const { isMobile } = useScreenSize();
   const totalPages = Math.ceil(total / limit);
+
+  const mode = statsMode === "auto" ? (isMobile ? "carousel" : "grid") : statsMode;
 
   // Compter les filtres actifs (excluant limit et sortBy/Order)
   const activeFiltersCount = Object.entries(filters).filter(([key, value]) => 
@@ -637,7 +641,7 @@ export function EntityList<T>({
 
       {/* Statistiques adaptatives */}
       {showStats && renderStats && (
-        <StatsCarousel mode="auto">
+        <StatsCarousel mode={mode}>
           {renderStats()}
         </StatsCarousel>
       )}

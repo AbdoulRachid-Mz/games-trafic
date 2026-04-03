@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useTransition } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ArrowUp, ArrowDown, Trash2, Loader2 } from "lucide-react";
-import { updatePhaseGroup, deletePhaseGroup, getPhaseGroups } from "@/actions/phases";
+import { updatePhaseGroup, deletePhaseGroup, getPhaseGroups, toggleGroupLock } from "@/actions/phases";
+import { Lock, Unlock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -18,6 +20,7 @@ import {
     AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
+import { deleteGroup } from "@/actions/groups";
 
 interface GroupItemActionsProps {
     group: any;
@@ -65,14 +68,27 @@ export function GroupItemActions({
         });
     };
 
+    //handle delete
     const handleDelete = () => {
         startTransition(async () => {
             try {
-                await deletePhaseGroup(group.id);
+                await deleteGroup(group.id);
                 toast.success("Groupe supprimé");
                 router.refresh();
             } catch (error) {
                 toast.error("Erreur lors de la suppression");
+            }
+        });
+    };
+
+    const handleToggleLock = () => {
+        startTransition(async () => {
+            try {
+                await toggleGroupLock(group.id, !group.isLocked);
+                toast.success(group.isLocked ? "Groupe déverrouillé" : "Groupe verrouillé");
+                router.refresh();
+            } catch (error) {
+                toast.error("Erreur lors du changement de statut");
             }
         });
     };
@@ -91,11 +107,12 @@ export function GroupItemActions({
             <Button
                 variant="outline"
                 size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => handleMove("down")}
-                disabled={isLast || isPending}
+                className={cn("h-8 w-8 p-0", group.isLocked ? "text-amber-600 border-amber-200 bg-amber-50" : "text-muted-foreground")}
+                onClick={handleToggleLock}
+                disabled={isPending}
+                title={group.isLocked ? "Déverrouiller le groupe" : "Verrouiller le groupe"}
             >
-                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowDown className="h-3.5 w-3.5" />}
+                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : group.isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
             </Button>
 
             <Button size="sm" variant="outline" asChild>

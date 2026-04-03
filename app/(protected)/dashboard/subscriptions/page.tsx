@@ -19,8 +19,12 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuthContext } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
 
 export default function SubscriptionsDashboardPage() {
+  const { user } = useAuthContext();
+  const router = useRouter();
   const { isSmallScreen, isMediumScreen } = useScreenSize();
 
   const {
@@ -41,8 +45,13 @@ export default function SubscriptionsDashboardPage() {
     onRefresh,
   } = useEntityList<VipSubscription>({
     entityType: "subscriptions",
+    defaultFilters: { userId: user?.id },
+    enabled: !!user?.id,
     defaultLimit: isSmallScreen ? 10 : isMediumScreen ? 15 : 20,
   });
+
+  const activeSubscription = data.find(s => (s as any).status === "ACTIVE");
+  const hasActiveSub = !!activeSubscription;
 
   const renderSubscriptionCard = (s: VipSubscription, index: number) => {
     const isActive = (s as any).status === "ACTIVE";
@@ -153,11 +162,55 @@ export default function SubscriptionsDashboardPage() {
         <Button
           variant="outline"
           className="gap-2 border-purple-500/50 text-purple-500 hover:bg-purple-500/5"
+          onClick={() => router.push("/vip")}
         >
           <Zap className="h-4 w-4" />
           Upgrade Plan
         </Button>
       </motion.div>
+
+      {/* Active Subscription Summary */}
+      {hasActiveSub ? (
+        <Card className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border-purple-500/20">
+            <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-2xl bg-purple-500 text-white shadow-lg shadow-purple-500/20">
+                            <Star className="h-6 w-6 fill-current" />
+                        </div>
+                        <div>
+                            <Typography variant="h3" weight="bold">Vous êtes VIP {(activeSubscription as any).planType}</Typography>
+                            <Typography variant="body-sm" theme="muted">
+                                Votre abonnement est actif jusqu'au {new Date((activeSubscription as any).endDate).toLocaleDateString()}
+                            </Typography>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 px-3 py-1">
+                            {Math.ceil((new Date((activeSubscription as any).endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} jours restants
+                        </Badge>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+      ) : !loading && (
+        <Card className="border-dashed border-2 border-muted hover:border-purple-500/50 transition-colors cursor-pointer" onClick={() => router.push("/vip")}>
+            <CardContent className="p-8 text-center space-y-4">
+                <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                    <Zap className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div>
+                    <Typography variant="h4" weight="bold">Aucun abonnement actif</Typography>
+                    <Typography variant="body-base" theme="muted">
+                        Devenez VIP pour débloquer des fonctionnalités exclusives et booster votre expérience.
+                    </Typography>
+                </div>
+                <Button className="bg-purple-600 hover:bg-purple-700">
+                    Découvrir les offres VIP
+                </Button>
+            </CardContent>
+        </Card>
+      )}
 
       <EntityList<VipSubscription>
         entityType="subscriptions"

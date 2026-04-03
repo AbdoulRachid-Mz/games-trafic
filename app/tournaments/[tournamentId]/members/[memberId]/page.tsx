@@ -24,18 +24,25 @@ import {
   Award,
   TrendingUp,
   BarChart,
+  User,
 } from "lucide-react";
-import { getTournamentMemberById, updateTournamentMember } from "@/actions/members";
+import { getTournamentMemberById, updateTournamentMember, getMemberStatsByEdition, getTeamMembers } from "@/actions/members";
 import { useAuthContext } from "@/contexts/auth-context";
 import type { TournamentMember } from "@/database/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
+import Link from "next/link";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 export default function MemberDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuthContext();
-  const [member, setMember] = useState<TournamentMember | null>(null);
+  const [member, setMember] = useState<any>(null);
+  const [editionStats, setEditionStats] = useState<any[]>([]);
+  const [teammates, setTeammates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -52,9 +59,19 @@ export default function MemberDetailPage() {
       const data = await getTournamentMemberById(memberId);
       if (data) {
         setMember(data);
+        
+        // Load additional info in parallel
+        const [stats, teamRes] = await Promise.all([
+          getMemberStatsByEdition(memberId),
+          data.teamId ? getTeamMembers(data.teamId) : Promise.resolve([])
+        ]);
+        
+        setEditionStats(stats);
+        setTeammates(teamRes.filter(m => m.id !== memberId));
       }
     } catch (error) {
       console.error("Erreur chargement membre:", error);
+      toast.error("Impossible de charger les données du membre");
     } finally {
       setLoading(false);
     }
@@ -138,6 +155,12 @@ export default function MemberDetailPage() {
             </div>
 
             <div className="ml-auto flex items-center gap-3">
+              <Button asChild variant="secondary">
+                <Link href={`/profile/${member.userId}`}>
+                  <User className="h-4 w-4 mr-2" />
+                  Profil Réel
+                </Link>
+              </Button>
               {(isOwner || isOrganizer) && (
                 <Button variant="outline" onClick={() => setIsEditing(true)}>
                   <Edit className="h-4 w-4 mr-2" />
@@ -146,12 +169,6 @@ export default function MemberDetailPage() {
                   </span>
                 </Button>
               )}
-              <Button>
-                <MessageCircle className="h-4 w-4 mr-2" />
-                <span className="hidden md:inline">
-                  Message
-                </span>
-              </Button>
             </div>
           </div>
         </div>
@@ -266,10 +283,11 @@ export default function MemberDetailPage() {
         {/* Main Column */}
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="profile">
-            <TabsList>
+            <TabsList className="bg-muted/50 border-none">
               <TabsTrigger value="profile">Profil</TabsTrigger>
+              <TabsTrigger value="history">Historique des Éditions</TabsTrigger>
+              <TabsTrigger value="teammates">Coéquipiers</TabsTrigger>
               <TabsTrigger value="achievements">Réussites</TabsTrigger>
-              <TabsTrigger value="history">Historique</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="space-y-6">
@@ -286,27 +304,32 @@ export default function MemberDetailPage() {
               </Card>
 
               {/* Team Info */}
-              <Card>
+              <Card className="border-none shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
+                    <Users className="h-5 w-5 text-primary" />
                     Équipe
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {member.clubName ? (
-                    <div className="flex items-center gap-4">
-                      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="h-8 w-8 text-primary" />
+                  {member.team ? (
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-primary/5">
+                      <div className="flex items-center gap-4">
+                        <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center border-2 border-primary/20 shadow-inner">
+                          <Trophy className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                          <Typography variant="body-base" weight="bold">
+                            {member.team.name}
+                          </Typography>
+                          <Typography variant="caption2" theme="muted" className="uppercase tracking-widest font-black">
+                            {teammates.length + 1} Membres
+                          </Typography>
+                        </div>
                       </div>
-                      <div>
-                        <Typography variant="body-base" weight="semibold">
-                          {member.clubName}
-                        </Typography>
-                        <Button variant="link" className="p-0 h-auto">
-                          Voir l'équipe
-                        </Button>
-                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/teams/${member.teamId}`}>Gérer</Link>
+                      </Button>
                     </div>
                   ) : (
                     <Typography variant="body-base" theme="muted">
@@ -315,6 +338,76 @@ export default function MemberDetailPage() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4">
+              {editionStats.length > 0 ? (
+                editionStats.map((stat: any) => (
+                  <Card key={stat.id} className="group hover:border-primary/50 transition-colors">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center font-bold text-primary">
+                          {stat.edition?.number || "#"}
+                        </div>
+                        <div>
+                          <Typography variant="body-base" weight="bold">
+                            Edition {stat.edition?.number || stat.edition?.id}
+                          </Typography>
+                          <Typography variant="caption2" theme="muted">
+                            Inscrit le {format(new Date(stat.registeredAt), "PP", { locale: fr })}
+                          </Typography>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                         <div className="text-right">
+                           <Typography variant="caption2" theme="muted">Position</Typography>
+                           <Typography variant="body-sm" weight="bold">#{stat.position || "?"}</Typography>
+                         </div>
+                         <div className="text-right">
+                           <Typography variant="caption2" theme="muted">Points</Typography>
+                           <Typography variant="body-sm" weight="bold">{stat.points || 0}</Typography>
+                         </div>
+                         <Badge variant={stat.status === "REGISTERED" ? "secondary" : "default"}>
+                           {stat.status}
+                         </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-12 bg-muted/20 rounded-xl border-2 border-dashed">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground opacity-20" />
+                  <Typography variant="body-base" theme="muted" className="mt-4">
+                    Aucune participation enregistrée pour le moment.
+                  </Typography>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="teammates" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {teammates.length > 0 ? (
+                  teammates.map((t: any) => (
+                    <Card key={t.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => router.push(`/tournaments/${tournamentId}/members/${t.id}`)}>
+                      <CardContent className="p-4 flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={t.avatar} />
+                          <AvatarFallback>{t.displayName?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <Typography variant="body-sm" weight="bold">{t.displayName}</Typography>
+                          <Typography variant="caption2" theme="muted">{t.role}</Typography>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center py-12">
+                     <Users className="h-12 w-12 mx-auto opacity-10" />
+                     <Typography variant="body-base" theme="muted">Seul dans l'équipe.</Typography>
+                  </div>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="achievements" className="space-y-6">
@@ -328,7 +421,7 @@ export default function MemberDetailPage() {
                 <CardContent>
                   {member.achievements && member.achievements.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {member.achievements.map((achievement, index) => (
+                      {(member.achievements as string[]).map((achievement: string, index: number) => (
                         <div
                           key={index}
                           className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"

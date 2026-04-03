@@ -133,16 +133,21 @@ export async function getTournamentsWithEditions(
  * Récupère un tournoi par son ID avec relations optionnelles
  */
 export async function getTournamentById(
-  id: string,
+  idOrSlug: string,
   options?: { populate?: string[] },
 ): Promise<TournamentWithRelations | null> {
   "use cache";
-  cacheTag(`tournament-${id}`, "tournaments");
+  cacheTag(`tournament-${idOrSlug}`, "tournaments");
   cacheLife("minutes");
   try {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournaments.findFirst({
-        where: (tournaments, { eq }) => eq(tournaments.id, id),
+        where: (tournaments, { eq, or }) => or(
+          eq(tournaments.id, idOrSlug),
+          eq(tournaments.slug, idOrSlug)
+        ),
         with: {
           organizer: options.populate.includes("organizer")
             ? { columns: USER_MINI_COLUMNS }
@@ -166,14 +171,19 @@ export async function getTournamentById(
           : undefined,
       } as TournamentWithRelations;
     }
+
     const result = await db
       .select()
       .from(tournaments)
-      .where(eq(tournaments.id, id))
+      .where(or(
+        eq(tournaments.id, idOrSlug),
+        eq(tournaments.slug, idOrSlug)
+      ))
       .limit(1);
+    
     return result[0] || null;
   } catch (error) {
-    console.error("Error getting tournament by ID:", error);
+    console.error("Error getting tournament by ID or Slug:", error);
     throw new Error("Failed to fetch tournament");
   }
 }
