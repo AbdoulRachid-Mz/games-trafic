@@ -18,7 +18,7 @@ export async function listAllApiKeys() {
   if (!session?.user || session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
-
+ 
   const result = await db
     .select({
       id: apiKeys.id,
