@@ -24,30 +24,48 @@ import { Badge } from "@/components/ui/badge";
 
 const categories = [
   {
-    title: "Guides",
-    description: "Tutoriels étape par étape pour maîtriser la plateforme",
-    icon: Book,
-    href: "/docs/guides",
-    color: "from-blue-500 to-cyan-500",
-    badge: "10+ guides",
+    title: "Démarrage",
+    description: "Tout ce qu'il faut savoir pour bien débuter sur la plateforme",
+    icon: Rocket,
+    href: "/docs/getting-started",
+    color: "from-emerald-500 to-teal-500",
+    badge: "Essentiel",
   },
   {
-    title: "Légal",
-    description: "Conditions d'utilisation et politiques de confidentialité",
-    icon: Shield,
-    href: "/docs/legal",
-    color: "from-purple-500 to-pink-500",
-    badge: "Documents officiels",
+    title: "Transactions",
+    description: "Gestion du Wallet GTC, dépôts et retraits sécurisés",
+    icon: Wallet,
+    href: "/docs/transactions/overview",
+    color: "from-blue-500 to-indigo-500",
+    badge: "Finances",
   },
   {
-    title: "API & Développeurs",
-    description: "Documentation technique pour intégrer nos services",
-    icon: Database,
-    href: "/docs/api",
-    color: "from-orange-500 to-red-500",
-    badge: "Bientôt disponible",
+    title: "Tournois",
+    description: "Organisation de compétitions et gestion des matches",
+    icon: Trophy,
+    href: "/docs/tournaments/overview",
+    color: "from-amber-500 to-orange-500",
+    badge: "E-sport",
+  },
+  {
+    title: "Boutiques",
+    description: "Vente de produits et services sur la Marketplace",
+    icon: ShoppingBag,
+    href: "/docs/shops/overview",
+    color: "from-pink-500 to-rose-500",
+    badge: "Commerce",
+  },
+  {
+    title: "Support",
+    description: "Aide, FAQ et assistance technique 7j/7",
+    icon: HelpCircle,
+    href: "/support",
+    color: "from-cyan-500 to-blue-500",
+    badge: "Assistance",
   },
 ];
+
+import { HelpCircle } from "lucide-react";
 
 const features = [
   {
