@@ -3,11 +3,6 @@
 import {
   tournamentEditions,
   editionRegistrations,
-  tournamentMembers,
-  teams,
-  users,
-  TournamentEdition,
-  NewEditionRegistration,
   TournamentEditionWithRelations,
   tournamentPhases,
   phaseGroupParticipants,
@@ -18,6 +13,10 @@ import { db } from "@/lib/db";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getMatchesWithParticipants } from "./phases";
+
+import { Parser } from "@json2csv/plainjs";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Type for Edition with Relations
 // export type TournamentEditionWithRelations = TournamentEdition & {
@@ -53,7 +52,7 @@ export async function getTournamentEditionById(id: string) {
  * Get Tournament Edition with populated relations (Registrations -> Member -> Team/User)
  */
 export async function getTournamentEditionWithRelations(
-  editionId: string
+  editionId: string,
 ): Promise<TournamentEditionWithRelations | null> {
   try {
     const edition = await db.query.tournamentEditions.findFirst({
@@ -112,7 +111,7 @@ export async function getEditionActivePhase(editionId: string) {
     const phases = await db.query.tournamentPhases.findMany({
       where: and(
         eq(tournamentPhases.editionId, editionId),
-        eq(tournamentPhases.isDeleted, false)
+        eq(tournamentPhases.isDeleted, false),
       ),
       orderBy: (phases, { asc }) => [asc(phases.order)],
     });
@@ -136,7 +135,7 @@ export async function getEditionActivePhase(editionId: string) {
 export async function joinEdition(
   editionId: string,
   userId: string,
-  userInfo: { username: string; image?: string | null }
+  userInfo: { username: string; image?: string | null },
 ): Promise<{
   success: boolean;
   message?: string;
@@ -146,7 +145,7 @@ export async function joinEdition(
     amount: string;
     currency: string;
     editionName: string;
-  }
+  };
 }> {
   try {
     // 1. Get Edition
@@ -157,10 +156,11 @@ export async function joinEdition(
     if (!edition) throw new Error("Edition not found");
 
     // 2. Check/Create Tournament Member using the new members action
-    const { getTournamentMembers, addTournamentMember } = await import("./members");
+    const { getTournamentMembers, addTournamentMember } =
+      await import("./members");
 
     const memberRes = await getTournamentMembers({
-      filters: { tournamentId: edition.tournamentId, userId }
+      filters: { tournamentId: edition.tournamentId, userId },
     });
 
     let member = memberRes.data[0];
@@ -179,12 +179,16 @@ export async function joinEdition(
     const existingRegistration = await db.query.editionRegistrations.findFirst({
       where: and(
         eq(editionRegistrations.editionId, editionId),
-        eq(editionRegistrations.memberId, member.id)
+        eq(editionRegistrations.memberId, member.id),
       ),
     });
 
     if (existingRegistration) {
-      return { success: true, message: "Déjà inscrit", registration: existingRegistration };
+      return {
+        success: true,
+        message: "Déjà inscrit",
+        registration: existingRegistration,
+      };
     }
 
     // 4. Handle Private/Paid Editions
@@ -196,21 +200,26 @@ export async function joinEdition(
         paymentDetails: {
           amount: edition.entryFee || "0",
           currency: edition.prizeCurrency || "GTC",
-          editionName: edition.name || `Édition #${edition.editionNumber}`
-        }
+          editionName: edition.name || `Édition #${edition.editionNumber}`,
+        },
       };
     }
 
     // 5. Register
-    const registration = await db.insert(editionRegistrations).values({
-      editionId,
-      memberId: member.id,
-      status: "REGISTERED",
-      checkedIn: false,
-      feePaid: true,
-    }).returning();
+    const registration = await db
+      .insert(editionRegistrations)
+      .values({
+        editionId,
+        memberId: member.id,
+        status: "REGISTERED",
+        checkedIn: false,
+        feePaid: true,
+      })
+      .returning();
 
-    revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}`);
+    revalidatePath(
+      `/tournaments/${edition.tournamentId}/editions/${editionId}`,
+    );
 
     return { success: true, registration: registration[0] };
   } catch (error) {
@@ -222,12 +231,16 @@ export async function joinEdition(
 /**
  * Update Edition
  */
-export async function updateEdition(id: string, data: Partial<NewTournamentEdition>) {
+export async function updateEdition(
+  id: string,
+  data: Partial<NewTournamentEdition>,
+) {
   try {
-    const result = await db.update(tournamentEditions)
+    const result = await db
+      .update(tournamentEditions)
       .set({
         ...data,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(tournamentEditions.id, id))
       .returning();
@@ -277,15 +290,17 @@ export async function deleteEditionRegistrationAction(id: string) {
         `Impossible de retirer ce participant : il est impliqué dans ${
           deps.matchCount > 0 ? `${deps.matchCount} match(s)` : ""
         }${
-          deps.groupCount > 0
-            ? `, ${deps.groupCount} groupe(s)`
-            : ""
-        }. Retirez-le d'abord de ces entités.`
+          deps.groupCount > 0 ? `, ${deps.groupCount} groupe(s)` : ""
+        }. Retirez-le d'abord de ces entités.`,
       );
     }
 
-    await db.delete(editionRegistrations).where(eq(editionRegistrations.id, id));
-    revalidatePath(`/tournaments/${registration.editionId}/dashboard/participants`);
+    await db
+      .delete(editionRegistrations)
+      .where(eq(editionRegistrations.id, id));
+    revalidatePath(
+      `/tournaments/${registration.editionId}/dashboard/participants`,
+    );
     return { success: true };
   } catch (error) {
     console.error("Delete registration failed", error);
@@ -296,7 +311,9 @@ export async function deleteEditionRegistrationAction(id: string) {
 /**
  * Helper: vérifie si une registration est utilisée dans des matches ou des groupes
  */
-export async function checkParticipantDependencies(registrationId: string): Promise<{
+export async function checkParticipantDependencies(
+  registrationId: string,
+): Promise<{
   hasBlockers: boolean;
   matchCount: number;
   groupCount: number;
@@ -338,14 +355,15 @@ export async function addEditionParticipantAction(data: {
   phone?: string;
 }) {
   try {
-    const { getTournamentMembers, addTournamentMember } = await import("./members");
+    const { getTournamentMembers, addTournamentMember } =
+      await import("./members");
 
     let member;
 
     // 1. Find or Create Member
     if (data.userId) {
       const memberRes = await getTournamentMembers({
-        filters: { tournamentId: data.tournamentId, userId: data.userId }
+        filters: { tournamentId: data.tournamentId, userId: data.userId },
       });
       member = memberRes.data[0];
     }
@@ -362,15 +380,20 @@ export async function addEditionParticipantAction(data: {
     }
 
     // 2. Register for Edition
-    const [registration] = await db.insert(editionRegistrations).values({
-      editionId: data.editionId,
-      memberId: member.id,
-      status: "REGISTERED",
-      checkedIn: false,
-      feePaid: true, // Default to paid if added by organizer
-    }).returning();
+    const [registration] = await db
+      .insert(editionRegistrations)
+      .values({
+        editionId: data.editionId,
+        memberId: member.id,
+        status: "REGISTERED",
+        checkedIn: false,
+        feePaid: true, // Default to paid if added by organizer
+      })
+      .returning();
 
-    revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/participants`);
+    revalidatePath(
+      `/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/participants`,
+    );
 
     return { success: true, registrationId: registration.id };
   } catch (error: any) {
@@ -398,7 +421,9 @@ export async function reorderPhasesAction(data: {
       pagination: { page: 1, limit: 500 },
     });
 
-    const phasesArr = list.data.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const phasesArr = list.data
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const idx = phasesArr.findIndex((p) => p.id === data.id);
 
     if (idx === -1) return { success: false };
@@ -412,7 +437,9 @@ export async function reorderPhasesAction(data: {
     await updateTournamentPhase(a.id, { order: b.order ?? swapWith + 1 });
     await updateTournamentPhase(b.id, { order: a.order ?? idx + 1 });
 
-    revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`);
+    revalidatePath(
+      `/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`,
+    );
     return { success: true };
   } catch (error) {
     console.error("Reorder failed", error);
@@ -442,7 +469,9 @@ export async function activatePhaseAction(data: {
       await updateTournamentPhase(p.id, { isActive: p.id === data.id });
     }
 
-    revalidatePath(`/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`);
+    revalidatePath(
+      `/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`,
+    );
     return { success: true };
   } catch (error) {
     console.error("Activate phase failed", error);
@@ -462,7 +491,8 @@ export async function finishEditionAction(editionId: string) {
     if (!edition) throw new Error("Édition introuvable");
     if (edition.status === "COMPLETED") return { success: true };
 
-    const result = await db.update(tournamentEditions)
+    const result = await db
+      .update(tournamentEditions)
       .set({
         status: "COMPLETED",
         endDate: new Date(),
@@ -471,7 +501,9 @@ export async function finishEditionAction(editionId: string) {
       .where(eq(tournamentEditions.id, editionId))
       .returning();
 
-    revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}`);
+    revalidatePath(
+      `/tournaments/${edition.tournamentId}/editions/${editionId}`,
+    );
     return { success: true, edition: result[0] };
   } catch (error) {
     console.error("Finish edition failed", error);
@@ -484,66 +516,320 @@ export async function finishEditionAction(editionId: string) {
  */
 export async function exportEditionParticipants(
   editionId: string,
-  format: "pdf" | "csv" | "json"
-) {
+  format: "csv" | "json" | "pdf",
+): Promise<{
+  success: boolean;
+  data?: string;
+  error?: string;
+  filename?: string;
+}> {
   try {
-    const list = await db.query.editionRegistrations.findMany({
+    // 1. Récupérer les données enrichies
+    const registrations = await db.query.editionRegistrations.findMany({
       where: eq(editionRegistrations.editionId, editionId),
       with: {
         member: {
           with: {
-            user: true,
-            team: true,
-          }
-        }
-      }
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                fullName: true,
+                email: true,
+                profileImage: true,
+              },
+            },
+            team: { columns: { id: true, name: true, logo: true } },
+          },
+        },
+        results: true,
+        groupParticipations: {
+          with: { group: { with: { phase: true } } },
+        },
+      },
     });
 
-    // Note: Dans une application réelle, on générerait un lien de téléchargement
-    // ou on renverrait le buffer de fichier. Ici, on simule l'opération.
-    console.log(`Generating participants export in ${format} for edition ${editionId}`);
-    
-    // Simuler un délai de génération
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return { 
-      success: true, 
-      count: list.length, 
-      format,
-      message: "Export généré avec succès" 
-    };
+    // 2. Transformer les données pour l'export
+    const exportData = registrations.map((reg) => {
+      const result = reg.results?.[0];
+      return {
+        Nom: reg.member?.displayName || reg.member?.user?.username || "N/A",
+        Email: reg.member?.user?.email || reg.member?.contactEmail || "N/A",
+        Équipe: reg.member?.team?.name || "Individuel",
+        Statut: reg.status,
+        "Check-in": reg.checkedIn ? "Oui" : "Non",
+        Payé: reg.feePaid ? "Oui" : "Non",
+        "Matches joués": result?.matchesPlayed || 0,
+        Victoires: result?.matchesWon || 0,
+        Défaites: result?.matchesLost || 0,
+        // 'Points': result?.points || 0,
+        Position: result?.position || "N/A",
+        "Date inscription": reg.registeredAt
+          ? new Date(reg.registeredAt).toLocaleDateString("fr-FR")
+          : "N/A",
+      };
+    });
+
+    let data: string | undefined;
+    let filename: string | undefined;
+    let contentType: string | undefined;
+
+    if (format === "csv") {
+      const parser = new Parser();
+      data = parser.parse(exportData);
+      filename = `participants_${editionId}_${Date.now()}.csv`;
+      contentType = "text/csv";
+    } else if (format === "json") {
+      data = JSON.stringify(exportData, null, 2);
+      filename = `participants_${editionId}_${Date.now()}.json`;
+      contentType = "application/json";
+    } else if (format === "pdf") {
+      // Génération PDF avec jspdf
+      const doc = new jsPDF({ orientation: "landscape" });
+
+      // En-tête
+      doc.setFontSize(16);
+      doc.text(`Liste des participants - Édition ${editionId}`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(
+        `Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`,
+        14,
+        25,
+      );
+
+      // Tableau
+      const tableData = exportData.map((row) => [
+        row["Nom"],
+        row["Email"],
+        row["Équipe"],
+        row["Statut"],
+        row["Check-in"],
+        row["Payé"],
+        row["Matches joués"].toString(),
+        row["Victoires"].toString(),
+        row["Défaites"].toString(),
+        // row['Points'].toString(),
+        row["Position"],
+        row["Date inscription"].toString(),
+      ]);
+
+      autoTable(doc, {
+        head: [
+          [
+            "Nom",
+            "Email",
+            "Équipe",
+            "Statut",
+            "Check-in",
+            "Payé",
+            "MJ",
+            "V",
+            "D",
+            "Position",
+            "Date inscription",
+          ],
+        ],
+        body: tableData,
+        startY: 35,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontSize: 9 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+      });
+
+      data = doc.output("datauristring");
+      filename = `participants_${editionId}_${Date.now()}.pdf`;
+      contentType = "application/pdf";
+    }
+
+    return { success: true, data, filename, error: undefined };
   } catch (error) {
-    console.error("Export participants failed", error);
-    throw error;
+    console.error("Export failed:", error);
+    return {
+      success: false,
+      error: String(error),
+      data: undefined,
+      filename: undefined,
+    };
   }
 }
 
 /**
  * Export des matchs d'une édition
  */
+// actions/editions.ts
+
+/**
+ * Export des matchs d'une édition
+ * Formats: CSV, JSON, PDF
+ */
 export async function exportEditionMatches(
   editionId: string,
-  format: "pdf" | "csv" | "json"
-) {
+  format: "csv" | "json" | "pdf",
+): Promise<{
+  success: boolean;
+  data?: string;
+  error?: string;
+  filename?: string;
+}> {
   try {
-    const { data: matchesData } = await getMatchesWithParticipants({
+    // 1. Récupérer les matchs enrichis
+    const matchesRes = await getMatchesWithParticipants({
       filters: { editionId },
-      pagination: { page: 1, limit: 1000 }
+      pagination: { page: 1, limit: 1000 },
     });
 
-    console.log(`Generating matches export in ${format} for edition ${editionId}`);
-    
-    // Simuler un délai de génération
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return { 
-      success: true, 
-      count: matchesData.length, 
-      format,
-      message: "Export généré avec succès" 
-    };
+    const matches = matchesRes.data;
+
+    // 2. Transformer les données pour l'export
+    const exportData = matches.map((m: any) => ({
+      "Match #": m.matchNumber || "N/A",
+      Code: m.matchCode || "N/A",
+      Phase: m.phase?.name || "N/A",
+      Groupe: m.group?.name || "N/A",
+      Round: m.round || 1,
+      "Joueur 1":
+        m.participant1?.member?.displayName ||
+        m.participant1?.member?.user?.username ||
+        m.participant1?.member?.team?.name ||
+        "TBD",
+      "Tag 1": m.participant1?.member?.gameTag || "N/A",
+      "Joueur 2":
+        m.participant2?.member?.displayName ||
+        m.participant2?.member?.user?.username ||
+        m.participant2?.member?.team?.name ||
+        "TBD",
+      "Tag 2": m.participant2?.member?.gameTag || "N/A",
+      Score:
+        m.score1 !== null && m.score2 !== null
+          ? `${m.score1} - ${m.score2}`
+          : "N/A",
+      Vainqueur:
+        m.winnerRegistrationId === m.participant1RegistrationId
+          ? "J1"
+          : m.winnerRegistrationId === m.participant2RegistrationId
+            ? "J2"
+            : "N/A",
+      Statut: getMatchStatusLabel(m.status),
+      "Date planifiée": m.scheduledTime
+        ? new Date(m.scheduledTime).toLocaleString("fr-FR")
+        : "N/A",
+      "Date réelle": m.actualStartTime
+        ? new Date(m.actualStartTime).toLocaleString("fr-FR")
+        : "N/A",
+      "Durée (min)": m.duration || "N/A",
+      Stream: m.streamLink || "N/A",
+      Litige: m.disputed ? "Oui" : "Non",
+    }));
+
+    let data: string | undefined;
+    let filename: string | undefined;
+    let contentType: string | undefined;
+
+    if (format === "csv") {
+      const parser = new Parser();
+      data = parser.parse(exportData);
+      filename = `matches_${editionId}_${Date.now()}.csv`;
+      contentType = "text/csv";
+    } else if (format === "json") {
+      data = JSON.stringify(exportData, null, 2);
+      filename = `matches_${editionId}_${Date.now()}.json`;
+      contentType = "application/json";
+    } else if (format === "pdf") {
+      // Génération PDF avec jspdf
+      const doc = new jsPDF({ orientation: "landscape" });
+
+      // En-tête
+      doc.setFontSize(16);
+      doc.text(`Calendrier des matchs - Édition ${editionId}`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(
+        `Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`,
+        14,
+        25,
+      );
+
+      // Statistiques rapides
+      const totalMatches = exportData.length;
+      const completedMatches = exportData.filter(
+        (m) => m.Statut === "Terminé",
+      ).length;
+      const pendingMatches = exportData.filter(
+        (m) => m.Statut === "Programmé",
+      ).length;
+
+      doc.setFontSize(9);
+      doc.text(
+        `Total: ${totalMatches} matchs | Terminés: ${completedMatches} | À venir: ${pendingMatches}`,
+        14,
+        35,
+      );
+
+      // Tableau des matchs
+      const tableData = exportData.map((row) => [
+        row["Match #"].toString(),
+        row["Phase"],
+        row["Groupe"],
+        row["Round"].toString(),
+        row["Joueur 1"].substring(0, 20),
+        row["Joueur 2"].substring(0, 20),
+        row["Score"],
+        row["Statut"],
+        row["Date planifiée"].substring(0, 16),
+      ]);
+
+      autoTable(doc, {
+        head: [
+          [
+            "#",
+            "Phase",
+            "Groupe",
+            "R",
+            "Joueur 1",
+            "Joueur 2",
+            "Score",
+            "Statut",
+            "Date",
+          ],
+        ],
+        body: tableData,
+        startY: 45,
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontSize: 8 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: {
+          0: { cellWidth: 15 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 10 },
+          4: { cellWidth: 40 },
+          5: { cellWidth: 40 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 25 },
+          8: { cellWidth: 35 },
+        },
+      });
+
+      data = doc.output("datauristring");
+      filename = `matches_${editionId}_${Date.now()}.pdf`;
+      contentType = "application/pdf";
+    }
+
+    return { success: true, data, filename };
   } catch (error) {
-    console.error("Export matches failed", error);
-    throw error;
+    console.error("Export matches failed:", error);
+    return { success: false, error: String(error) };
   }
+}
+
+function getMatchStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    PENDING: "Programmé",
+    IN_PROGRESS: "En cours",
+    COMPLETED: "Terminé",
+    CANCELLED: "Annulé",
+    PENDING_REVIEW: "En attente",
+    AWAITING_ADMIN_CONFIRMATION: "Validation admin",
+    DISPUTED: "Litige",
+  };
+  return labels[status] || status;
 }

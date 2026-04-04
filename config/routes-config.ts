@@ -70,8 +70,14 @@ export const defaultDockLinks: DockLinkConfig[] = [
   },
   {
     href: "/marketplace",
-    label: "Boutique",
+    label: "Marché",
     icon: "marketplace",
+    requireAuth: false,
+  },
+  {
+    href: "/shops",
+    label: "Boutiques",
+    icon: "shops",
     requireAuth: false,
   },
   {

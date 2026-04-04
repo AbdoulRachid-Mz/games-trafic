@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Trash2,
   Plus,
-  Pencil,
   ChevronDown,
   AlertTriangle,
+  Loader2,
+  ShieldAlert,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,49 +30,55 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useScreenSize } from "@/hooks/use-screen";
+import { toast } from "sonner";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
 export interface BulkAction<T = string> {
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
   variant?: "default" | "destructive" | "outline";
-  /** Confirm dialog before executing */
   confirm?: {
     title: string;
     description: string;
   };
+  /** Validation à effectuer avant l'action */
+  validate?: (selectedIds: T[]) => Promise<ValidationResult>;
   onClick: (selectedIds: T[]) => void | Promise<void>;
+  /** Désactiver si condition non remplie */
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export interface BulkActionsProps<T = string> {
-  /** All selectable item IDs */
   items: Array<{ id: T; label?: string }>;
-  /** Custom bulk actions */
   actions: BulkAction<T>[];
-  /** Called when add button clicked */
   onAdd?: () => void;
-  /** Label for add button */
   addLabel?: string;
-  /** Extra class for container */
   className?: string;
-  /** Whether any mutation is loading */
   isLoading?: boolean;
-  /** Show count badge */
   showCount?: boolean;
+  /** Capacité maximale pour l'ajout (ex: max participants) */
+  maxCapacity?: number;
+  currentCount?: number;
+  /** Message quand la limite est atteinte */
+  capacityMessage?: string;
 }
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-/**
- * BulkActions — composant générique pour sélection multiple et actions en lot
- * Utilisé dans : matches, groupes, brackets, phases
- */
 export function BulkActions<T extends string = string>({
   items,
   actions,
@@ -80,17 +87,27 @@ export function BulkActions<T extends string = string>({
   className,
   isLoading = false,
   showCount = true,
+  maxCapacity,
+  currentCount = 0,
+  capacityMessage = "Limite atteinte",
 }: BulkActionsProps<T>) {
   const [selectedIds, setSelectedIds] = useState<Set<T>>(new Set());
-  const [pendingAction, setPendingAction] = useState<BulkAction<T> | null>(
-    null
-  );
+  const [pendingAction, setPendingAction] = useState<BulkAction<T> | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
   const { isMobile } = useScreenSize();
 
-  const isAllSelected =
-    items.length > 0 && selectedIds.size === items.length;
-  const isPartialSelected =
-    selectedIds.size > 0 && selectedIds.size < items.length;
+  const isAllSelected = items.length > 0 && selectedIds.size === items.length;
+  const isPartialSelected = selectedIds.size > 0 && selectedIds.size < items.length;
+  
+  const isAddDisabled = maxCapacity !== undefined && currentCount >= maxCapacity;
+  const addDisabledReason = isAddDisabled ? capacityMessage : undefined;
+
+  // Reset selection when items change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [items.length]);
 
   const toggleAll = () => {
     if (isAllSelected) {
@@ -111,6 +128,26 @@ export function BulkActions<T extends string = string>({
 
   const handleAction = async (action: BulkAction<T>) => {
     if (selectedIds.size === 0) return;
+    
+    // Vérifier si l'action est désactivée
+    if (action.disabled) {
+      toast.error(action.disabledReason || "Action non disponible");
+      return;
+    }
+    
+    // Validation pré-action
+    if (action.validate) {
+      setIsValidating(true);
+      const result = await action.validate(Array.from(selectedIds));
+      setIsValidating(false);
+      
+      if (!result.isValid) {
+        setValidationErrors(result.errors);
+        setValidationWarnings(result.warnings);
+        return;
+      }
+    }
+    
     if (action.confirm) {
       setPendingAction(action);
     } else {
@@ -126,16 +163,17 @@ export function BulkActions<T extends string = string>({
     setPendingAction(null);
   };
 
+  const clearValidationDialog = () => {
+    setValidationErrors([]);
+    setValidationWarnings([]);
+  };
+
   const hasDestructive = actions.some((a) => a.variant === "destructive");
+  const isDisabled = isLoading || isValidating || items.length === 0;
 
   return (
     <>
-      <div
-        className={cn(
-          "flex items-center gap-2 flex-wrap",
-          className
-        )}
-      >
+      <div className={cn("flex items-center gap-2 flex-wrap", className)}>
         {/* Select all */}
         <div className="flex items-center gap-2 mr-1">
           <Checkbox
@@ -143,7 +181,7 @@ export function BulkActions<T extends string = string>({
             checked={isAllSelected}
             aria-checked={isPartialSelected ? "mixed" : isAllSelected}
             onCheckedChange={toggleAll}
-            disabled={isLoading || items.length === 0}
+            disabled={isDisabled}
           />
           {showCount && selectedIds.size > 0 && (
             <Badge variant="secondary" className="text-xs">
@@ -152,50 +190,61 @@ export function BulkActions<T extends string = string>({
           )}
         </div>
 
-        {/* Add button */}
+        {/* Add button with capacity check */}
         {onAdd && (
-          <Button
-            size="sm"
-            variant="default"
-            onClick={onAdd}
-            disabled={isLoading}
-            className="gap-1.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {!isMobile && addLabel}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={onAdd}
+                    disabled={isDisabled || isAddDisabled}
+                    className="gap-1.5"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {!isMobile && addLabel}
+                    {maxCapacity !== undefined && (
+                      <Badge variant="secondary" className="ml-1 text-[9px] h-4">
+                        {currentCount}/{maxCapacity}
+                      </Badge>
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {isAddDisabled && addDisabledReason && (
+                <TooltipContent>
+                  <p className="text-xs">{addDisabledReason}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         {/* Bulk action buttons */}
         {selectedIds.size > 0 && (
           <>
-            {actions.length <= 2 ? (
-              // Show as individual buttons if few actions
-              actions.map((action, i) => (
-                <Button
-                  key={i}
-                  size="sm"
-                  variant={action.variant || "outline"}
-                  onClick={() => handleAction(action)}
-                  disabled={isLoading}
-                  className="gap-1.5"
-                >
-                  {action.icon && (
-                    <action.icon className="h-3.5 w-3.5" />
-                  )}
-                  {!isMobile && action.label}
-                </Button>
-              ))
-            ) : (
-              // Show as dropdown if many actions
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            {actions.filter(a => !a.disabled).length <= 2 ? (
+              actions
+                .filter(a => !a.disabled)
+                .map((action, i) => (
                   <Button
+                    key={i}
                     size="sm"
-                    variant="outline"
-                    disabled={isLoading}
+                    variant={action.variant || "outline"}
+                    onClick={() => handleAction(action)}
+                    disabled={isDisabled}
                     className="gap-1.5"
                   >
+                    {action.icon && <action.icon className="h-3.5 w-3.5" />}
+                    {!isMobile && action.label}
+                  </Button>
+                ))
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={isDisabled} className="gap-1.5">
                     Actions
                     <ChevronDown className="h-3.5 w-3.5" />
                   </Button>
@@ -203,19 +252,22 @@ export function BulkActions<T extends string = string>({
                 <DropdownMenuContent align="start">
                   {actions.map((action, i) => (
                     <React.Fragment key={i}>
-                      {action.variant === "destructive" &&
-                        i > 0 && <DropdownMenuSeparator />}
+                      {action.variant === "destructive" && i > 0 && <DropdownMenuSeparator />}
                       <DropdownMenuItem
                         onClick={() => handleAction(action)}
+                        disabled={action.disabled}
                         className={cn(
-                          action.variant === "destructive" &&
-                            "text-destructive"
+                          action.variant === "destructive" && "text-destructive",
+                          action.disabled && "opacity-50"
                         )}
                       >
-                        {action.icon && (
-                          <action.icon className="h-4 w-4 mr-2" />
-                        )}
+                        {action.icon && <action.icon className="h-4 w-4 mr-2" />}
                         {action.label}
+                        {action.disabled && action.disabledReason && (
+                          <span className="ml-2 text-[10px] text-muted-foreground">
+                            ({action.disabledReason})
+                          </span>
+                        )}
                       </DropdownMenuItem>
                     </React.Fragment>
                   ))}
@@ -224,16 +276,43 @@ export function BulkActions<T extends string = string>({
             )}
           </>
         )}
+        
+        {/* Loading indicator */}
+        {isValidating && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Validation...
+          </div>
+        )}
       </div>
 
-      {/* Row checkboxes are rendered via a hook/context pattern — 
-          expose toggleItem and isSelected for parent to use */}
+      {/* Validation Error Dialog */}
+      <AlertDialog open={validationErrors.length > 0} onOpenChange={clearValidationDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="h-5 w-5" />
+              Action impossible
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {validationErrors.map((err, i) => (
+                  <p key={i} className="text-sm text-destructive">{err}</p>
+                ))}
+                {validationWarnings.map((warn, i) => (
+                  <p key={i} className="text-sm text-yellow-600">{warn}</p>
+                ))}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Fermer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Confirm dialog */}
-      <AlertDialog
-        open={!!pendingAction}
-        onOpenChange={(open) => !open && setPendingAction(null)}
-      >
+      {/* Confirm Dialog */}
+      <AlertDialog open={!!pendingAction} onOpenChange={(open) => !open && setPendingAction(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -242,18 +321,14 @@ export function BulkActions<T extends string = string>({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingAction?.confirm?.description ||
-                `Cette action sera appliquée à ${selectedIds.size} élément(s). Cette opération est irréversible.`}
+                `Cette action sera appliquée à ${selectedIds.size} élément(s).`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmAction}
-              className={
-                pendingAction?.variant === "destructive"
-                  ? "bg-destructive hover:bg-destructive/90"
-                  : ""
-              }
+              className={pendingAction?.variant === "destructive" ? "bg-destructive" : ""}
             >
               Confirmer
             </AlertDialogAction>
@@ -261,22 +336,20 @@ export function BulkActions<T extends string = string>({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Expose selection state via data attributes for child components */}
+      {/* Context Provider for children */}
       <BulkActionsSelectionContext.Provider
-        value={{ 
-          selectedIds: selectedIds as unknown as Set<string>, 
-          toggleItem: toggleItem as unknown as (id: string) => void, 
-          isSelected: (id: string) => selectedIds.has(id as unknown as T) 
+        value={{
+          selectedIds: selectedIds as unknown as Set<string>,
+          toggleItem: toggleItem as unknown as (id: string) => void,
+          isSelected: (id: string) => selectedIds.has(id as unknown as T),
         }}
-      >
-        {/* Children would be rendered by the parent */}
-      </BulkActionsSelectionContext.Provider>
+      />
     </>
   );
 }
 
 // ============================================================================
-// CONTEXT for row-level checkboxes
+// CONTEXT
 // ============================================================================
 
 const BulkActionsSelectionContext = React.createContext<{
@@ -294,7 +367,7 @@ export function useBulkSelection() {
 }
 
 // ============================================================================
-// SIMPLE BULK DELETE SHORTHAND
+// SIMPLE BULK DELETE
 // ============================================================================
 
 interface BulkDeleteBarProps {
@@ -303,6 +376,8 @@ interface BulkDeleteBarProps {
   onAdd?: () => void;
   addLabel?: string;
   isLoading?: boolean;
+  maxCapacity?: number;
+  currentCount?: number;
   className?: string;
 }
 
@@ -312,6 +387,8 @@ export function BulkDeleteBar({
   onAdd,
   addLabel,
   isLoading,
+  maxCapacity,
+  currentCount,
   className,
 }: BulkDeleteBarProps) {
   return (
@@ -320,6 +397,8 @@ export function BulkDeleteBar({
       onAdd={onAdd}
       addLabel={addLabel}
       isLoading={isLoading}
+      maxCapacity={maxCapacity}
+      currentCount={currentCount}
       className={className}
       actions={[
         {
@@ -328,8 +407,7 @@ export function BulkDeleteBar({
           variant: "destructive",
           confirm: {
             title: "Supprimer les éléments sélectionnés",
-            description:
-              "Êtes-vous sûr de vouloir supprimer les éléments sélectionnés ? Cette action est irréversible.",
+            description: "Cette action est irréversible.",
           },
           onClick: onDeleteSelected,
         },

@@ -117,7 +117,7 @@ const itemVariants = {
 
 export default function DocsPage() {
   return (
-    <div className="space-y-12">
+    <div className="space-y-8">
       {/* Hero Section */}
       <section className="text-center space-y-6">
         <motion.div

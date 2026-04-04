@@ -300,19 +300,20 @@ export const FloatingActionButton = ({
                   return (
                     <Tooltip key={idx}>
                       <TooltipTrigger asChild>
-                        <Link href={item.href}>
+                        <button
+                          onClick={() => router.push(item.href)}
+                          className="flex flex-col items-center justify-center p-1 rounded-xl transition-all duration-300 hover:shadow-lg cursor-pointer min-w-[50px] relative group"
+                          aria-label={item.label}
+                        >
                           <motion.div
                             whileHover={{ scale: 1.15, y: -5 }}
                             whileTap={{ scale: 0.9 }}
                             className={cn(
-                              "flex flex-col items-center justify-center p-1 rounded-xl transition-all duration-300",
-                              "hover:shadow-lg cursor-pointer min-w-[50px]",
-                              "relative group",
+                              "flex flex-col items-center justify-center",
                               isActiveRoute
                                 ? "bg-primary/10 text-primary"
                                 : "hover:bg-primary/5",
                             )}
-                            aria-label={item.label}
                           >
                             {/* Indicateur actif */}
                             {isActiveRoute && (
@@ -351,7 +352,7 @@ export const FloatingActionButton = ({
                               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-purple-600/5 -z-10" />
                             )}
                           </motion.div>
-                        </Link>
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="top">
                         <Typography variant="caption1">{item.label}</Typography>

@@ -12,15 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogTrigger,
   AlertDialogContent,
@@ -34,15 +25,29 @@ import {
 import {
   getPhaseGroupById,
   getPhaseGroupParticipants,
-  createPhaseGroupParticipant,
-  deletePhaseGroupParticipant,
   getBracketNodes,
   recalculateGroupStandings,
 } from "@/actions/phases";
-import { getEditionRegistrations, createMatch } from "@/actions/tournaments";
+import { getEditionRegistrations } from "@/actions/tournaments";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { GroupParticipantsManagement } from "@/components/pages/tournaments/edition-detail/group-participants-management";
+import type { PhaseGroupParticipant } from "@/database/schema";
+import {
+  ArrowLeft,
+  Trophy,
+  Swords,
+  Trash2,
+  Lock,
+  RefreshCcw,
+  Settings,
+  Users,
+} from "lucide-react";
+import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/edition-detail/generate-group-matches-dialog";
+import { CreateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/create-bracket-node-dialog";
+import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
+import { UpdatePhaseGroupDialog } from "@/components/pages/tournaments/edition-detail/update-phase-group-dialog";
+import { deleteBracketNode } from "@/actions/phases";
 function getName(registrationId: string | null | undefined, allRegs: any[]) {
   const reg = allRegs.find((r: any) => r.id === registrationId);
   return (
@@ -52,31 +57,6 @@ function getName(registrationId: string | null | undefined, allRegs: any[]) {
     "Joueur"
   );
 }
-import type {
-  PhaseGroup,
-  PhaseGroupParticipant,
-  EditionRegistration,
-} from "@/database/schema";
-import {
-  ArrowLeft,
-  Plus,
-  Trophy,
-  Swords,
-  UserPlus,
-  Trash2,
-  Lock,
-  Unlock,
-  RefreshCcw,
-  LayoutDashboard,
-  Settings,
-  Users,
-} from "lucide-react";
-import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/edition-detail/generate-group-matches-dialog";
-import { CreateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/create-bracket-node-dialog";
-import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
-import { UpdatePhaseGroupDialog } from "@/components/pages/tournaments/edition-detail/update-phase-group-dialog";
-import { deleteBracketNode } from "@/actions/phases";
-import { QuicKAction } from "./quick-acions";
 
 interface PageProps {
   params: Promise<{
@@ -119,13 +99,14 @@ export default async function GroupDetailPage({ params }: PageProps) {
     const sourcePhaseId = source.replace("PHASE_", "");
     // Fetch qualified from source phase
     const sourceParticipants = await getPhaseGroupParticipants({
-        filters: { phaseId: sourcePhaseId, qualified: true },
-        pagination: { limit: 1000, page: 1 }
+      filters: { phaseId: sourcePhaseId, qualified: true },
+      pagination: { limit: 1000, page: 1 },
     });
-    const qualifiedIds = (sourceParticipants.data as any[])
-        .map(p => p.registrationId);
-    
-    allowedRegs = allRegs.filter(r => qualifiedIds.includes(r.id));
+    const qualifiedIds = (sourceParticipants.data as any[]).map(
+      (p) => p.registrationId,
+    );
+
+    allowedRegs = allRegs.filter((r) => qualifiedIds.includes(r.id));
   }
 
   // Sort by points DESC, then goal diff, then goals scored
@@ -153,7 +134,6 @@ export default async function GroupDetailPage({ params }: PageProps) {
       "Joueur"
     );
   }
-
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -203,12 +183,18 @@ export default async function GroupDetailPage({ params }: PageProps) {
             </Button>
           </div>
         </div>
-       <div className="flex items-center gap-2 w-full">
-     
+        <div className="flex items-center gap-2 w-full">
           <GenerateGroupMatchesDialog
             groupId={groupId}
             editionId={editionId}
             phaseId={group?.phaseId || ""}
+            maxMatches={100} // Limite de matchs pour ce groupe
+            existingMatchesCount={Math.round(totalMatches)} // Matchs existants
+            groupConfig={{
+              maxParticipants: group?.participantCount || 8,
+              matchesPerParticipant:
+                (group?.config as any)?.matchesPerParticipant || 1,
+            }}
           />
 
           <Button variant="outline" className="gap-1.5" asChild>

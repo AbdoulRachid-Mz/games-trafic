@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎮 Games-Trafics (GT-V3)
 
-## Getting Started
+Bienvenue sur le dépôt officiel de **Games-Trafics**, la plateforme e-sport et gaming tout-en-un conçue pour dynamiser l'écosystème compétitif francophone.
 
-First, run the development server:
+!\[Games-Trafics Banner]\(/icons/gt-primary.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🚀 À propos du projet
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Games-Trafics est une plateforme moderne permettant aux joueurs de participer à des tournois, de gérer leurs finances via un wallet sécurisé (GTC), et d'accéder à une marketplace dédiée aux produits et services gaming.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> \[!IMPORTANT]
+> Ce projet est actuellement en phase de développement actif (V3). La stabilité des fonctionnalités est notre priorité.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ✨ Fonctionnalités Clés
 
-## Learn More
+- **Système de Tournois Avancé** : Gestion des éditions, phases de groupes, brackets et progression automatique des scores.
+- **Wallet GTC** : Un système financier interne sécurisé pour les dépôts, retraits et transferts.
+- **Boutiques & Marketplace** : Espaces de vente certifiés pour produits digitaux et physiques.
+- **Hub de Documentation** : Documentation technique et utilisateur intégrée via MDX.
+- **Messagerie Contextuelle** : Échanges facilités autour des matches et des commandes.
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ Stack Technique
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Le projet repose sur les technologies les plus récentes du web :
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework** : [Next.js 16 ](https://nextjs.org/)(App Router)
+- **Base de Données** : PostgreSQL avec [Drizzle ORM](https://orm.drizzle.team/)
+- **Styling** : [Tailwind CSS 4.0](https://tailwindcss.com/)
+- **Animations** : [Framer Motion](https://www.framer.com/motion/)
+- **Documentation** : [MDX](https://mdxjs.com/) avec `next-mdx-remote`
+- **Composants UI** : Radix UI & Lucide React
 
-## Deploy on Vercel
+## 📖 Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Notre système de documentation est désormais modulaire et éditable directement en Markdown.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Guides Utilisateurs** : `/docs`
+- **Dépannage & Support** : `/support`
+- **Contact Technique** : `/contact`
+
+> \[!TIP]
+> Pour ajouter ou modifier la documentation, consultez le dossier `docs/content/`.
+
+## ⚙️ Installation Locale
+
+1. **Cloner le projet** :
+   ```TypeScript
+   git clone https://github.com/AbdoulRachid-Mz/games-trafic.git
+   cd games-trafic
+   ```
+2. **Installer les dépendances** :
+   ```bash
+   pnpm install
+   ```
+3. **Configurer l'environnement** :
+   Créez un fichier `.env.local` basé sur `.env.example` et renseignez vos clés d'accès (Database, API Keys).
+4. **Lancer le serveur de développement** :
+   ```bash
+   pnpm dev
+   ```
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une *Issue* ou une *Pull Request* pour suggérer des améliorations ou signaler des bugs.
+
+***
+
+*© 2026 Games-Trafics - Tous droits réservés.*

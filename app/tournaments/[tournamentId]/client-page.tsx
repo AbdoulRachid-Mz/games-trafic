@@ -108,12 +108,12 @@ export function TournamentPageContent() {
   const tournamentId = params.tournamentId as string;
 
   // Optimized React Query Fetch
-  const { data: tournament, isLoading: isTournamentLoading } = useTournamentById(
-    tournamentId,
-    ["organizer", "editions", "members"]
-  );
+  const { data: tournament, isLoading: isTournamentLoading } =
+    useTournamentById(tournamentId, ["organizer", "editions", "members"]);
 
-  const [similarTournaments, setSimilarTournaments] = useState<Tournament[]>([]);
+  const [similarTournaments, setSimilarTournaments] = useState<Tournament[]>(
+    [],
+  );
   const [activeTab, setActiveTab] = useState("overview");
   const [showAllEditions, setShowAllEditions] = useState(false);
   const [showAllMembers, setShowAllMembers] = useState(false);
@@ -141,7 +141,9 @@ export function TournamentPageContent() {
         },
         options: { sortBy: "viewCount", sortOrder: "desc" },
       });
-      const similar = res.data.filter((t) => t.id !== tournament.id).slice(0, 8);
+      const similar = res.data
+        .filter((t) => t.id !== tournament.id)
+        .slice(0, 8);
       setSimilarTournaments(similar);
     } catch (error) {
       console.error("Erreur chargement tournois similaires:", error);
@@ -213,7 +215,6 @@ export function TournamentPageContent() {
   const editions = tournament?.editions || [];
   const members = (tournament?.members as TournamentMember[]) || [];
 
-
   const displayedEditions = showAllEditions ? editions : editions.slice(0, 6);
   const displayedMembers = showAllMembers ? members : members.slice(0, 12);
 
@@ -258,7 +259,6 @@ export function TournamentPageContent() {
     router.push(`/tournaments/${tournamentId}/members/${memberId}`);
   };
 
-
   if (isTournamentLoading) {
     return <TournamentSkeleton />;
   }
@@ -272,9 +272,12 @@ export function TournamentPageContent() {
             <Typography variant="h4" weight="bold" className="mb-2">
               Tournoi non trouvé
             </Typography>
-            <Button onClick={() => router.push("/tournaments")}>
-              Explorer les tournois
-            </Button>
+            <div className="flex justify-center items-center gap-4">
+              <Button onClick={() => router.push("/tournaments")}>
+                Explorer les tournois
+              </Button>
+              <Button onClick={() => router.refresh()}>Actualiser</Button>
+            </div>
           </CardContent>
         </Card>
       </div>

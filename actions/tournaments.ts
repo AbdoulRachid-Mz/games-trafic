@@ -140,14 +140,15 @@ export async function getTournamentById(
   cacheTag(`tournament-${idOrSlug}`, "tournaments");
   cacheLife("minutes");
   try {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        idOrSlug,
+      );
+
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournaments.findFirst({
-        where: (tournaments, { eq, or }) => or(
-          eq(tournaments.id, idOrSlug),
-          eq(tournaments.slug, idOrSlug)
-        ),
+        where: (tournaments, { eq, or }) =>
+          or(eq(tournaments.id, idOrSlug), eq(tournaments.slug, idOrSlug)),
         with: {
           organizer: options.populate.includes("organizer")
             ? { columns: USER_MINI_COLUMNS }
@@ -175,12 +176,9 @@ export async function getTournamentById(
     const result = await db
       .select()
       .from(tournaments)
-      .where(or(
-        eq(tournaments.id, idOrSlug),
-        eq(tournaments.slug, idOrSlug)
-      ))
+      .where(or(eq(tournaments.id, idOrSlug), eq(tournaments.slug, idOrSlug)))
       .limit(1);
-    
+
     return result[0] || null;
   } catch (error) {
     console.error("Error getting tournament by ID or Slug:", error);
@@ -1702,9 +1700,9 @@ export async function updateEditionResultForParticipant(
         eq(matches.status, "COMPLETED"),
         or(
           eq(matches.participant1RegistrationId, registrationId),
-          eq(matches.participant2RegistrationId, registrationId)
-        )
-      )
+          eq(matches.participant2RegistrationId, registrationId),
+        ),
+      ),
     });
 
     let wins = 0;
@@ -1715,15 +1713,18 @@ export async function updateEditionResultForParticipant(
 
     for (const m of participantMatches) {
       const isP1 = m.participant1RegistrationId === registrationId;
-      const myScore = isP1 ? (m.score1 || 0) : (m.score2 || 0);
-      const oppScore = isP1 ? (m.score2 || 0) : (m.score1 || 0);
+      const myScore = isP1 ? m.score1 || 0 : m.score2 || 0;
+      const oppScore = isP1 ? m.score2 || 0 : m.score1 || 0;
 
       scoreFor += myScore;
       scoreAgainst += oppScore;
 
       if (m.winnerRegistrationId === registrationId) {
         wins++;
-      } else if (m.winnerRegistrationId && m.winnerRegistrationId !== registrationId) {
+      } else if (
+        m.winnerRegistrationId &&
+        m.winnerRegistrationId !== registrationId
+      ) {
         losses++;
       } else if (m.status === "COMPLETED" && m.score1 === m.score2) {
         draws++;
@@ -1734,8 +1735,8 @@ export async function updateEditionResultForParticipant(
     const existing = await db.query.editionResults.findFirst({
       where: and(
         eq(editionResults.editionId, editionId),
-        eq(editionResults.registrationId, registrationId)
-      )
+        eq(editionResults.registrationId, registrationId),
+      ),
     });
 
     const resultData = {
@@ -1751,7 +1752,8 @@ export async function updateEditionResultForParticipant(
     };
 
     if (existing) {
-      await db.update(editionResults)
+      await db
+        .update(editionResults)
         .set(resultData)
         .where(eq(editionResults.id, existing.id));
     } else {
@@ -1967,13 +1969,168 @@ export async function confirmMatchResult(
 }
 
 /**
+ * Vérifie si le gagnant a terminé tous ses matches dans le bracket actuel
+ */
+export async function checkIfLastMatchForWinner(
+  winnerRegistrationId: string,
+  bracketNodeId: string
+): Promise<boolean> {
+  try {
+    // Récupérer le bracket node actuel
+    const currentNode = await db.query.bracketNodes.findFirst({
+      where: eq(bracketNodes.id, bracketNodeId),
+      with: {
+        phase: true,
+        group: true,
+      },
+    });
+
+    if (!currentNode) return false;
+
+    // Récupérer tous les matches du même bracket (même groupe ou même phase)
+    const allMatchesInBracket = await db.query.matches.findMany({
+      where: and(
+        eq(matches.bracketNodeId, bracketNodeId),
+        or(
+          eq(matches.participant1RegistrationId, winnerRegistrationId),
+          eq(matches.participant2RegistrationId, winnerRegistrationId)
+        ),
+        eq(matches.status, "COMPLETED")
+      ),
+    });
+
+    // Pour un bracket simple, un seul match par joueur suffit
+    // Pour un bracket avec plusieurs rounds, il faut vérifier si c'est le dernier
+    if (currentNode.phase?.phaseType === "ELIMINATION") {
+      // Vérifier si le joueur a un match parent (prochain match)
+      const nextMatches = await db.query.matches.findMany({
+        where: and(
+          eq(matches.bracketNodeId, bracketNodeId),
+          eq(matches.status, "PENDING")
+        ),
+      });
+
+      // Si plus de matchs en attente avec ce joueur, c'est fini
+      const hasPendingMatches = nextMatches.some(m => 
+        m.participant1RegistrationId === winnerRegistrationId ||
+        m.participant2RegistrationId === winnerRegistrationId
+      );
+
+      return !hasPendingMatches;
+    }
+
+    // Pour une phase de groupes, vérifier si tous les matches sont joués
+    if (currentNode.phase?.phaseType === "GROUP_STAGE") {
+      const allMatchesInGroup = await db.query.matches.findMany({
+        where: and(
+          eq(matches.groupId, currentNode.groupId || ""),
+          or(
+            eq(matches.participant1RegistrationId, winnerRegistrationId),
+            eq(matches.participant2RegistrationId, winnerRegistrationId)
+          )
+        ),
+      });
+
+      const completedCount = allMatchesInGroup.filter(m => m.status === "COMPLETED").length;
+      const totalCount = allMatchesInGroup.length;
+
+      return completedCount === totalCount && totalCount > 0;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error checking last match for winner:", error);
+    return false;
+  }
+}
+
+/**
+ * Récupère la phase suivante dans l'ordre de l'édition
+ */
+export async function getNextPhase(currentPhaseId: string): Promise<TournamentPhase | null> {
+  try {
+    // Récupérer la phase actuelle
+    const currentPhase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, currentPhaseId),
+    });
+
+    if (!currentPhase) return null;
+
+    // Récupérer toutes les phases de l'édition
+    const allPhases = await db.query.tournamentPhases.findMany({
+      where: and(
+        eq(tournamentPhases.editionId, currentPhase.editionId),
+        eq(tournamentPhases.isDeleted, false)
+      ),
+      orderBy: [asc(tournamentPhases.order)],
+    });
+
+    // Trouver l'index de la phase actuelle
+    const currentIndex = allPhases.findIndex(p => p.id === currentPhaseId);
+    
+    if (currentIndex === -1 || currentIndex + 1 >= allPhases.length) {
+      return null;
+    }
+
+    return allPhases[currentIndex + 1];
+  } catch (error) {
+    console.error("Error getting next phase:", error);
+    return null;
+  }
+}
+
+/**
+ * Récupère une registration avec les infos du membre (user/team)
+ */
+export async function getRegistrationWithMember(registrationId: string): Promise<any> {
+  try {
+    const registration = await db.query.editionRegistrations.findFirst({
+      where: eq(editionRegistrations.id, registrationId),
+      with: {
+        member: {
+          with: {
+            user: {
+              columns: {
+                id: true,
+                username: true,
+                fullName: true,
+                profileImage: true,
+              },
+            },
+            team: {
+              columns: {
+                id: true,
+                name: true,
+                logo: true,
+              },
+            },
+          },
+        },
+        edition: true,
+      },
+    });
+
+    return registration;
+  } catch (error) {
+    console.error("Error getting registration with member:", error);
+    return null;
+  }
+}
+
+/**
  * Validation finale par l'administrateur.
  */
 export async function adminConfirmMatchResult(
   id: string,
   score1?: number,
   score2?: number,
-): Promise<Match> {
+): Promise<{
+  match: Match;
+  needsProgression?: boolean;
+  winnerName?: string;
+  winnerRegistrationId?: string;
+  nextPhaseId?: string;
+}> {
   try {
     const match = await db.query.matches.findFirst({
       where: eq(matches.id, id),
@@ -2017,19 +2174,48 @@ export async function adminConfirmMatchResult(
     }
 
     // Trigger auto-progression if it's a bracket match
+    let progressionInfo = null;
     if (updatedMatch.bracketNodeId && updatedMatch.winnerRegistrationId) {
+      // Vérifier si c'est le dernier match du bracket pour ce joueur
+      const isLastMatch = await checkIfLastMatchForWinner(
+        updatedMatch.winnerRegistrationId,
+        updatedMatch.bracketNodeId,
+      );
+
+      if (isLastMatch) {
+        // Trouver la phase suivante
+        const nextPhase = await getNextPhase(updatedMatch.phaseId);
+        if (nextPhase) {
+          const winnerReg = await getRegistrationWithMember(
+            updatedMatch.winnerRegistrationId,
+          );
+          progressionInfo = {
+            needsProgression: true,
+            winnerName: winnerReg?.member?.displayName || "Le joueur",
+            winnerRegistrationId: updatedMatch.winnerRegistrationId,
+            nextPhaseId: nextPhase.id,
+          };
+        }
+      }
+
       await handleMatchProgression(updatedMatch as any);
     }
 
     // Sync cumulative edition results for both participants
     if (updatedMatch.participant1RegistrationId) {
-        await updateEditionResultForParticipant(updatedMatch.participant1RegistrationId, updatedMatch.editionId);
+      await updateEditionResultForParticipant(
+        updatedMatch.participant1RegistrationId,
+        updatedMatch.editionId,
+      );
     }
     if (updatedMatch.participant2RegistrationId) {
-        await updateEditionResultForParticipant(updatedMatch.participant2RegistrationId, updatedMatch.editionId);
+      await updateEditionResultForParticipant(
+        updatedMatch.participant2RegistrationId,
+        updatedMatch.editionId,
+      );
     }
 
-    return updatedMatch;
+    return { match: updatedMatch, ...progressionInfo };
   } catch (error) {
     console.error("Error admin confirming match result:", error);
     throw error;
@@ -2062,7 +2248,8 @@ export async function updateMatchResult(
   winnerRegistrationId: string,
   submittedByUserId: string,
 ): Promise<Match> {
-  return adminConfirmMatchResult(id, score1, score2);
+  const res = await adminConfirmMatchResult(id, score1, score2);
+  return res.match;
 }
 
 /**
@@ -3761,4 +3948,128 @@ function buildEditionResultWhereConditions(
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+export async function addQualifiedToNextPhase({
+  registrationId,
+  nextPhaseId,
+  editionId,
+}: {
+  registrationId: string;
+  nextPhaseId: string;
+  editionId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Vérifier que la registration existe
+    const registration = await db.query.editionRegistrations.findFirst({
+      where: eq(editionRegistrations.id, registrationId),
+    });
+
+    if (!registration) {
+      return { success: false, error: "Inscription introuvable" };
+    }
+
+    // Vérifier que la phase suivante existe
+    const nextPhase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, nextPhaseId),
+    });
+
+    if (!nextPhase) {
+      return { success: false, error: "Phase suivante introuvable" };
+    }
+
+    // Pour une phase d'élimination, créer un bracket node ou ajouter à un match existant
+    if (nextPhase.phaseType === "ELIMINATION") {
+      // Logique pour ajouter le participant au bracket
+      // Soit créer un nouveau match, soit ajouter à un match existant avec un slot libre
+      const existingMatches = await db.query.matches.findMany({
+        where: and(
+          eq(matches.phaseId, nextPhaseId),
+          eq(matches.editionId, editionId),
+          or(
+            isNull(matches.participant1RegistrationId),
+            isNull(matches.participant2RegistrationId),
+          ),
+        ),
+        limit: 1,
+      });
+
+      if (existingMatches.length > 0) {
+        const match = existingMatches[0];
+        const updateData: any = {};
+
+        if (!match.participant1RegistrationId) {
+          updateData.participant1RegistrationId = registrationId;
+        } else if (!match.participant2RegistrationId) {
+          updateData.participant2RegistrationId = registrationId;
+        }
+
+        await db
+          .update(matches)
+          .set(updateData)
+          .where(eq(matches.id, match.id));
+      } else {
+        // Créer un nouveau bracket node et match
+        const [node] = await db
+          .insert(bracketNodes)
+          .values({
+            phaseId: nextPhaseId,
+            nodeCode: `Q-${Date.now()}`,
+            round: 1,
+            matchNumber: 1,
+            bracketType: "UPPER",
+            order: 0,
+            metadata: { participants: [registrationId] },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        await db.insert(matches).values({
+          editionId,
+          phaseId: nextPhaseId,
+          bracketNodeId: node.id,
+          participant1RegistrationId: registrationId,
+          status: "PENDING",
+          round: 1,
+          matchNumber: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
+
+    // Pour une phase de groupes, ajouter le participant à un groupe
+    if (nextPhase.phaseType === "GROUP_STAGE") {
+      const groups = await db.query.phaseGroups.findMany({
+        where: eq(phaseGroups.phaseId, nextPhaseId),
+        with: { participants: true },
+      });
+
+      // Trouver le groupe avec le moins de participants
+      const sortedGroups = groups.sort(
+        (a, b) => (a.participants?.length || 0) - (b.participants?.length || 0),
+      );
+
+      if (sortedGroups.length > 0) {
+        const targetGroup = sortedGroups[0];
+        await db.insert(phaseGroupParticipants).values({
+          groupId: targetGroup.id,
+          registrationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } else {
+        return {
+          success: false,
+          error: "Aucun groupe disponible dans la phase suivante",
+        };
+      }
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error adding qualified to next phase:", error);
+    return { success: false, error: String(error) };
+  }
 }

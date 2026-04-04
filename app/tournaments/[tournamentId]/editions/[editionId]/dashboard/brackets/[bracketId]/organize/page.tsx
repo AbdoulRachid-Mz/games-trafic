@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import {
   getBracketNodeById,
+  getMatchesWithParticipants,
   getPhaseGroupParticipants,
 } from "@/actions/phases";
 import { getEditionRegistrations, getMatches } from "@/actions/tournaments";
@@ -43,10 +44,10 @@ export default async function BracketNodeOrganizePage({
       })
     : { data: [] };
 
-  const matchesRes = await getMatches({
-    filters: { editionId, bracketNodeId: bracketId },
-    pagination: { limit: 100, page: 1 },
-  });
+   const matchesRes = await getMatchesWithParticipants({
+      filters: { editionId, bracketNodeId: bracketId },
+      pagination: { page: 1, limit: 1000 },
+    });
 
   return (
     <div className="space-y-6">

@@ -101,31 +101,70 @@ export async function getTournamentPhases(
     const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
-    const whereConditions = buildTournamentPhaseWhereConditions(filters, options);
-
-    const phasesQuery = db
-      .select()
-      .from(tournamentPhases)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof TournamentPhase;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
-      phasesQuery.orderBy(sortOrder(tournamentPhases[sortField]));
-    } else {
-      phasesQuery.orderBy(asc(tournamentPhases.order));
+    // Build where conditions safely
+    let whereConditions;
+    try {
+      whereConditions = buildTournamentPhaseWhereConditions(filters, options);
+    } catch (buildError) {
+      console.error('Error building where conditions:', buildError);
+      // Fallback to a safe default condition
+      whereConditions = eq(tournamentPhases.isDeleted, false);
     }
 
-    const countQuery = db
-      .select({ count: count() })
-      .from(tournamentPhases)
-      .where(whereConditions);
+    // Execute queries with error handling
+    let phasesData: TournamentPhase[] = [];
+    let total = 0;
 
-    const [phasesData, totalResult] = await Promise.all([phasesQuery, countQuery]);
+    try {
+      const phasesQuery = db
+        .select()
+        .from(tournamentPhases)
+        .where(whereConditions)
+        .limit(pagination.limit)
+        .offset(offset);
 
-    const total = totalResult[0]?.count || 0;
+      if (options.sortBy) {
+        const sortField = options.sortBy as keyof TournamentPhase;
+        const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+        phasesQuery.orderBy(sortOrder(tournamentPhases[sortField]));
+      } else {
+        phasesQuery.orderBy(asc(tournamentPhases.order));
+      }
+
+      const countQuery = db
+        .select({ count: count() })
+        .from(tournamentPhases)
+        .where(whereConditions);
+
+      const [phasesResult, countResult] = await Promise.all([
+        phasesQuery.execute().catch(err => {
+          console.error('Phases query failed:', err);
+          return [];
+        }),
+        countQuery.execute().catch(err => {
+          console.error('Count query failed:', err);
+          return [{ count: 0 }];
+        })
+      ]);
+
+      phasesData = phasesResult;
+      total = countResult[0]?.count ?? 0;
+    } catch (queryError) {
+      console.error('Database query error:', queryError);
+      // Return empty result on query failure
+      return {
+        data: [],
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
+    }
+
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
@@ -144,7 +183,6 @@ export async function getTournamentPhases(
     throw new Error('Failed to fetch tournament phases');
   }
 }
-
 /**
  * Récupère les statistiques des phases de tournoi
  */
@@ -801,22 +839,8 @@ export async function getMatchesWithParticipants(
           with: {
             member: {
               with: {
-                user: {
-                  columns: {
-                    id: true,
-                    username: true,
-                    fullName: true,
-                    profileImage: true,
-                    image: true,
-                  }
-                },
-                team: {
-                  columns: {
-                    id: true,
-                    name: true,
-                    logo: true,
-                  }
-                },
+                user: { columns: { id: true, username: true, fullName: true, profileImage: true, image: true } },
+                team: { columns: { id: true, name: true, logo: true } }
               }
             }
           }
@@ -825,32 +849,14 @@ export async function getMatchesWithParticipants(
           with: {
             member: {
               with: {
-                user: {
-                  columns: {
-                    id: true,
-                    username: true,
-                    fullName: true,
-                    profileImage: true,
-                    image: true,
-                  }
-                },
-                team: {
-                  columns: {
-                    id: true,
-                    name: true,
-                    logo: true,
-                  }
-                },
+                user: { columns: { id: true, username: true, fullName: true, profileImage: true, image: true } },
+                team: { columns: { id: true, name: true, logo: true } }
               }
             }
           }
         },
-        phase: {
-          columns: { id: true, name: true, phaseType: true }
-        },
-        group: {
-          columns: { id: true, name: true }
-        },
+        phase: { columns: { id: true, name: true, phaseType: true } },
+        group: { columns: { id: true, name: true } },
       }
     });
 
