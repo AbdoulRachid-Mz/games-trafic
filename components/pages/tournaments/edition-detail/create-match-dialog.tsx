@@ -13,13 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, Swords, AlertCircle, Users } from "lucide-react";
 import { createMatch } from "@/actions/tournaments";
-import { validateGroupCapacity } from "@/hooks/use-bulk-validation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { validateGroupCapacity } from "@/hooks/use-bulk-validation";
 
 interface CreateMatchDialogProps {
   editionId: string;

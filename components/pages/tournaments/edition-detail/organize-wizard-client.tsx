@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,7 +8,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -47,16 +46,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type DraftPhase = {
+  id: string; // ID unique temporaire pour le frontend
   name: string;
   phaseType: "GROUP_STAGE" | "ELIMINATION";
   order: number;
   participantSource: "EDITION" | "PHASE_QUALIFIED" | "PHASE_ELIMINATED" | "ALL";
-  sourcePhaseId?: string;
+  sourcePhaseId?: string; // Référence à l'ID temporaire d'une phase précédente
   qualifiedCount?: number;
 };
+
+// Générer un ID unique pour les phases en draft
+const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 interface OrganizeWizardClientProps {
   editionId: string;
@@ -73,9 +75,10 @@ export function OrganizeWizardClient({
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<"AUTO" | "MANUAL">("AUTO");
 
-  // Draft State for Manual Mode
+  // Draft State for Manual Mode - with unique temp IDs
   const [draftPhases, setDraftPhases] = useState<DraftPhase[]>([
     {
+      id: generateTempId(),
       name: "Phase 1: Groupes",
       phaseType: "GROUP_STAGE",
       order: 0,
@@ -83,11 +86,12 @@ export function OrganizeWizardClient({
       qualifiedCount: 2,
     },
     {
+      id: generateTempId(),
       name: "Phase 2: Élimination",
       phaseType: "ELIMINATION",
       order: 1,
       participantSource: "PHASE_QUALIFIED",
-      sourcePhaseId: undefined,
+      sourcePhaseId: undefined, // Sera défini quand la phase précédente existe
       qualifiedCount: 8,
     },
   ]);
@@ -118,38 +122,61 @@ export function OrganizeWizardClient({
   const existingPhasesCount = edition?.phases?.length || 0;
   const hasExistingPhases = existingPhasesCount > 0;
 
-  // Mettre à jour les sourcePhaseId quand les phases sont créées
-  useEffect(() => {
-    if (mode === "MANUAL" && draftPhases.length > 1) {
-      const updated = [...draftPhases];
-      for (let i = 1; i < updated.length; i++) {
-        if (
-          updated[i].participantSource !== "EDITION" &&
-          !updated[i].sourcePhaseId
-        ) {
-          updated[i].sourcePhaseId = `PHASE_${i}`; // Placeholder
+  // Mettre à jour les sourcePhaseId après chaque modification des phases
+  // Utiliser useMemo pour éviter les boucles infinies
+  const phasesWithSourceLinks = useMemo(() => {
+    return draftPhases.map((phase, idx) => {
+      if (idx === 0) return phase; // Première phase pas de source
+      
+      if (phase.participantSource !== "EDITION" && !phase.sourcePhaseId) {
+        // Lier automatiquement à la phase précédente
+        const previousPhase = draftPhases[idx - 1];
+        if (previousPhase) {
+          return { ...phase, sourcePhaseId: previousPhase.id };
         }
       }
+      return phase;
+    });
+  }, [draftPhases]);
+
+  // Synchroniser les phases avec les liens automatiques
+  const updateDraftPhasesWithLinks = useCallback(() => {
+    const updated = phasesWithSourceLinks;
+    if (JSON.stringify(updated) !== JSON.stringify(draftPhases)) {
       setDraftPhases(updated);
     }
-  }, [draftPhases, mode]);
+  }, [phasesWithSourceLinks, draftPhases]);
+
+  // Exécuter la synchronisation après chaque modification
+  const handleUpdateDraftPhase = useCallback((
+    index: number,
+    updates: Partial<DraftPhase>
+  ) => {
+    setDraftPhases(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], ...updates };
+      return updated;
+    });
+  }, []);
+
+  // Effet pour lier automatiquement les phases (exécuté une fois après modification)
+useEffect(() => {
+  updateDraftPhasesWithLinks();
+}, [draftPhases.length]);
 
   const handleAddDraftPhase = () => {
     const newOrder = draftPhases.length;
     const previousPhase = draftPhases[draftPhases.length - 1];
-    setDraftPhases([
-      ...draftPhases,
-      {
-        name: `Phase ${newOrder + 1}`,
-        phaseType: "ELIMINATION",
-        order: newOrder,
-        participantSource: previousPhase ? "PHASE_QUALIFIED" : "EDITION",
-        sourcePhaseId: previousPhase
-          ? `PHASE_${previousPhase.order}`
-          : undefined,
-        qualifiedCount: 2,
-      },
-    ]);
+    const newPhase: DraftPhase = {
+      id: generateTempId(),
+      name: `Phase ${newOrder + 1}`,
+      phaseType: "ELIMINATION",
+      order: newOrder,
+      participantSource: previousPhase ? "PHASE_QUALIFIED" : "EDITION",
+      sourcePhaseId: previousPhase ? previousPhase.id : undefined,
+      qualifiedCount: 2,
+    };
+    setDraftPhases([...draftPhases, newPhase]);
   };
 
   const handleRemoveDraftPhase = (index: number) => {
@@ -159,19 +186,10 @@ export function OrganizeWizardClient({
     setDraftPhases(updated);
   };
 
-  const handleUpdateDraftPhase = (
-    index: number,
-    updates: Partial<DraftPhase>,
-  ) => {
-    const updated = [...draftPhases];
-    updated[index] = { ...updated[index], ...updates };
-    setDraftPhases(updated);
-  };
-
   const getAvailablePhasesForSource = (currentIndex: number) => {
     return draftPhases
       .filter((_, i) => i < currentIndex)
-      .map((p, i) => ({ id: `PHASE_${i}`, name: p.name }));
+      .map((p) => ({ id: p.id, name: p.name }));
   };
 
   const validatePhaseConfig = (): { isValid: boolean; errors: string[] } => {
@@ -192,13 +210,14 @@ export function OrganizeWizardClient({
         phase.phaseType === "GROUP_STAGE"
       ) {
         errors.push(
-          `Phase "${phase.name}": une phase de groupes ne peut pas prendre des qualifiés`,
+          `Phase "${phase.name}": une phase de groupes ne peut pas prendre des qualifiés`
         );
       }
 
       if (
         phase.phaseType === "ELIMINATION" &&
-        phase.participantSource === "EDITION"
+        phase.participantSource === "EDITION" &&
+        i === 0
       ) {
         const participantCount =
           participantStrategy === "ALL"
@@ -207,13 +226,73 @@ export function OrganizeWizardClient({
         const isPowerOfTwo = (n: number) => (n & (n - 1)) === 0 && n !== 0;
         if (!isPowerOfTwo(participantCount) && participantCount > 0) {
           errors.push(
-            `Phase "${phase.name}": élimination directe nécessite un nombre de participants puissance de 2 (${participantCount} actuellement)`,
+            `Phase "${phase.name}": élimination directe nécessite un nombre de participants puissance de 2 (${participantCount} actuellement)`
           );
         }
       }
     }
 
     return { isValid: errors.length === 0, errors };
+  };
+
+  const buildAutoPhases = (): DraftPhase[] => {
+    const phases: DraftPhase[] = [];
+    let lastPhaseId: string | null = null;
+
+    if (autoConfig.includeGroups) {
+      const newId = generateTempId();
+      phases.push({
+        id: newId,
+        name: "Phase de groupes",
+        phaseType: "GROUP_STAGE",
+        order: phases.length,
+        participantSource: "EDITION",
+        qualifiedCount: autoConfig.groupsQualifiedCount,
+      });
+      lastPhaseId = newId;
+    }
+
+    if (autoConfig.includeQuarterFinals) {
+      const newId = generateTempId();
+      phases.push({
+        id: newId,
+        name: "Quarts de finale",
+        phaseType: "ELIMINATION",
+        order: phases.length,
+        participantSource: lastPhaseId ? "PHASE_QUALIFIED" : "EDITION",
+        sourcePhaseId: lastPhaseId || undefined,
+        qualifiedCount: 8,
+      });
+      lastPhaseId = newId;
+    }
+
+    if (autoConfig.includeSemiFinals) {
+      const newId = generateTempId();
+      phases.push({
+        id: newId,
+        name: "Demi-finales",
+        phaseType: "ELIMINATION",
+        order: phases.length,
+        participantSource: "PHASE_QUALIFIED",
+        sourcePhaseId: lastPhaseId || undefined,
+        qualifiedCount: 4,
+      });
+      lastPhaseId = newId;
+    }
+
+    if (autoConfig.includeFinal) {
+      phases.push({
+        id: generateTempId(),
+        name: "Finale",
+        phaseType: "ELIMINATION",
+        order: phases.length,
+        participantSource: "PHASE_QUALIFIED",
+        sourcePhaseId: lastPhaseId || undefined,
+        qualifiedCount: 2,
+      });
+    }
+
+    return phases;
   };
 
   const handleSaveOrganize = () => {
@@ -233,9 +312,20 @@ export function OrganizeWizardClient({
 
     startTransition(async () => {
       try {
-        await organizeEditionStructure(
-          editionId,
-          phasesToCreate.map((p, idx) => ({
+        // Convertir les références d'IDs temporaires en indices pour la création
+        const phasesForCreation = phasesToCreate.map((p, idx) => {
+          // Trouver l'index de la phase source si elle existe
+          let sourcePhaseIndex = undefined;
+          if (p.sourcePhaseId) {
+            const sourceIndex = phasesToCreate.findIndex(
+              (phase) => phase.id === p.sourcePhaseId
+            );
+            if (sourceIndex !== -1) {
+              sourcePhaseIndex = sourceIndex;
+            }
+          }
+
+          return {
             name: p.name,
             phaseType: p.phaseType,
             order: idx + existingPhasesCount,
@@ -245,24 +335,29 @@ export function OrganizeWizardClient({
             isDeleted: false,
             config: {
               participantSource: p.participantSource,
-              sourcePhaseId: p.sourcePhaseId,
+              sourcePhaseIndex: sourcePhaseIndex, // Utiliser l'index plutôt que l'ID
               qualifiedCount: p.qualifiedCount,
               groupsSize: groupsSize,
             },
-          })),
+          };
+        });
+
+        await organizeEditionStructure(
+          editionId,
+          phasesForCreation,
           selectedRegIds,
           {
             autoInitializeFirstPhase:
               autoInit && phasesToCreate[0]?.phaseType === "GROUP_STAGE",
             groupsSize: groupsSize,
-          },
+          }
         );
 
         toast.success("Structure et participants configurés avec succès !");
 
         setTimeout(() => {
           router.push(
-            `/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`,
+            `/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`
           );
           router.refresh();
         }, 1000);
@@ -270,59 +365,6 @@ export function OrganizeWizardClient({
         toast.error(error.message || "Erreur lors de l'organisation.");
       }
     });
-  };
-
-  const buildAutoPhases = (): DraftPhase[] => {
-    const phases: DraftPhase[] = [];
-    let lastPhaseType: string | null = null;
-
-    if (autoConfig.includeGroups) {
-      phases.push({
-        name: "Phase de groupes",
-        phaseType: "GROUP_STAGE",
-        order: phases.length,
-        participantSource: "EDITION",
-        qualifiedCount: autoConfig.groupsQualifiedCount,
-      });
-      lastPhaseType = "GROUP_STAGE";
-    }
-
-    if (autoConfig.includeQuarterFinals) {
-      phases.push({
-        name: "Quarts de finale",
-        phaseType: "ELIMINATION",
-        order: phases.length,
-        participantSource:
-          lastPhaseType === "GROUP_STAGE" ? "PHASE_QUALIFIED" : "EDITION",
-        sourcePhaseId: lastPhaseType === "GROUP_STAGE" ? "PHASE_0" : undefined,
-        qualifiedCount: 8,
-      });
-      lastPhaseType = "ELIMINATION";
-    }
-
-    if (autoConfig.includeSemiFinals) {
-      phases.push({
-        name: "Demi-finales",
-        phaseType: "ELIMINATION",
-        order: phases.length,
-        participantSource: "PHASE_QUALIFIED",
-        sourcePhaseId: `PHASE_${phases.length - 1}`,
-        qualifiedCount: 4,
-      });
-    }
-
-    if (autoConfig.includeFinal) {
-      phases.push({
-        name: "Finale",
-        phaseType: "ELIMINATION",
-        order: phases.length,
-        participantSource: "PHASE_QUALIFIED",
-        sourcePhaseId: `PHASE_${phases.length - 1}`,
-        qualifiedCount: 2,
-      });
-    }
-
-    return phases;
   };
 
   const getName = (reg: any) =>
@@ -389,373 +431,221 @@ export function OrganizeWizardClient({
           </CardHeader>
           <CardContent className="space-y-6">
             {mode === "AUTO" ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl border bg-card hover:border-primary/40 transition-all space-y-3">
-                    <Label className="font-bold text-xs uppercase tracking-wider text-primary">
-                      Structure
-                    </Label>
-                    <div className="space-y-3 pt-1">
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          id="groups"
-                          checked={autoConfig.includeGroups}
-                          onCheckedChange={(v) =>
-                            setAutoConfig({ ...autoConfig, includeGroups: !!v })
-                          }
-                        />
-                        <Label
-                          htmlFor="groups"
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          Groupes
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          id="qf"
-                          checked={autoConfig.includeQuarterFinals}
-                          onCheckedChange={(v) =>
-                            setAutoConfig({
-                              ...autoConfig,
-                              includeQuarterFinals: !!v,
-                            })
-                          }
-                        />
-                        <Label
-                          htmlFor="qf"
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          Quarts
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          id="sf"
-                          checked={autoConfig.includeSemiFinals}
-                          onCheckedChange={(v) =>
-                            setAutoConfig({
-                              ...autoConfig,
-                              includeSemiFinals: !!v,
-                            })
-                          }
-                        />
-                        <Label
-                          htmlFor="sf"
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          Demies
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          id="f"
-                          checked={autoConfig.includeFinal}
-                          onCheckedChange={(v) =>
-                            setAutoConfig({ ...autoConfig, includeFinal: !!v })
-                          }
-                        />
-                        <Label
-                          htmlFor="f"
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          Finale
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl border bg-card space-y-3">
-                    <Label className="font-bold text-xs uppercase tracking-wider text-primary">
-                      Paramètres
-                    </Label>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="groupsQualified" className="text-xs">
-                          Qualifiés par groupe
-                        </Label>
-                        <Input
-                          id="groupsQualified"
-                          type="number"
-                          min={1}
-                          max={8}
-                          className="w-20 h-8 text-center"
-                          value={autoConfig.groupsQualifiedCount}
-                          onChange={(e) =>
-                            setAutoConfig({
-                              ...autoConfig,
-                              groupsQualifiedCount:
-                                parseInt(e.target.value) || 2,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="groupsSize" className="text-xs">
-                          Taille des groupes
-                        </Label>
-                        <Input
-                          id="groupsSize"
-                          type="number"
-                          min={2}
-                          max={16}
-                          className="w-20 h-8 text-center"
-                          value={groupsSize}
-                          onChange={(e) =>
-                            setGroupsSize(parseInt(e.target.value) || 4)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <AutoModeConfig
+                autoConfig={autoConfig}
+                setAutoConfig={setAutoConfig}
+                groupsSize={groupsSize}
+                setGroupsSize={setGroupsSize}
+              />
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="font-bold text-xs uppercase tracking-wider text-primary">
-                    Séquence des phases
-                  </Label>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={handleAddDraftPhase}
-                    className="h-7 gap-1"
-                  >
-                    <Plus className="h-3 w-3" /> Ajouter
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  {draftPhases.map((phase, idx) => (
-                    <PhaseConfigCard
-                      key={idx}
-                      phase={phase}
-                      index={idx}
-                      isFirst={idx === 0}
-                      availablePhases={getAvailablePhasesForSource(idx)}
-                      onUpdate={(updates) =>
-                        handleUpdateDraftPhase(idx, updates)
-                      }
-                      onRemove={() => handleRemoveDraftPhase(idx)}
-                    />
-                  ))}
-
-                  {draftPhases.length === 0 && (
-                    <div className="py-6 text-center border-dashed border-2 rounded-xl text-muted-foreground text-xs">
-                      Aucune phase dans la séquence.
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ManualModeConfig
+                draftPhases={draftPhases}
+                onUpdatePhase={handleUpdateDraftPhase}
+                onAddPhase={handleAddDraftPhase}
+                onRemovePhase={handleRemoveDraftPhase}
+                getAvailablePhases={getAvailablePhasesForSource}
+              />
             )}
 
             {/* Participant Strategy */}
-            <div className="pt-4 border-t border-primary/10 space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="font-bold text-xs uppercase tracking-wider text-primary flex items-center gap-2">
-                  <Users className="h-3 w-3" />
-                  Participants initiaux
-                </Label>
-                <Badge variant="secondary" className="text-[10px]">
-                  {currentParticipantsCount} sélectionnés
-                </Badge>
-              </div>
+            <ParticipantStrategySection
+              participantStrategy={participantStrategy}
+              setParticipantStrategy={setParticipantStrategy}
+              selectedRegIds={selectedRegIds}
+              setSelectedRegIds={setSelectedRegIds}
+              currentParticipantsCount={currentParticipantsCount}
+              isPending={isPending}
+              editionRegistrations={edition?.registrations || []}
+              getName={getName}
+            />
 
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant={
-                    participantStrategy === "ALL" ? "default" : "outline"
-                  }
-                  size="sm"
-                  className="justify-start gap-2 h-10"
-                  onClick={() => {
-                    setParticipantStrategy("ALL");
-                    setSelectedRegIds(
-                      edition?.registrations?.map((r: any) => r.id) || [],
-                    );
-                  }}
-                >
-                  <Users className="h-4 w-4" /> Tous les inscrits
-                </Button>
-                <Button
-                  variant={
-                    participantStrategy === "SELECTED" ? "default" : "outline"
-                  }
-                  size="sm"
-                  className="justify-start gap-2 h-10"
-                  onClick={() => setParticipantStrategy("SELECTED")}
-                >
-                  <CheckCircle2 className="h-4 w-4" /> Sélection manuelle
-                </Button>
-              </div>
+            {/* Auto-initialization */}
+            <AutoInitSection
+              autoInit={autoInit}
+              setAutoInit={setAutoInit}
+              groupsSize={groupsSize}
+              setGroupsSize={setGroupsSize}
+            />
 
-              {/* Auto-initialization */}
-              <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="autoInit"
-                      checked={autoInit}
-                      onCheckedChange={(v) => setAutoInit(!!v)}
-                    />
-                    <Label
-                      htmlFor="autoInit"
-                      className="text-xs font-bold cursor-pointer"
-                    >
-                      Initialiser automatiquement la Phase 1
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-[10px] max-w-[200px]">
-                            Crée automatiquement les groupes et assigne les
-                            participants sélectionnés.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              className={cn(
-                "w-full h-14 text-lg font-bold shadow-lg gap-3",
-                isOverLimit
-                  ? "bg-destructive hover:bg-destructive"
-                  : "shadow-primary/20",
-              )}
-              disabled={
-                isPending ||
-                (mode === "MANUAL" && draftPhases.length === 0) ||
-                isOverLimit
-              }
-              onClick={handleSaveOrganize}
-            >
-              {isPending ? (
-                <RefreshCw className="w-6 h-6 animate-spin" />
-              ) : isOverLimit ? (
-                <AlertCircle className="w-6 h-6" />
-              ) : (
-                <Play className="w-6 h-6" />
-              )}
-              {isPending
-                ? "Déploiement..."
-                : isOverLimit
-                  ? `Limite dépassée (${currentParticipantsCount}/${maxParticipants})`
-                  : "Déployer la structure"}
-            </Button>
+            <SubmitButton
+              isPending={isPending}
+              isOverLimit={isOverLimit}
+              currentParticipantsCount={currentParticipantsCount}
+              maxParticipants={maxParticipants}
+              mode={mode}
+              draftPhasesLength={draftPhases.length}
+              onSave={handleSaveOrganize}
+            />
           </CardContent>
         </Card>
 
         {/* Step 2: Participant Selection */}
-        <Card className="border-none shadow-xl bg-muted/30">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Filter className="w-4 h-4 text-primary" /> 2. Participants (
-              {edition?.registrations?.length || 0})
-            </CardTitle>
-            <CardDescription className="text-xs">
-              {participantStrategy === "ALL"
-                ? "Tous les inscrits seront inclus dans la première phase."
-                : "Cochez les participants à inclure dans la structure."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 border-t">
-            <div className="max-h-[550px] overflow-y-auto">
-              {edition?.registrations?.length === 0 ? (
-                <div className="py-20 text-center text-muted-foreground italic text-sm">
-                  Aucun participant inscrit.
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-border/50">
-                    {edition?.registrations?.map((reg: any) => (
-                      <tr
-                        key={reg.id}
-                        className="hover:bg-primary/5 transition-colors group"
-                      >
-                        <td className="p-4 w-12">
-                          <Checkbox
-                            checked={selectedRegIds.includes(reg.id)}
-                            disabled={
-                              participantStrategy === "ALL" || isPending
-                            }
-                            onCheckedChange={(v) => {
-                              if (v)
-                                setSelectedRegIds([...selectedRegIds, reg.id]);
-                              else
-                                setSelectedRegIds(
-                                  selectedRegIds.filter((id) => id !== reg.id),
-                                );
-                            }}
-                            className="h-5 w-5"
-                          />
-                        </td>
-                        <td className="p-4">
-                          <div
-                            className={cn(
-                              "font-bold text-sm",
-                              !selectedRegIds.includes(reg.id) &&
-                                "text-muted-foreground/50",
-                            )}
-                          >
-                            {getName(reg)}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <span className="bg-muted px-1.5 py-0.5 rounded uppercase font-mono">
-                              ID: {reg.id.slice(0, 8)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-right">
-                          {selectedRegIds.includes(reg.id) ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-600 border-none text-[10px]">
-                              INCLUS
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="text-muted-foreground text-[10px] opacity-40"
-                            >
-                              EXCLU
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <ParticipantSelectionCard
+          editionRegistrations={edition?.registrations || []}
+          participantStrategy={participantStrategy}
+          selectedRegIds={selectedRegIds}
+          setSelectedRegIds={setSelectedRegIds}
+          isPending={isPending}
+          getName={getName}
+        />
       </div>
 
       {/* Info Banner */}
-      <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 p-4 rounded-xl text-primary text-sm shadow-sm">
-        <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-          <MoveRight className="w-5 h-5" />
+      <InfoBanner />
+    </div>
+  );
+}
+
+// ============================================================================
+// SOUS-COMPOSANTS (pour réduire la complexité et éviter les boucles)
+// ============================================================================
+
+function AutoModeConfig({ autoConfig, setAutoConfig, groupsSize, setGroupsSize }: any) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-4 rounded-xl border bg-card hover:border-primary/40 transition-all space-y-3">
+          <Label className="font-bold text-xs uppercase tracking-wider text-primary">
+            Structure
+          </Label>
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="groups"
+                checked={autoConfig.includeGroups}
+                onCheckedChange={(v) =>
+                  setAutoConfig({ ...autoConfig, includeGroups: !!v })
+                }
+              />
+              <Label htmlFor="groups" className="text-sm font-medium cursor-pointer">
+                Groupes
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="qf"
+                checked={autoConfig.includeQuarterFinals}
+                onCheckedChange={(v) =>
+                  setAutoConfig({ ...autoConfig, includeQuarterFinals: !!v })
+                }
+              />
+              <Label htmlFor="qf" className="text-sm font-medium cursor-pointer">
+                Quarts
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="sf"
+                checked={autoConfig.includeSemiFinals}
+                onCheckedChange={(v) =>
+                  setAutoConfig({ ...autoConfig, includeSemiFinals: !!v })
+                }
+              />
+              <Label htmlFor="sf" className="text-sm font-medium cursor-pointer">
+                Demies
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="f"
+                checked={autoConfig.includeFinal}
+                onCheckedChange={(v) =>
+                  setAutoConfig({ ...autoConfig, includeFinal: !!v })
+                }
+              />
+              <Label htmlFor="f" className="text-sm font-medium cursor-pointer">
+                Finale
+              </Label>
+            </div>
+          </div>
         </div>
-        <div className="space-y-0.5">
-          <p className="font-bold">Validation de la hiérarchie</p>
-          <p className="text-xs opacity-80">
-            Les participants sélectionnés seront propagés à la Phase 1. Les
-            phases suivantes dépendront des résultats (qualifiés/éliminés) des
-            phases précédentes.
-          </p>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <Label className="font-bold text-xs uppercase tracking-wider text-primary">
+            Paramètres
+          </Label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="groupsQualified" className="text-xs">
+                Qualifiés par groupe
+              </Label>
+              <Input
+                id="groupsQualified"
+                type="number"
+                min={1}
+                max={8}
+                className="w-20 h-8 text-center"
+                value={autoConfig.groupsQualifiedCount}
+                onChange={(e) =>
+                  setAutoConfig({
+                    ...autoConfig,
+                    groupsQualifiedCount: parseInt(e.target.value) || 2,
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="groupsSize" className="text-xs">
+                Taille des groupes
+              </Label>
+              <Input
+                id="groupsSize"
+                type="number"
+                min={2}
+                max={16}
+                className="w-20 h-8 text-center"
+                value={groupsSize}
+                onChange={(e) => setGroupsSize(parseInt(e.target.value) || 4)}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Composant de configuration d'une phase (Mode Expert)
+function ManualModeConfig({
+  draftPhases,
+  onUpdatePhase,
+  onAddPhase,
+  onRemovePhase,
+  getAvailablePhases,
+}: any) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="font-bold text-xs uppercase tracking-wider text-primary">
+          Séquence des phases
+        </Label>
+        <Button size="xs" variant="outline" onClick={onAddPhase} className="h-7 gap-1">
+          <Plus className="h-3 w-3" /> Ajouter
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        {draftPhases.map((phase: DraftPhase, idx: number) => (
+          <PhaseConfigCard
+            key={phase.id}
+            phase={phase}
+            index={idx}
+            isFirst={idx === 0}
+            availablePhases={getAvailablePhases(idx)}
+            onUpdate={(updates: Partial<DraftPhase>) => onUpdatePhase(idx, updates)}
+            onRemove={() => onRemovePhase(idx)}
+          />
+        ))}
+
+        {draftPhases.length === 0 && (
+          <div className="py-6 text-center border-dashed border-2 rounded-xl text-muted-foreground text-xs">
+            Aucune phase dans la séquence.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PhaseConfigCard({
   phase,
   index,
@@ -800,41 +690,51 @@ function PhaseConfigCard({
           <Label className="text-[10px] font-bold uppercase text-muted-foreground">
             Type
           </Label>
-          <select
-            className="w-full mt-1 text-xs bg-muted/50 border rounded px-2 py-1.5"
+          <Select
             value={phase.phaseType}
-            onChange={(e) => onUpdate({ phaseType: e.target.value as any })}
+            onValueChange={(value) => onUpdate({ phaseType: value as any })}
           >
-            <option value="GROUP_STAGE">Phase de groupes</option>
-            <option value="ELIMINATION">Élimination directe</option>
-          </select>
+            <SelectTrigger className="h-8 text-xs mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="GROUP_STAGE">Phase de groupes</SelectItem>
+              <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div>
           <Label className="text-[10px] font-bold uppercase text-muted-foreground">
             Source participants
           </Label>
-          <select
-            className="w-full mt-1 text-xs bg-muted/50 border rounded px-2 py-1.5"
+          <Select
             value={phase.participantSource}
-            onChange={(e) =>
-              onUpdate({ participantSource: e.target.value as any })
+            onValueChange={(value) =>
+              onUpdate({ participantSource: value as any })
             }
             disabled={isFirst}
           >
-            <option value="EDITION">Tous les inscrits</option>
-            {!isFirst && (
-              <>
-                <option value="PHASE_QUALIFIED">
-                  Qualifiés phase précédente
-                </option>
-                <option value="PHASE_ELIMINATED">
-                  Éliminés phase précédente
-                </option>
-                <option value="ALL">Tous participants phase précédente</option>
-              </>
-            )}
-          </select>
+            <SelectTrigger className="h-8 text-xs mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="EDITION">Tous les inscrits</SelectItem>
+              {!isFirst && (
+                <>
+                  <SelectItem value="PHASE_QUALIFIED">
+                    Qualifiés phase précédente
+                  </SelectItem>
+                  <SelectItem value="PHASE_ELIMINATED">
+                    Éliminés phase précédente
+                  </SelectItem>
+                  <SelectItem value="ALL">
+                    Tous participants phase précédente
+                  </SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -844,18 +744,21 @@ function PhaseConfigCard({
             <Label className="text-[10px] font-bold uppercase text-muted-foreground">
               Phase source
             </Label>
-            <select
-              className="w-full mt-1 text-xs bg-muted/50 border rounded px-2 py-1.5"
+            <Select
               value={phase.sourcePhaseId || ""}
-              onChange={(e) => onUpdate({ sourcePhaseId: e.target.value })}
+              onValueChange={(value) => onUpdate({ sourcePhaseId: value })}
             >
-              <option value="">Sélectionner...</option>
-              {availablePhases.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectValue placeholder="Sélectionner..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePhases.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {phase.participantSource === "PHASE_QUALIFIED" && (
@@ -877,6 +780,224 @@ function PhaseConfigCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ParticipantStrategySection({
+  participantStrategy,
+  setParticipantStrategy,
+  selectedRegIds,
+  setSelectedRegIds,
+  currentParticipantsCount,
+  isPending,
+  editionRegistrations,
+  getName,
+}: any) {
+  return (
+    <div className="pt-4 border-t border-primary/10 space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="font-bold text-xs uppercase tracking-wider text-primary flex items-center gap-2">
+          <Users className="h-3 w-3" />
+          Participants initiaux
+        </Label>
+        <Badge variant="secondary" className="text-[10px]">
+          {currentParticipantsCount} sélectionnés
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button
+          variant={participantStrategy === "ALL" ? "default" : "outline"}
+          size="sm"
+          className="justify-start gap-2 h-10"
+          onClick={() => {
+            setParticipantStrategy("ALL");
+            setSelectedRegIds(editionRegistrations.map((r: any) => r.id));
+          }}
+        >
+          <Users className="h-4 w-4" /> Tous les inscrits
+        </Button>
+        <Button
+          variant={participantStrategy === "SELECTED" ? "default" : "outline"}
+          size="sm"
+          className="justify-start gap-2 h-10"
+          onClick={() => setParticipantStrategy("SELECTED")}
+        >
+          <CheckCircle2 className="h-4 w-4" /> Sélection manuelle
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AutoInitSection({
+  autoInit,
+  setAutoInit,
+  groupsSize,
+  setGroupsSize,
+}: any) {
+  return (
+    <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="autoInit"
+            checked={autoInit}
+            onCheckedChange={(v) => setAutoInit(!!v)}
+          />
+          <Label htmlFor="autoInit" className="text-xs font-bold cursor-pointer">
+            Initialiser automatiquement la Phase 1
+          </Label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-[10px] max-w-[200px]">
+                  Crée automatiquement les groupes et assigne les participants sélectionnés.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubmitButton({
+  isPending,
+  isOverLimit,
+  currentParticipantsCount,
+  maxParticipants,
+  mode,
+  draftPhasesLength,
+  onSave,
+}: any) {
+  return (
+    <Button
+      className={cn(
+        "w-full h-14 text-lg font-bold shadow-lg gap-3",
+        isOverLimit ? "bg-destructive hover:bg-destructive" : "shadow-primary/20"
+      )}
+      disabled={
+        isPending ||
+        (mode === "MANUAL" && draftPhasesLength === 0) ||
+        isOverLimit
+      }
+      onClick={onSave}
+    >
+      {isPending ? (
+        <RefreshCw className="w-6 h-6 animate-spin" />
+      ) : isOverLimit ? (
+        <AlertCircle className="w-6 h-6" />
+      ) : (
+        <Play className="w-6 h-6" />
+      )}
+      {isPending
+        ? "Déploiement..."
+        : isOverLimit
+          ? `Limite dépassée (${currentParticipantsCount}/${maxParticipants})`
+          : "Déployer la structure"}
+    </Button>
+  );
+}
+
+function ParticipantSelectionCard({
+  editionRegistrations,
+  participantStrategy,
+  selectedRegIds,
+  setSelectedRegIds,
+  isPending,
+  getName,
+}: any) {
+  return (
+    <Card className="border-none shadow-xl bg-muted/30">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-sm font-bold flex items-center gap-2">
+          <Filter className="w-4 h-4 text-primary" /> 2. Participants ({editionRegistrations.length})
+        </CardTitle>
+        <CardDescription className="text-xs">
+          {participantStrategy === "ALL"
+            ? "Tous les inscrits seront inclus dans la première phase."
+            : "Cochez les participants à inclure dans la structure."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0 border-t">
+        <div className="max-h-[550px] overflow-y-auto">
+          {editionRegistrations.length === 0 ? (
+            <div className="py-20 text-center text-muted-foreground italic text-sm">
+              Aucun participant inscrit.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-border/50">
+                {editionRegistrations.map((reg: any) => (
+                  <tr key={reg.id} className="hover:bg-primary/5 transition-colors group">
+                    <td className="p-4 w-12">
+                      <Checkbox
+                        checked={selectedRegIds.includes(reg.id)}
+                        disabled={participantStrategy === "ALL" || isPending}
+                        onCheckedChange={(v: boolean) => {
+                          if (v) setSelectedRegIds([...selectedRegIds, reg.id]);
+                          else setSelectedRegIds(selectedRegIds.filter((id: string) => id !== reg.id));
+                        }}
+                        className="h-5 w-5"
+                      />
+                    </td>
+                    <td className="p-4">
+                      <div
+                        className={cn(
+                          "font-bold text-sm",
+                          !selectedRegIds.includes(reg.id) && "text-muted-foreground/50"
+                        )}
+                      >
+                        {getName(reg)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <span className="bg-muted px-1.5 py-0.5 rounded uppercase font-mono">
+                          ID: {reg.id.slice(0, 8)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-right">
+                      {selectedRegIds.includes(reg.id) ? (
+                        <Badge className="bg-emerald-500/10 text-emerald-600 border-none text-[10px]">
+                          INCLUS
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground text-[10px] opacity-40">
+                          EXCLU
+                        </Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoBanner() {
+  return (
+    <div className="flex items-center gap-4 bg-primary/5 border border-primary/20 p-4 rounded-xl text-primary text-sm shadow-sm">
+      <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+        <MoveRight className="w-5 h-5" />
+      </div>
+      <div className="space-y-0.5">
+        <p className="font-bold">Validation de la hiérarchie</p>
+        <p className="text-xs opacity-80">
+          Les participants sélectionnés seront propagés à la Phase 1. Les
+          phases suivantes dépendront des résultats (qualifiés/éliminés) des
+          phases précédentes.
+        </p>
+      </div>
     </div>
   );
 }

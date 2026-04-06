@@ -33,6 +33,8 @@ interface TransactionDepositFormProps {
   onBack: () => void;
 }
 
+// Mettre à jour les PAYMENT_METHODS et PAYMENT_PROVIDERS
+
 const PAYMENT_METHODS = [
   {
     id: "BANK_TRANSFER",
@@ -65,9 +67,9 @@ const PAYMENT_METHODS = [
 ];
 
 const PAYMENT_PROVIDERS = {
-  BANK_TRANSFER: ["BNI", "BOA", "ECOBANK", "UBA"],
-  MOBILE_MONEY: ["MTN", "ORANGE", "WAVE", "MOOV"],
-  CRYPTO: ["BITCOIN", "ETHEREUM", "USDT"],
+  BANK_TRANSFER: ["BNI", "BOA", "ECOBANK", "UBA", "NITA", "AMANATA"],
+  MOBILE_MONEY: ["MTN", "ORANGE", "WAVE", "MOOV", "AIRTel", "ZAMANI"],
+  CRYPTO: ["BITCOIN", "ETHEREUM", "USDT", "USDC"],
 };
 
 export function TransactionDepositForm({

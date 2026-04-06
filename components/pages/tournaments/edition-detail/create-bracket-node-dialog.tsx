@@ -13,13 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, AlertCircle, Layers } from "lucide-react";
 import { createBracketNode } from "@/actions/phases";
-import { validateGroupCapacity } from "@/hooks/use-bulk-validation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { validateGroupCapacityAction } from "@/actions/validation";
 
 interface CreateBracketNodeDialogProps {
   phaseId: string;
@@ -48,25 +48,37 @@ export function CreateBracketNodeDialog({
   const isAtCapacity = currentNodesCount >= maxNodes;
   const remainingSlots = maxNodes - currentNodesCount;
 
-  // Vérifier la capacité à l'ouverture
+  // Dans le useEffect
   useEffect(() => {
     if (open) {
       if (isAtCapacity) {
-        setCapacityError(`Limite de nodes atteinte (${currentNodesCount}/${maxNodes})`);
+        setCapacityError(
+          `Limite de nodes atteinte (${currentNodesCount}/${maxNodes})`,
+        );
+      } else if (groupId) {
+        validateGroupCapacityAction(groupId, 1).then((result) => {
+          if (!result.isValid) {
+            setCapacityError(result.errors[0]);
+          } else {
+            setCapacityError(null);
+          }
+        });
       } else {
         setCapacityError(null);
       }
     }
-  }, [open, isAtCapacity, currentNodesCount, maxNodes]);
+  }, [open, isAtCapacity, currentNodesCount, maxNodes, groupId]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (isAtCapacity) {
-      toast.error(`Impossible d'ajouter un node : limite de ${maxNodes} nodes atteinte`);
+      toast.error(
+        `Impossible d'ajouter un node : limite de ${maxNodes} nodes atteinte`,
+      );
       return;
     }
-    
+
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
@@ -110,9 +122,9 @@ export function CreateBracketNodeDialog({
           variant="outline"
           className={cn(
             "h-8 gap-1.5 shadow-sm",
-            isAtCapacity 
-              ? "border-destructive/50 text-destructive hover:bg-destructive/10" 
-              : "border-primary/20 bg-primary/5 hover:bg-primary/10"
+            isAtCapacity
+              ? "border-destructive/50 text-destructive hover:bg-destructive/10"
+              : "border-primary/20 bg-primary/5 hover:bg-primary/10",
           )}
           disabled={isAtCapacity}
         >
@@ -132,24 +144,25 @@ export function CreateBracketNodeDialog({
             Nouveau nœud de bracket
           </DialogTitle>
           <DialogDescription>
-            Créez un nouveau nœud dans le bracket. Les participants pourront y être assignés ensuite.
+            Créez un nouveau nœud dans le bracket. Les participants pourront y
+            être assignés ensuite.
           </DialogDescription>
         </DialogHeader>
-        
+
         {capacityError && (
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{capacityError}</span>
           </div>
         )}
-        
+
         {!isAtCapacity && remainingSlots <= 3 && (
           <div className="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2 text-yellow-600 text-xs">
             <AlertCircle className="h-3 w-3" />
             Plus que {remainingSlots} place(s) disponible(s)
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-1.5">
             <Label htmlFor="nodeCode">Code d'identification</Label>
@@ -163,7 +176,7 @@ export function CreateBracketNodeDialog({
               Laissez vide pour génération automatique
             </p>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="round">Round</Label>

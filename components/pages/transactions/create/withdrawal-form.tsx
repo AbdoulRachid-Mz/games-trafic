@@ -61,8 +61,8 @@ const PAYMENT_METHODS = [
   },
 ];
 
-const BANK_OPTIONS = ["BNI", "BOA", "ECOBANK", "UBA", "SGBC", "BGFI"];
-const MOBILE_MONEY_OPTIONS = ["MTN", "ORANGE", "WAVE", "MOOV"];
+const BANK_OPTIONS = ["BNI", "BOA", "ECOBANK", "UBA", "NITA", "AMANATA"];
+const MOBILE_MONEY_OPTIONS = ["MTN", "ORANGE", "WAVE", "MOOV", "AIRTEL", "ZAMANI"];
 
 export function TransactionWithdrawalForm({
   onSubmit,

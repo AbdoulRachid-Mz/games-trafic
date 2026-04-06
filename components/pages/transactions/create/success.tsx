@@ -31,6 +31,7 @@ import { generateEnhancedReceipt } from "@/utils/receipt-templates";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface TransactionSuccessProps {
   transactionId: string | null;
@@ -57,6 +58,8 @@ export function TransactionSuccess({
   const transactionReference = transactionId
     ? `TX-${transactionId.slice(-8)}`
     : `REQ-${Date.now().toString().slice(-8)}`;
+
+  const router = useRouter();
 
   useEffect(() => {
     // Lancer les confettis au montage
@@ -305,11 +308,18 @@ export function TransactionSuccess({
               <Share2 className="mr-2 h-4 w-4" /> Partager
             </Button>
             <Button
-              onClick={onReturnHome}
-              className="col-span-2 rounded-xl h-12 shadow-lg shadow-primary/20"
-            >
-              Retour au portefeuille
-            </Button>
+  onClick={() => {
+    if (transactionId) {
+      router.push(`/wallet/transactions/${transactionId}`);
+    } else {
+      onReturnHome();
+    }
+  }}
+  className="col-span-2 rounded-xl h-12 shadow-lg shadow-primary/20"
+>
+  Voir le détail de la transaction
+  <ExternalLink className="ml-2 h-4 w-4" />
+</Button>
           </div>
         </motion.div>
       </CardContent>

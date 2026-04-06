@@ -85,7 +85,9 @@ function CreateTransactionContent({
   });
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
-  const [prefilledRecipientWalletId, setPrefilledRecipientWalletId] = useState<string | null>(null);
+  const [prefilledRecipientWalletId, setPrefilledRecipientWalletId] = useState<
+    string | null
+  >(null);
 
   // Fetch fees via the dedicated hook
   const {
@@ -94,12 +96,10 @@ function CreateTransactionContent({
     isLoading: feesLoading,
     isError,
     error,
-    refetch
-  } = useTransactionFees(
-    transactionData.type,
-    transactionData.amount,
-    { enabled: !!transactionData.type && transactionData.amount > 0 }
-  );
+    refetch,
+  } = useTransactionFees(transactionData.type, transactionData.amount, {
+    enabled: !!transactionData.type && transactionData.amount > 0,
+  });
 
   const feesObj = useMemo(() => {
     const baseAmount = transactionData.amount || 0;
@@ -172,7 +172,10 @@ function CreateTransactionContent({
           description: edition.description || "",
           price: parseFloat(edition.entryFee || "0"),
           currency: edition.prizeCurrency || "GTC",
-          image: edition.tournament?.profileImage || edition.tournament?.profileImage || undefined,
+          image:
+            edition.tournament?.profileImage ||
+            edition.tournament?.profileImage ||
+            undefined,
           metadata: {
             tournamentId: edition.tournamentId,
             editionNumber: edition.editionNumber,
@@ -204,17 +207,20 @@ function CreateTransactionContent({
           type,
           amount: amount ? parseFloat(amount) : 0,
           metadata: {
-            ...(imageUrl && { image: imageUrl }) // Stocker l'image
+            ...(imageUrl && { image: imageUrl }), // Stocker l'image
           },
         };
 
         // Pour DEPOSIT et WITHDRAWAL, on pré-rempli les détails si fournis
-        const hasPaymentDetails = searchParams.get("paymentMethod") ||
+        const hasPaymentDetails =
+          searchParams.get("paymentMethod") ||
           searchParams.get("paymentProvider") ||
           searchParams.get("paymentAccountId");
 
-        if ((type === "DEPOSIT" || type === "WITHDRAWAL") && hasPaymentDetails) {
-          
+        if (
+          (type === "DEPOSIT" || type === "WITHDRAWAL") &&
+          hasPaymentDetails
+        ) {
           newData.metadata = {
             ...newData.metadata,
             paymentMethod: searchParams.get("paymentMethod") || "",
@@ -248,7 +254,10 @@ function CreateTransactionContent({
               }
               newData.entity = entity as any;
               if (type === "GAME_ITEM_PURCHASE" && entity.price) {
-                if (newData.amount && Math.abs(newData.amount - entity.price) > 0.01) {
+                if (
+                  newData.amount &&
+                  Math.abs(newData.amount - entity.price) > 0.01
+                ) {
                   newData.metadata = {
                     ...newData.metadata,
                     originalAmount: newData.amount,
@@ -267,16 +276,27 @@ function CreateTransactionContent({
         setTransactionData(newData);
 
         // Calculer les étapes initiales
-        const initialStepIndex = getInitialStepForType(
-          type,
-          config,
-          !!newData.targetId || !!newData.recipientWalletId
-        );
-        setCurrentStep(initialStepIndex);
+        let initialStepIndex = 0;
+        if (config) {
+          if (type === "DEPOSIT") {
+            initialStepIndex = config.steps.indexOf("DEPOSIT_DETAILS");
+          } else if (type === "WITHDRAWAL") {
+            initialStepIndex = config.steps.indexOf("WITHDRAWAL_DETAILS");
+          } else if (type === "TRANSFER" && newData.recipientWalletId) {
+            initialStepIndex = config.steps.indexOf("AMOUNT_INPUT");
+          } else if (config.requiresEntity && newData.targetId) {
+            initialStepIndex = config.steps.indexOf("AMOUNT_INPUT");
+          } else {
+            initialStepIndex = 0;
+          }
+        }
+        setCurrentStep(initialStepIndex >= 0 ? initialStepIndex : 0);
       }
 
       if (completeData && !completeData?.wallet) {
-        toast.error("Vous devez avoir un wallet pour effectuer des transactions");
+        toast.error(
+          "Vous devez avoir un wallet pour effectuer des transactions",
+        );
         router.push("/wallet");
       }
     };
@@ -295,7 +315,7 @@ function CreateTransactionContent({
   const getInitialStepForType = (
     type: TransactionType,
     config: (typeof TRANSACTION_CONFIGS)[TransactionType],
-    hasTargetId: boolean
+    hasTargetId: boolean,
   ): number => {
     if (type === "TRANSFER") {
       const recipientStepIndex = config.steps.indexOf("RECIPIENT_SELECTION");
@@ -373,7 +393,10 @@ function CreateTransactionContent({
           }
           newData.entity = entity as any;
           if (type === "GAME_ITEM_PURCHASE" && entity.price) {
-            if (newData.amount && Math.abs(newData.amount - entity.price) > 0.01) {
+            if (
+              newData.amount &&
+              Math.abs(newData.amount - entity.price) > 0.01
+            ) {
               newData.metadata = {
                 ...newData.metadata,
                 originalAmount: newData.amount,
@@ -394,7 +417,7 @@ function CreateTransactionContent({
       const initialStep = getInitialStepForType(
         type,
         config,
-        !!newData.targetId || !!newData.recipientWalletId
+        !!newData.targetId || !!newData.recipientWalletId,
       );
       setCurrentStep(initialStep);
 
@@ -405,7 +428,10 @@ function CreateTransactionContent({
   };
 
   const handleEntitySelect = async (entity: any) => {
-    if (transactionData.type === "THEME_PURCHASE" || transactionData.type === "PRODUCT_PURCHASE") {
+    if (
+      transactionData.type === "THEME_PURCHASE" ||
+      transactionData.type === "PRODUCT_PURCHASE"
+    ) {
       const creatorId = entity.creatorId || entity.userId || entity.ownerId;
       if (creatorId && user?.id && creatorId === user.id) {
         toast.error("Action non autorisée: vous êtes l'auteur de cet élément");
@@ -428,8 +454,7 @@ function CreateTransactionContent({
             toast.error("Vous êtes déjà membre ou organisateur de ce tournoi");
             return;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     }
 
@@ -556,7 +581,10 @@ function CreateTransactionContent({
       throw new Error("Wallet non trouvé");
     }
 
-    if (transactionData.type === "DEPOSIT" || transactionData.type === "WITHDRAWAL") {
+    if (
+      transactionData.type === "DEPOSIT" ||
+      transactionData.type === "WITHDRAWAL"
+    ) {
       const request = await createRequest(
         {
           userId: user!.id,
@@ -566,7 +594,7 @@ function CreateTransactionContent({
           paymentProvider: transactionData.metadata?.paymentProvider,
           paymentAccountId: transactionData.metadata?.paymentAccountId,
         },
-        { allowDuplicate }
+        { allowDuplicate },
       );
 
       if (!request) throw new Error("Erreur lors de la création de la requête");
@@ -579,16 +607,28 @@ function CreateTransactionContent({
 
     if (transactionData.type === "GAME_ITEM_PURCHASE") {
       if (!transactionData.targetId) throw new Error("Item non trouvé");
-      const gameAccount = transactionData.metadata?.gameAccount as string | undefined;
-      const encryptedPassword = transactionData.metadata?.encryptedPassword as string | undefined;
-      const additionalInfo = transactionData.metadata?.additionalInfo as string | undefined;
+      const gameAccount = transactionData.metadata?.gameAccount as
+        | string
+        | undefined;
+      const encryptedPassword = transactionData.metadata?.encryptedPassword as
+        | string
+        | undefined;
+      const additionalInfo = transactionData.metadata?.additionalInfo as
+        | string
+        | undefined;
       if (!gameAccount || !encryptedPassword) {
-        throw new Error("Veuillez renseigner les informations du compte de jeu");
+        throw new Error(
+          "Veuillez renseigner les informations du compte de jeu",
+        );
       }
-      const quantity =
-        transactionData.entity?.price
-          ? Math.max(1, Math.round(transactionData.amount / (transactionData.entity?.price || 1)))
-          : 1;
+      const quantity = transactionData.entity?.price
+        ? Math.max(
+            1,
+            Math.round(
+              transactionData.amount / (transactionData.entity?.price || 1),
+            ),
+          )
+        : 1;
       const request = await createRequest(
         {
           userId: user!.id,
@@ -603,7 +643,7 @@ function CreateTransactionContent({
             totalGtc: transactionData.amount.toString(),
           },
         },
-        { allowDuplicate }
+        { allowDuplicate },
       );
       setTransactionId(request.id);
       toast.success("Demande créée ! L’équipe va traiter votre achat.");
@@ -618,12 +658,16 @@ function CreateTransactionContent({
         {
           productId: transactionData.targetId,
           totalAmount: transactionData.amount,
-          buyerInstructions: transactionData.metadata?.buyerInstructions as string | undefined,
+          buyerInstructions: transactionData.metadata?.buyerInstructions as
+            | string
+            | undefined,
         },
-        { allowDuplicate }
+        { allowDuplicate },
       );
       if (!order.success) {
-        throw new Error(order.error || "Erreur lors de la création de la commande");
+        throw new Error(
+          order.error || "Erreur lors de la création de la commande",
+        );
       }
       setTransactionId(order.orderId || null);
       toast.success("Commande créée ! Elle sera validée par la boutique.");
@@ -648,7 +692,7 @@ function CreateTransactionContent({
           totalCalculated: feesObj.totalAmount,
         },
       },
-      { allowDuplicate }
+      { allowDuplicate },
     );
 
     setTransactionId(transaction.id);
@@ -679,19 +723,21 @@ function CreateTransactionContent({
   };
 
   const handleConfirm = async () => {
-    setIsLoading(true);
-    try {
-      await executeConfirm(false);
-    } catch (error: any) {
-      if (error?.message?.includes("déjà en cours")) {
-        setDuplicateDialogOpen(true);
-      } else {
-        toast.error(error.message);
-      }
-    } finally {
-      setIsLoading(false);
+  setIsLoading(true);
+  try {
+    await executeConfirm(false);
+    // After success, proceed to next step (transactionId is set in executeConfirm via setTransactionId)
+    nextStep();
+  } catch (error: any) {
+    if (error?.message?.includes("déjà en cours")) {
+      setDuplicateDialogOpen(true);
+    } else {
+      toast.error(error.message);
     }
-  };
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleDuplicateConfirm = async () => {
     setDuplicateDialogOpen(false);
@@ -722,8 +768,9 @@ function CreateTransactionContent({
       case "WITHDRAWAL":
         return "Demande de retrait";
       case "TRANSFER":
-        return `Transfert à ${(data.metadata as any).recipientName || "utilisateur"
-          }`;
+        return `Transfert à ${
+          (data.metadata as any).recipientName || "utilisateur"
+        }`;
       default:
         return "Transaction";
     }
@@ -738,18 +785,36 @@ function CreateTransactionContent({
       return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center justify-between">
-            <Typography variant="h4" className="font-black italic uppercase tracking-tighter">Scanner QR Code</Typography>
-            <Button variant="ghost" size="icon" onClick={() => setShowScanner(false)} className="rounded-full">
+            <Typography
+              variant="h4"
+              className="font-black italic uppercase tracking-tighter"
+            >
+              Scanner QR Code
+            </Typography>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowScanner(false)}
+              className="rounded-full"
+            >
               <X className="h-5 w-5" />
             </Button>
           </div>
           <QrScanner onScan={handleQrScan} />
           <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10">
-            <Typography variant="body-sm" className="text-center text-muted-foreground leading-relaxed">
-              Placez le QR Code de transaction, d'item ou de profil dans le cadre pour scanner automatiquement.
+            <Typography
+              variant="body-sm"
+              className="text-center text-muted-foreground leading-relaxed"
+            >
+              Placez le QR Code de transaction, d'item ou de profil dans le
+              cadre pour scanner automatiquement.
             </Typography>
           </div>
-          <Button variant="outline" onClick={() => setShowScanner(false)} className="w-full h-12 rounded-2xl font-bold">
+          <Button
+            variant="outline"
+            onClick={() => setShowScanner(false)}
+            className="w-full h-12 rounded-2xl font-bold"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" /> Retour à la liste
           </Button>
         </div>
@@ -882,19 +947,32 @@ function CreateTransactionContent({
     <div className="min-h-screen bg-background pb-20">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-12 text-center md:text-left">
-          <Typography variant="h1" className="mb-3 font-black italic uppercase tracking-tighter text-4xl md:text-5xl">
+          <Typography
+            variant="h1"
+            className="mb-3 font-black italic uppercase tracking-tighter text-4xl md:text-5xl"
+          >
             {config?.label || (showScanner ? "SCANNER" : "TRANSAC")}
           </Typography>
           <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <Typography variant="body-base" theme="muted" className="font-bold flex-1">
+            <Typography
+              variant="body-base"
+              theme="muted"
+              className="font-bold flex-1"
+            >
               {config
                 ? `Étape ${currentStep + 1} sur ${steps.length}`
-                : showScanner ? "Scannez un QR Code pour continuer" : "Sélectionnez le type de transaction"}
+                : showScanner
+                  ? "Scannez un QR Code pour continuer"
+                  : "Sélectionnez le type de transaction"}
             </Typography>
             {completeData?.wallet && !showScanner && (
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-2xl border border-primary/20 self-center md:self-auto">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Solde:</span>
-                <span className="text-sm font-black text-primary">{completeData.ledgerBalance || "0"} GTC</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">
+                  Solde:
+                </span>
+                <span className="text-sm font-black text-primary">
+                  {completeData.ledgerBalance || "0"} GTC
+                </span>
               </div>
             )}
           </div>
@@ -914,12 +992,16 @@ function CreateTransactionContent({
           </div>
         </div>
       </div>
-      <AlertDialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
+      <AlertDialog
+        open={duplicateDialogOpen}
+        onOpenChange={setDuplicateDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Transaction déjà en cours</AlertDialogTitle>
             <AlertDialogDescription>
-              Une opération du même type est déjà en cours. Voulez-vous continuer quand même ?
+              Une opération du même type est déjà en cours. Voulez-vous
+              continuer quand même ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
