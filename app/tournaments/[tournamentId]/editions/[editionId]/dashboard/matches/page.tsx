@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import Image from "next/image";
+import { MatchesDashboardFilters } from "@/components/pages/tournaments/edition-detail/matches-dashboard-filters";
 
 export const metadata: Metadata = {
   title: "Gestion des Matchs - Dashboard",
@@ -131,53 +132,12 @@ export default async function MatchesDashboardPage({ params, searchParams }: Pag
 
       {/* Filters Bar */}
       <Card className="bg-muted/50 border-none">
-        <CardContent className="p-4 flex flex-wrap items-center gap-4">
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input 
-              className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:ring-1 focus:ring-primary outline-none"
-              placeholder="Rechercher un participant..."
-              defaultValue={search}
-              //@ts-ignore
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const val = e.currentTarget.value;
-                  const url = new URL(window.location.href);
-                  if (val) url.searchParams.set("search", val);
-                  else url.searchParams.delete("search");
-                  url.searchParams.set("page", "1");
-                  window.location.href = url.pathname + url.search;
-                }
-              }}
-            />
-          </div>
-
-          <select 
-            className="h-10 px-3 rounded-md border border-input bg-background text-sm outline-none w-full sm:w-auto"
-            defaultValue={status || "ALL"}
-            //@ts-ignore
-            onChange={(e) => {
-              const val = e.target.value;
-              const url = new URL(window.location.href);
-              if (val === "ALL") url.searchParams.delete("status");
-              else url.searchParams.set("status", val);
-              url.searchParams.set("page", "1");
-              window.location.href = url.pathname + url.search;
-            }}
-          >
-            <option value="ALL">Tous les statuts</option>
-            <option value="PENDING">En attente</option>
-            <option value="IN_PROGRESS">En cours</option>
-            <option value="COMPLETED">Terminé</option>
-            <option value="PENDING_REVIEW">A valider</option>
-            <option value="DISPUTED">Litige</option>
-          </select>
-
-          {phaseId && (
-             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
-               <Link href="?">Réinitialiser</Link>
-             </Button>
-          )}
+        <CardContent className="p-4">
+          <MatchesDashboardFilters 
+            search={search} 
+            status={status} 
+            phaseId={phaseId} 
+          />
         </CardContent>
       </Card>
 

@@ -190,6 +190,7 @@ export default async function GroupDetailPage({ params }: PageProps) {
             phaseId={group?.phaseId || ""}
             maxMatches={100} // Limite de matchs pour ce groupe
             existingMatchesCount={Math.round(totalMatches)} // Matchs existants
+            groupParticipantsCount={participants.length}
             groupConfig={{
               maxParticipants: group?.participantCount || 8,
               matchesPerParticipant:

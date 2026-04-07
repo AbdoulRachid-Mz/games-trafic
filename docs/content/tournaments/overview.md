@@ -1,38 +1,54 @@
+---
+title: "Tournois & Éditions"
+description: "Organisation de compétitions esportives, arborescences, et gestion des brackets."
+category: "Tournois"
+order: 2
+---
+
 # Tournois & Éditions
 
-La gestion des compétitions est l'un des piliers de **Games-Trafics**. Nous distinguons les **Tournois** (entités globales) des **Éditions** (instances spécifiques d'un tournoi).
+## 🧩 Vue d’ensemble
+L'écosystème compétitif de la plateforme sépare clairement l'identité abstraite d'un événement (le <beautifulMention>Tournament</beautifulMention>) des saisons et itérations réelles où se déroulent les faits (les <beautifulMention>Editions</beautifulMention>).
 
-## 🧩 Vue d'ensemble
-
-- **Tournoi** : Définit le jeu, les règles générales et l'organisateur.
-- **Édition** : Définit les dates, le cashprize, le format de jeu et les participants. Une édition appartient à un tournoi.
+<Callout type="info" title="L'Architecture">
+Un tournoi est défini par ses règles, ses organisateurs, et son jeu (par ex: "GT League"). Ses éditions (ex: "Saison Printemps 2024", "Saison Hiver 2025") contiennent la liste des joueurs enregistrés et des phases compétitives.
+</Callout>
 
 ## ⚙️ Fonctionnement
 
-Une édition progresse à travers plusieurs étapes :
-1. **Inscription** : Les joueurs ou équipes rejoignent la compétition.
-2. **Phase de Groupes** (Optionnel) : Round Robin pour qualifier les meilleurs.
-3. **Arbre de Tournoi (Brackets)** : Élimination directe ou double élimination.
-4. **Matches** : Rencontres individuelles avec saisie et validation des scores.
+L'évolution au sein d'une compétition se déroule ainsi :
+1. **Édition** : Les joueurs/équipes paient/obtiennent leur droit d'entrée à l'édition d'un tournoi (Registration).
+2. **Phase** : L'édition est découpée en "étapes" (Groupes de Pool, Play-In, Playoffs).
+3. **Group** : Chaque Phase possède un ou plusieurs Groupes dans lesquels des participants sont répartis selon des *Seedings*.
+4. **BracketNode** : La représentation des cellules croisées d'un arbre `UPPER` ou `LOWER`.
+5. **Match** : La rencontre effective. Dès qu'un vainqueur émerge, le système pousse l'entité gagnante vers le BracketNode suivant.
 
-### Formats supportés :
-- **Round Robin** : Tout le monde affronte tout le monde dans un groupe.
-- **Single Elimination** : Défaite interdite.
-- **Double Elimination** : Une seconde chance via le bracket "Losers".
+<Steps>
+  <Step title="Round Robin">
+    Toutes les équipes dans un Groupe s'affrontent mutuellement (matches en ligue). On gagne des points selon un système de classement victoires / défaites.
+  </Step>
+  <Step title="Elimination (Single / Double)">
+    Génération d'un arbre où la défaite exclut du bracket Supérieur. Arbre de type classique *Esport*.
+  </Step>
+  <Step title="Hybrid">
+    Groupes de départ en Round Robin (Group Stage), puis phase d'élimination pour le carré final (Knockout Stage).
+  </Step>
+</Steps>
 
 ## 👤 Côté utilisateur
-
-Les joueurs peuvent s'inscrire, consulter leurs prochains matches, et uploader des preuves de victoire (screenshots). Les organisateurs disposent d'un **Dashboard Organisateur** pour gérer les participants et générer les rounds.
+Les participants bénéficient d'un **hub personnalisé** (`/tournaments/...`), permettant de naviguer visuellement avec réactivité. Le bracket généré gère le scroll infini, les zoom et permet d'observer facilement ses prochains adversaires. La plateforme remonte les résultats de matchs validés et les scores automatiquement.
 
 ## 🧠 Logique métier
-
-Le système utilise une @beautifulMention(Progression Automatique). Dès qu'un match est validé, le gagnant est automatiquement propulsé au round suivant dans le bracket. Les statistiques de victoires/défaites sont mises à jour instantanément sur le profil du joueur.
+- La table mère `tournaments` est partagée, mais `tournamentEditions` fige la timeline (Dates, Cagnotte, Registrations liées).
+- Le backend garantit qu'aucun noeud de bracket n'est surécrasé ou mal référencé. Un match lié à un noeud attend de recevoir le résultat des nœuds enfants pour définir les "À déterminer".
 
 ## 🔗 Relations
-- **Games** : Le jeu associé au tournoi.
-- **Participants** : Équipes ou joueurs inscrits.
-- **Matches** : Les instances de jeu créées par les phases.
+- **Résultats Financiers (Wallet)** : Le rattachement au wallet se fait sur les récompenses. Tout comme les frais de "Entry Fees" dépendent du modèle `/transactions`.
+- **Matchs & GroupParticipants** : Chaque match est hydraté grâce aux participations enregistrées (GroupParticipants -> Registration -> User/Team).
+
+## 📊 Cas d’usage
+- Les organisateurs entrent dans le "Dashboard de l'Édition" -> Créent une *Phase de Qualification* (Group Stage) -> Génèrent 4 groupes Round-Robin.
+- Une fois les matchs résolus par les joueurs, les 2 de tête accèdent automatiquement à une autre Phase (Playoffs) sous format d'élimination Directe.
 
 ## 🖼️ Illustration
-
-![Tournament Structure](/docs/images/tournament-structure.png)
+![Tournament Flow](/docs/images/tournament-flow.png)

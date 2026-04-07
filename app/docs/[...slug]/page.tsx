@@ -8,11 +8,12 @@ import Link from "next/link";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
 import { cn } from "@/lib/utils";
+import React from "react";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string[];
-  };
+  }>;
 }
 
 export async function generateStaticParams() {
@@ -23,7 +24,8 @@ export async function generateStaticParams() {
 }
 
 export default async function DocPage({ params }: PageProps) {
-  const doc = await getDocBySlug(params.slug);
+  const { slug } = await params;
+  const doc = await getDocBySlug(slug);
 
   if (!doc) {
     notFound();
@@ -42,12 +44,12 @@ export default async function DocPage({ params }: PageProps) {
           <Home className="w-4 h-4" />
           Docs
         </Link>
-        {params.slug.map((segment, index) => (
+        {slug.map((segment, index) => (
           <React.Fragment key={segment}>
             <ChevronRight className="w-4 h-4 flex-shrink-0" />
             <span className={cn(
               "capitalize",
-              index === params.slug.length - 1 ? "text-foreground font-medium" : "hover:text-foreground transition-colors"
+              index === slug.length - 1 ? "text-foreground font-medium" : "hover:text-foreground transition-colors"
             )}>
               {segment.replace(/-/g, " ")}
             </span>
@@ -113,4 +115,3 @@ export default async function DocPage({ params }: PageProps) {
   );
 }
 
-import React from "react";

@@ -16,6 +16,7 @@ export function BracketRoundCard({
   matchesCount,
   tournamentId,
   editionId,
+  nodeId,
   phaseId
 }: { 
   roundNumber: number;
@@ -23,6 +24,7 @@ export function BracketRoundCard({
   nodeCount: number;
   matchesCount: number;
   tournamentId: string;
+  nodeId?: string;
   editionId: string;
   phaseId: string;
 }) {
@@ -52,6 +54,7 @@ export function BracketRoundCard({
           </div>
           <span className="font-mono font-bold">{matchesCount}</span>
         </div>
+        {nodeId && (
 
         <Button 
           variant="ghost" 
@@ -59,10 +62,12 @@ export function BracketRoundCard({
           className="w-full h-7 mt-2 text-[10px] gap-1 group-hover:bg-primary/10"
           asChild
         >
-          <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}?round=${roundNumber}`}>
-            Voir les matchs
+          <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/brackets/${nodeId}`}>
+            Voir detail
           </Link>
         </Button>
+        )}
+
       </CardContent>
     </Card>
   );

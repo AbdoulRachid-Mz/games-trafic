@@ -251,6 +251,7 @@ export default async function BracketsDashboardPage({
                         nodeCount={roundNodes.length}
                         matchesCount={matchesInRound}
                         tournamentId={tournamentId}
+                        nodeId={roundNodes[0]?.id || undefined}
                         editionId={editionId}
                         phaseId={phase.id}
                       />

@@ -17,8 +17,12 @@ export type DocContent = {
   content: string;
 };
 
-export async function getDocBySlug(slugArray: string[]): Promise<DocContent | null> {
+export async function getDocBySlug(slugArray?: string[]): Promise<DocContent | null> {
   try {
+    if (!slugArray || slugArray.length === 0) {
+      return null;
+    }
+
     const slug = slugArray.join("/");
     const fullPath = path.join(CONTENT_DIR, `${slug}.md`);
     

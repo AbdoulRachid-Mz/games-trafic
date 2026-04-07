@@ -1,37 +1,48 @@
-# Shops & Produits
+---
+title: "Boutiques & Produits (comptes)"
+description: "Création, gestion et vente sur la Marketplace intégrée."
+category: "Shops"
+order: 3
+---
 
-L'écosystème **Games-Trafics** permet aux partenaires et aux utilisateurs certifiés de créer leur propre espace de vente.
+# Boutiques & Marketplace
 
-## 🧩 Vue d'ensemble
+## 🧩 Vue d’ensemble
+L'application propose des outils de E-Commerce complets avec les <beautifulMention>Boutiques</beautifulMention>. Chaque utilisateur ou équipe peut avoir sa propre boutique (selon conditions) et ses produits (comptes) mis à la vente globale sur l'espace central.
 
-Un **Shop** est une boutique virtuelle associée à un utilisateur ou une entité. Elle peut contenir :
-- **Produits Physiques/Digitaux** : Clés de jeux, skins, matériel.
-- **Services** : Coaching, boost de compte, design de logo.
-- **Catégories** : Organisation logique des articles.
+<Callout type="tip" title="Monétisation">
+La Marketplace permet la revente de matériel de jeu, de designs virtuels ou encore l'achat d'abonnements.
+</Callout>
 
 ## ⚙️ Fonctionnement
 
-Chaque boutique dispose d'un inventaire géré dynamiquement.
-1. **Création** : Un utilisateur demande l'ouverture d'une boutique.
-2. **Ajout d'Articles** : Définition du prix (en GTC), de la description et des images.
-3. **Gestion des Stocks** : Mise à jour automatique ou manuelle des quantités disponibles.
-
-### Validation :
-Toute nouvelle boutique ou produit passe par une phase de @beautifulMention(Modération) pour garantir la sécurité des acheteurs.
+L'espace e-commerce de Games-Trafics s'organise en 3 axes :
+- **Shops** : Identité globale (bannière, descriptions, devises).
+- **Categories** : Structuration hiérarchique pour la segmentation catalogue (ex: Accessoires, Assets Numériques).
+- **Produits** : Attributs spécifiques (images, variantes). L'interface produit implique du multi-upload sophistiqué, parfois protégé pour des services spécifiques.
 
 ## 👤 Côté utilisateur
 
-Les acheteurs parcourent la **Marketplace**, ajoutent des articles à leur panier et règlent via leur @beautifulMention(Wallet GTC). Ils peuvent laisser des avis et noter les vendeurs.
+**Acheteur :**
+- L'utilisateur dispose de listes, tri par collections et paiements extrêmement fluides (puisés sur le `Wallet GTC`).
+- Accès facile au tracking de commandes (digital ou physique).
+
+**Vendeur :**
+- Dashboard métier privé (`/shops/dashboard`) avec un constructeur visuel performant.
+- `AutoSyncField` : Des formulaires modernes qui s'enregistrent instantanément sans besoin d'appuyer sur Save à chaque fois (autosauvegarde et revalidation SSR).
 
 ## 🧠 Logique métier
-
-Lors d'un achat, les GTC sont transférés du wallet de l'acheteur vers un compte d'attente. Ils ne sont libérés au vendeur que lorsque l'acheteur confirme la réception du produit ou du service.
+- La table *shops* a une relation forte (1 : N) vers `products`.
+- Les produits peuvent être *Soft Deleted* (masqués) ou passés en status "ARCHIVED" afin de protéger les archives de commandes (`orders`) passées. Lève par contre l'affichage dans la marketplace.
 
 ## 🔗 Relations
-- **Users** : Propriétaires des boutiques.
-- **Orders** : Historique des ventes et achats.
-- **GTC** : Monnaie de transaction.
+- Tout est lié de façon transparente aux **Orders**. 
+- Le compte vendeur dispose d'un wallet spécifique séparable qui va agréger les profits après prélèvement d'éventuelles commissions de la plateforme.
+
+## 📊 Cas d’usage
+- Romain possède un grand stock de cartes in-game qu'il vend physiquement. 
+- Il crée une boutique, paramètre la catégorie "Hardware" et publie 5 objets avec photo multi-upload. 
+- Dès qu'un objet est vendu, son compteur "Stock" baisse à 0 et empêche une nouvelle commande.
 
 ## 🖼️ Illustration
-
-![Shop Management](/docs/images/shop-management.png)
+![Shop Configuration](/docs/images/shop-dashboard.png)

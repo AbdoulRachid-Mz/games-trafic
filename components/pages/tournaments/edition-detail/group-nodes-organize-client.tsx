@@ -32,6 +32,7 @@ interface GroupNodesOrganizeClientProps {
   phaseId: string;
   existingNodes: any[];
   groupParticipants: any[];
+  allRegistrations: any[];
 }
 
 type DraftNode = {
@@ -48,6 +49,7 @@ export function GroupNodesOrganizeClient({
   phaseId,
   existingNodes,
   groupParticipants,
+  allRegistrations,
 }: GroupNodesOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -57,6 +59,11 @@ export function GroupNodesOrganizeClient({
   const [nodePrefix, setNodePrefix] = useState("N");
   const [nodeCount, setNodeCount] = useState("4");
   const [startRound, setStartRound] = useState("1");
+
+  const getName = (id: string) => {
+    const reg = allRegistrations.find(r => r.id === id);
+    return reg?.member?.displayName || reg?.member?.user?.username || reg?.member?.team?.name || "Joueur";
+  };
 
   const handleAddToDraft = () => {
     const count = parseInt(nodeCount) || 1;
@@ -257,7 +264,7 @@ export function GroupNodesOrganizeClient({
                                <option value="">À déterminer</option>
                                {groupParticipants.map(gp => (
                                  <option key={gp.registrationId} value={gp.registrationId}>
-                                   {gp.registration?.member?.displayName || gp.registration?.member?.user?.username || "Joueur"}
+                                   {getName(gp.registrationId)}
                                  </option>
                                ))}
                             </select>
@@ -278,7 +285,7 @@ export function GroupNodesOrganizeClient({
                                <option value="">À déterminer</option>
                                {groupParticipants.map(gp => (
                                  <option key={gp.registrationId} value={gp.registrationId}>
-                                   {gp.registration?.member?.displayName || gp.registration?.member?.user?.username || "Joueur"}
+                                   {getName(gp.registrationId)}
                                  </option>
                                ))}
                             </select>

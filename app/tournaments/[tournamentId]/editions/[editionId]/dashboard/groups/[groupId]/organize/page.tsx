@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { getPhaseGroupById, getBracketNodes } from "@/actions/phases";
+import { getEditionRegistrations } from "@/actions/tournaments";
 import { notFound } from "next/navigation";
 import { ChevronLeft, LayoutGrid, Settings } from "lucide-react";
 import Link from "next/link";
@@ -25,7 +26,13 @@ export default async function GroupNodesOrganizePage({
     pagination: { limit: 100, page: 1 },
   });
 
-  const groupParticipantsRes = (await getPhaseGroupById(groupId, { populate: ["participants", "participants.registration", "participants.registration.member", "participants.registration.member.user", "participants.registration.member.team"] })) as any;
+  const regsRes = await getEditionRegistrations({
+    filters: { editionId },
+    options: { populate: ["member", "member.user", "member.team"] },
+    pagination: { page: 1, limit: 1000 },
+  });
+
+  const groupParticipantsRes = (await getPhaseGroupById(groupId, { populate: ["participants"] })) as any;
   const participants = groupParticipantsRes?.participants || [];
 
   return (
@@ -54,6 +61,7 @@ export default async function GroupNodesOrganizePage({
         phaseId={group.phaseId}
         existingNodes={nodesRes.data as any[]}
         groupParticipants={participants as any[]}
+        allRegistrations={regsRes.data as any[]}
       />
     </div>
   );

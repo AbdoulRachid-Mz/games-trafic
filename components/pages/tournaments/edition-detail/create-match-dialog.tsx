@@ -19,7 +19,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { validateGroupCapacity } from "@/hooks/use-bulk-validation";
+import { validateGroupCapacity } from "@/lib/tournaments/bulk-validation";
+ // ✅ UTILISER LE HOOK (ou une action)
+import { useGroupCapacity } from "@/hooks/use-bulk-validation";
 
 interface CreateMatchDialogProps {
   editionId: string;
@@ -61,22 +63,22 @@ export function CreateMatchDialog({
   const isAtCapacity = currentMatchesCount >= maxMatches;
   const remainingSlots = maxMatches - currentMatchesCount;
 
-  // Vérifier la capacité à l'ouverture
+ 
+
+ // Utilise ton hook au lieu du useEffect manuel
+  const { data: validation, isLoading } = useGroupCapacity(groupId || "", 1);
+
   useEffect(() => {
     if (open) {
       if (isAtCapacity) {
         setCapacityError(`Limite de matchs atteinte (${currentMatchesCount}/${maxMatches})`);
-      } else if (groupId) {
-        validateGroupCapacity(groupId, 1).then(result => {
-          if (!result.isValid) {
-            setCapacityError(result.errors[0]);
-          }
-        });
+      } else if (validation && !validation.isValid) {
+        setCapacityError(validation.errors[0]);
       } else {
         setCapacityError(null);
       }
     }
-  }, [open, isAtCapacity, currentMatchesCount, maxMatches, groupId]);
+  }, [open, isAtCapacity, validation, currentMatchesCount, maxMatches]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

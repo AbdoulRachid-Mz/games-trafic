@@ -34,6 +34,7 @@ interface GenerateGroupMatchesDialogProps {
     maxParticipants?: number;
     matchesPerParticipant?: number;
   };
+  groupParticipantsCount?: number;
 }
 
 export function GenerateGroupMatchesDialog({
@@ -43,11 +44,13 @@ export function GenerateGroupMatchesDialog({
   maxMatches = 100,
   existingMatchesCount = 0,
   groupConfig,
+  groupParticipantsCount = 0,
 }: GenerateGroupMatchesDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [participantsCount, setParticipantsCount] = useState(0);
+  const [participantsCount, setParticipantsCount] = useState(groupParticipantsCount);
   const [expectedMatchesCount, setExpectedMatchesCount] = useState(0);
+  const [format, setFormat] = useState("SINGLE");
   const router = useRouter();
 
   // Calculer le nombre de matchs attendus selon le format
@@ -60,29 +63,11 @@ export function GenerateGroupMatchesDialog({
     return 0;
   };
 
-  // Vérifier la faisabilité à l'ouverture
+  // Calculate initial metrics based on props
   useEffect(() => {
-    if (open) {
-      const fetchData = async () => {
-        try {
-          const list = await getPhaseGroupParticipants({
-            filters: { groupId },
-            pagination: { page: 1, limit: 500 },
-          });
-          const participants = list.data as PhaseGroupParticipant[];
-          const count = participants.length;
-          setParticipantsCount(count);
-
-          // Calculer pour le format SINGLE par défaut
-          const expected = calculateExpectedMatches(count, "SINGLE");
-          setExpectedMatchesCount(expected);
-        } catch (error) {
-          console.error("Error fetching participants count:", error);
-        }
-      };
-      fetchData();
-    }
-  }, [open, groupId]);
+    setParticipantsCount(groupParticipantsCount);
+    setExpectedMatchesCount(calculateExpectedMatches(groupParticipantsCount, format));
+  }, [groupParticipantsCount, format]);
 
   const handleGenerate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -249,7 +234,7 @@ export function GenerateGroupMatchesDialog({
         <Button
           variant="outline"
           className="gap-2"
-          disabled={!isGenerationPossible}
+          disabled={isDisabled}
         >
           <RefreshCw className="h-4 w-4" /> Générer matchs
           {!isGenerationPossible && participantsCount < 2 && (

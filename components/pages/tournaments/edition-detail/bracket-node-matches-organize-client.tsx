@@ -78,7 +78,7 @@ export function BracketNodeMatchesOrganizeClient({
 
   const getName = (id: string) => {
     const reg = allRegistrations.find(r => r.id === id);
-    return reg?.member?.displayName || reg?.member?.user?.username || "Joueur";
+    return reg?.member?.displayName || reg?.member?.user?.username || reg?.member?.team?.name || "Joueur";
   };
 
   const handleAddToDraft = () => {

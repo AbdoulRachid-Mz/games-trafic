@@ -1,6 +1,5 @@
 // lib/validation/bulk-validation.ts
-// ⚠️ CE FICHIER NE DOIT PAS ÊTRE IMPORTÉ DANS UN CLIENT COMPONENT
-// Utiliser uniquement dans les Server Components et Server Actions
+"use server";
 
 import { db } from "@/lib/db";
 import {

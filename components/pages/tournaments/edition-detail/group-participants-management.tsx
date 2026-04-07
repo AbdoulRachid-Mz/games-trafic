@@ -30,6 +30,16 @@ import {
   MoveLeft,
   AlertCircle
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -58,6 +68,7 @@ export function GroupParticipantsManagement({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmAction, setConfirmAction] = useState<{ type: 'add' | 'remove', id: string, name: string, regId?: string } | null>(null);
   
   // Draft State
   const [draftAddIds, setDraftAddIds] = useState<Set<string>>(new Set());
@@ -232,7 +243,7 @@ export function GroupParticipantsManagement({
                     </TableRow>
                   ) : (
                     availableList.map((reg) => (
-                      <TableRow key={reg.id} className="hover:bg-primary/5 cursor-pointer group" onClick={() => toggleAdd(reg.id)}>
+                      <TableRow key={reg.id} className="hover:bg-primary/5 cursor-pointer group" onClick={() => setConfirmAction({ type: 'add', id: reg.id, name: reg.member?.displayName || reg.member?.user?.username || reg.member?.team?.name || "Participant" })}>
                         <TableCell className="py-3 pl-6">
                            <div className="flex items-center gap-3">
                               <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
@@ -277,7 +288,7 @@ export function GroupParticipantsManagement({
                     </TableRow>
                   ) : (
                     groupList.map((p) => (
-                      <TableRow key={p.id} className={cn("hover:bg-destructive/5 cursor-pointer group", p.isDraft && "bg-emerald-50/50")} onClick={() => toggleRemove(p.id, p.registrationId)}>
+                      <TableRow key={p.id} className={cn("hover:bg-destructive/5 cursor-pointer group", p.isDraft && "bg-emerald-50/50")} onClick={() => setConfirmAction({ type: 'remove', id: p.id, regId: p.registrationId, name: p.reg?.member?.displayName || p.reg?.member?.user?.username || p.reg?.member?.team?.name || "Participant" })}>
                         <TableCell className="py-3 pl-6">
                            <div className="flex items-center gap-3">
                               <Avatar className={cn("h-10 w-10 border-2 border-background shadow-sm", p.isDraft && "ring-2 ring-emerald-500 ring-offset-2")}>
@@ -309,6 +320,29 @@ export function GroupParticipantsManagement({
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmAction?.type === 'add' ? "Ajouter au groupe" : "Retirer du groupe"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Voulez-vous vraiment {confirmAction?.type === 'add' ? "ajouter" : "retirer"} <strong>{confirmAction?.name}</strong> du groupe ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (confirmAction) {
+                if (confirmAction.type === 'add') toggleAdd(confirmAction.id);
+                else if (confirmAction.type === 'remove') toggleRemove(confirmAction.id, confirmAction.regId!);
+              }
+              setConfirmAction(null);
+            }}>
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
