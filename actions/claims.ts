@@ -198,14 +198,35 @@ export async function createClaim(claimData: NewClaim): Promise<Claim> {
       throw new Error('userId, type, title and description are required');
     }
 
+    // Vérification de la transaction si elle est fournie
+    if (claimData.transactionId) {
+      const transactionExists = await db
+        .select({ id: walletTransactions.id })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.id, claimData.transactionId))
+        .limit(1);
+
+      if (!transactionExists.length) {
+        throw new Error('Transaction not found');
+      }
+    }
+
+    // Préparation des données à insérer
+    const insertData = {
+      ...claimData,
+      status: claimData.status || 'PENDING',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Si transactionId est une chaîne vide, le supprimer
+    if (insertData.transactionId === '') {
+      delete insertData.transactionId;
+    }
+
     const result = await db
       .insert(claims)
-      .values({
-        ...claimData,
-        status: claimData.status || 'PENDING',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .values(insertData)
       .returning();
 
     return result[0];
@@ -231,12 +252,33 @@ export async function updateClaim(
       throw new Error('Claim not found');
     }
 
+    // Vérification de la transaction si elle est fournie
+    if (claimData.transactionId) {
+      const transactionExists = await db
+        .select({ id: walletTransactions.id })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.id, claimData.transactionId))
+        .limit(1);
+
+      if (!transactionExists.length) {
+        throw new Error('Transaction not found');
+      }
+    }
+
+    // Préparation des données à mettre à jour
+    const updateData = {
+      ...claimData,
+      updatedAt: new Date(),
+    };
+
+    // Si transactionId est une chaîne vide, le supprimer
+    if (updateData.transactionId === '') {
+      delete updateData.transactionId;
+    }
+
     const result = await db
       .update(claims)
-      .set({
-        ...claimData,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(claims.id, id))
       .returning();
 

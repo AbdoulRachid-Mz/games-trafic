@@ -125,16 +125,6 @@ export default async function GroupDetailPage({ params }: PageProps) {
     standings.reduce((acc, p) => acc + (p.matchesPlayed ?? 0), 0) / 2;
   const totalGoals = standings.reduce((acc, p) => acc + (p.scoreFor ?? 0), 0);
 
-  function getName(registrationId: string | null | undefined) {
-    const reg = allRegs.find((r: any) => r.id === registrationId);
-    return (
-      reg?.member?.displayName ||
-      reg?.member?.user?.username ||
-      reg?.member?.team?.name ||
-      "Joueur"
-    );
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
@@ -190,7 +180,6 @@ export default async function GroupDetailPage({ params }: PageProps) {
             phaseId={group?.phaseId || ""}
             maxMatches={100} // Limite de matchs pour ce groupe
             existingMatchesCount={Math.round(totalMatches)} // Matchs existants
-            groupParticipantsCount={participants.length}
             groupConfig={{
               maxParticipants: group?.participantCount || 8,
               matchesPerParticipant:
@@ -291,7 +280,7 @@ export default async function GroupDetailPage({ params }: PageProps) {
                           </span>
                         </TableCell>
                         <TableCell className="font-semibold">
-                          {getName(p.registrationId)}
+                          {getName(p.registrationId, allRegs)}
                         </TableCell>
                         <TableCell className="text-center font-black text-primary text-base">
                           {p.points ?? 0}
@@ -369,6 +358,7 @@ export default async function GroupDetailPage({ params }: PageProps) {
               tournamentId={tournamentId}
               editionId={editionId}
               basePath={basePath}
+              allRegs={allRegs}
             />
           </CardContent>
         </Card>
@@ -383,11 +373,13 @@ async function BracketNodesList({
   tournamentId,
   editionId,
   basePath,
+  allRegs,
 }: {
   groupId: string;
   tournamentId: string;
   editionId: string;
   basePath: string;
+  allRegs: any[];
 }) {
   const nodesRes = await getBracketNodes({
     filters: { groupId },
@@ -408,98 +400,122 @@ async function BracketNodesList({
 
   return (
     <div className="space-y-2">
-      {nodes.map((node: any) => (
-        <div
-          key={node.id}
-          className="flex flex-col sm:flex-row sm:items-center justify-between border border-primary/5 rounded-xl p-3 bg-card hover:border-primary/20 transition-all hover:shadow-sm gap-3"
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`h-10 w-10 rounded-lg flex items-center justify-center ${node.bracketType === "LOWER" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
-            >
-              <span className="font-bold text-xs">{node.nodeCode || "N"}</span>
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm">
-                  {node.nodeCode || "Nœud"}
-                </span>
-                <Badge
-                  variant="secondary"
-                  className="text-[9px] h-4 py-0 leading-none bg-primary/10 text-primary border-none uppercase tracking-tighter"
+      {nodes.map((node: any) => {
+        const nodeParticipants = (node.metadata as any)?.participants || [];
+        
+        return (
+          <div
+            key={node.id}
+            className="flex flex-col border border-primary/5 rounded-xl bg-card hover:border-primary/20 transition-all hover:shadow-sm overflow-hidden"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 border-b border-primary/5 bg-muted/10">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`h-10 w-10 rounded-lg flex items-center justify-center ${node.bracketType === "LOWER" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}
                 >
-                  {node.bracketType || "UPPER"}
-                </Badge>
+                  <span className="font-bold text-xs">{node.nodeCode || "N"}</span>
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm">
+                      {(node.metadata as any)?.name || node.nodeCode || "Nœud"}
+                    </span>
+                    <Badge
+                      variant="secondary"
+                      className="text-[9px] h-4 py-0 leading-none bg-primary/10 text-primary border-none uppercase tracking-tighter"
+                    >
+                      {node.bracketType || "UPPER"}
+                    </Badge>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
+                    Round {node.round} • Match #{node.matchNumber}
+                  </span>
+                </div>
               </div>
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
-                Round {node.round} • Match #{node.matchNumber} · Profondeur{" "}
-                {node.depth}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 justify-end">
-            <UpdateBracketNodeDialog
-              node={{
-                id: node.id,
-                nodeCode: node.nodeCode,
-                round: node.round,
-                matchNumber: node.matchNumber,
-                bracketType: node.bracketType,
-              }}
-              revalidatePath={basePath}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs font-bold border-primary/20 bg-primary/5 text-primary"
-              asChild
-            >
-              <Link
-                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/brackets/${node.id}`}
-              >
-                Gérer
-              </Link>
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
+              
+              <div className="flex items-center gap-1.5 shrink-0 justify-end">
+                <UpdateBracketNodeDialog
+                  node={{
+                    id: node.id,
+                    nodeCode: node.nodeCode,
+                    round: node.round,
+                    matchNumber: node.matchNumber,
+                    bracketType: node.bracketType,
+                  }}
+                  revalidatePath={basePath}
+                />
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                  variant="outline"
+                  className="h-8 text-xs font-bold border-primary/20 bg-primary/5 text-primary"
+                  asChild
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Supprimer le nœud ?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Êtes-vous sûr de vouloir supprimer ce nœud de bracket ? Les
-                    données associées seront perdues.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <form
-                    action={async () => {
-                      "use server";
-                      await deleteBracketNode(node.id);
-                      revalidatePath(basePath);
-                    }}
+                  <Link
+                    href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/brackets/${node.id}`}
                   >
-                    <AlertDialogAction
-                      type="submit"
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    Gérer
+                  </Link>
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
                     >
-                      Supprimer définitivement
-                    </AlertDialogAction>
-                  </form>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer le nœud ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Êtes-vous sûr de vouloir supprimer ce nœud de bracket ? Les
+                        données associées seront perdues.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <form
+                        action={async () => {
+                          "use server";
+                          await deleteBracketNode(node.id);
+                          revalidatePath(basePath);
+                        }}
+                      >
+                        <AlertDialogAction
+                          type="submit"
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Supprimer définitivement
+                        </AlertDialogAction>
+                      </form>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+
+            {/* Participants in this Node */}
+            <div className="p-3 bg-card">
+              <div className="flex flex-wrap gap-2">
+                {nodeParticipants.length > 0 ? (
+                  nodeParticipants.map((regId: string) => {
+                    const reg = allRegs.find(r => r.id === regId);
+                    return (
+                      <Badge key={regId} variant="outline" className="text-[10px] bg-background">
+                        {reg?.member?.displayName || "Joueur"}
+                      </Badge>
+                    );
+                  })
+                ) : (
+                  <span className="text-[10px] text-muted-foreground italic">Aucun participant assigné</span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

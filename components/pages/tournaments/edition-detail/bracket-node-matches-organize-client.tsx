@@ -1,38 +1,38 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription,
-  CardFooter
+  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Plus, 
-  Swords, 
-  Trash2, 
-  Loader2, 
-  CheckCircle2, 
+import {
+  Plus,
+  Swords,
+  Trash2,
+  Loader2,
+  CheckCircle2,
   AlertCircle,
   Clock,
   Settings2,
   Trophy,
   X,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { bulkCreateMatches, deleteMatch } from "@/actions/phases";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -63,7 +63,7 @@ export function BracketNodeMatchesOrganizeClient({
 }: BracketNodeMatchesOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  
+
   // Selection state
   const nodeParticipants = (node?.config as any)?.participants || [];
   const hasNodeParticipants = nodeParticipants.length > 0;
@@ -77,8 +77,13 @@ export function BracketNodeMatchesOrganizeClient({
   const [draftMatches, setDraftMatches] = useState<DraftMatch[]>([]);
 
   const getName = (id: string) => {
-    const reg = allRegistrations.find(r => r.id === id);
-    return reg?.member?.displayName || reg?.member?.user?.username || reg?.member?.team?.name || "Joueur";
+    const reg = allRegistrations.find((r) => r.id === id);
+    return (
+      reg?.member?.displayName ||
+      reg?.member?.user?.username ||
+      reg?.member?.team?.name ||
+      "Joueur"
+    );
   };
 
   const handleAddToDraft = () => {
@@ -94,12 +99,12 @@ export function BracketNodeMatchesOrganizeClient({
     const count = parseInt(matchCount);
     const newDrafts: DraftMatch[] = [];
     for (let i = 0; i < count; i++) {
-       newDrafts.push({
-         participant1RegistrationId: p1,
-         participant2RegistrationId: p2,
-         format,
-         leg: i + 1,
-       });
+      newDrafts.push({
+        participant1RegistrationId: p1,
+        participant2RegistrationId: p2,
+        format,
+        leg: i + 1,
+      });
     }
     setDraftMatches([...draftMatches, ...newDrafts]);
     toast.success(`${count} match(s) ajouté(s) au draft.`);
@@ -111,18 +116,21 @@ export function BracketNodeMatchesOrganizeClient({
     startTransition(async () => {
       try {
         await bulkCreateMatches(
-          draftMatches.map((m, idx) => ({
-            ...m,
-            editionId,
-            phaseId: node.phaseId,
-            groupId: node.groupId,
-            bracketNodeId: node.id,
-            round: node.round || 1,
-            matchNumber: node.matchNumber || 1,
-            matchCode: `${node.nodeCode || "BR"}-M${existingMatches.length + idx + 1}`,
-            status: "PENDING",
-            metadata: { format: m.format, leg: m.leg },
-          } as any))
+          draftMatches.map(
+            (m, idx) =>
+              ({
+                ...m,
+                editionId,
+                phaseId: node.phaseId,
+                groupId: node.groupId,
+                bracketNodeId: node.id,
+                round: node.round || 1,
+                matchNumber: node.matchNumber || 1,
+                matchCode: `${node.nodeCode || "BR"}-M${existingMatches.length + idx + 1}`,
+                status: "PENDING",
+                metadata: { format: m.format, leg: m.leg },
+              }) as any,
+          ),
         );
         toast.success(`${draftMatches.length} matchs sauvegardés.`);
         setDraftMatches([]);
@@ -153,7 +161,8 @@ export function BracketNodeMatchesOrganizeClient({
       <Card className="lg:col-span-1 border-primary/10 shadow-lg h-fit sticky top-6">
         <CardHeader className="bg-primary/5 pb-4 rounded-t-xl">
           <CardTitle className="text-base font-bold flex items-center gap-2">
-            <Settings2 className="h-5 w-5 text-primary" /> Configurateur de Matchs
+            <Settings2 className="h-5 w-5 text-primary" /> Configurateur de
+            Matchs
           </CardTitle>
           <CardDescription className="text-xs">
             Sélectionnez les duellistes pour ce nœud de bracket.
@@ -162,21 +171,35 @@ export function BracketNodeMatchesOrganizeClient({
         <CardContent className="space-y-5 pt-6">
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Joueur 1</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                Joueur 1
+              </label>
               <Select value={p1} onValueChange={setP1}>
                 <SelectTrigger className="h-11 rounded-lg">
                   <SelectValue placeholder="Choisir P1" />
                 </SelectTrigger>
                 <SelectContent>
                   {groupParticipants
-                    .filter((pg: any) => !hasNodeParticipants || nodeParticipants.includes(pg.registrationId))
+                    .filter(
+                      (pg: any) =>
+                        !hasNodeParticipants ||
+                        nodeParticipants.includes(pg.registrationId),
+                    )
                     .map((pg: any) => (
-                      <SelectItem key={pg.registrationId} value={pg.registrationId}>
+                      <SelectItem
+                        key={pg.registrationId}
+                        value={pg.registrationId}
+                      >
                         <div className="flex items-center gap-2">
-                           {getName(pg.registrationId)}
-                           {nodeParticipants.includes(pg.registrationId) && (
-                             <Badge variant="secondary" className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none">Propagé</Badge>
-                           )}
+                          {getName(pg.registrationId)}
+                          {nodeParticipants.includes(pg.registrationId) && (
+                            <Badge
+                              variant="secondary"
+                              className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none"
+                            >
+                              Propagé
+                            </Badge>
+                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -185,27 +208,41 @@ export function BracketNodeMatchesOrganizeClient({
             </div>
 
             <div className="flex justify-center -my-2 relative z-10">
-               <div className="bg-background border rounded-full p-2 shadow-sm text-muted-foreground">
-                  <Swords className="h-3 w-3" />
-               </div>
+              <div className="bg-background border rounded-full p-2 shadow-sm text-muted-foreground">
+                <Swords className="h-3 w-3" />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Joueur 2</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                Joueur 2
+              </label>
               <Select value={p2} onValueChange={setP2}>
                 <SelectTrigger className="h-11 rounded-lg">
                   <SelectValue placeholder="Choisir P2" />
                 </SelectTrigger>
                 <SelectContent>
                   {groupParticipants
-                    .filter((pg: any) => !hasNodeParticipants || nodeParticipants.includes(pg.registrationId))
+                    .filter(
+                      (pg: any) =>
+                        !hasNodeParticipants ||
+                        nodeParticipants.includes(pg.registrationId),
+                    )
                     .map((pg: any) => (
-                      <SelectItem key={pg.registrationId} value={pg.registrationId}>
+                      <SelectItem
+                        key={pg.registrationId}
+                        value={pg.registrationId}
+                      >
                         <div className="flex items-center gap-2">
-                           {getName(pg.registrationId)}
-                           {nodeParticipants.includes(pg.registrationId) && (
-                             <Badge variant="secondary" className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none">Propagé</Badge>
-                           )}
+                          {getName(pg.registrationId)}
+                          {nodeParticipants.includes(pg.registrationId) && (
+                            <Badge
+                              variant="secondary"
+                              className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none"
+                            >
+                              Propagé
+                            </Badge>
+                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -216,7 +253,9 @@ export function BracketNodeMatchesOrganizeClient({
 
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Matchs</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                Matchs
+              </label>
               <Select value={matchCount} onValueChange={setMatchCount}>
                 <SelectTrigger className="h-10 text-xs rounded-lg">
                   <SelectValue />
@@ -230,7 +269,9 @@ export function BracketNodeMatchesOrganizeClient({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">Série</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+                Série
+              </label>
               <Select value={format} onValueChange={setFormat}>
                 <SelectTrigger className="h-10 text-xs rounded-lg">
                   <SelectValue />
@@ -242,23 +283,29 @@ export function BracketNodeMatchesOrganizeClient({
               </Select>
             </div>
           </div>
-          
-          <Button 
+
+          <Button
             variant="secondary"
-            className="w-full gap-2 font-bold h-11" 
+            className="w-full gap-2 font-bold h-11"
             onClick={handleAddToDraft}
           >
             <Plus className="h-4 w-4" /> Ajouter au Draft
           </Button>
         </CardContent>
         <CardFooter className="pt-4 border-t bg-muted/30 rounded-b-xl">
-          <Button 
-            className="w-full gap-2 font-bold h-12 shadow-md shadow-primary/20" 
+          <Button
+            className="w-full gap-2 font-bold h-12 shadow-md shadow-primary/20"
             onClick={handleSaveDrafts}
             disabled={isPending || draftMatches.length === 0}
           >
-            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
-            {isPending ? "Sauvegarde..." : `Sauvegarder ${draftMatches.length} Matchs`}
+            {isPending ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-5 w-5" />
+            )}
+            {isPending
+              ? "Sauvegarde..."
+              : `Sauvegarder ${draftMatches.length} Matchs`}
           </Button>
         </CardFooter>
       </Card>
@@ -269,20 +316,35 @@ export function BracketNodeMatchesOrganizeClient({
           <CardHeader className="border-b pb-0 shrink-0">
             <div className="flex items-center justify-between mb-2">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                 <Swords className="h-4 w-4 text-primary" /> Organisation du Nœud
+                <Swords className="h-4 w-4 text-primary" /> Organisation du Nœud
               </CardTitle>
             </div>
             <TabsList className="bg-transparent gap-6 p-0 h-10 justify-start">
-              <TabsTrigger value="draft" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2 font-bold text-xs">
-                Draft <Badge variant="secondary" className="h-5 min-w-5 px-1">{draftMatches.length}</Badge>
+              <TabsTrigger
+                value="draft"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2 font-bold text-xs"
+              >
+                Draft{" "}
+                <Badge variant="secondary" className="h-5 min-w-5 px-1">
+                  {draftMatches.length}
+                </Badge>
               </TabsTrigger>
-              <TabsTrigger value="existing" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2 font-bold text-xs">
-                Existants <Badge variant="outline" className="h-5 min-w-5 px-1">{existingMatches.length}</Badge>
+              <TabsTrigger
+                value="existing"
+                className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2 font-bold text-xs"
+              >
+                Existants{" "}
+                <Badge variant="outline" className="h-5 min-w-5 px-1">
+                  {existingMatches.length}
+                </Badge>
               </TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">
-            <TabsContent value="draft" className="m-0 focus-visible:ring-0 h-full overflow-y-auto">
+            <TabsContent
+              value="draft"
+              className="m-0 focus-visible:ring-0 h-full overflow-y-auto"
+            >
               {draftMatches.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-32 text-muted-foreground opacity-30">
                   <Clock className="h-12 w-12 mb-3" />
@@ -291,26 +353,47 @@ export function BracketNodeMatchesOrganizeClient({
               ) : (
                 <div className="divide-y">
                   {draftMatches.map((m, i) => (
-                    <div key={i} className="p-4 hover:bg-primary/5 transition-colors flex items-center justify-between group animate-in slide-in-from-right-2 duration-300">
+                    <div
+                      key={i}
+                      className="p-4 hover:bg-primary/5 transition-colors flex items-center justify-between group animate-in slide-in-from-right-2 duration-300"
+                    >
                       <div className="flex items-center gap-4">
                         <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary text-xs shrink-0">
                           #{i + 1}
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold">{getName(m.participant1RegistrationId)}</span>
-                            <span className="text-[10px] font-black text-muted-foreground opacity-50">VS</span>
-                            <span className="text-sm font-bold">{getName(m.participant2RegistrationId)}</span>
+                            <span className="text-sm font-bold">
+                              {getName(m.participant1RegistrationId)}
+                            </span>
+                            <span className="text-[10px] font-black text-muted-foreground opacity-50">
+                              VS
+                            </span>
+                            <span className="text-sm font-bold">
+                              {getName(m.participant2RegistrationId)}
+                            </span>
                           </div>
                           <div className="flex gap-2 mt-1">
-                             <Badge variant="outline" className="h-4 text-[9px] border-primary/20">{m.format}</Badge>
-                             {m.leg > 1 && <Badge variant="secondary" className="h-4 text-[9px]">Match #{m.leg}</Badge>}
+                            <Badge
+                              variant="outline"
+                              className="h-4 text-[9px] border-primary/20"
+                            >
+                              {m.format}
+                            </Badge>
+                            {m.leg > 1 && (
+                              <Badge
+                                variant="secondary"
+                                className="h-4 text-[9px]"
+                              >
+                                Match #{m.leg}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => handleRemoveDraft(i)}
                       >
@@ -321,7 +404,10 @@ export function BracketNodeMatchesOrganizeClient({
                 </div>
               )}
             </TabsContent>
-            <TabsContent value="existing" className="m-0 focus-visible:ring-0 h-full overflow-y-auto">
+            <TabsContent
+              value="existing"
+              className="m-0 focus-visible:ring-0 h-full overflow-y-auto"
+            >
               {existingMatches.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-32 text-muted-foreground opacity-30">
                   <RefreshCw className="h-12 w-12 mb-3" />
@@ -330,28 +416,49 @@ export function BracketNodeMatchesOrganizeClient({
               ) : (
                 <div className="divide-y">
                   {existingMatches.map((m, idx) => (
-                    <div key={m.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between group">
+                    <div
+                      key={m.id}
+                      className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between group"
+                    >
                       <div className="flex items-center gap-4">
                         <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center font-bold text-muted-foreground text-xs shrink-0 ring-1 ring-border">
                           #{idx + 1}
                         </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold">{getName(m.participant1RegistrationId)}</span>
-                            <span className="text-[10px] font-black text-muted-foreground opacity-50">VS</span>
-                            <span className="text-sm font-bold">{getName(m.participant2RegistrationId)}</span>
+                            <span className="text-sm font-bold">
+                              {getName(m.participant1RegistrationId)}
+                            </span>
+                            <span className="text-[10px] font-black text-muted-foreground opacity-50">
+                              VS
+                            </span>
+                            <span className="text-sm font-bold">
+                              {getName(m.participant2RegistrationId)}
+                            </span>
                           </div>
                           <div className="flex gap-2 mt-1">
-                             <Badge variant="outline" className="h-4 text-[9px]">{m.metadata?.format || "BO1"}</Badge>
-                             <Badge variant="outline" className={cn("h-4 text-[9px]", m.status === 'COMPLETED' ? "bg-green-500/10 text-green-600 border-none" : "text-amber-600 border-amber-500/20")}>
-                                {m.status === 'COMPLETED' ? "Terminé" : "En attente"}
-                             </Badge>
+                            <Badge variant="outline" className="h-4 text-[9px]">
+                              {m.metadata?.format || "BO1"}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "h-4 text-[9px]",
+                                m.status === "COMPLETED"
+                                  ? "bg-green-500/10 text-green-600 border-none"
+                                  : "text-amber-600 border-amber-500/20",
+                              )}
+                            >
+                              {m.status === "COMPLETED"
+                                ? "Terminé"
+                                : "En attente"}
+                            </Badge>
                           </div>
                         </div>
                       </div>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         onClick={() => handleDeleteExisting(m.id)}
                       >
@@ -364,10 +471,12 @@ export function BracketNodeMatchesOrganizeClient({
             </TabsContent>
           </CardContent>
           <CardFooter className="border-t bg-muted/5 p-4 shrink-0">
-             <div className="flex items-center gap-3 text-xs text-muted-foreground italic">
-                <Trophy className="h-4 w-4 text-primary" />
-                <span>Le vainqueur de cette série progressera dans l'arbre principal.</span>
-             </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground italic">
+              <Trophy className="h-4 w-4 text-primary" />
+              <span>
+                Le vainqueur de cette série progressera dans l'arbre principal.
+              </span>
+            </div>
           </CardFooter>
         </Tabs>
       </Card>

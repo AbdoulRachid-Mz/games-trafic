@@ -113,6 +113,7 @@ export function OrganizeWizardClient({
   );
 
   const [autoInit, setAutoInit] = useState(true);
+  const [randomize, setRandomize] = useState(true);
   const [groupsSize, setGroupsSize] = useState(4);
 
   const maxParticipants = edition?.maxParticipants || 0;
@@ -348,8 +349,9 @@ useEffect(() => {
           selectedRegIds,
           {
             autoInitializeFirstPhase:
-              autoInit && phasesToCreate[0]?.phaseType === "GROUP_STAGE",
+              autoInit && (phasesToCreate[0]?.phaseType === "GROUP_STAGE" || phasesToCreate[0]?.phaseType === "ELIMINATION"),
             groupsSize: groupsSize,
+            randomizeDistribution: randomize,
           }
         );
 
@@ -463,8 +465,8 @@ useEffect(() => {
             <AutoInitSection
               autoInit={autoInit}
               setAutoInit={setAutoInit}
-              groupsSize={groupsSize}
-              setGroupsSize={setGroupsSize}
+              randomize={randomize}
+              setRandomize={setRandomize}
             />
 
             <SubmitButton
@@ -834,11 +836,11 @@ function ParticipantStrategySection({
 function AutoInitSection({
   autoInit,
   setAutoInit,
-  groupsSize,
-  setGroupsSize,
+  randomize,
+  setRandomize,
 }: any) {
   return (
-    <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
+    <div className="bg-primary/5 rounded-lg p-4 border border-primary/10 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Checkbox
@@ -856,12 +858,24 @@ function AutoInitSection({
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-[10px] max-w-[200px]">
-                  Crée automatiquement les groupes et assigne les participants sélectionnés.
+                  Crée automatiquement les groupes/nœuds et assigne les participants sélectionnés.
                 </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 pl-6 border-l-2 border-primary/20">
+        <Checkbox
+          id="randomize"
+          checked={randomize}
+          onCheckedChange={(v) => setRandomize(!!v)}
+          disabled={!autoInit}
+        />
+        <Label htmlFor="randomize" className={cn("text-xs font-medium cursor-pointer", !autoInit && "opacity-50")}>
+          Mélanger aléatoirement les participants
+        </Label>
       </div>
     </div>
   );

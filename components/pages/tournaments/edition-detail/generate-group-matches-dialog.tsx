@@ -13,13 +13,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Swords, AlertCircle, Users, RefreshCw } from "lucide-react";
 import { createMatch } from "@/actions/tournaments";
-import { getPhaseGroupParticipants, getMatches } from "@/actions/phases";
+import { 
+  getPhaseGroupParticipants, 
+  getMatches, 
+  getBracketNodes, 
+  createBracketNode, 
+  generateBracketMatches,
+  getTournamentPhaseById 
+} from "@/actions/phases";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { PhaseGroupParticipant, Match } from "@/database/schema";
+import type { PhaseGroupParticipant, Match, BracketNode, TournamentPhase } from "@/database/schema";
+import { GitBranch, Hash } from "lucide-react";
 
 interface GenerateGroupMatchesDialogProps {
   groupId: string;
@@ -34,7 +44,6 @@ interface GenerateGroupMatchesDialogProps {
     maxParticipants?: number;
     matchesPerParticipant?: number;
   };
-  groupParticipantsCount?: number;
 }
 
 export function GenerateGroupMatchesDialog({
@@ -44,13 +53,15 @@ export function GenerateGroupMatchesDialog({
   maxMatches = 100,
   existingMatchesCount = 0,
   groupConfig,
-  groupParticipantsCount = 0,
 }: GenerateGroupMatchesDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [participantsCount, setParticipantsCount] = useState(groupParticipantsCount);
+  const [participantsCount, setParticipantsCount] = useState(0);
   const [expectedMatchesCount, setExpectedMatchesCount] = useState(0);
-  const [format, setFormat] = useState("SINGLE");
+  const [bracketNodesList, setBracketNodesList] = useState<BracketNode[]>([]);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [nodesToCreate, setNodesToCreate] = useState(1);
+  const [phaseType, setPhaseType] = useState<string>("");
   const router = useRouter();
 
   // Calculer le nombre de matchs attendus selon le format
@@ -63,11 +74,45 @@ export function GenerateGroupMatchesDialog({
     return 0;
   };
 
-  // Calculate initial metrics based on props
+  // Vérifier la faisabilité à l'ouverture
   useEffect(() => {
-    setParticipantsCount(groupParticipantsCount);
-    setExpectedMatchesCount(calculateExpectedMatches(groupParticipantsCount, format));
-  }, [groupParticipantsCount, format]);
+    if (open) {
+      const fetchData = async () => {
+        try {
+          const [ptsRes, nodesRes, phaseRes] = await Promise.all([
+            getPhaseGroupParticipants({
+              filters: { groupId },
+              pagination: { page: 1, limit: 500 },
+            }),
+            getBracketNodes({
+              filters: { groupId },
+              pagination: { page: 1, limit: 100 },
+            }),
+            getTournamentPhaseById(phaseId)
+          ]);
+
+          const participants = ptsRes.data as PhaseGroupParticipant[];
+          const count = participants.length;
+          setParticipantsCount(count);
+
+          const nodes = nodesRes.data as BracketNode[];
+          setBracketNodesList(nodes);
+          setSelectedNodeIds(nodes.map(n => n.id));
+          
+          if (phaseRes) {
+            setPhaseType(phaseRes.phaseType || "");
+          }
+
+          // Calculer pour le format SINGLE par défaut
+          const expected = calculateExpectedMatches(count, "SINGLE");
+          setExpectedMatchesCount(expected);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      };
+      fetchData();
+    }
+  }, [open, groupId, phaseId]);
 
   const handleGenerate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -89,126 +134,59 @@ export function GenerateGroupMatchesDialog({
         .filter(Boolean) as string[];
 
       if (regIds.length < 2) {
-        throw new Error(
-          "Pas assez de participants pour générer des matchs (minimum 2).",
-        );
+        throw new Error("Pas assez de participants dans le groupe (minimum 2).");
       }
 
-      // 2. Vérifier la limite de matchs
-      const totalMatchesNeeded = calculateExpectedMatches(
-        regIds.length,
-        format,
-      );
-      if (existingMatchesCount + totalMatchesNeeded > maxMatches) {
-        throw new Error(
-          `Impossible de générer ${totalMatchesNeeded} matchs. Limite du groupe: ${maxMatches} matchs maximum. ` +
-            `(Actuellement: ${existingMatchesCount} matchs existants)`,
-        );
-      }
-
-      // 3. Shuffle participants if needed
       if (shuffleParticipants) {
         regIds = [...regIds].sort(() => Math.random() - 0.5);
       }
 
-      // 4. Get existing matches to avoid duplicates
-      const existingMatchesRes = await getMatches({
-        filters: { groupId },
-        pagination: { page: 1, limit: 1000 },
-      });
-      const existingMatches = existingMatchesRes.data as Match[];
+      let nodesToProcess: BracketNode[] = [];
 
-      const existingPairs = new Set();
-      for (const m of existingMatches) {
-        if (m.participant1RegistrationId && m.participant2RegistrationId) {
-          const key = `${m.participant1RegistrationId}-${m.participant2RegistrationId}`;
-          existingPairs.add(key);
-          if (format === "HOME_AWAY") {
-            existingPairs.add(
-              `${m.participant2RegistrationId}-${m.participant1RegistrationId}`,
-            );
-          }
+      // 2. Handle Bracket Nodes
+      if (bracketNodesList.length === 0) {
+        // Create new nodes if requested
+        const nodeCount = nodesToCreate;
+        const participantsPerNode = Math.ceil(regIds.length / nodeCount);
+        
+        for (let i = 0; i < nodeCount; i++) {
+          const nodeParticipants = regIds.slice(i * participantsPerNode, (i + 1) * participantsPerNode);
+          if (nodeParticipants.length < 2) continue;
+
+          const nodeName = phaseType === "ROUND_ROBIN" ? `Jour ${i + 1}` : `Bracket ${String.fromCharCode(65 + i)}`;
+          const newNode = await createBracketNode({
+            phaseId,
+            groupId,
+            nodeCode: `${groupId.slice(0, 4)}-${i + 1}`,
+            round: i + 1,
+            order: i,
+            metadata: { 
+              participants: nodeParticipants,
+              name: nodeName
+            }
+          } as any);
+          nodesToProcess.push(newNode);
         }
+      } else {
+        // Use selected nodes
+        nodesToProcess = bracketNodesList.filter(n => selectedNodeIds.includes(n.id));
       }
 
-      // 5. Generate matches (only missing ones)
-      let counter = existingMatches.length + 1;
-      const promises = [];
-      let createdCount = 0;
-
-      for (let i = 0; i < regIds.length; i++) {
-        for (let j = i + 1; j < regIds.length; j++) {
-          const key1 = `${regIds[i]}-${regIds[j]}`;
-          const key2 = `${regIds[j]}-${regIds[i]}`;
-
-          if (format === "HOME_AWAY") {
-            // Aller
-            if (!existingPairs.has(key1)) {
-              promises.push(
-                createMatch({
-                  editionId,
-                  phaseId,
-                  groupId,
-                  round: 1,
-                  matchNumber: counter++,
-                  participant1RegistrationId: regIds[i],
-                  participant2RegistrationId: regIds[j],
-                  status: "PENDING",
-                  metadata: { format: "HOME_AWAY", leg: 1 },
-                } as any),
-              );
-              createdCount++;
-            }
-            // Retour
-            if (!existingPairs.has(key2)) {
-              promises.push(
-                createMatch({
-                  editionId,
-                  phaseId,
-                  groupId,
-                  round: 1,
-                  matchNumber: counter++,
-                  participant1RegistrationId: regIds[j],
-                  participant2RegistrationId: regIds[i],
-                  status: "PENDING",
-                  metadata: { format: "HOME_AWAY", leg: 2 },
-                } as any),
-              );
-              createdCount++;
-            }
-          } else {
-            if (!existingPairs.has(key1)) {
-              promises.push(
-                createMatch({
-                  editionId,
-                  phaseId,
-                  groupId,
-                  round: 1,
-                  matchNumber: counter++,
-                  participant1RegistrationId: regIds[i],
-                  participant2RegistrationId: regIds[j],
-                  status: "PENDING",
-                  metadata: { format: "BEST_OF_1" },
-                } as any),
-              );
-              createdCount++;
-            }
-          }
-        }
+      if (nodesToProcess.length === 0) {
+        throw new Error("Aucun bracket sélectionné ou créé pour la génération.");
       }
 
-      if (createdCount === 0) {
-        toast.info("Tous les matchs sont déjà générés pour ce groupe.");
-        setOpen(false);
-        setLoading(false);
-        return;
+      // 3. Generate matches for each node
+      let totalCreated = 0;
+      for (const node of nodesToProcess) {
+        const res = await generateBracketMatches(node.id, { 
+          returnType: format === "HOME_AWAY" ? "double" : "single",
+          forceRecreate: false 
+        });
+        totalCreated += res.count;
       }
 
-      await Promise.all(promises);
-
-      toast.success(
-        `${createdCount} nouveau(x) match(s) généré(s) avec succès !`,
-      );
+      toast.success(`${totalCreated} match(s) généré(s) à travers ${nodesToProcess.length} bracket(s).`);
       setOpen(false);
       router.refresh();
     } catch (error: any) {
@@ -219,134 +197,120 @@ export function GenerateGroupMatchesDialog({
   };
 
   const isGenerationPossible = participantsCount >= 2;
-  const willExceedLimit =
-    existingMatchesCount + expectedMatchesCount > maxMatches;
-  const isDisabled = !isGenerationPossible || willExceedLimit || loading;
-
-  let disabledReason = "";
-  if (!isGenerationPossible) disabledReason = "Minimum 2 participants requis";
-  else if (willExceedLimit)
-    disabledReason = `Limite de ${maxMatches} matchs dépassée`;
+  const isDisabled = !isGenerationPossible || loading;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-2"
-          disabled={isDisabled}
-        >
-          <RefreshCw className="h-4 w-4" /> Générer matchs
-          {!isGenerationPossible && participantsCount < 2 && (
-            <Badge variant="destructive" className="ml-1 text-[8px] h-4">
-              Attente participants
-            </Badge>
-          )}
+        <Button variant="outline" className="gap-2" disabled={!isGenerationPossible}>
+          <RefreshCw className="h-4 w-4" /> Générer matches (Brackets)
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Swords className="h-5 w-5 text-primary" />
-            Génération automatique des matchs
+            Génération via Brackets
           </DialogTitle>
           <DialogDescription>
-            Créez toutes les confrontations du groupe en une seule opération.
+            Les matches seront créés et répartis dans les brackets du groupe.
           </DialogDescription>
         </DialogHeader>
 
-        {/* État des participants */}
-        <div className="p-3 bg-muted/30 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">Participants dans le groupe</span>
-          </div>
-          <Badge variant={participantsCount >= 2 ? "default" : "destructive"}>
-            {participantsCount}
-          </Badge>
-        </div>
-
-        {/* Avertissement de limite */}
-        {willExceedLimit && (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>
-              Limite de {maxMatches} matchs. Actuellement:{" "}
-              {existingMatchesCount} / {maxMatches}. Besoin de{" "}
-              {expectedMatchesCount} nouveaux matchs.
-            </span>
-          </div>
-        )}
-
-        {/* Info sur le nombre de matchs attendus */}
-        {isGenerationPossible && !willExceedLimit && (
-          <div className="p-2 bg-primary/5 border border-primary/10 rounded-lg text-xs text-muted-foreground flex items-center justify-between">
-            <span>Matchs à générer :</span>
-            <Badge variant="secondary" className="text-[10px]">
-              {expectedMatchesCount} nouveaux
-            </Badge>
-          </div>
-        )}
-
-        <form onSubmit={handleGenerate} className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="format">Format de la rencontre</Label>
-            <select
-              id="format"
-              name="format"
-              defaultValue="SINGLE"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              disabled={loading}
-            >
-              <option value="SINGLE">
-                Round-robin (chaque paire une fois)
-              </option>
-              <option value="HOME_AWAY">
-                Aller-retour (chaque paire deux fois)
-              </option>
-            </select>
-            <p className="text-[10px] text-muted-foreground">
-              {participantsCount >= 2
-                ? `Générera ${(participantsCount * (participantsCount - 1)) / 2} (SINGLE) ou ${participantsCount * (participantsCount - 1)} (HOME_AWAY) matchs`
-                : "Au moins 2 participants requis"}
-            </p>
+        <form onSubmit={handleGenerate} className="space-y-6 pt-4">
+          {/* Participants Info */}
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2 text-sm">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span>Participants disponibles</span>
+            </div>
+            <Badge variant="secondary">{participantsCount}</Badge>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="shuffle"
-              name="shuffle"
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label
-              htmlFor="shuffle"
-              className="text-sm font-normal cursor-pointer"
-            >
-              Mélanger aléatoirement l'ordre des matchs
+          {/* Bracket Selection/Creation */}
+          <div className="space-y-3">
+            <Label className="text-sm font-bold flex items-center gap-2">
+              <GitBranch className="h-4 w-4" /> Configuration des Brackets
             </Label>
+            
+            {bracketNodesList.length > 0 ? (
+              <div className="border rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Sélectionner les brackets</p>
+                {bracketNodesList.map(node => (
+                  <div key={node.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`node-${node.id}`} 
+                      checked={selectedNodeIds.includes(node.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) setSelectedNodeIds([...selectedNodeIds, node.id]);
+                        else setSelectedNodeIds(selectedNodeIds.filter(id => id !== node.id));
+                      }}
+                    />
+                    <label htmlFor={`node-${node.id}`} className="text-sm cursor-pointer">
+                      {(node.metadata as any)?.name || `Bracket #${node.nodeCode || node.id.slice(0, 4)}`}
+                      <span className="ml-2 text-[10px] text-muted-foreground">
+                        ({((node.metadata as any)?.participants || []).length} pts)
+                      </span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 border border-dashed rounded-lg bg-primary/5 space-y-3">
+                <p className="text-xs text-center text-muted-foreground">
+                  Aucun bracket n'existe pour ce groupe. Ils seront créés automatiquement.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="node-count" className="text-xs">Nombre de brackets (Journées/Sous-groupes)</Label>
+                  <div className="flex items-center gap-3">
+                    <Input 
+                      id="node-count" 
+                      type="number" 
+                      min={1} 
+                      max={Math.floor(participantsCount / 2)}
+                      value={nodesToCreate}
+                      onChange={(e) => setNodesToCreate(parseInt(e.target.value) || 1)}
+                      className="h-8 w-20"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      ~{Math.ceil(participantsCount / nodesToCreate)} participants par bracket
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <DialogFooter className="pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={loading}
-            >
+          {/* Format Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="format">Format</Label>
+              <select
+                id="format"
+                name="format"
+                defaultValue="SINGLE"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                <option value="SINGLE">Round-robin</option>
+                <option value="HOME_AWAY">Aller-retour</option>
+              </select>
+            </div>
+            <div className="flex items-end pb-1">
+              <div className="flex items-center space-x-2">
+                <Checkbox id="shuffle" name="shuffle" defaultChecked />
+                <Label htmlFor="shuffle" className="text-xs font-normal cursor-pointer">
+                  Mélanger aléatoirement
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={loading}>
               Annuler
             </Button>
-            <Button
-              type="submit"
-              disabled={isDisabled}
-              className="gap-2"
-              title={disabledReason}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Swords className="h-4 w-4" />
-              )}
+            <Button type="submit" disabled={isDisabled} className="gap-2">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
               {loading ? "Génération..." : "Générer maintenant"}
             </Button>
           </DialogFooter>

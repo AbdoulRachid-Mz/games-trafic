@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,15 +34,18 @@ import { AdvancedUpload } from "@/components/ui/advanced-upload";
 export function MatchControlClient({
   match,
   tournamentId,
-  editionId
+  editionId,
+  autoSubmit = false,
 }: {
-  match: any,
-  tournamentId: string,
-  editionId: string
+  match: any;
+  tournamentId: string;
+  editionId: string;
+  autoSubmit?: boolean;
 }) {
   const router = useRouter();
   const { user } = useAuthContext();
   const [isPending, startTransition] = useTransition();
+  const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     score1: match.score1 ?? 0,
     score2: match.score2 ?? 0,
@@ -57,6 +60,13 @@ export function MatchControlClient({
 
   const canSubmit = isParticipant && match.status !== "COMPLETED" && match.status !== "DISPUTED";
   const canAdmin = isOrganizer;
+
+  useEffect(() => {
+    if (autoSubmit && formRef.current && (canSubmit || canAdmin)) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast.info("Prêt pour la saisie du score !");
+    }
+  }, [autoSubmit, canSubmit, canAdmin]);
 
   const handleScoreChange = (field: "score1" | "score2", value: string) => {
     const val = parseInt(value) || 0;
@@ -112,18 +122,30 @@ export function MatchControlClient({
   return (
     <div className="space-y-6">
       {/* 🧩 1. Participants View / Form */}
-      <Card className={cn(
-        "border-2 transition-all",
-        canSubmit ? "border-primary/20 shadow-lg" : "border-transparent bg-muted/20"
-      )}>
+      <Card 
+        ref={formRef}
+        className={cn(
+          "border-2 transition-all",
+          (canSubmit || canAdmin) ? "border-primary/20 shadow-lg" : "border-transparent bg-muted/20",
+          autoSubmit && "ring-2 ring-primary ring-offset-2 animate-pulse"
+        )}
+      >
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
-            {canSubmit ? <Send className="h-5 w-5 text-primary" /> : <ShieldCheck className="h-5 w-5 text-muted-foreground" />}
-            {canSubmit ? "Soumission des Scores" : "Résultats Enregistrés"}
+            {canAdmin ? (
+              <Settings2 className="h-5 w-5 text-primary" />
+            ) : canSubmit ? (
+              <Send className="h-5 w-5 text-primary" />
+            ) : (
+              <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+            )}
+            {canAdmin ? "Contrôle Organisateur" : canSubmit ? "Saisie du Résultat" : "Résultats Enregistrés"}
           </CardTitle>
           <CardDescription className="text-[10px] sm:text-xs">
-            {canSubmit
-              ? "En tant que participant, saisissez le score final et joignez une preuve."
+            {canAdmin 
+              ? "En tant qu'organisateur, vous pouvez forcer le résultat final."
+              : canSubmit
+              ? "Entrez le score final constaté à la fin de la rencontre."
               : "Le score affiché est celui actuellement enregistré en base de données."}
           </CardDescription>
         </CardHeader>

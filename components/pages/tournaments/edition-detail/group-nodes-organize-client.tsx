@@ -65,6 +65,33 @@ export function GroupNodesOrganizeClient({
     return reg?.member?.displayName || reg?.member?.user?.username || reg?.member?.team?.name || "Joueur";
   };
 
+  const handleAutoAssign = () => {
+    if (draftNodes.length === 0) {
+      toast.error("Ajoutez d'abord des nœuds au draft.");
+      return;
+    }
+
+    const availableRegIds = groupParticipants
+      .map((gp) => gp.registrationId)
+      .filter(Boolean);
+
+    // Shuffle available participants
+    const shuffled = [...availableRegIds].sort(() => Math.random() - 0.5);
+
+    const newDrafts = draftNodes.map((node, i) => {
+      // Pick 2 participants for each node if available
+      const p1 = shuffled[i * 2] || "";
+      const p2 = shuffled[i * 2 + 1] || "";
+      return {
+        ...node,
+        participants: [p1, p2].filter(Boolean),
+      };
+    });
+
+    setDraftNodes(newDrafts);
+    toast.success("Participants assignés aléatoirement aux nœuds du draft.");
+  };
+
   const handleAddToDraft = () => {
     const count = parseInt(nodeCount) || 1;
     const round = parseInt(startRound) || 1;
@@ -173,13 +200,23 @@ export function GroupNodesOrganizeClient({
             </div>
           </div>
           
-          <Button 
-            variant="secondary"
-            className="w-full gap-2 font-bold" 
-            onClick={handleAddToDraft}
-          >
-            <Plus className="h-4 w-4" /> Ajouter au Draft
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="secondary"
+              className="flex-1 gap-2 font-bold" 
+              onClick={handleAddToDraft}
+            >
+              <Plus className="h-4 w-4" /> Ajouter
+            </Button>
+            <Button 
+              variant="outline"
+              className="flex-1 gap-2 font-bold border-primary/20" 
+              onClick={handleAutoAssign}
+              disabled={draftNodes.length === 0}
+            >
+              <RefreshCcw className="h-4 w-4" /> Auto-Assign
+            </Button>
+          </div>
         </CardContent>
         <CardFooter className="pt-4 border-t bg-muted/30 rounded-b-xl">
           <Button 

@@ -124,7 +124,7 @@ const defaultMenuItems: MenuItem[] = [
     link: "/blogs",
     icon: MessageSquare,
     group: "application",
-    requiresAuth: true,
+    requiresAuth: false,
   },
   {
     id: "services",
@@ -132,7 +132,7 @@ const defaultMenuItems: MenuItem[] = [
     link: "/services",
     icon: Package,
     group: "application",
-    requiresAuth: true,
+    requiresAuth: false,
   },
   {
     id: "partners",
@@ -142,6 +142,32 @@ const defaultMenuItems: MenuItem[] = [
     group: "application",
     requiresAuth: true,
   },
+  
+  {
+    id: "documentation",
+    label: "Documentation",
+    link: "/docs",
+    icon: TrendingUp,
+    group: "application",
+    requiresAuth: false,
+  },
+  {
+    id: "support",
+    label: "Support",
+    link: "/support",
+    icon: MessageSquare,
+    group: "application",
+    requiresAuth: false,
+  },
+  {
+    id: "contact",
+    label: "Contact",
+    link: "/contact",
+    icon: Users,
+    group: "application",
+    requiresAuth: false,
+  },
+
 
   // Social & Communication
 
@@ -247,7 +273,7 @@ export function LeftBar({
     }
   };
 
-  const handleCreateAction = (type: "shop" | "tournament" | "product") => {
+  const handleCreateAction = (type: "shop" | "tournament") => {
     router.push(`/${type}s/create`);
     if (onClose) onClose();
   };

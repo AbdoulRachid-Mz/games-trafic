@@ -139,13 +139,14 @@ function PhaseBracket({
         {sortedRounds.map(([roundNumber, roundMatches]) => (
           <div key={roundNumber} className="min-w-[300px] max-w-[400px]">
             <div className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b pb-1">Round {roundNumber}</div>
-            <div className="space-y-4">
+            <div className="space-y-4 w-full">
               {roundMatches
                 .sort((a: any, b: any) => (a.matchNumber ?? 0) - (b.matchNumber ?? 0))
                 .map((match: any) => (
                   <MatchCard
                     key={match.id}
                     match={match}
+                    viewMode="list"
                     currentUserId={currentUserId}
                     isAdmin={isAdmin}
                     onUpdate={handleUpdate}

@@ -276,7 +276,14 @@ export function TournamentPageContent() {
               <Button onClick={() => router.push("/tournaments")}>
                 Explorer les tournois
               </Button>
-              <Button onClick={() => router.refresh()}>Actualiser</Button>
+              <Button
+                onClick={async () => {
+                  await router.refresh();
+                  window.location.reload();
+                }}
+              >
+                Actualiser
+              </Button>
             </div>
           </CardContent>
         </Card>

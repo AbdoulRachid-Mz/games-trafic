@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { GameClipCard } from "@/types/view-models";
 import { Typography } from "../ui/typography";
 import { useRouter } from "next/navigation";
-import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
+import { useGameClipsStore } from "@/stores/game-clips-store";
 
 interface GameClipReelProps {
   initialClipId?: string;
@@ -38,32 +38,39 @@ export function GameClipReel({
   const router = useRouter();
   const [orderedClips, setOrderedClips] = useState<GameClipCard[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialized = useRef(false);
   const itemsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const isScrollingRef = useRef(false);
+  
+  const { muted, toggleMute, setGlobalPause } = useGameClipsStore();
 
-  // Shuffle logic
-  const shuffleAndSet = useCallback((clipsToShuffle: GameClipCard[]) => {
-    const shuffled = [...clipsToShuffle].sort(() => Math.random() - 0.5);
-    setOrderedClips(shuffled);
-    setActiveIndex(0);
-    if (containerRef.current) containerRef.current.scrollTop = 0;
+  // Fonction pour mélanger aléatoirement les clips
+  const shuffleArray = useCallback((array: GameClipCard[]) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }, []);
 
-  // Sync clips
+  // Initialisation et ajout de nouveaux clips de manière aléatoire
   useEffect(() => {
-    if (originalClips.length > 0 && orderedClips.length === 0) {
-      setOrderedClips(originalClips);
-    } else if (originalClips.length > orderedClips.length) {
-      // Append new clips from pagination
+    if (originalClips.length > 0) {
       setOrderedClips(prev => {
         const existingIds = new Set(prev.map(c => c.id));
-        const news = originalClips.filter(c => !existingIds.has(c.id));
-        return [...prev, ...news];
+        const newClips = originalClips.filter(c => !existingIds.has(c.id));
+        
+        if (newClips.length > 0) {
+          // Mélanger les nouveaux clips et les ajouter
+          const shuffledNew = shuffleArray(newClips);
+          return [...prev, ...shuffledNew];
+        }
+        return prev;
       });
     }
-  }, [originalClips, orderedClips.length]);
+  }, [originalClips, shuffleArray]);
 
   // Initial scroll to active
   useEffect(() => {
@@ -82,18 +89,37 @@ export function GameClipReel({
     }
   }, [orderedClips, initialClipId]);
 
-  // Hook to handle intersection and update activeIndex
-  const handleIntersect = useCallback((index: number, isIntersecting: boolean) => {
-    if (isIntersecting) {
-      setActiveIndex(index);
-      onClipChange?.(orderedClips[index].id);
-
-      // Load more if near end
-      if (index >= orderedClips.length - 2 && hasNextPage && !isFetchingNextPage) {
-        onFetchNextPage?.();
+  // Gestion du scroll avec détection de fin
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current || isScrollingRef.current) return;
+    
+    isScrollingRef.current = true;
+    requestAnimationFrame(() => {
+      const scrollTop = containerRef.current?.scrollTop || 0;
+      const windowHeight = window.innerHeight;
+      const newIndex = Math.round(scrollTop / windowHeight);
+      
+      if (newIndex !== activeIndex && newIndex >= 0 && newIndex < orderedClips.length) {
+        setActiveIndex(newIndex);
+        onClipChange?.(orderedClips[newIndex].id);
+        
+        // Charger plus si on approche de la fin
+        if (newIndex >= orderedClips.length - 3 && hasNextPage && !isFetchingNextPage) {
+          onFetchNextPage?.();
+        }
       }
+      
+      isScrollingRef.current = false;
+    });
+  }, [activeIndex, orderedClips, onClipChange, hasNextPage, isFetchingNextPage, onFetchNextPage]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [orderedClips, onClipChange, hasNextPage, isFetchingNextPage, onFetchNextPage]);
+  }, [handleScroll]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -101,25 +127,39 @@ export function GameClipReel({
       if (areCommentsOpen) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        containerRef.current?.scrollBy({ top: window.innerHeight, behavior: "smooth" });
+        const nextIndex = Math.min(activeIndex + 1, orderedClips.length - 1);
+        if (containerRef.current) {
+          containerRef.current.scrollTo({ top: nextIndex * window.innerHeight, behavior: "smooth" });
+        }
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        containerRef.current?.scrollBy({ top: -window.innerHeight, behavior: "smooth" });
+        const prevIndex = Math.max(activeIndex - 1, 0);
+        if (containerRef.current) {
+          containerRef.current.scrollTo({ top: prevIndex * window.innerHeight, behavior: "smooth" });
+        }
       } else if (e.key === "m" || e.key === "M") {
-        setIsMuted(prev => !prev);
+        toggleMute();
+      } else if (e.key === " " || e.key === "Space") {
+        e.preventDefault();
+        setGlobalPause(!useGameClipsStore.getState().isGloballyPaused);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [areCommentsOpen]);
+  }, [areCommentsOpen, activeIndex, orderedClips.length, toggleMute, setGlobalPause]);
 
-  // Handle end of reel
+  // Gestion de la fin du reel avec reshuffle
   const handleLastClipEnd = useCallback(() => {
     if (!hasNextPage) {
-      // Shuffle and restart
-      shuffleAndSet(orderedClips);
+      // Reshuffle tous les clips et recommencer
+      const reshuffled = shuffleArray(orderedClips);
+      setOrderedClips(reshuffled);
+      setActiveIndex(0);
+      if (containerRef.current) {
+        containerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
     }
-  }, [hasNextPage, orderedClips, shuffleAndSet]);
+  }, [hasNextPage, orderedClips, shuffleArray]);
 
   return (
     <div className={cn("relative h-screen w-full bg-black overflow-hidden", className)}>
@@ -134,10 +174,10 @@ export function GameClipReel({
       </div>
 
       <button
-        onClick={() => setIsMuted(!isMuted)}
+        onClick={toggleMute}
         className="absolute top-6 right-6 z-50 bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all shadow-xl md:top-20"
       >
-        {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+        {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
 
       {/* Reel Scroll Container */}
@@ -151,32 +191,39 @@ export function GameClipReel({
             clip={clip}
             index={index}
             isActive={index === activeIndex}
-            isMuted={isMuted}
-            isPaused={areCommentsOpen}
             onAutoNext={() => {
               if (index === orderedClips.length - 1) {
                 handleLastClipEnd();
               } else {
-                containerRef.current?.scrollBy({ top: window.innerHeight, behavior: "smooth" });
+                const nextIndex = index + 1;
+                containerRef.current?.scrollTo({ top: nextIndex * window.innerHeight, behavior: "smooth" });
               }
             }}
             onAutoPrev={() => {
-              containerRef.current?.scrollBy({ top: -window.innerHeight, behavior: "smooth" });
+              if (index > 0) {
+                const prevIndex = index - 1;
+                containerRef.current?.scrollTo({ top: prevIndex * window.innerHeight, behavior: "smooth" });
+              }
             }}
-            onIntersect={handleIntersect}
             onCommentsToggle={onCommentsToggle}
-            onMuteToggle={() => setIsMuted(!isMuted)}
-            // Windowing: only render core player for active and neighbors
-            shouldRenderPlayer={index >= activeIndex - 1 && index <= activeIndex + 1}
           />
         ))}
 
         {/* Loading Indicator at end */}
-        {hasNextPage && (
+        {isFetchingNextPage && (
           <div className="h-screen w-full flex items-center justify-center snap-start">
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <Typography variant="body-sm" className="text-white/50">Chargement...</Typography>
+            </div>
+          </div>
+        )}
+        
+        {!hasNextPage && orderedClips.length > 0 && (
+          <div className="h-screen w-full flex items-center justify-center snap-start">
+            <div className="flex flex-col items-center gap-4 text-white/30">
+              <Typography variant="body-sm">Fin des clips</Typography>
+              <Typography variant="caption1">Le chargement va reprendre...</Typography>
             </div>
           </div>
         )}
@@ -209,67 +256,27 @@ interface ReelItemProps {
   clip: GameClipCard;
   index: number;
   isActive: boolean;
-  isMuted: boolean;
-  isPaused: boolean;
   onAutoNext: () => void;
   onAutoPrev: () => void;
-  onIntersect: (index: number, isIntersecting: boolean) => void;
   onCommentsToggle?: () => void;
-  onMuteToggle: () => void;
-  shouldRenderPlayer: boolean;
 }
 
 const ReelItem = memo(({ 
   clip, 
-  index, 
   isActive, 
-  isMuted, 
-  isPaused, 
   onAutoNext, 
   onAutoPrev, 
-  onIntersect,
-  onCommentsToggle,
-  onMuteToggle,
-  shouldRenderPlayer
+  onCommentsToggle
 }: ReelItemProps) => {
-  const itemRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        onIntersect(index, entry.isIntersecting);
-      },
-      { threshold: 0.6 } // High threshold to ensure it's mostly centered
-    );
-
-    if (itemRef.current) observer.observe(itemRef.current);
-    return () => observer.disconnect();
-  }, [index, onIntersect]);
-
   return (
-    <div
-      ref={itemRef}
-      className="h-screen w-full shrink-0 snap-start snap-always relative"
-    >
-      {shouldRenderPlayer ? (
-        <GameClipPlayer
-          clip={clip}
-          isActive={isActive}
-          isMuted={isMuted}
-          onMuteToggle={onMuteToggle}
-          onAutoNext={onAutoNext}
-          onAutoPrev={onAutoPrev}
-          onCommentsToggle={onCommentsToggle}
-          isPaused={isPaused}
-        />
-      ) : (
-        <div className="h-full w-full bg-black/40 animate-pulse flex items-center justify-center">
-            {clip.thumbnailUrl && (
-                <img src={clip.thumbnailUrl} className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-20" alt="" />
-            )}
-            <Loader2 className="h-8 w-8 animate-spin text-white/10" />
-        </div>
-      )}
+    <div className="h-screen w-full shrink-0 snap-start snap-always relative">
+      <GameClipPlayer
+        clip={clip}
+        isActive={isActive}
+        onAutoNext={onAutoNext}
+        onAutoPrev={onAutoPrev}
+        onCommentsToggle={onCommentsToggle}
+      />
     </div>
   );
 });

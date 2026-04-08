@@ -77,6 +77,21 @@ export function useEditionManager(editionId: string, tournamentId?: string) {
   const exportParticipants = useMutation({
     mutationFn: async (format: "csv" | "json" | "pdf") => {
       const result = await exportEditionParticipants(editionId, format);
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Erreur lors de l'export");
+      }
+
+      // Déclencher le téléchargement côté client
+      const blob = await (await fetch(result.data)).blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", result.filename || `export_participants.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       return result;
     },
     onSuccess: (_, format) => {
@@ -91,6 +106,21 @@ export function useEditionManager(editionId: string, tournamentId?: string) {
   const exportMatches = useMutation({
     mutationFn: async (format: "csv" | "json" | "pdf") => {
       const result = await exportEditionMatches(editionId, format);
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Erreur lors de l'export");
+      }
+
+      // Déclencher le téléchargement côté client
+      const blob = await (await fetch(result.data)).blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", result.filename || `export_matchs.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       return result;
     },
     onSuccess: (_, format) => {

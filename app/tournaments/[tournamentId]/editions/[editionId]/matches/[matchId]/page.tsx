@@ -1,6 +1,8 @@
 import { Metadata } from "next";
-import { getMatchById } from "@/actions/phases";
+import { getMatchById, getMatchesWithParticipants } from "@/actions/phases";
 import { isUserTournamentOrganizer } from "@/actions/tournaments";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +22,8 @@ import {
   Flag,
   Settings2,
   ExternalLink,
-  GitBranch
+  GitBranch,
+  History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -39,10 +42,14 @@ interface PageProps {
     editionId: string;
     matchId: string;
   }>;
+  searchParams: Promise<{
+    submit?: string;
+  }>;
 }
 
-export default async function MatchDetailPage({ params }: PageProps) {
+export default async function MatchDetailPage({ params, searchParams }: PageProps) {
   const { tournamentId, editionId, matchId } = await params;
+  const { submit } = await searchParams;
 
   // Fetch match with full relations
   const match: any = await getMatchById(matchId, {
@@ -63,9 +70,31 @@ export default async function MatchDetailPage({ params }: PageProps) {
 
   if (!match) notFound();
 
-  // Check if current user is organizer (we will need this for admin controls)
-  // In a server component, we would usually check the session.
-  // For the demo, we assume the client component will handle auth checks or we pass a prop.
+  // 1. Get Session and check Organizer status
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  
+  const isOrganizer = session?.user?.id 
+    ? await isUserTournamentOrganizer(tournamentId, session.user.id) 
+    : false;
+
+  // 2. Fetch Match History between these two participants
+  const historyRes = await getMatchesWithParticipants({
+    filters: { 
+      editionId,
+      // We need matches where BOTH participants played against each other
+      // Since our filter only supports one participant at a time for now, 
+      // we'll fetch matches for P1 and filter in memory for P2
+      memberRegistrationId: match.participant1RegistrationId
+    },
+    pagination: { limit: 50, page: 1 }
+  });
+
+  const h2hMatches = historyRes.data.filter((m: any) => 
+    (m.participant1RegistrationId === match.participant1RegistrationId && m.participant2RegistrationId === match.participant2RegistrationId) ||
+    (m.participant1RegistrationId === match.participant2RegistrationId && m.participant2RegistrationId === match.participant1RegistrationId)
+  ).filter((m: any) => m.id !== matchId); // Exclude current match
   
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -109,13 +138,16 @@ export default async function MatchDetailPage({ params }: PageProps) {
                 </div>
              </div>
              <Separator orientation="vertical" className="h-10 mx-2 hidden sm:block" />
-             <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="gap-2" asChild>
-                   <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`}>
-                      <Settings2 className="h-4 w-4" /> Administration
-                   </Link>
-                </Button>
-             </div>
+             
+             {isOrganizer && (
+               <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" className="gap-2" asChild>
+                     <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`}>
+                        <Settings2 className="h-4 w-4" /> Administration
+                     </Link>
+                  </Button>
+               </div>
+             )}
           </div>
         </div>
       </div>
@@ -171,7 +203,58 @@ export default async function MatchDetailPage({ params }: PageProps) {
             match={match} 
             tournamentId={tournamentId} 
             editionId={editionId} 
+            autoSubmit={submit === "true"}
           />
+
+          {/* Head-to-Head History */}
+          <div className="space-y-4">
+             <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-primary" />
+                <Typography variant="h5" weight="bold">Historique des rencontres</Typography>
+             </div>
+             
+             {h2hMatches.length > 0 ? (
+               <div className="grid grid-cols-1 gap-3">
+                 {h2hMatches.map((m: any) => (
+                   <Card key={m.id} className="overflow-hidden border-none bg-muted/20 hover:bg-muted/40 transition-colors">
+                     <CardContent className="p-4 flex items-center justify-between">
+                       <div className="flex items-center gap-4 flex-1">
+                         <div className="text-center w-24 truncate text-xs font-bold">
+                           {m.participant1?.member?.displayName}
+                         </div>
+                         <div className="flex items-center gap-2 bg-background px-3 py-1 rounded-full border border-border/50">
+                           <span className={cn("font-bold", m.score1 > m.score2 && "text-primary")}>{m.score1}</span>
+                           <span className="text-muted-foreground text-[10px]">vs</span>
+                           <span className={cn("font-bold", m.score2 > m.score1 && "text-primary")}>{m.score2}</span>
+                         </div>
+                         <div className="text-center w-24 truncate text-xs font-bold">
+                           {m.participant2?.member?.displayName}
+                         </div>
+                       </div>
+                       
+                       <div className="flex items-center gap-4">
+                         <Badge variant="outline" className="text-[9px] uppercase">
+                           {m.phase?.name}
+                         </Badge>
+                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                           <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`}>
+                             <ExternalLink className="h-3.5 w-3.5" />
+                           </Link>
+                         </Button>
+                       </div>
+                     </CardContent>
+                   </Card>
+                 ))}
+               </div>
+             ) : (
+               <Card className="border-dashed py-8">
+                 <CardContent className="flex flex-col items-center justify-center text-muted-foreground">
+                   <Swords className="h-8 w-8 mb-2 opacity-20" />
+                   <p className="text-sm">Aucune rencontre précédente enregistrée</p>
+                 </CardContent>
+               </Card>
+             )}
+          </div>
         </div>
 
         {/* Right Column: Info & History */}

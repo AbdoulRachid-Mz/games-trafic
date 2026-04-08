@@ -2,14 +2,12 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { EditionPageContent } from "@/components/pages/tournaments/edition-detail/edition-page-content";
 import {
-  Tournament,
-  TournamentEdition,
-  TournamentMember,
+  TournamentMember
 } from "@/database/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getTournamentEditionWithRelations, getEditionActivePhase } from "@/actions/editions";
 import { getTournamentById, getTournamentEditionById, getTournamentMembers } from "@/actions/tournaments";
-import { getPhaseGroups, getPhaseGroupParticipants, getTournamentPhases } from "@/actions/phases";
+import { getTournamentPhases } from "@/actions/phases";
 import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
 import { Card, CardContent } from "@/components/ui/card";

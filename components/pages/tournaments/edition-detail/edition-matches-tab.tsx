@@ -32,6 +32,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { Separator } from "@/components/ui/separator";
 
 interface EditionMatchesTabProps {
   editionId: string;
@@ -56,19 +58,16 @@ export function EditionMatchesTab({
   const { data: userReg } = useUserRegistration(editionId, currentUserId);
   const { data: stats, isLoading: statsLoading } =
     useEditionMatchStats(editionId);
-  const { exportParticipants, exportMatches } = useEditionManager(editionId);
+  const { exportMatches } = useEditionManager(editionId);
 
+  // 1. All Matches query
   const filters: any = { editionId };
   if (activePhaseId) filters.phaseId = activePhaseId;
   if (statusFilter !== "ALL") filters.statuses = [statusFilter];
-  if (showOnlyMyMatches && userReg?.id) {
-    filters.memberRegistrationId = userReg.id;
-  }
 
   const {
     data: matchesRes,
     isLoading,
-    isError,
     refetch,
   } = useMatchList({
     filters,
@@ -76,7 +75,15 @@ export function EditionMatchesTab({
     options: { sortBy: "scheduledTime", sortOrder: "asc" },
   });
 
+  // 2. My Matches query (for priority section)
+  const { data: myMatchesRes, isLoading: myMatchesLoading } = useMatchList({
+    filters: { ...filters, memberRegistrationId: userReg?.id },
+    pagination: { page: 1, limit: 5 },
+    options: { sortBy: "scheduledTime", sortOrder: "asc" },
+  });
+
   const matches = matchesRes?.data || [];
+  const myMatches = myMatchesRes?.data || [];
   const pagination = matchesRes?.pagination;
 
   // --- HANDLERS ---
@@ -85,6 +92,13 @@ export function EditionMatchesTab({
   };
 
   // --- RENDER HELPERS ---
+  const matchStats = [
+    { label: "Total Matchs", value: stats?.total || 0, icon: <Trophy className="h-4 w-4" />, color: "text-blue-500" },
+    { label: "Terminés", value: stats?.completed || 0, icon: <CheckCircle2 className="h-4 w-4" />, color: "text-green-500" },
+    { label: "En cours", value: stats?.inProgress || 0, icon: <Clock className="h-4 w-4" />, color: "text-yellow-500" },
+    { label: "Litiges", value: stats?.disputed || 0, icon: <AlertCircle className="h-4 w-4" />, color: "text-red-500" },
+  ];
+
   if (isLoading && page === 1) {
     return (
       <div className="space-y-6">
@@ -92,10 +106,6 @@ export function EditionMatchesTab({
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
-        </div>
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-32" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -107,37 +117,57 @@ export function EditionMatchesTab({
   }
 
   return (
-    <div className="space-y-6">
-      {/* 📊 STATS CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Matchs"
-          value={stats?.total || 0}
-          icon={<Trophy className="h-4 w-4" />}
-          color="blue"
-        />
-        <StatCard
-          label="Terminés"
-          value={stats?.completed || 0}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          color="green"
-        />
-        <StatCard
-          label="En cours"
-          value={stats?.inProgress || 0}
-          icon={<Clock className="h-4 w-4" />}
-          color="yellow"
-        />
-        <StatCard
-          label="Litiges"
-          value={stats?.disputed || 0}
-          icon={<AlertCircle className="h-4 w-4" />}
-          color="red"
-        />
-      </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* 📊 STATS CAROUSEL */}
+      <StatsCarousel 
+        data={matchStats.map(s => ({
+          label: s.label,
+          value: s.value,
+          icon: s.icon,
+          className: cn("border-none bg-muted/30", s.color)
+        }))}
+        itemsPerView={{ mobile: 2, md: 4, lg: 4 }}
+      />
+
+      {/* 🔥 MY MATCHES SECTION (Priority) */}
+      {!showOnlyMyMatches && myMatches.length > 0 && page === 1 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔥</span>
+              <Typography variant="h5" weight="bold">Mes Matches Prioritaires</Typography>
+              <Badge variant="default" className="bg-primary/10 text-primary border-primary/20">VOUS</Badge>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowOnlyMyMatches(true)}>
+              Voir tous mes matches
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myMatches.map((match: any) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                onUpdate={() => refetch()}
+              />
+            ))}
+          </div>
+          <Separator className="my-8 opacity-50" />
+        </div>
+      )}
 
       {/* 🔍 ACTION BAR */}
-      <div className="bg-card border rounded-xl p-4 flex flex-col md:flex-row gap-4 justify-between items-center shadow-sm">
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div className="flex flex-col gap-1">
+           <Typography variant="h5" weight="bold">
+             {showOnlyMyMatches ? "Mes Matches" : "Tous les Matches"}
+           </Typography>
+           <Typography variant="caption1" theme="muted">
+             {pagination?.total || 0} match(s) trouvé(s)
+           </Typography>
+        </div>
+
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="flex bg-muted p-1 rounded-lg">
             <button
@@ -152,7 +182,7 @@ export function EditionMatchesTab({
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              Tous les matchs
+              Tous
             </button>
             <button
               disabled={!currentUserId || !userReg}
@@ -167,8 +197,7 @@ export function EditionMatchesTab({
                   : "text-muted-foreground hover:text-foreground disabled:opacity-50",
               )}
             >
-              <Users className="h-3 w-3" />
-              Mes Matchs
+              Moi
             </button>
           </div>
 
@@ -191,33 +220,16 @@ export function EditionMatchesTab({
               <SelectItem value="DISPUTED">Litige</SelectItem>
             </SelectContent>
           </Select>
-        </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
           <Select onValueChange={(val) => handleExport(val as any)}>
-            <SelectTrigger className="h-9 w-full md:w-[160px] text-xs bg-primary text-primary-foreground hover:bg-primary/90">
+            <SelectTrigger className="h-9 w-32 text-xs border-primary/20 hover:bg-primary/5">
               <Download className="h-3.5 w-3.5 mr-2" />
-              <span>Exporter Matchs</span>
+              <span>Export</span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pdf">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-red-500" />
-                  <span>Format PDF</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="csv">
-                <div className="flex items-center gap-2">
-                  <FileDown className="h-4 w-4 text-green-500" />
-                  <span>Format CSV</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="json">
-                <div className="flex items-center gap-2">
-                  <FileJson className="h-4 w-4 text-blue-500" />
-                  <span>Format JSON</span>
-                </div>
-              </SelectItem>
+              <SelectItem value="pdf">PDF</SelectItem>
+              <SelectItem value="csv">CSV</SelectItem>
+              <SelectItem value="json">JSON</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -234,9 +246,6 @@ export function EditionMatchesTab({
               ? "Vous n'avez aucun match filtré."
               : "Aucun match trouvé."}
           </Typography>
-          <Typography variant="body-sm" theme="muted">
-            Essayez de modifier vos filtres ou revenez plus tard.
-          </Typography>
           {(statusFilter !== "ALL" || showOnlyMyMatches) && (
             <Button
               variant="ghost"
@@ -252,7 +261,7 @@ export function EditionMatchesTab({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {matches.map((match: any) => (
+          {(showOnlyMyMatches ? matches : matches.filter((m: any) => !myMatches.some((my: any) => my.id === m.id))).map((match: any) => (
             <MatchCard
               key={match.id}
               match={match}

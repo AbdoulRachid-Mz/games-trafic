@@ -18,7 +18,7 @@ import { EditionJoinDialog } from "./edition-join-dialog";
 import { EditionPaymentDialog } from "./edition-payment-dialog";
 import { EditionStandingsTab } from "./edition-standings-tab";
 import { EditionMatchesTab } from "./edition-matches-tab";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveTabs, type ResponsiveTab } from "@/components/ui/responsive-tabs";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -27,9 +27,10 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
-import { Users, Target, Trophy, Calendar, Wallet } from "lucide-react";
+import { Users, Target, Trophy, Calendar, Wallet, Info, LayoutGrid, Swords, Shield } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 interface EditionPageContentProps {
   tournament: Tournament;
@@ -61,9 +62,7 @@ export function EditionPageContent({
   const isRegistered = !!currentUserRegistration;
   const registrations = edition.registrations || [];
   const checkedInCount = registrations.filter((r) => r.checkedIn).length;
-  const totalMatchCount =
-    (edition.matchCount || 0);
-
+  
   const editionStats = [
     {
       icon: <Users className="h-5 w-5" />,
@@ -99,6 +98,110 @@ export function EditionPageContent({
           },
         ]
       : []),
+  ];
+
+  const tabs: ResponsiveTab[] = [
+    {
+      value: "standings",
+      label: "Classement",
+      icon: <Trophy className="h-4 w-4" />,
+      content: (
+        <EditionStandingsTab
+          activePhaseId={activePhaseId}
+          registrations={edition.registrations || []}
+          currentRegistrationId={currentUserRegistration?.id}
+        />
+      ),
+    },
+    {
+      value: "groups",
+      label: "Phases & Groupes",
+      icon: <LayoutGrid className="h-4 w-4" />,
+      content: (
+        <EditionPhasesView
+          phases={phases}
+          editionId={edition.id}
+          currentUserId={user?.id}
+          isAdmin={isOrganizer}
+          onUpdate={() => router.refresh()}
+        />
+      ),
+    },
+    {
+      value: "matches",
+      label: "Matches",
+      icon: <Swords className="h-4 w-4" />,
+      content: (
+        <EditionMatchesTab 
+          editionId={edition.id}
+          activePhaseId={activePhaseId}
+          currentUserId={user?.id}
+          isAdmin={isOrganizer}
+        />
+      ),
+    },
+    {
+      value: "overview",
+      label: "Infos",
+      icon: <Info className="h-4 w-4" />,
+      content: (
+        <div className="space-y-4 mt-4">
+          <div className="bg-card border rounded-xl p-6">
+            <h3 className="text-xl font-bold mb-4">À propos de cette édition</h3>
+            <div className="prose dark:prose-invert max-w-none">
+              <p className="text-muted-foreground">
+                {edition.name || "Aucune description disponible pour cette édition."}
+              </p>
+              {edition.description && <p className="mt-2">{edition.description}</p>}
+            </div>
+
+            {edition.editionRules && (
+              <div className="mt-8 pt-8 border-t">
+                <h4 className="text-lg font-bold mb-3">Règles spécifiques</h4>
+                <div className="bg-muted p-4 rounded-lg text-sm border">
+                  {edition.editionRules}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-card border rounded-xl p-6">
+            <CommentsSection
+              entityId={edition.id}
+              entityType="EDITION"
+              title="Discussion de l'édition"
+            />
+          </div>
+        </div>
+      ),
+    },
+    {
+      value: "calendar",
+      label: "Calendrier",
+      icon: <Calendar className="h-4 w-4" />,
+      content: (
+        <div className="bg-card border rounded-xl p-12 text-center space-y-4 mt-4">
+          <Typography variant="h4" weight="bold">Calendrier des matches</Typography>
+          <Typography variant="body-sm" theme="muted">Consultez les dates et heures de tous les matches de l&apos;édition.</Typography>
+          <Button variant="default" asChild>
+            <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
+              Ouvrir le calendrier complet
+            </Link>
+          </Button>
+        </div>
+      ),
+    },
+    {
+      value: "members",
+      label: "Membres",
+      icon: <Users className="h-4 w-4" />,
+      content: (
+        <EditionParticipantsList
+          participants={edition.registrations || []}
+          editionId={edition.id}
+        />
+      ),
+    },
   ];
 
   const handleJoinClick = () => {
@@ -155,35 +258,40 @@ export function EditionPageContent({
         isRegistered={isRegistered}
       />
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-4 py-6 space-y-8">
         {/* Stats Carousel */}
         <StatsCarousel
           data={editionStats}
           itemsPerView={{ mobile: 2, lg: 4, xl: 5 }}
         />
 
-        <div className="flex flex-col md:flex-row gap-4 items-start">
-          <div className="flex-1 w-full space-y-4">
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          <div className="flex-1 w-full space-y-6">
 
             {/* Organizer dashboard link */}
             {isOrganizer && (
-              <div className="bg-card border border-primary/30 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-                <div>
-                  <h3 className="text-sm font-bold">Vous organisez cette édition</h3>
-                  <p className="text-muted-foreground text-xs">Accédez au dashboard pour gérer les phases, participants et matchs.</p>
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Shield className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold">Vous organisez cette édition</h3>
+                    <p className="text-muted-foreground text-xs">Accédez au dashboard pour gérer les phases, participants et matchs.</p>
+                  </div>
                 </div>
-                <Button variant="default" size="sm" asChild>
-                  <a href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}>
+                <Button variant="default" size="sm" className="w-full sm:w-auto shadow-lg shadow-primary/20" asChild>
+                  <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}>
                     Dashboard organisateur
-                  </a>
+                  </Link>
                 </Button>
               </div>
             )}
 
             {!isRegistered && (
-              <div className="bg-card border rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+              <div className="bg-card border rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
                 <div>
-                  <h3 className="text-lg font-bold mb-1">
+                  <h3 className="text-xl font-black uppercase tracking-tighter mb-1">
                     Inscriptions ouvertes !
                   </h3>
                   <p className="text-muted-foreground text-sm">
@@ -196,7 +304,7 @@ export function EditionPageContent({
                 <Button
                   size="lg"
                   onClick={handleJoinClick}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto px-8 font-bold"
                   disabled={joinMutation.isPending}
                 >
                   {joinMutation.isPending
@@ -206,123 +314,37 @@ export function EditionPageContent({
               </div>
             )}
 
-            <Tabs defaultValue="standings" className="w-full">
-              <TabsList className="flex w-full overflow-auto mb-3 gap-2 px-1 md:justify-center">
-                <TabsTrigger value="overview" className="flex-shrink-0">
-                  Infos
-                </TabsTrigger>
-                <TabsTrigger value="standings" className="flex-shrink-0">
-                  Classement
-                </TabsTrigger>
-                <TabsTrigger value="groups" className="flex-shrink-0">
-                  Groupes
-                </TabsTrigger>
-                <TabsTrigger value="calendar" className="flex-shrink-0">
-                  Calendrier
-                </TabsTrigger>
-                <TabsTrigger value="matches" className="flex-shrink-0">
-                  Matches
-                </TabsTrigger>
-                <TabsTrigger value="members" className="flex-shrink-0">
-                  Membres
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-4">
-                <div className="bg-card border rounded-xl p-6">
-                  <h3 className="text-xl font-bold mb-4">
-                    À propos de cette édition
-                  </h3>
-                  <div className="prose dark:prose-invert max-w-none">
-                    <p className="text-muted-foreground">
-                      {edition.name ||
-                        "Aucune description disponible pour cette édition."}
-                    </p>
-                    {edition.description && <p className="mt-2">{edition.description}</p>}
-                  </div>
-
-                  {edition.editionRules && (
-                    <div className="mt-8 pt-8 border-t">
-                      <h4 className="text-lg font-bold mb-3">
-                        Règles spécifiques
-                      </h4>
-                      <div className="bg-muted p-4 rounded-lg text-sm border">
-                        {edition.editionRules}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-card border rounded-xl p-6">
-                  <CommentsSection
-                    entityId={edition.id}
-                    entityType="EDITION"
-                    title="Discussion de l'édition"
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="standings" className="mt-6 space-y-4">
-                <EditionStandingsTab
-                  activePhaseId={activePhaseId}
-                  registrations={edition.registrations || []}
-                  currentRegistrationId={currentUserRegistration?.id}
-                />
-              </TabsContent>
-
-              <TabsContent value="groups" className="mt-6">
-                <EditionPhasesView
-                  phases={phases}
-                  editionId={edition.id}
-                  currentUserId={user?.id}
-                  isAdmin={isOrganizer}
-                  onUpdate={() => router.refresh()}
-                />
-              </TabsContent>
-
-              <TabsContent value="calendar" className="mt-6">
-                <div className="bg-card border rounded-xl p-12 text-center space-y-4">
-                  <Typography variant="h4" weight="bold">Calendrier des matches</Typography>
-                  <Typography variant="body-sm" theme="muted">Consultez les dates et heures de tous les matches de l&apos;édition.</Typography>
-                  <Button variant="default" asChild>
-                    <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
-                      Ouvrir le calendrier complet
-                    </Link>
-                  </Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="matches" className="mt-6">
-                 <EditionMatchesTab 
-                   editionId={edition.id}
-                   activePhaseId={activePhaseId}
-                   currentUserId={user?.id}
-                   isAdmin={isOrganizer}
-                 />
-              </TabsContent>
-
-              <TabsContent value="members" className="mt-6">
-                <EditionParticipantsList
-                  participants={edition.registrations || []}
-                  editionId={edition.id}
-                />
-              </TabsContent>
-            </Tabs>
+            <ResponsiveTabs 
+              tabs={tabs} 
+              defaultValue="standings"
+              className="w-full"
+              mobileCount={2}
+              tabletCount={3}
+            />
           </div>
 
           <div className="hidden lg:block w-80 space-y-6">
-            <div className="bg-card border rounded-xl p-3 sticky top-24">
-              <h4 className="font-bold mb-4">Informations Tournoi</h4>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
+            <div className="bg-card border rounded-2xl p-5 sticky top-24">
+              <h4 className="font-bold mb-4 flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                Détails du Tournoi
+              </h4>
+              <div className="space-y-4 text-sm">
+                <div className="flex justify-between items-center py-2 border-b border-border/50">
                   <span className="text-muted-foreground">Jeu</span>
-                  <span className="font-medium">{tournament.game}</span>
+                  <span className="font-bold">{tournament.game}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Organisateur</span>
-                  <span className="font-medium truncate ml-2">
-                    Organisateur
-                  </span>
+                <div className="flex justify-between items-center py-2 border-b border-border/50">
+                  <span className="text-muted-foreground">Type</span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {phases.length > 0 
+                      ? (phases[phases.length - 1].phaseType === "ELIMINATION" ? "Élimination Directe" : "Championnat / Groupes")
+                      : "Standard"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground">Plateforme</span>
+                  <span className="font-medium">Web / PC</span>
                 </div>
               </div>
               <Button variant="outline" className="w-full mt-6" asChild>

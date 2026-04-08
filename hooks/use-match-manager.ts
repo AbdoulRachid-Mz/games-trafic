@@ -98,30 +98,48 @@ export function useMatchesByGroup(editionId: string, groupId: string) {
 }
 
 export function useMyMatches(editionId: string, userId: string) {
-  return useQuery({
-    queryKey: ["my-matches", editionId, userId],
+  // 1. Get user registration first
+  const { data: userReg } = useQuery({
+    queryKey: ["edition-registration", editionId, userId],
     queryFn: async () => {
-      const allMatches = await getMatchesWithParticipants({
+      const { getEditionRegistrations } = await import("@/actions/tournaments");
+      const res = await getEditionRegistrations({
         filters: { editionId },
-        pagination: { page: 1, limit: 100 },
+        pagination: { page: 1, limit: 1000 },
       });
-
-      // Filtrer les matches où l'utilisateur est participant
-      const myMatches = allMatches.data.filter((match: any) => {
-        const p1UserId = match.participant1?.member?.userId;
-        const p2UserId = match.participant2?.member?.userId;
-        return p1UserId === userId || p2UserId === userId;
-      });
-
-      const otherMatches = allMatches.data.filter((match: any) => {
-        const p1UserId = match.participant1?.member?.userId;
-        const p2UserId = match.participant2?.member?.userId;
-        return p1UserId !== userId && p2UserId !== userId;
-      });
-
-      return { myMatches, otherMatches, total: allMatches.pagination.total };
+      return res.data.find((r: any) => r.member?.userId === userId) || null;
     },
     enabled: !!editionId && !!userId,
+  });
+
+  // 2. Fetch matches using the registration ID filter
+  return useQuery({
+    queryKey: ["my-matches", editionId, userId, userReg?.id],
+    queryFn: async () => {
+      if (!userReg) return { myMatches: [], otherMatches: [], total: 0 };
+
+      const [myMatchesRes, allMatchesRes] = await Promise.all([
+        getMatchesWithParticipants({
+          filters: { editionId, memberRegistrationId: userReg.id },
+          pagination: { page: 1, limit: 50 },
+        }),
+        getMatchesWithParticipants({
+          filters: { editionId },
+          pagination: { page: 1, limit: 50 },
+        })
+      ]);
+
+      const myMatchIds = new Set(myMatchesRes.data.map((m: any) => m.id));
+      const otherMatches = allMatchesRes.data.filter((m: any) => !myMatchIds.has(m.id));
+
+      return { 
+        myMatches: myMatchesRes.data, 
+        otherMatches, 
+        total: allMatchesRes.pagination.total 
+      };
+    },
+    enabled: !!editionId && !!userId && !!userReg,
+    staleTime: 1000 * 60,
   });
 }
 
