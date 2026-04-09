@@ -28,9 +28,10 @@ interface MatchCardProps {
   isAdmin?: boolean;
   onUpdate?: () => void;
   viewMode?: "list" | "grid" | "compact"
+  className?: string
 }
 
-export function MatchCard({ match, registrations, onView, currentUserId, isAdmin, onUpdate, viewMode = "grid" }: MatchCardProps) {
+export function MatchCard({ match, registrations, onView, currentUserId, isAdmin, onUpdate, viewMode = "grid", className }: MatchCardProps) {
   const p1 = match.participant1?.member?.user || match.participant1?.member?.team || match.participant1;
   const p2 = match.participant2?.member?.user || match.participant2?.member?.team || match.participant2;
 

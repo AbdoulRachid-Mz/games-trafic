@@ -247,6 +247,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     requireAuth: true,
     styleGroup: "wallet",
   },
+  // claims
+  {
+    path: ["/wallet/claims", "/wallet/claims/**"],
+    name: "reclamations",
+    styleGroup: "wallet",
+    requireAuth: true,
+  },
+  {
+    path: ["/wallet/transactions", "/wallet/transactions/**"],
+    name: "transactions",
+    styleGroup: "wallet",
+    requireAuth: true,
+  },
   {
     path: ["/chats", "/chats/**"],
     name: "Messagerie",
@@ -456,30 +469,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: true,
     navigationLinks: true,
     hideFloatingActions: true,
-    dockLinks: [
-      { href: "/", label: "Accueil", icon: "home", requireAuth: true },
-      { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
-      {
-        href: "/chats",
-        label: "Messagerie",
-        icon: "communities",
-        requireAuth: true,
-      },
-      { href: "/shops", label: "Boutiques", icon: "shops", requireAuth: true },
-      {
-        href: "/tournaments/[tournamentId]/editions/[editionId]/matches",
-        label: "edition matches",
-        icon: "tournaments",
-        requireAuth: true,
-      },
-      {
-        href: "/tournaments/[tournamentId]/editions/[editionId]/calendar",
-        label: "edition calendar",
-        icon: "tournaments",
-        requireAuth: true,
-      },
-      // { href: "/tournaments/[tournamentId]/editions/[editionId]/standings", label: "edition standings", icon: "tournaments", requireAuth: true },
-    ],
+    dockLinks: defaultDockLinks,
   },
   {
     path: ["/themes", "/themes/**"],

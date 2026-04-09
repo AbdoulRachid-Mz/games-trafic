@@ -182,6 +182,7 @@ export default function EditionDashboardLayout({
       title={edition?.name || "Édition"}
       description="Gestion de l'édition"
       showSidebarTrigger={true}
+      togglerComponent={false}
     />
   );
 

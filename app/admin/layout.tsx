@@ -1,4 +1,3 @@
-// app/admin/layout.tsx
 "use client";
 
 import type React from "react";
@@ -11,17 +10,22 @@ import {
   DashboardHeader,
   SidebarContainer,
 } from "@/components/dashboard/enhanced-dashboard";
+
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useActiveRoute } from "@/hooks/use-active-route";
-// import { getAdminRouteGroups, checkRouteAccess } from "@/config/admin-routes";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Typography } from "@/components/ui/typography";
 import { AlertCircle } from "lucide-react";
-import { checkRouteAccess, getAdminRouteGroups } from "@/config/admin-items";
 
 import { useUserProfile } from "@/hooks/use-profile";
+import { useAdminPermissions } from "@/hooks/use-admin-permissions";
+import {
+  flatRoutes,
+  getAdminRouteGroups,
+  getAdminRoutesForLevel,
+} from "@/config/admin-items";
 
 export default function AdminLayout({
   children,
@@ -33,6 +37,7 @@ export default function AdminLayout({
     isAuthenticated,
     loading: authLoading,
   } = useAuthContext();
+
   const { data: userProfile, loading: profileLoading } =
     useUserProfile(isAuthenticated);
 
@@ -41,12 +46,19 @@ export default function AdminLayout({
   const loading =
     authLoading || (isAuthenticated && profileLoading && !userProfile);
 
-  const { isActive } = useActiveRoute();
   const router = useRouter();
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "";
+  const { isActive } = useActiveRoute();
 
-  // Vérifier si l'utilisateur est admin
+  const adminLevel = user?.level || "C";
+
+  // ✅ HOOK CENTRAL
+  const {
+    canAccessCurrentRoute,
+    hasRouteAccess,
+    getAccessibleRoutes,
+  } = useAdminPermissions();
+
+  // 🔒 PROTECTION ROUTE
   useEffect(() => {
     if (!loading && user) {
       if (!user.isAdmin) {
@@ -54,19 +66,18 @@ export default function AdminLayout({
         return;
       }
 
-      // Vérifier l'accès à la route actuelle
-      const accessCheck = checkRouteAccess(pathname, user.level || "C");
-      if (!accessCheck.accessible) {
+      if (!canAccessCurrentRoute) {
         router.push("/admin");
       }
     }
-  }, [loading, user, pathname, router]);
+  }, [loading, user, canAccessCurrentRoute, router]);
 
+  // ⏳ LOADING
   if (loading) {
     return <PageSkeleton type="dashboard" />;
   }
 
-  // Si l'utilisateur n'est pas admin
+  // ❌ PAS ADMIN
   if (!user?.isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -76,31 +87,32 @@ export default function AdminLayout({
             Accès refusé
           </Typography>
           <Typography variant="body-base" theme="muted">
-            Vous n'avez pas les permissions nécessaires pour accéder à cette
-            page.
+            Vous n'avez pas les permissions nécessaires.
           </Typography>
         </div>
       </div>
     );
   }
 
-  // Obtenir les groupes de routes selon le niveau d'admin
-  const adminLevel = user.level || "C";
+  // 📦 ROUTES (via config)
   const routeGroups = getAdminRouteGroups(adminLevel);
 
-  // Récupérer toutes les routes pour trouver l'active
-  const allRoutes = routeGroups.flatMap((group) => group.routes);
-  const activeRoute = allRoutes.find(
-    (route) => route.path && isActive(route.path, route.path === "/admin"),
+  // 🔥 routes accessibles pour active state
+  const allRoutes = useMemo(() => {
+    return flatRoutes(getAccessibleRoutes());
+  }, [getAccessibleRoutes]);
+
+  const activeRoute = allRoutes.find((route) =>
+    isActive(route.path, route.path === "/admin"),
   );
 
   const pageTitle = activeRoute?.label || "Administration";
   const pageDescription =
     activeRoute?.description || `Administration - Niveau ${adminLevel}`;
 
-  // Construire la sidebar
+  // 🧱 SIDEBAR
   const AdminSidebar = (
-    <SidebarContainer sidebarBgType='default'>
+    <SidebarContainer sidebarBgType="default">
       <SidebarHeader
         title="Administration"
         subtitle={`Niveau ${adminLevel}`}
@@ -119,15 +131,30 @@ export default function AdminLayout({
             sidebarBgType="gradient"
           >
             {group.routes.map((route) => (
-              <SidebarItem
-                key={route.id}
-                title={route.label}
-                url={route.path}
-                icon={route.icon}
-                description={route.description}
-                isActive={isActive(route.path, route.path === "/admin")}
-                sidebarBgType="gradient"
-              />
+              <div key={route.id} className="space-y-1">
+                {/* Parent */}
+                <SidebarItem
+                  title={route.label}
+                  url={route.path}
+                  icon={route.icon}
+                  description={route.description}
+                  isActive={isActive(route.path, route.path === "/admin")}
+                  sidebarBgType="gradient"
+                />
+
+                {/* Enfants */}
+                {route.children?.map((child) => (
+                  <SidebarItem
+                    key={child.id}
+                    title={`- ${child.label}`}
+                    url={child.path}
+                    icon={child.icon}
+                    description={child.description}
+                    isActive={isActive(child.path)}
+                    sidebarBgType="gradient"
+                  />
+                ))}
+              </div>
             ))}
           </SidebarGroup>
         ))}
@@ -144,6 +171,7 @@ export default function AdminLayout({
     </SidebarContainer>
   );
 
+  // 🧭 HEADER
   const AdminHeader = (
     <DashboardHeader
       title={pageTitle}

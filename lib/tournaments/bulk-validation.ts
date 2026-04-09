@@ -7,8 +7,9 @@ import {
   matches,
   phaseGroupParticipants,
   tournamentPhases,
+  bracketNodes,
 } from "@/database/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -74,6 +75,43 @@ export async function validatePhaseConstraints(
           `Limite de participants atteinte (max: ${maxParticipants})`,
         );
       }
+    }
+
+    return { isValid: errors.length === 0, errors, warnings };
+  } catch (error) {
+    errors.push(`Erreur de validation: ${error}`);
+    return { isValid: false, errors, warnings };
+  }
+}
+
+/**
+ * Valide qu'un bracket node peut accueillir des participants
+ */
+export async function validateBracketNodeCapacity(
+  bracketNodeId: string,
+  additionalCount: number = 1,
+): Promise<ValidationResult> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  try {
+    const node = await db.query.bracketNodes.findFirst({
+      where: eq(bracketNodes.id, bracketNodeId),
+    });
+
+    if (!node) {
+      errors.push("Nœud de bracket introuvable");
+      return { isValid: false, errors, warnings };
+    }
+
+    const metadata = (node.metadata as any) || {};
+    const participants = metadata.participants || [];
+    const maxParticipants = 2; // Standard bracket node limit
+
+    if (participants.length + additionalCount > maxParticipants) {
+      errors.push(
+        `Capacité du bracket dépassée (${participants.length}/${maxParticipants})`,
+      );
     }
 
     return { isValid: errors.length === 0, errors, warnings };

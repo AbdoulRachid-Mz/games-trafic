@@ -1,119 +1,96 @@
-// hooks/use-admin-permissions.ts
-import { checkRouteAccess, getAdminRoutesForLevel } from "@/config/admin-items";
+import {
+  checkRouteAccess,
+  flatRoutes,
+  getAdminRouteGroups,
+  getAdminRoutesForLevel,
+} from "@/config/admin-items";
+
 import { useAuthContext } from "@/contexts/auth-context";
-// import { checkRouteAccess, getAdminRoutesForLevel } from "@/config/admin-routes";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 export interface AdminPermissions {
-  // Permissions de base
-  canViewDashboard: boolean;
-  canManageUsers: boolean;
-  canManageShops: boolean;
-  canManageProducts: boolean;
-  canManageTransactions: boolean;
-  canManageTournaments: boolean;
-  canManageContent: boolean;
-  canManageSystem: boolean;
-  
-  // Permissions financières
-  canViewFinancial: boolean;
-  canManageWallets: boolean;
-  canManageVIP: boolean;
-  canAccessCurrentRoute?: boolean;
-  
-  // Permissions système
-  canManageDatabase: boolean;
-  canManageSettings: boolean;
-  canViewLogs: boolean;
-  
-  // Vérifications spécifiques
+  isAdmin: boolean;
+  adminLevel: "A" | "B" | "C";
+
+  // Accès global
+  canAccessCurrentRoute: boolean;
+
+  // Helpers
   hasRouteAccess: (path: string) => boolean;
+  routes: any[];
+  flatRoutes: any[];
   getAccessibleRoutes: () => any[];
 }
 
 export function useAdminPermissions(): AdminPermissions {
   const { user } = useAuthContext();
   const pathname = usePathname();
-  
+
   const isAdmin = user?.isAdmin || false;
-  const adminLevel = user?.level || 'C';
+  const adminLevel = (user?.level || "C") as "A" | "B" | "C";
 
-  // Permissions selon le niveau
-  const permissions = {
-    // Niveau C (admin basique)
-    canViewDashboard: isAdmin,
-    canManageUsers: isAdmin && ['A', 'B', 'C'].includes(adminLevel),
-    canManageShops: isAdmin && ['A', 'B', 'C'].includes(adminLevel),
-    canManageProducts: isAdmin && ['A', 'B', 'C'].includes(adminLevel),
-    canManageTournaments: isAdmin && ['A', 'B', 'C'].includes(adminLevel),
-    canManageContent: isAdmin && ['A', 'B', 'C'].includes(adminLevel),
-    
-    // Niveau B (admin intermédiaire)
-    canManageTransactions: isAdmin && ['A', 'B'].includes(adminLevel),
-    canManageWallets: isAdmin && ['A', 'B'].includes(adminLevel),
-    canManageVIP: isAdmin && ['A', 'B'].includes(adminLevel),
-    canViewFinancial: isAdmin && ['A', 'B'].includes(adminLevel),
-    
-    // Niveau A (super admin)
-    canManageSystem: isAdmin && adminLevel === 'A',
-    canManageDatabase: isAdmin && adminLevel === 'A',
-    canManageSettings: isAdmin && adminLevel === 'A',
-    canViewLogs: isAdmin && adminLevel === 'A',
-  };
-
-  // Vérifier l'accès à une route spécifique
-  const hasRouteAccess = (path: string): boolean => {
-    if (!isAdmin) return false;
-    const accessCheck = checkRouteAccess(path, adminLevel);
-    return accessCheck.accessible;
-  };
-
-  // Obtenir les routes accessibles
-  const getAccessibleRoutes = () => {
+  // 📦 Routes accessibles (source unique)
+  const routes = useMemo(() => {
     if (!isAdmin) return [];
     return getAdminRoutesForLevel(adminLevel);
+  }, [isAdmin, adminLevel]);
+
+  // 🔥 Flat routes (important pour active / access)
+  const allFlatRoutes = useMemo(() => {
+    return flatRoutes(routes);
+  }, [routes]);
+
+  // 🔒 Vérifier accès route spécifique
+  const hasRouteAccess = (path: string): boolean => {
+    if (!isAdmin) return false;
+    return checkRouteAccess(path, adminLevel).accessible;
   };
 
-  // Vérifier l'accès à la route actuelle
-  const canAccessCurrentRoute = hasRouteAccess(pathname);
+  // 🔒 Route actuelle
+  const canAccessCurrentRoute = useMemo(() => {
+    if (!isAdmin) return false;
+    return hasRouteAccess(pathname);
+  }, [pathname, isAdmin, adminLevel]);
+
+  const accessibleRoutes = useMemo(() => {
+    if (!isAdmin) return [];
+    return getAdminRoutesForLevel(adminLevel);
+  }, [isAdmin, adminLevel]);
+  const getAccessibleRoutes = () => accessibleRoutes;
 
   return {
-    ...permissions,
-    hasRouteAccess,
-    getAccessibleRoutes,
-    // // Ajouter la vérification de la route actuelle
+    isAdmin,
+    adminLevel,
     canAccessCurrentRoute,
+    getAccessibleRoutes,
+    hasRouteAccess,
+    routes,
+    flatRoutes: allFlatRoutes,
   };
 }
 
-// Hook pour protéger les composants
-export function useProtectedRoute(requiredLevel: 'A' | 'B' | 'C' = 'C') {
+export function useProtectedRoute() {
   const { user } = useAuthContext();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     if (!user?.isAdmin) {
-      router.push('/login');
+      router.push("/");
       return;
     }
 
-    const userLevel = user.level || 'C';
-    const levelWeights = { 'A': 3, 'B': 2, 'C': 1 };
-    const requiredWeight = levelWeights[requiredLevel];
-    const userWeight = levelWeights[userLevel];
+    const level = user.level || "C";
+    const access = checkRouteAccess(pathname, level);
 
-    if (userWeight < requiredWeight) {
-      router.push('/admin');
+    if (!access.accessible) {
+      router.push("/admin");
     }
-  }, [user, requiredLevel, router, pathname]);
+  }, [user, pathname, router]);
 
   return {
-    hasAccess: user?.isAdmin && 
-      (user.level === 'A' || 
-       (user.level === 'B' && requiredLevel !== 'A') || 
-       (user.level === 'C' && requiredLevel === 'C')),
-    userLevel: user?.level,
+    isAdmin: user?.isAdmin,
+    level: user?.level,
   };
 }

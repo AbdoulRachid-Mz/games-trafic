@@ -30,6 +30,7 @@ import { fr } from "date-fns/locale";
 import {
   useMatchesByPhase,
   useMatchesByGroup,
+  useMatchList,
 } from "@/hooks/use-match-manager";
 import { usePhases } from "@/hooks/use-phase-manager";
 import { useGroups } from "@/hooks/use-group-manager";
@@ -68,14 +69,14 @@ export function EditionCalendarTimeline({
   const groups = groupsRes?.data || [];
 
   // Fetch matches
-  const filters: any = { editionId };
-  if (selectedPhaseId !== "all") filters.phaseId = selectedPhaseId;
-  if (selectedGroupId !== "all") filters.groupId = selectedGroupId;
-
-  const { data: matchesRes, isLoading } = useMatchesByPhase(
-    selectedPhaseId !== "all" ? selectedPhaseId : "",
-    selectedPhaseId !== "all" ? selectedPhaseId : "",
-  );
+  const { data: matchesRes, isLoading } = useMatchList({
+    filters: { 
+      editionId,
+      phaseId: selectedPhaseId !== "all" ? selectedPhaseId : undefined,
+      groupId: selectedGroupId !== "all" ? selectedGroupId : undefined,
+    },
+    pagination: { limit: 500, page: 1 }
+  });
   const matches = matchesRes?.data || [];
 
   // Grouper les matchs par date

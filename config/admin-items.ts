@@ -47,7 +47,7 @@ export interface AdminRoute {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   description?: string;
-  requiredLevel?: 'A' | 'B' | 'C'; // Niveau d'admin requis (A = super admin, B = admin intermédiaire, C = admin basique)
+  requiredLevel?: "A" | "B" | "C"; // Niveau d'admin requis (A = super admin, B = admin intermédiaire, C = admin basique)
   requiredPermission?: string[]; // Permissions spécifiques requises
   isSystem?: boolean; // Pour les routes système (DB, paramètres)
   isFinancial?: boolean; // Pour les routes financières
@@ -67,7 +67,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin",
     icon: BarChart3,
     description: "Tableau de bord général",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 
   // Utilisateurs (accessible à tous les admins)
@@ -77,7 +77,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/users",
     icon: Users,
     description: "Gestion des comptes utilisateurs",
-    requiredLevel: 'C',
+    requiredLevel: "B",
   },
 
   // Boutiques
@@ -87,7 +87,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/shops",
     icon: ShoppingBag,
     description: "Gérer les boutiques et vendeurs",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 
   // Produits
@@ -97,7 +97,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/products",
     icon: Package,
     description: "Gérer les produits en vente",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 
   // Commandes
@@ -107,7 +107,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/orders",
     icon: ShoppingBag,
     description: "Suivi des commandes et transactions",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 
   // Tournois
@@ -117,7 +117,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/tournaments",
     icon: Trophy,
     description: "Gestion des tournois",
-    requiredLevel: 'C',
+    requiredLevel: "B",
     children: [
       {
         id: "tournament-editions",
@@ -125,7 +125,7 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/tournaments/editions",
         icon: Calendar,
         description: "Éditions et saisons",
-        requiredLevel: 'C',
+        requiredLevel: "C",
       },
       {
         id: "tournament-phases",
@@ -133,7 +133,7 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/tournaments/phases",
         icon: Layers,
         description: "Phases et groupes",
-        requiredLevel: 'C',
+        requiredLevel: "C",
       },
       {
         id: "tournament-matches",
@@ -141,7 +141,7 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/tournaments/matches",
         icon: Swords,
         description: "Gérer les matchs",
-        requiredLevel: 'C',
+        requiredLevel: "C",
       },
     ],
   },
@@ -153,7 +153,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/teams",
     icon: Users2,
     description: "Gérer les équipes",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 
   // Contenu & Social
@@ -163,7 +163,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/content",
     icon: Newspaper,
     description: "Gérer les contenus",
-    requiredLevel: 'C',
+    requiredLevel: "B",
     children: [
       {
         id: "posts",
@@ -171,15 +171,7 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/posts",
         icon: Newspaper,
         description: "Actualités et articles",
-        requiredLevel: 'C',
-      },
-      {
-        id: "blogs",
-        label: "Blogs",
-        path: "/admin/blogs",
-        icon: BookOpen,
-        description: "Articles de blog",
-        requiredLevel: 'C',
+        requiredLevel: "C",
       },
       {
         id: "guides",
@@ -187,7 +179,7 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/guides",
         icon: LifeBuoy,
         description: "Tutoriels et guides",
-        requiredLevel: 'C',
+        requiredLevel: "C",
       },
     ],
   },
@@ -199,7 +191,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/communication",
     icon: MessageSquare,
     description: "Gérer la communication",
-    requiredLevel: 'C',
+    requiredLevel: "B",
     children: [
       {
         id: "messages",
@@ -207,7 +199,7 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/messages",
         icon: MessageSquare,
         description: "Messagerie et commentaires",
-        requiredLevel: 'C',
+        requiredLevel: "C",
       },
       {
         id: "announcements",
@@ -215,7 +207,15 @@ export const commonAdminRoutes: AdminRoute[] = [
         path: "/admin/announcements",
         icon: Bell,
         description: "Annonces système",
-        requiredLevel: 'C',
+        requiredLevel: "C",
+      },
+      {
+        id: "blogs",
+        label: "Blogs",
+        path: "/admin/blogs",
+        icon: BookOpen,
+        description: "Articles de blog",
+        requiredLevel: "C",
       },
     ],
   },
@@ -227,7 +227,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/interactions",
     icon: Activity,
     description: "Likes, vues et partages",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 
   // Groupes
@@ -237,7 +237,7 @@ export const commonAdminRoutes: AdminRoute[] = [
     path: "/admin/groups",
     icon: Users2,
     description: "Groupes communautaires",
-    requiredLevel: 'C',
+    requiredLevel: "C",
   },
 ];
 
@@ -250,7 +250,16 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/transactions",
     icon: CreditCard,
     description: "Transactions financières",
-    requiredLevel: 'C',
+    requiredLevel: "B",
+    isFinancial: true,
+  },
+  {
+    id: "claims",
+    label: "Réclamations",
+    path: "/admin/claims",
+    icon: CreditCard,
+    description: "Réclamations",
+    requiredLevel: "B",
     isFinancial: true,
   },
   {
@@ -259,7 +268,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/requests",
     icon: AlertCircle,
     description: "Dépôts, retraits et items",
-    requiredLevel: 'C',
+    requiredLevel: "B",
     isFinancial: true,
   },
 
@@ -270,7 +279,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/wallets",
     icon: Wallet,
     description: "Gestion des portefeuilles",
-    requiredLevel: 'C',
+    requiredLevel: "B",
     isFinancial: true,
   },
 
@@ -281,7 +290,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/vip",
     icon: Award,
     description: "Gestion des abonnements VIP",
-    requiredLevel: 'C',
+    requiredLevel: "B",
   },
 
   // Jeux et Items
@@ -291,7 +300,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/games",
     icon: Gamepad2,
     description: "Gestion des jeux",
-    requiredLevel: 'B',
+    requiredLevel: "B",
     children: [
       {
         id: "game-items",
@@ -299,7 +308,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
         path: "/admin/games/items",
         icon: Package,
         description: "Items et coins de jeu",
-        requiredLevel: 'B',
+        requiredLevel: "B",
       },
       {
         id: "game-requests",
@@ -307,7 +316,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
         path: "/admin/games/requests",
         icon: AlertCircle,
         description: "Demandes d'items",
-        requiredLevel: 'B',
+        requiredLevel: "B",
       },
     ],
   },
@@ -317,7 +326,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/themes",
     icon: Palette,
     description: "Thèmes personnalisés",
-    requiredLevel: 'B',
+    requiredLevel: "B",
   },
   {
     id: "categories",
@@ -325,7 +334,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/categories",
     icon: Tag,
     description: "Catégories et tags",
-    requiredLevel: 'B',
+    requiredLevel: "B",
   },
   {
     id: "media",
@@ -333,7 +342,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/media",
     icon: Image,
     description: "Gestion des médias",
-    requiredLevel: 'B',
+    requiredLevel: "B",
   },
   {
     id: "services",
@@ -341,7 +350,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/services",
     icon: LifeBuoy,
     description: "Services support",
-    requiredLevel: 'B',
+    requiredLevel: "B",
   },
   {
     id: "claims",
@@ -349,7 +358,7 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     path: "/admin/claims",
     icon: AlertCircle,
     description: "Gestion des réclamations",
-    requiredLevel: 'B',
+    requiredLevel: "B",
   },
 ];
 
@@ -362,7 +371,7 @@ export const superAdminRoutes: AdminRoute[] = [
     path: "/admin/system",
     icon: Settings,
     description: "Administration système",
-    requiredLevel: 'A',
+    requiredLevel: "A",
     isSystem: true,
     children: [
       {
@@ -371,16 +380,16 @@ export const superAdminRoutes: AdminRoute[] = [
         path: "/admin/system/database",
         icon: Database,
         description: "Surveillance de la DB",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
       {
         id: "settings",
         label: "Paramètres",
-        path: "/admin/system/settings",
+        path: "/admin/settings",
         icon: Settings,
         description: "Configuration système",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
       {
@@ -389,7 +398,7 @@ export const superAdminRoutes: AdminRoute[] = [
         path: "/admin/system/analytics",
         icon: BarChart3,
         description: "Analyses avancées",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
     ],
@@ -402,7 +411,7 @@ export const superAdminRoutes: AdminRoute[] = [
     path: "/admin/api/keys",
     icon: Database,
     description: "Gérer les clés API et les accès",
-    requiredLevel: 'A',
+    requiredLevel: "A",
     isSystem: true,
     children: [
       {
@@ -411,7 +420,7 @@ export const superAdminRoutes: AdminRoute[] = [
         path: "/admin/api/keys",
         icon: Key,
         description: "Gérer les jetons d'accès",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
       {
@@ -420,7 +429,7 @@ export const superAdminRoutes: AdminRoute[] = [
         path: "/admin/api/logs",
         icon: Activity,
         description: "Surveillance des requêtes",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
     ],
@@ -433,7 +442,7 @@ export const superAdminRoutes: AdminRoute[] = [
     path: "/admin/logs",
     icon: Activity,
     description: "Journaux et traces",
-    requiredLevel: 'A',
+    requiredLevel: "A",
     isSystem: true,
     children: [
       {
@@ -442,7 +451,7 @@ export const superAdminRoutes: AdminRoute[] = [
         path: "/admin/logs/traces",
         icon: Activity,
         description: "Traces d'activité",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
       {
@@ -451,7 +460,7 @@ export const superAdminRoutes: AdminRoute[] = [
         path: "/admin/logs/search",
         icon: Filter,
         description: "Historique des recherches",
-        requiredLevel: 'A',
+        requiredLevel: "A",
         isSystem: true,
       },
     ],
@@ -464,7 +473,7 @@ export const superAdminRoutes: AdminRoute[] = [
     path: "/admin/advanced",
     icon: Settings,
     description: "Outils avancés",
-    requiredLevel: 'A',
+    requiredLevel: "A",
     isSystem: true,
   },
 ];
@@ -473,27 +482,48 @@ export const superAdminRoutes: AdminRoute[] = [
 // FONCTIONS UTILITAIRES
 // ============================================================================
 
+function filterRoutesByAccess(
+  routes: AdminRoute[],
+  level: "A" | "B" | "C",
+): AdminRoute[] {
+  return routes
+    .filter((route) => isRouteAccessible(route, level))
+    .map((route) => {
+      const children = route.children
+        ? filterRoutesByAccess(route.children, level)
+        : undefined;
+
+      return {
+        ...route,
+        children,
+      };
+    });
+}
+
 /**
  * Retourne les routes accessibles pour un niveau d'admin donné
  */
-export function getAdminRoutesForLevel(level: 'A' | 'B' | 'C'): AdminRoute[] {
+export function getAdminRoutesForLevel(level: "A" | "B" | "C"): AdminRoute[] {
   let routes = [...commonAdminRoutes];
 
-  if (level === 'A' || level === 'B') {
+  if (level === "A" || level === "B") {
     routes = [...routes, ...intermediateAdminRoutes];
   }
 
-  if (level === 'A') {
+  if (level === "A") {
     routes = [...routes, ...superAdminRoutes];
   }
 
-  return routes;
+  return filterRoutesByAccess(routes, level); // ✅ IMPORTANT
 }
 
 /**
  * Retourne une route admin par son ID.
  */
-export function getAdminRouteById(id: string, level: 'A' | 'B' | 'C' = 'C'): AdminRoute | undefined {
+export function getAdminRouteById(
+  id: string,
+  level: "A" | "B" | "C" = "C",
+): AdminRoute | undefined {
   const routes = getAdminRoutesForLevel(level);
 
   function search(routes: AdminRoute[]): AdminRoute | undefined {
@@ -511,11 +541,14 @@ export function getAdminRouteById(id: string, level: 'A' | 'B' | 'C' = 'C'): Adm
 /**
  * Vérifie si une route est accessible pour un niveau donné
  */
-export function isRouteAccessible(route: AdminRoute, userLevel: 'A' | 'B' | 'C'): boolean {
+export function isRouteAccessible(
+  route: AdminRoute,
+  userLevel: "A" | "B" | "C",
+): boolean {
   if (!route.requiredLevel) return true;
 
   // Convertir les niveaux en poids
-  const levelWeights = { 'A': 3, 'B': 2, 'C': 1 };
+  const levelWeights = { A: 3, B: 2, C: 1 };
   const routeWeight = levelWeights[route.requiredLevel];
   const userWeight = levelWeights[userLevel];
 
@@ -525,7 +558,7 @@ export function isRouteAccessible(route: AdminRoute, userLevel: 'A' | 'B' | 'C')
 /**
  * Aplatit l'arbre des routes en un tableau linéaire (utile pour les menus).
  */
-export function flattenAdminRoutes(routes: AdminRoute[]): AdminRoute[] {
+export function flatRoutes(routes: AdminRoute[]): AdminRoute[] {
   const flat: AdminRoute[] = [];
   function traverse(list: AdminRoute[]) {
     list.forEach((r) => {
@@ -540,7 +573,7 @@ export function flattenAdminRoutes(routes: AdminRoute[]): AdminRoute[] {
 /**
  * Groupes les routes par catégorie pour l'affichage sidebar
  */
-export function getAdminRouteGroups(level: 'A' | 'B' | 'C'): Array<{
+export function getAdminRouteGroups(level: "A" | "B" | "C"): Array<{
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   routes: AdminRoute[];
@@ -551,50 +584,50 @@ export function getAdminRouteGroups(level: 'A' | 'B' | 'C'): Array<{
     {
       label: "Général",
       icon: Home,
-      routes: routes.filter(r =>
-        ['overview', 'users', 'shops', 'products', 'orders'].includes(r.id)
+      routes: routes.filter((r) =>
+        ["overview", "users", "shops", "products", "orders"].includes(r.id),
       ),
     },
     {
       label: "Compétitions",
       icon: Trophy,
-      routes: routes.filter(r =>
-        ['tournaments', 'teams', 'tournament-editions', 'tournament-phases', 'tournament-matches'].includes(r.id)
-      ),
+      routes: routes.filter((r) => ["tournaments", "teams"].includes(r.id)),
     },
     {
       label: "Finances",
       icon: CreditCard,
-      routes: routes.filter(r => r.isFinancial ||
-        ['transactions', 'wallets', 'vip'].includes(r.id)
+      routes: routes.filter(
+        (r) =>
+          r.isFinancial || ["transactions", "wallets", "vip"].includes(r.id),
       ),
     },
     {
       label: "Contenu",
       icon: Newspaper,
-      routes: routes.filter(r =>
-        ['content', 'posts', 'blogs', 'guides', 'announcements', 'communication'].includes(r.id)
-      ),
+      routes: routes.filter((r) => ["content", "communication"].includes(r.id)),
     },
     {
       label: "Jeux",
       icon: Gamepad2,
-      routes: routes.filter(r =>
-        ['games', 'game-items', 'game-requests', 'themes'].includes(r.id)
-      ),
+      routes: routes.filter((r) => ["games", "themes"].includes(r.id)),
     },
     {
       label: "Communauté",
       icon: Users2,
-      routes: routes.filter(r =>
-        ['groups', 'interactions', 'messages', 'claims'].includes(r.id)
-      ),
+      routes: routes.filter((r) => ["groups", "interactions"].includes(r.id)),
     },
     {
       label: "Configuration",
       icon: Settings,
-      routes: routes.filter(r =>
-        ['categories', 'services', 'system', 'settings', 'database', 'logs', 'api-management', 'advanced'].includes(r.id)
+      routes: routes.filter((r) =>
+        [
+          "categories",
+          "services",
+          "system",
+          "api-management",
+          "logs",
+          "advanced",
+        ].includes(r.id),
       ),
     },
   ];
@@ -603,13 +636,18 @@ export function getAdminRouteGroups(level: 'A' | 'B' | 'C'): Array<{
 /**
  * Vérifie l'accès à une route spécifique
  */
-export function checkRouteAccess(path: string, userLevel: 'A' | 'B' | 'C'): {
+export function checkRouteAccess(
+  path: string,
+  userLevel: "A" | "B" | "C",
+): {
   accessible: boolean;
   route?: AdminRoute;
-  requiredLevel?: 'A' | 'B' | 'C';
+  requiredLevel?: "A" | "B" | "C";
 } {
-  const allRoutes = flattenAdminRoutes(getAdminRoutesForLevel('A'));
-  const route = allRoutes.find(r => r.path === path);
+  const allRoutes = flatRoutes(
+    getAdminRoutesForLevel("A"), // ✅ toujours tout
+  );
+  const route = allRoutes.find((r) => r.path === path);
 
   if (!route) {
     return { accessible: false };
@@ -620,6 +658,6 @@ export function checkRouteAccess(path: string, userLevel: 'A' | 'B' | 'C'): {
   return {
     accessible,
     route,
-    requiredLevel: route.requiredLevel
+    requiredLevel: route.requiredLevel,
   };
 }

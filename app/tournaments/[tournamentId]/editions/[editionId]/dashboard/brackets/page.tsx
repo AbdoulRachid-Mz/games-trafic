@@ -1,5 +1,6 @@
 import { Metadata } from "next";
-import { getTournamentPhases, getBracketNodes } from "@/actions/phases";
+import { getTournamentPhases, getBracketNodes, getMatchesWithParticipants } from "@/actions/phases";
+import { getMatches } from "@/actions/tournaments";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
@@ -15,9 +16,12 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  LayoutGrid,
+  List,
+  StretchHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BracketRoundCard } from "./bracket-round-card";
+import { BracketNodeCard } from "@/components/cards/bracket-node-card";
 import { PhaseFilter } from "../groups/phase-filter";
 
 export const metadata: Metadata = {
@@ -31,6 +35,7 @@ interface PageProps {
   }>;
   searchParams: Promise<{
     phaseId?: string;
+    viewMode?: "grid" | "list" | "compact";
   }>;
 }
 
@@ -54,7 +59,7 @@ export default async function BracketsDashboardPage({
   searchParams,
 }: PageProps) {
   const { tournamentId, editionId } = await params;
-  const { phaseId } = await searchParams;
+  const { phaseId, viewMode = "grid" } = await searchParams;
 
   // Fetch all phases to get their bracket nodes
   const phasesRes = await getTournamentPhases({
@@ -63,7 +68,7 @@ export default async function BracketsDashboardPage({
   });
 
   const phases = phasesRes.data || [];
-  const eliminationPhases = phases.filter((p) => p.phaseType === "ELIMINATION");
+  const eliminationPhases = phases.filter((p) => p.phaseType === "ELIMINATION" || p.phaseType === "ROUND_ROBIN" || p.phaseType === "GROUP_STAGE");
 
   if (eliminationPhases.length === 0) {
     return (
@@ -73,8 +78,7 @@ export default async function BracketsDashboardPage({
           Aucun arbre configuré
         </Typography>
         <Typography variant="body-sm" theme="muted" className="max-w-xs mt-2">
-          Cette édition ne contient aucune phase d'élimination directe
-          (Bracket).
+          Cette édition ne contient aucune phase configurée avec des brackets.
         </Typography>
         <Button className="mt-6" asChild>
           <Link
@@ -87,17 +91,32 @@ export default async function BracketsDashboardPage({
     );
   }
 
-  // Fetch nodes for each elimination phase
+  // Fetch nodes for each phase
   const phasesWithNodes = await Promise.all(
     eliminationPhases.map(async (phase) => {
       const nodesRes = await getBracketNodes({
         filters: { phaseId: phase.id },
-        options: { sortBy: "order", sortOrder: "asc" },
+        options: { sortBy: "round", sortOrder: "asc" },
         pagination: { page: 1, limit: 200 },
       });
+      
+      const nodes = nodesRes.data || [];
+      
+      // Get matches for each node to count them
+      const nodesWithStats = await Promise.all(nodes.map(async (node) => {
+        const matchesRes = await getMatchesWithParticipants({
+          filters: { bracketNodeId: node.id },
+          pagination: { page: 1, limit: 1 } // Just need total
+        });
+        return {
+          ...node,
+          matchesCount: matchesRes.pagination.total
+        };
+      }));
+
       return {
         ...phase,
-        bracketNodes: nodesRes.data || [],
+        bracketNodes: nodesWithStats,
       };
     }),
   );
@@ -108,8 +127,6 @@ export default async function BracketsDashboardPage({
     : phasesWithNodes;
 
   // Get matches count for each phase to show stats
-  const { getMatches } = await import("@/actions/tournaments");
-
   const phasesWithStats = await Promise.all(
     targetPhases.map(async (phase) => {
       const matchesRes = await getMatches({
@@ -134,14 +151,47 @@ export default async function BracketsDashboardPage({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <Typography variant="h3" weight="bold">
-            Arbres de Phase
+            Gestion des Brackets
           </Typography>
           <Typography variant="body-sm" theme="muted">
-            Gestion des rounds et des rencontres par élimination
+            Gestion des rounds et des rencontres par bracket
           </Typography>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <div className="flex bg-muted p-1 rounded-lg">
+            <Button 
+              variant={viewMode === "grid" ? "default" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8" 
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...(phaseId ? { phaseId } : {}), viewMode: "grid" })}`}>
+                <LayoutGrid className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button 
+              variant={viewMode === "list" ? "default" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8"
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...(phaseId ? { phaseId } : {}), viewMode: "list" })}`}>
+                <List className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button 
+              variant={viewMode === "compact" ? "default" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8"
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...(phaseId ? { phaseId } : {}), viewMode: "compact" })}`}>
+                <StretchHorizontal className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
           <PhaseFilter
             phases={eliminationPhases}
             currentPhaseId={phaseId}
@@ -154,22 +204,6 @@ export default async function BracketsDashboardPage({
       <div className="space-y-12">
         {phasesWithStats.map((phase) => {
           const nodes = phase.bracketNodes || [];
-
-          // Group nodes by round
-          const nodesByRound: Record<number, any[]> = {};
-          nodes.forEach((node: any) => {
-            const round = node.round || 1;
-            if (!nodesByRound[round]) nodesByRound[round] = [];
-            nodesByRound[round].push(node);
-          });
-
-          const maxRound = Math.max(
-            1,
-            ...Object.keys(nodesByRound).map(Number),
-          );
-
-          // Get unique bracket types
-          const bracketTypes = new Set(nodes.map((n: any) => n.bracketType));
 
           const progressPercent =
             phase.matchesCount > 0
@@ -194,7 +228,7 @@ export default async function BracketsDashboardPage({
                     </Typography>
                     <div className="flex items-center gap-3 mt-1">
                       <Typography variant="caption1" theme="muted">
-                        {nodes.length} nœud(s) • {phase.matchesCount} match(s)
+                        {nodes.length} bracket(s) • {phase.matchesCount} match(s)
                       </Typography>
                       <div className="flex items-center gap-1">
                         <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -211,19 +245,9 @@ export default async function BracketsDashboardPage({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {Array.from(bracketTypes).map((type) => (
-                    <Badge
-                      key={type}
-                      variant="outline"
-                      className="text-[10px] uppercase"
-                    >
-                      {type === "UPPER"
-                        ? "Upper Bracket"
-                        : type === "LOWER"
-                          ? "Lower Bracket"
-                          : type}
-                    </Badge>
-                  ))}
+                  <Badge variant="secondary" className="text-[10px] uppercase">
+                    {phase.phaseType}
+                  </Badge>
                   <Button size="sm" variant="outline" asChild>
                     <Link
                       href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phase.id}`}
@@ -234,31 +258,34 @@ export default async function BracketsDashboardPage({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {Array.from({ length: maxRound }, (_, i) => i + 1).map(
-                  (roundNum) => {
-                    const roundNodes = nodesByRound[roundNum] || [];
-                    const roundName = getRoundLabel(roundNum - 1, maxRound);
-
-                    // Count matches in this round (approx from nodes)
-                    const matchesInRound = roundNodes.length;
-
-                    return (
-                      <BracketRoundCard
-                        key={roundNum}
-                        roundNumber={roundNum}
-                        roundName={roundName}
-                        nodeCount={roundNodes.length}
-                        matchesCount={matchesInRound}
-                        tournamentId={tournamentId}
-                        nodeId={roundNodes[0]?.id || undefined}
-                        editionId={editionId}
-                        phaseId={phase.id}
-                      />
-                    );
-                  },
-                )}
+              <div className={cn(
+                "grid gap-4",
+                viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : 
+                viewMode === "compact" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : 
+                "grid-cols-1"
+              )}>
+                {nodes.map((node: any) => (
+                  <BracketNodeCard
+                    key={node.id}
+                    node={node}
+                    tournamentId={tournamentId}
+                    editionId={editionId}
+                    viewMode={viewMode}
+                  />
+                ))}
               </div>
+              
+              {nodes.length === 0 && (
+                <div className="text-center py-12 border border-dashed rounded-xl bg-muted/5">
+                  <GitBranch className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-20" />
+                  <Typography variant="body-sm" theme="muted">Aucun bracket généré pour cette phase.</Typography>
+                  <Button variant="link" size="sm" asChild>
+                    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phase.id}`}>
+                      Générer les brackets
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -266,3 +293,4 @@ export default async function BracketsDashboardPage({
     </div>
   );
 }
+

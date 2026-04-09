@@ -51,7 +51,14 @@ interface MenuItem {
   badgeCount?: number;
   requiresAuth?: boolean;
   adminOnly?: boolean;
-  group?: "main" | "social" | "tools" | "admin" | "vip" | "games" | "application";
+  group?:
+    | "main"
+    | "social"
+    | "tools"
+    | "admin"
+    | "vip"
+    | "games"
+    | "application";
   new?: boolean;
 }
 
@@ -142,7 +149,7 @@ const defaultMenuItems: MenuItem[] = [
     group: "application",
     requiresAuth: true,
   },
-  
+
   {
     id: "documentation",
     label: "Documentation",
@@ -167,7 +174,6 @@ const defaultMenuItems: MenuItem[] = [
     group: "application",
     requiresAuth: false,
   },
-
 
   // Social & Communication
 
@@ -298,14 +304,14 @@ export function LeftBar({
                     weight="bold"
                     className="truncate bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent"
                   >
-                    GT-V2
+                    GT
                   </Typography>
                   <Typography
                     variant="caption2"
                     theme="muted"
                     className="truncate"
                   >
-                    Gaming Hub
+                    Games Trafic
                   </Typography>
                 </div>
               )}
@@ -339,7 +345,12 @@ export function LeftBar({
                 whileHover={{ x: 5 }}
               >
                 <Avatar className="h-11 w-11 border-2 border-primary/30 shadow-md flex-shrink-0">
-                  <AvatarImage src={authUser.profileImage || undefined} />
+                  <AvatarImage
+                    src={authUser.profileImage || undefined}
+                    alt={
+                      authUser.username || authUser.fullName || "Utilisateur"
+                    }
+                  />
                   <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white font-semibold">
                     {authUser.username?.[0]?.toUpperCase() || "U"}
                   </AvatarFallback>
@@ -402,7 +413,7 @@ export function LeftBar({
             >
               Actions Rapides
             </Typography>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -413,7 +424,7 @@ export function LeftBar({
                   onClick={() => handleCreateAction("shop")}
                 >
                   <PlusCircle className="h-4 w-4 text-primary" />
-                  <span className="text-xs">Boutique</span>
+                  <span className="text-xs text-primary">Boutique</span>
                 </Button>
               </motion.div>
               <motion.div
@@ -426,10 +437,10 @@ export function LeftBar({
                   onClick={() => handleCreateAction("tournament")}
                 >
                   <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-xs">Tournoi</span>
+                  <span className="text-xs text-primary">Tournoi</span>
                 </Button>
               </motion.div>
-              <motion.div
+              {/* <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -441,7 +452,7 @@ export function LeftBar({
                   <Package className="h-4 w-4 text-primary" />
                   <span className="text-xs">Produit</span>
                 </Button>
-              </motion.div>
+              </motion.div> */}
             </div>
           </div>
         )}
@@ -630,7 +641,7 @@ export function LeftBar({
 
               <div className="text-center pt-2">
                 <Typography variant="caption2" theme="muted">
-                  © {new Date().getFullYear()} GT-V2
+                  © {new Date().getFullYear()} GT
                 </Typography>
               </div>
             </div>

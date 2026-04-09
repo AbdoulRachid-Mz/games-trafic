@@ -1358,7 +1358,11 @@ export const bracketNodes = pgTable('bracket_nodes', {
   // Métadonnées
   metadata: jsonb('metadata').default({
     isBye: false,
-    requiresMatch: true
+    requiresMatch: true,
+    participants: [],
+    generateMatches: true,
+    matchesCount: 1,
+    format: 'BEST_OF_1'
   }),
 
   isDeleted: boolean('is_deleted').default(false),

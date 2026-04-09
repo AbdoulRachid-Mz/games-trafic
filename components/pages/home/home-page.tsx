@@ -23,14 +23,14 @@ import { PartnersSection } from "./partners-section";
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
+  // useEffect(() => {
+  //   const timer = setTimeout(() => setIsLoading(false), 800);
+  //   return () => clearTimeout(timer);
+  // }, []);
 
-  if (isLoading) {
-    return <HomeLoadingSkeleton />;
-  }
+  // if (isLoading) {
+  //   return <HomeLoadingSkeleton />;
+  // }
 
   return (
     <div className="relative flex flex-col min-h-screen w-full">

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, Calendar } from "lucide-react";
 import { usePhases } from "@/hooks/use-phase-manager";
 import { useGroups } from "@/hooks/use-group-manager";
-import { useMatchesByPhase, useMatchesByGroup } from "@/hooks/use-match-manager";
+import { useMatchesByPhase, useMatchesByGroup, useMatchList } from "@/hooks/use-match-manager";
 import { MatchCard } from "@/components/cards/match-card";
 import {
   Select,
@@ -47,16 +47,7 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
 
-  // Select active phase initially
-  useEffect(() => {
-    if (phases.length > 0 && selectedPhaseId === "all") {
-      const active = phases.find((p) => p.isActive);
-      if (active) setSelectedPhaseId(active.id);
-      else setSelectedPhaseId(phases[0].id);
-    }
-  }, [phases, selectedPhaseId]);
-
-  // Fetch Groups for selected Phase
+  // Fetch groups for selected Phase
   const { data: groupsRes, isLoading: isLoadingGroups } = useGroups(
     selectedPhaseId !== "all" ? selectedPhaseId : "",
     selectedPhaseId !== "all",
@@ -68,24 +59,17 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
     setSelectedGroupId("all");
   }, [selectedPhaseId]);
 
-  // Fetch Matches
-  const { data: matchesResPhase, isLoading: isLoadingPhaseMatches } =
-    useMatchesByPhase(
-      selectedPhaseId !== "all" ? selectedPhaseId : "",
-      selectedPhaseId !== "all" && selectedGroupId === "all" ? "true" : "false",
-    );
+  // Fetch Matches with full relations
+  const { data: matchesRes, isLoading: isLoadingMatches } = useMatchList({
+    filters: { 
+      editionId,
+      phaseId: selectedPhaseId !== "all" ? selectedPhaseId : undefined,
+      groupId: selectedGroupId !== "all" ? selectedGroupId : undefined,
+    },
+    pagination: { limit: 200, page: 1 }
+  });
 
-  const { data: matchesResGroup, isLoading: isLoadingGroupMatches } =
-    useMatchesByGroup(
-      selectedGroupId !== "all" ? selectedGroupId : "",
-      selectedGroupId !== "all" ? "true" : "false",
-    );
-
-  const matches = useMemo(() => {
-    if (selectedGroupId !== "all") return matchesResGroup?.data || [];
-    if (selectedPhaseId !== "all") return matchesResPhase?.data || [];
-    return [];
-  }, [selectedPhaseId, selectedGroupId, matchesResPhase, matchesResGroup]);
+  const matches = matchesRes?.data || [];
 
   // Grouping matches by Round
   const roundsMap = new Map<number, any[]>();
@@ -97,11 +81,7 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
   }
   const rounds = Array.from(roundsMap.entries()).sort((a, b) => a[0] - b[0]);
 
-  const isLoading =
-    isLoadingPhases ||
-    isLoadingGroups ||
-    isLoadingPhaseMatches ||
-    isLoadingGroupMatches;
+  const isLoading = isLoadingPhases || isLoadingGroups || isLoadingMatches;
 
   return (
     <div className="space-y-6 container p-4 max-w-5xl mx-auto">

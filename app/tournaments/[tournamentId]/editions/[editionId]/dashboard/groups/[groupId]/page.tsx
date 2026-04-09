@@ -420,12 +420,22 @@ async function BracketNodesList({
                     <span className="font-bold text-sm">
                       {(node.metadata as any)?.name || node.nodeCode || "Nœud"}
                     </span>
-                    <Badge
-                      variant="secondary"
-                      className="text-[9px] h-4 py-0 leading-none bg-primary/10 text-primary border-none uppercase tracking-tighter"
-                    >
-                      {node.bracketType || "UPPER"}
-                    </Badge>
+                    <div className="flex gap-1">
+                      <Badge
+                        variant="secondary"
+                        className="text-[9px] h-4 py-0 leading-none bg-primary/10 text-primary border-none uppercase tracking-tighter"
+                      >
+                        {node.bracketType || "UPPER"}
+                      </Badge>
+                      {(node.metadata as any)?.format && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] h-4 py-0 leading-none border-primary/20 text-muted-foreground uppercase tracking-tighter"
+                        >
+                          {(node.metadata as any).format}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
                     Round {node.round} • Match #{node.matchNumber}
@@ -498,18 +508,21 @@ async function BracketNodesList({
 
             {/* Participants in this Node */}
             <div className="p-3 bg-card">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {nodeParticipants.length > 0 ? (
-                  nodeParticipants.map((regId: string) => {
-                    const reg = allRegs.find(r => r.id === regId);
-                    return (
-                      <Badge key={regId} variant="outline" className="text-[10px] bg-background">
-                        {reg?.member?.displayName || "Joueur"}
-                      </Badge>
-                    );
-                  })
+                  nodeParticipants.map((regId: string) => (
+                    <Badge 
+                      key={regId} 
+                      variant="outline" 
+                      className="bg-muted/30 text-[10px] font-medium py-0 h-6 px-2 border-primary/5"
+                    >
+                      {getName(regId, allRegs)}
+                    </Badge>
+                  ))
                 ) : (
-                  <span className="text-[10px] text-muted-foreground italic">Aucun participant assigné</span>
+                  <span className="text-[10px] text-muted-foreground italic ml-1">
+                    Aucun participant assigné
+                  </span>
                 )}
               </div>
             </div>

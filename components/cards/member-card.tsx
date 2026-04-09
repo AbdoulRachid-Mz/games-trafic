@@ -14,6 +14,7 @@ import {
   PenSquare,
   Eye,
   MessageSquare,
+  Phone,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ import { TournamentMemberWithRelations } from "@/database/schema";
 import { cn } from "@/lib/utils";
 import { useScreenSize } from "@/hooks/use-screen";
 import { useRouter } from "next/navigation";
+import { ActiveLink } from "../shared/active-link";
 
 interface MemberCardProps {
   member: TournamentMemberWithRelations;
@@ -112,6 +114,11 @@ export function MemberCard({
                 {member.contactEmail}
               </div>
             )}
+            {
+              member.user?.phoneNumber && (
+                <ActiveLink icon={<Phone className="w-4 h-4" />} href={`tel:${member.user?.phoneNumber}`} className="text-xs text-muted-foreground" />
+              )
+            }
           </div>
         </div>
 

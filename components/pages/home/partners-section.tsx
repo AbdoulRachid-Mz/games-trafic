@@ -53,7 +53,7 @@ export function PartnersSection() {
             <PartnerCard
               key={partner.id}
               partner={partner}
-              viewMode="compact"
+              viewMode="grid"
               showActions={false}
               showBadge={partner.verified ?? false}
               showDescription={false}

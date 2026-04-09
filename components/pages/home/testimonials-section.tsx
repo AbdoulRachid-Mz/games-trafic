@@ -68,7 +68,7 @@ export default function TestimonialsSection() {
 
               <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12 border border-primary/20">
-                  <AvatarImage src={testimonial.avatar} />
+                  <AvatarImage src={testimonial.avatar} alt={testimonial.name} />
                   <AvatarFallback className="font-bold">
                     {testimonial.fallback}
                   </AvatarFallback>

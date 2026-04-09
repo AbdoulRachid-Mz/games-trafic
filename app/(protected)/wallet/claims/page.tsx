@@ -146,7 +146,7 @@ export default function ClaimsPage() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <Typography variant="h1" weight="bold" gradient animated>
+        <Typography variant="h1" weight="bold" animated>
           Centre de Réclamations
         </Typography>
         <Typography variant="body-base" theme="muted" className="mt-1">

@@ -101,6 +101,9 @@ export function CreateBracketNodeDialog({
         metadata: {
           participants: [],
           requiresMatch: true,
+          generateMatches: true,
+          matchesCount: 1,
+          format: 'BEST_OF_1'
         },
       } as any);
 

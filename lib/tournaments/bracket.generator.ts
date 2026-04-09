@@ -1,5 +1,5 @@
 import { generateEliminationMatches } from "./match.generator";
-import { Bracket, BracketNode, Participant } from "./types";
+import { Bracket, BracketNode, MatchType, Participant } from "./types";
 import { generateId, shuffle } from "./utils";
 
 export function generateSingleEliminationBracket(
@@ -18,6 +18,13 @@ export function generateSingleEliminationBracket(
       id: generateId("node"),
       round: currentRound,
       match,
+      metadata: {
+        participants: [match.playerA?.id, match.playerB?.id].filter(Boolean) as string[],
+        name: `Node R${currentRound}`,
+        generateMatches: true,
+        matchesCount: 1,
+        format: 'SINGLE' as MatchType
+      }
     }));
 
     nodes.push(...roundNodes);

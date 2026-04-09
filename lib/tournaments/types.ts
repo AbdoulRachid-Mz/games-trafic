@@ -36,6 +36,15 @@ export interface BracketNode {
   round: number;
   match?: Match;
   nextNodeId?: string;
+  metadata?: {
+    participants?: string[];
+    name?: string;
+    generateMatches?: boolean;
+    matchesCount?: number;
+    format?: MatchType;
+    isBye?: boolean;
+    requiresMatch?: boolean;
+  };
 }
 
 export interface Bracket {

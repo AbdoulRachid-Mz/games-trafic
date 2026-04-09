@@ -62,6 +62,10 @@ export default async function GroupNodesOrganizePage({
         existingNodes={nodesRes.data as any[]}
         groupParticipants={participants as any[]}
         allRegistrations={regsRes.data as any[]}
+        groupConfig={group.config as any}
+        phaseConfig={(group.phase as any)?.config || {}}
+        tournamentId={tournamentId}
+        editionId={editionId}
       />
     </div>
   );

@@ -53,7 +53,13 @@ export function MatchControlClient({
     disputeReason: ""
   });
 
-  const isOrganizer = user?.id === match.edition?.tournament?.organizerId;
+  // Amélioration de la détection d'organisateur/co-organisateur
+  const isOwner = user?.id === match.edition?.tournament?.organizerId;
+  const isCoOrganizer = match.edition?.tournament?.members?.some(
+    (m: any) => m.userId === user?.id && m.isCoOrganizer
+  );
+  const isOrganizer = isOwner || isCoOrganizer;
+  
   const isParticipant1 = user?.id === match.participant1?.member?.userId;
   const isParticipant2 = user?.id === match.participant2?.member?.userId;
   const isParticipant = isParticipant1 || isParticipant2;

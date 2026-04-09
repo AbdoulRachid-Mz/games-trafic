@@ -13,10 +13,13 @@ import {
   ArrowRight,
   Settings2,
   Trophy,
+  List,
+  StretchHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { PhaseFilter } from "./phase-filter";
+import { GroupCard } from "@/components/cards/group-card";
 
 export const metadata: Metadata = {
   title: "Gestion des Groupes - Dashboard",
@@ -29,6 +32,7 @@ interface PageProps {
   }>;
   searchParams: Promise<{
     phaseId?: string;
+    viewMode?: "grid" | "list" | "compact";
   }>;
 }
 
@@ -37,7 +41,7 @@ export default async function GroupsDashboardPage({
   searchParams,
 }: PageProps) {
   const { tournamentId, editionId } = await params;
-  const { phaseId } = await searchParams;
+  const { phaseId, viewMode = "grid" } = await searchParams;
 
   // Fetch all phases to get their groups
   const phasesRes = await getTournamentPhases({
@@ -115,13 +119,46 @@ export default async function GroupsDashboardPage({
           </Typography>
         </div>
 
-        <div className="flex items-center gap-2">
-  <PhaseFilter 
-    phases={phases.filter(p => p.phaseType === "GROUP_STAGE" || p.phaseType === "ROUND_ROBIN")}
-    currentPhaseId={phaseId}
-    placeholder="Toutes les phases"
-  />
-</div>
+        <div className="flex items-center gap-4">
+          <div className="flex bg-muted p-1 rounded-lg">
+            <Button 
+              variant={viewMode === "grid" ? "default" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8" 
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...(phaseId ? { phaseId } : {}), viewMode: "grid" })}`}>
+                <LayoutGrid className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button 
+              variant={viewMode === "list" ? "default" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8"
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...(phaseId ? { phaseId } : {}), viewMode: "list" })}`}>
+                <List className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button 
+              variant={viewMode === "compact" ? "default" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8"
+              asChild
+            >
+              <Link href={`?${new URLSearchParams({ ...(phaseId ? { phaseId } : {}), viewMode: "compact" })}`}>
+                <StretchHorizontal className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          <PhaseFilter 
+            phases={phases.filter(p => p.phaseType === "GROUP_STAGE" || p.phaseType === "ROUND_ROBIN")}
+            currentPhaseId={phaseId}
+            placeholder="Toutes les phases"
+          />
+        </div>
       </div>
 
       {allGroups.length === 0 ? (
@@ -135,118 +172,23 @@ export default async function GroupsDashboardPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={cn(
+          "grid gap-4",
+          viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : 
+          viewMode === "compact" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : 
+          "grid-cols-1"
+        )}>
           {allGroups.map((group: any) => (
             <GroupCard
               key={group.id}
               group={group}
               tournamentId={tournamentId}
               editionId={editionId}
+              viewMode={viewMode}
             />
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-// Composant Client pour la carte d'un groupe
-function GroupCard({ group, tournamentId, editionId }: { 
-  group: any; 
-  tournamentId: string; 
-  editionId: string;
-}) {
-  const getParticipantCount = (group: any) => {
-    return group.participantCount || group.participants?.length || 0;
-  };
-
-  return (
-    <Card className="overflow-hidden group hover:border-primary/50 transition-all duration-200 hover:shadow-md">
-      <CardHeader className="pb-2 border-b bg-muted/30">
-        <div className="flex justify-between items-start">
-          <div className="space-y-1">
-            <Badge
-              variant="outline"
-              className="text-[10px] uppercase tracking-wider font-bold"
-            >
-              {group.phaseName}
-            </Badge>
-            <CardTitle className="text-lg font-bold tracking-tight">
-              {group.name}
-            </CardTitle>
-          </div>
-          <div className="flex gap-1">
-            {group.isLocked && (
-              <Badge
-                variant="secondary"
-                className="h-6 w-6 p-0 flex items-center justify-center rounded-full"
-                title="Groupe verrouillé"
-              >
-                <Lock className="h-3 w-3" />
-              </Badge>
-            )}
-            {group.isCompleted && (
-              <Badge className="bg-emerald-500 hover:bg-emerald-600 h-6 w-6 p-0 flex items-center justify-center rounded-full">
-                <CheckCircle2 className="h-3 w-3" />
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-4">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="h-4 w-4" />
-            <span>Participants</span>
-          </div>
-          <span className="font-bold">{getParticipantCount(group)}</span>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Trophy className="h-4 w-4" />
-            <span>Type</span>
-          </div>
-          <Badge variant="secondary" className="text-[10px] uppercase">
-            {group.groupType || "STANDARD"}
-          </Badge>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <LayoutGrid className="h-4 w-4" />
-            <span>Ordre</span>
-          </div>
-          <span className="font-mono text-sm">#{group.order + 1}</span>
-        </div>
-
-        <div className="pt-2 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 text-xs gap-1.5"
-            asChild
-          >
-            <Link
-              href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}`}
-            >
-              <Settings2 className="h-3.5 w-3.5" /> Gérer
-            </Link>
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            className="flex-1 text-xs gap-1.5"
-            asChild
-          >
-            <Link
-              href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}`}
-            >
-              <ArrowRight className="h-3.5 w-3.5" /> Détails
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

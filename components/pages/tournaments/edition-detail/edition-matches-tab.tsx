@@ -107,7 +107,7 @@ export function EditionMatchesTab({
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Skeleton key={i} className="h-48 rounded-xl" />
           ))}
@@ -126,6 +126,7 @@ export function EditionMatchesTab({
           icon: s.icon,
           className: cn("border-none bg-muted/30", s.color)
         }))}
+        className="p-4"
         itemsPerView={{ mobile: 2, md: 4, lg: 4 }}
       />
 
@@ -142,7 +143,7 @@ export function EditionMatchesTab({
               Voir tous mes matches
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {myMatches.map((match: any) => (
               <MatchCard
                 key={match.id}
@@ -260,7 +261,7 @@ export function EditionMatchesTab({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {(showOnlyMyMatches ? matches : matches.filter((m: any) => !myMatches.some((my: any) => my.id === m.id))).map((match: any) => (
             <MatchCard
               key={match.id}
