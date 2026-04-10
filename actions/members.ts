@@ -8,13 +8,131 @@ import {
     NewTournamentMember,
 } from "@/database/schema";
 import { db } from "@/lib/db";
-import { eq, and, or, desc, count } from "drizzle-orm";
+import { eq, and, or, desc, count, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
     type TournamentMemberFilters,
     type ListQuery,
     type PaginationResponse,
 } from "@/types/api";
+import { editionRegistrations, tournamentEditions } from "@/database/schema";
+
+/**
+ * Auto-génère des participants guests pour une édition
+ */
+export async function autoGenerateGuestParticipantsAction(editionId: string, count: number, config: { teamPrefix?: string, playerPrefix?: string }) {
+    try {
+        const edition = await db.query.tournamentEditions.findFirst({
+            where: eq(tournamentEditions.id, editionId),
+        });
+        if (!edition) throw new Error("Édition introuvable");
+
+        const teamPrefix = config.teamPrefix || "Team";
+        const playerPrefix = config.playerPrefix || "Joueur";
+
+        return await db.transaction(async (tx) => {
+            const createdRegistrations = [];
+
+            for (let i = 0; i < count; i++) {
+                const uniqueCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const displayName = `${playerPrefix} ${uniqueCode}`;
+                
+                // 1. Créer une équipe guest
+                const [newTeam] = await tx.insert(teams).values({
+                    name: `${teamPrefix} ${uniqueCode}`,
+                    isActive: true,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                }).returning();
+
+                // 2. Créer un membre guest dans le tournoi
+                const [newMember] = await tx.insert(tournamentMembers).values({
+                    tournamentId: edition.tournamentId,
+                    role: 'PARTICIPANT',
+                    displayName: displayName,
+                    teamId: newTeam.id,
+                    metadata: { isGuest: true, guestCode: uniqueCode },
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                }).returning();
+
+                // 3. Inscrire le membre à l'édition
+                const [registration] = await tx.insert(editionRegistrations).values({
+                    editionId,
+                    memberId: newMember.id,
+                    status: 'REGISTERED',
+                    checkedIn: true,
+                    feePaid: true,
+                    metadata: { registrationSource: 'AUTO_GENERATED' },
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                }).returning();
+
+                createdRegistrations.push(registration);
+            }
+
+            revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}/dashboard/participants`);
+            return { success: true, count: createdRegistrations.length };
+        });
+    } catch (error) {
+        console.error("Error generating guest participants:", error);
+        throw error;
+    }
+}
+
+/**
+ * Lie un membre guest à un vrai utilisateur
+ */
+export async function linkGuestToUserAction(memberId: string, userId: string) {
+    try {
+        const member = await db.query.tournamentMembers.findFirst({
+            where: eq(tournamentMembers.id, memberId),
+        });
+        if (!member) throw new Error("Membre introuvable");
+
+        const user = await db.query.users.findFirst({
+            where: eq(users.id, userId),
+        });
+        if (!user) throw new Error("Utilisateur introuvable");
+
+        // Vérifier si l'utilisateur est déjà membre du tournoi
+        const existingMember = await db.query.tournamentMembers.findFirst({
+            where: and(
+                eq(tournamentMembers.tournamentId, member.tournamentId),
+                eq(tournamentMembers.userId, userId)
+            ),
+        });
+
+        if (existingMember) {
+            throw new Error("Cet utilisateur est déjà membre de ce tournoi.");
+        }
+
+        return await db.transaction(async (tx) => {
+            // Mettre à jour le membre avec les infos de l'utilisateur
+            await tx.update(tournamentMembers)
+                .set({
+                    userId: userId,
+                    displayName: user.username || user.fullName || member.displayName,
+                    avatar: user.profileImage || user.image || member.avatar,
+                    contactEmail: user.email,
+                    metadata: { 
+                        ...(member.metadata as any || {}), 
+                        isGuest: false, 
+                        linkedAt: new Date().toISOString(),
+                        originalGuestName: member.displayName 
+                    },
+                    updatedAt: new Date(),
+                })
+                .where(eq(tournamentMembers.id, memberId));
+
+            revalidatePath(`/tournaments/${member.tournamentId}`);
+            return { success: true };
+        });
+    } catch (error: any) {
+        console.error("Error linking guest to user:", error);
+        throw error;
+    }
+}
 
 /**
  * Récupère un membre de tournoi par son ID

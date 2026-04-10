@@ -957,6 +957,35 @@ export async function createUser(userData: NewUser): Promise<User> {
 }
 
 /**
+ * Recherche des utilisateurs par email ou username
+ */
+export async function searchUsersAction(query: string): Promise<User[]> {
+  try {
+    if (!query || query.length < 2) return [];
+
+    const results = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.isDeleted, false),
+          or(
+            ilike(users.email, `%${query}%`),
+            ilike(users.username, `%${query}%`),
+            ilike(users.fullName, `%${query}%`)
+          )
+        )
+      )
+      .limit(10);
+
+    return results;
+  } catch (error) {
+    console.error("Error searching users:", error);
+    throw new Error("Failed to search users");
+  }
+}
+
+/**
  * Met à jour un utilisateur
  */
 export async function updateUser(

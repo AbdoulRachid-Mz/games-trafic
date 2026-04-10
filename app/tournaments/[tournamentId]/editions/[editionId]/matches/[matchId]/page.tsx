@@ -90,6 +90,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
     },
     pagination: { limit: 50, page: 1 }
   });
+  console.log("match", match)
 
   const h2hMatches = historyRes.data.filter((m: any) => 
     (m.participant1RegistrationId === match.participant1RegistrationId && m.participant2RegistrationId === match.participant2RegistrationId) ||
@@ -204,6 +205,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
             tournamentId={tournamentId} 
             editionId={editionId} 
             autoSubmit={submit === "true"}
+            isOrganizer={isOrganizer}
           />
 
           {/* Head-to-Head History */}

@@ -43,7 +43,7 @@ export function ConfirmationDialog({
       await onConfirm();
       setOpen(false);
     } catch (error) {
-       // Ignore error here, handled by onConfirm
+      // Ignore error here, handled by onConfirm
     } finally {
       setLoading(false);
     }
@@ -51,22 +51,26 @@ export function ConfirmationDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        {children}
-      </AlertDialogTrigger>
+      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>
-          <AlertDialogAction 
-             onClick={handleConfirm} 
-             disabled={loading}
-             className={variant === "destructive" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+          <AlertDialogCancel disabled={loading}>
+            {cancelLabel}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirm}
+            disabled={loading}
+            className={
+              variant === "destructive"
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : ""
+            }
           >
-             {loading ? "Chargement..." : confirmLabel}
+            {loading ? "Chargement..." : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

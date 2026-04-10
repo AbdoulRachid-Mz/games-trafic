@@ -47,6 +47,7 @@ import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/editi
 import { CreateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/create-bracket-node-dialog";
 import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
 import { UpdatePhaseGroupDialog } from "@/components/pages/tournaments/edition-detail/update-phase-group-dialog";
+import { MarkCompleteDialog } from "@/components/pages/tournaments/edition-detail/mark-complete-dialog";
 import { deleteBracketNode } from "@/actions/phases";
 function getName(registrationId: string | null | undefined, allRegs: any[]) {
   const reg = allRegs.find((r: any) => r.id === registrationId);
@@ -194,6 +195,14 @@ export default async function GroupDetailPage({ params }: PageProps) {
           </Button>
 
           {group && <UpdatePhaseGroupDialog group={group} />}
+
+          {!group?.isCompleted && (
+            <MarkCompleteDialog
+              type="GROUP"
+              id={groupId}
+              name={group?.name || "Groupe"}
+            />
+          )}
 
           {/* <Button variant="outline" asChild>
             <Link

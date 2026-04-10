@@ -25,8 +25,9 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { FileDown, Search, Download, FileJson, FileText, FileSpreadsheet } from "lucide-react";
+import { FileDown, Search, Download, FileJson, FileText, FileSpreadsheet, Settings2 } from "lucide-react";
 import { exportToCSV, exportToJSON, exportToPDF } from "@/lib/utils/member-export-utils";
+import Link from "next/link";
 
 export function ParticipantsManagementClient({
   editionId,
@@ -166,6 +167,13 @@ export function ParticipantsManagementClient({
               </ConfirmationDialog>
             )}
             <AddParticipantDialog editionId={editionId} tournamentId={tournamentId} />
+            
+            <Button variant="outline" size="sm" className="h-9 gap-2" asChild>
+              <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants/organize`}>
+                <Settings2 className="h-4 w-4" />
+                Organiser en masse
+              </Link>
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">

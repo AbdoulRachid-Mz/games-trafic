@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   Send,
   Settings2,
-  ImageIcon
+  ImageIcon,
+  ShieldAlert
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -30,17 +31,20 @@ import { cn } from "@/lib/utils";
 import { Typography } from "@/components/ui/typography";
 import { deleteMatch } from "@/actions/phases";
 import { AdvancedUpload } from "@/components/ui/advanced-upload";
+import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 
 export function MatchControlClient({
   match,
   tournamentId,
   editionId,
   autoSubmit = false,
+  isOrganizer: isOrganizerProp,
 }: {
   match: any;
   tournamentId: string;
   editionId: string;
   autoSubmit?: boolean;
+  isOrganizer?: boolean;
 }) {
   const router = useRouter();
   const { user } = useAuthContext();
@@ -58,7 +62,7 @@ export function MatchControlClient({
   const isCoOrganizer = match.edition?.tournament?.members?.some(
     (m: any) => m.userId === user?.id && m.isCoOrganizer
   );
-  const isOrganizer = isOwner || isCoOrganizer;
+  const isOrganizer = isOrganizerProp ?? (isOwner || isCoOrganizer);
   
   const isParticipant1 = user?.id === match.participant1?.member?.userId;
   const isParticipant2 = user?.id === match.participant2?.member?.userId;
@@ -238,14 +242,21 @@ export function MatchControlClient({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={onConfirmMatch}
-                disabled={isPending || match.status === "COMPLETED"}
-                className="flex-1 min-w-[200px] h-11 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+              <ConfirmationDialog
+                title="Validation Officielle"
+                description={`Êtes-vous sûr de vouloir valider officiellement le score ${formData.score1} - ${formData.score2} ? Cette action verrouillera le match.`}
+                onConfirm={onConfirmMatch}
+                confirmLabel="Confirmer la validation"
+                variant="default"
               >
-                {isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Valider officiellement le score
-              </Button>
+                <Button
+                  disabled={isPending || match.status === "COMPLETED"}
+                  className="flex-1 min-w-[200px] h-11 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg shadow-emerald-500/20"
+                >
+                  {isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Valider officiellement le score
+                </Button>
+              </ConfirmationDialog>
 
               <Button
                 variant="outline"

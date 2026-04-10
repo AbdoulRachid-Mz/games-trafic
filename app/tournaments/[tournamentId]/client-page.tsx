@@ -99,13 +99,10 @@ import { TournamentCard } from "@/components/cards/tournament-card";
 import { StatsCard } from "@/components/ui/stats-card";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 
-export function TournamentPageContent() {
-  const params = useParams();
+export function TournamentPageContent({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthContext();
   const { isSmallScreen, isLargeScreen } = useScreenSize();
-
-  const tournamentId = params.tournamentId as string;
 
   // Optimized React Query Fetch
   const { data: tournament, isLoading: isTournamentLoading } =
@@ -212,6 +209,7 @@ export function TournamentPageContent() {
     //   color: "text-orange-500",
     // },
   ];
+  
   const editions = tournament?.editions || [];
   const members = (tournament?.members as TournamentMember[]) || [];
 

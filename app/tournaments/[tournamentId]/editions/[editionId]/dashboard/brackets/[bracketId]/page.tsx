@@ -47,6 +47,7 @@ import {
   Users,
 } from "lucide-react";
 import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
+import { MarkCompleteDialog } from "@/components/pages/tournaments/edition-detail/mark-complete-dialog";
 import { CreateMatchDialog } from "@/components/pages/tournaments/edition-detail/create-match-dialog";
 import { UpdateMatchDialog } from "@/components/pages/tournaments/edition-detail/update-match-dialog";
 import { GenerateBracketMatchesButton } from "@/components/pages/tournaments/edition-detail/generate-bracket-matches-button";
@@ -162,6 +163,13 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
                 <Settings2 className="h-4 w-4" /> Organiser en masse
               </Link>
             </Button>
+            
+            <MarkCompleteDialog
+              type="BRACKET_NODE"
+              id={bracketId}
+              name={node?.nodeCode || "Nœud"}
+              onComplete={() => revalidatePath(`${basePath}/brackets/${bracketId}`)}
+            />
           </div>
         </div>
       </div>

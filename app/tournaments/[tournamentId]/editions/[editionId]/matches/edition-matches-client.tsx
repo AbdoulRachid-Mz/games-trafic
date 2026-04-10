@@ -73,7 +73,12 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
 
   // Grouping matches by Round
   const roundsMap = new Map<number, any[]>();
+  const unplannedMatches: any[] = [];
+
   for (const m of matches) {
+    if (!m.scheduledTime) {
+      unplannedMatches.push(m);
+    }
     const r = (m.round as number) || 1;
     const arr = roundsMap.get(r) || [];
     arr.push(m);
@@ -138,24 +143,26 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
             <p className="mt-4">Chargement des rencontres...</p>
           </CardContent>
         </Card>
-      ) : rounds.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-            <Calendar className="h-8 w-8 opacity-20" />
-            <p>Aucun match programmé pour cette sélection.</p>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="grid gap-6">
+        <div className="space-y-12">
           {rounds.map(([roundNumber, ms]) => (
-            <div key={roundNumber} className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Typography variant="h4" weight="semibold">
-                  Round {roundNumber}
-                </Typography>
-                <div className="h-px bg-border flex-1" />
+            <div key={roundNumber} className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black border border-primary/20">
+                  {roundNumber}
+                </div>
+                <div>
+                  <Typography variant="h5" weight="bold">
+                    Round {roundNumber}
+                  </Typography>
+                  <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
+                    Étape de compétition
+                  </p>
+                </div>
+                <div className="h-px bg-gradient-to-r from-border to-transparent flex-1" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {ms
                   .sort((a, b) => (a.matchNumber ?? 0) - (b.matchNumber ?? 0))
                   .map((m) => (
@@ -174,6 +181,59 @@ export function EditionMatchesClient({ editionId }: EditionMatchesClientProps) {
               </div>
             </div>
           ))}
+
+          {unplannedMatches.length > 0 && (
+            <div className="space-y-6 pt-8 border-t border-dashed">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 font-black border border-amber-500/20">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <Typography variant="h5" weight="bold" className="text-amber-700">
+                    Matchs non planifiés
+                  </Typography>
+                  <p className="text-xs text-amber-600/70 uppercase tracking-widest font-medium">
+                    À programmer
+                  </p>
+                </div>
+                <div className="h-px bg-gradient-to-r from-amber-500/20 to-transparent flex-1" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {unplannedMatches.map((m) => (
+                  <MatchCard
+                    key={m.id}
+                    match={m}
+                    currentUserId={user?.id}
+                    isAdmin={isOrganizer}
+                    onView={() =>
+                      router.push(
+                        `/tournaments/${m.tournamentId}/editions/${editionId}/matches/${m.id}`,
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {matches.length === 0 && (
+            <Card className="border-dashed py-20 bg-muted/20">
+              <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                  <Trophy className="h-8 w-8 text-muted-foreground/40" />
+                </div>
+                <div className="space-y-1">
+                  <Typography variant="h6" weight="bold">
+                    Aucun match trouvé
+                  </Typography>
+                  <p className="text-sm text-muted-foreground max-w-xs">
+                    Aucun match ne correspond aux filtres sélectionnés pour le moment.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>

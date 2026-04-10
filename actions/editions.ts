@@ -456,18 +456,17 @@ export async function activatePhaseAction(data: {
   tournamentId: string;
 }) {
   try {
-    const { getTournamentPhases } = await import("./tournaments");
-    const { updateTournamentPhase } = await import("./phases");
+    // 1. Deactivate all phases for this edition
+    await db
+      .update(tournamentPhases)
+      .set({ isActive: false })
+      .where(eq(tournamentPhases.editionId, data.editionId));
 
-    const list = await getTournamentPhases({
-      filters: { editionId: data.editionId },
-      options: { sortBy: "order", sortOrder: "asc" },
-      pagination: { page: 1, limit: 500 },
-    });
-
-    for (const p of list.data) {
-      await updateTournamentPhase(p.id, { isActive: p.id === data.id });
-    }
+    // 2. Activate the target phase
+    await db
+      .update(tournamentPhases)
+      .set({ isActive: true })
+      .where(eq(tournamentPhases.id, data.id));
 
     revalidatePath(
       `/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/phases`,

@@ -2,8 +2,9 @@
 
 import React, { useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Lock, Unlock, Loader2 } from "lucide-react";
+import { Lock, Unlock, Loader2, RefreshCcw } from "lucide-react";
 import { updateTournamentPhase } from "@/actions/phases";
+import { MarkCompleteDialog } from "./mark-complete-dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -33,14 +34,14 @@ export function PhaseDetailActions({
         });
     };
 
-    const handleToggleCompleted = () => {
+    const handleReopen = () => {
         startTransition(async () => {
             try {
-                await updateTournamentPhase(phaseId, { isCompleted: !isCompleted });
-                toast.success(isCompleted ? "Phase réouverte" : "Phase terminée");
+                await updateTournamentPhase(phaseId, { isCompleted: false });
+                toast.success("Phase réouverte");
                 router.refresh();
             } catch (error) {
-                toast.error("Erreur lors de la mise à jour");
+                toast.error("Erreur lors de la réouverture");
             }
         });
     };
@@ -58,15 +59,25 @@ export function PhaseDetailActions({
                 )}
                 {isActive ? "Désactiver" : "Activer"}
             </Button>
-            <Button
-                variant={isCompleted ? "outline" : "default"}
-                size="sm"
-                onClick={handleToggleCompleted}
-                disabled={isPending}
-            >
-                {isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                {isCompleted ? "Réouvrir" : "Terminer"}
-            </Button>
+
+            {isCompleted ? (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReopen}
+                    disabled={isPending}
+                >
+                    {isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />}
+                    Réouvrir
+                </Button>
+            ) : (
+                <MarkCompleteDialog
+                    type="PHASE"
+                    id={phaseId}
+                    name="Phase"
+                    onComplete={() => router.refresh()}
+                />
+            )}
         </div>
     );
 }

@@ -1,16 +1,17 @@
 "use client";
 
 import React from "react";
-import {
-  Clock,
-  AlertCircle,
-  CheckCircle2,
-  User,
-  History,
-  Camera,
-  ShieldCheck,
-  Check,
+import { 
+  Clock, 
+  AlertCircle, 
+  CheckCircle2, 
+  User, 
+  History, 
+  Camera, 
+  ShieldCheck, 
+  Check, 
   Trophy,
+  ShieldAlert
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -19,6 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
+import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import { updateMatchResult } from "@/actions/tournaments";
+import { toast } from "sonner";
 
 interface MatchCardProps {
   match: any; // match object with participants, status, scores, etc.
@@ -47,6 +51,22 @@ export function MatchCard({ match, registrations, onView, currentUserId, isAdmin
   );
 
   const canSubmit = (isParticipant || isAdmin) && match.status !== "COMPLETED";
+  const canAdminValidate = isAdmin && match.status !== "COMPLETED";
+
+  const handleAdminValidate = async () => {
+    try {
+      // Use existing scores or 0 if not set
+      const s1 = match.score1 ?? 0;
+      const s2 = match.score2 ?? 0;
+      const winnerId = s1 > s2 ? match.participant1RegistrationId : (s2 > s1 ? match.participant2RegistrationId : null);
+      
+      await updateMatchResult(match.id, s1, s2, winnerId || "", currentUserId || "");
+      toast.success("Match validé par l'administrateur");
+      onUpdate?.();
+    } catch (error: any) {
+      toast.error(error.message || "Erreur lors de la validation");
+    }
+  };
 
   const getStatusBadge = () => {
     switch (match.status) {
@@ -162,7 +182,7 @@ export function MatchCard({ match, registrations, onView, currentUserId, isAdmin
 
         {/* Score / VS */}
         <div className={scoreCenter}>
-          <div className={cn("flex items-center justify-center rounded-lg bg-slate-50 font-bold border-2 transition-colors", scoreBoxSize, match.status === "COMPLETED" ? "border-slate-200" : "border-transparent")}>
+          <div className={cn("flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors", scoreBoxSize, match.status === "COMPLETED" ? "border-slate-200" : "border-transparent")}>
             {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
           </div>
           {isList ? (
@@ -170,7 +190,7 @@ export function MatchCard({ match, registrations, onView, currentUserId, isAdmin
           ) : (
             <span className="text-sm font-medium text-muted-foreground">vs</span>
           )}
-          <div className={cn("flex items-center justify-center rounded-lg bg-slate-50 font-bold border-2 transition-colors", scoreBoxSize, match.status === "COMPLETED" ? "border-slate-200" : "border-transparent")}>
+          <div className={cn("flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors", scoreBoxSize, match.status === "COMPLETED" ? "border-slate-200" : "border-transparent")}>
             {match.status === "PENDING" ? "-" : (match.score2 ?? 0)}
           </div>
           {match.status === "COMPLETED" && !isCompact && (
@@ -202,10 +222,10 @@ export function MatchCard({ match, registrations, onView, currentUserId, isAdmin
       </div>
 
       {/* Action button */}
-      <div className={buttonWrapper}>
+      <div className={cn(buttonWrapper, "flex gap-2")}>
         <Link 
           href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}${canSubmit ? "?submit=true" : ""}`} 
-          className="w-full"
+          className="flex-1"
         >
           <Button 
             variant={canSubmit ? "default" : "outline"} 
@@ -226,6 +246,20 @@ export function MatchCard({ match, registrations, onView, currentUserId, isAdmin
             )}
           </Button>
         </Link>
+
+        {canAdminValidate && (
+          <ConfirmationDialog
+            title="Validation Administrateur"
+            description={`Êtes-vous sûr de vouloir valider officiellement ce score (${match.score1 ?? 0} - ${match.score2 ?? 0}) ? Cette action est irréversible.`}
+            onConfirm={handleAdminValidate}
+            confirmLabel="Valider le score"
+            variant="default"
+          >
+            <Button size="icon" variant="outline" className="shrink-0 border-primary/20 text-primary hover:bg-primary/5" title="Validation Admin">
+              <ShieldAlert className="h-4 w-4" />
+            </Button>
+          </ConfirmationDialog>
+        )}
       </div>
 
       {/* Proof indicator */}
