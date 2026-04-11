@@ -24,7 +24,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import type {
   BracketNode,
@@ -126,7 +125,7 @@ export default function ClientBracketNodeDetailPage({
 
   // Handler pour le rafraîchissement
   const handleRefresh = () => {
-    revalidatePath(`${basePath}/brackets/${bracketId}`);
+    // revalidatePath(`${basePath}/brackets/${bracketId}`);
     window.location.reload();
   };
 
@@ -134,7 +133,7 @@ export default function ClientBracketNodeDetailPage({
   const handleDeleteMatch = async (matchId: string) => {
     try {
       await deleteMatch(matchId);
-      revalidatePath(`${basePath}/brackets/${bracketId}`);
+    //   revalidatePath(`${basePath}/brackets/${bracketId}`);
       toast.success("Match supprimé avec succès");
       handleRefresh();
     } catch (error) {
