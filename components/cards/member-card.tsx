@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { useScreenSize } from "@/hooks/use-screen";
 import { useRouter } from "next/navigation";
 import { ActiveLink } from "../shared/active-link";
+import Link from "next/link";
 
 interface MemberCardProps {
   member: TournamentMemberWithRelations;
@@ -164,13 +165,12 @@ export function MemberCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                {actions?.onViewProfile && (
-                  <DropdownMenuItem
-                    onClick={() => actions.onViewProfile!(member.id)}
-                  >
+                <DropdownMenuItem asChild>
+                  <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
+                    <Eye className="h-4 w-4 mr-2" />
                     Voir le profil
-                  </DropdownMenuItem>
-                )}
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
                   disabled={!member.userId || isMe}
@@ -300,10 +300,12 @@ export function MemberCard({
             variant="secondary"
             size="sm"
             className="w-full font-bold h-9 bg-primary/5 hover:bg-primary/10 text-primary border-none"
-            onClick={() => actions?.onViewProfile?.(member.id)}
+            asChild
           >
-            <Eye className="w-3 h-3 mr-2" />
-            Profil
+            <ActiveLink href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
+              <Eye className="w-3 h-3 mr-2" />
+              Profil
+            </ActiveLink>
           </Button>
 
           {(member.contactPhone || user?.phoneNumber) && (

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import {
   getClaimById,
   getClaims,
@@ -11,15 +11,15 @@ import {
   deleteClaim,
   restoreClaim,
   addClaimEvidence,
-} from '@/actions/claims';
-import { getCurrentUser } from '@/lib/auth/session';
-import { type ClaimFilters, type ListQuery } from '@/types/api';
+} from "@/actions/claims";
+import { getCurrentUser } from "@/lib/auth/session";
+import { type ClaimFilters, type ListQuery } from "@/types/api";
 
 // ---------- Schemas de validation ----------
 const createClaimSchema = z.object({
   userId: z.string().uuid(),
   transactionId: z.string().uuid().optional(),
-  type: z.enum(['PAYMENT', 'ACCOUNT', 'TECHNICAL', 'OTHER']),
+  type: z.enum(["PAYMENT", "ACCOUNT", "TECHNICAL", "OTHER"]),
   title: z.string().min(1),
   description: z.string().min(1),
   evidence: z.string().optional(),
@@ -27,7 +27,7 @@ const createClaimSchema = z.object({
 });
 
 const updateClaimSchema = z.object({
-  type: z.enum(['PAYMENT', 'ACCOUNT', 'TECHNICAL', 'OTHER']).optional(),
+  type: z.enum(["PAYMENT", "ACCOUNT", "TECHNICAL", "OTHER"]).optional(),
   title: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
   evidence: z.string().optional(),
@@ -35,7 +35,7 @@ const updateClaimSchema = z.object({
 });
 
 const statusSchema = z.object({
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REJECTED']),
+  status: z.enum(["PENDING", "IN_PROGRESS", "RESOLVED", "CLOSED", "REJECTED"]),
   resolution: z.string().optional(),
 });
 
@@ -46,26 +46,27 @@ const evidenceSchema = z.object({
 
 // ---------- Helpers ----------
 function buildListQuery(url: URL): ListQuery<ClaimFilters> {
-  const page = Number(url.searchParams.get('page') ?? 1);
-  const limit = Number(url.searchParams.get('limit') ?? 50);
-  const sortBy = url.searchParams.get('sortBy') ?? undefined;
-  const sortOrder = url.searchParams.get('sortOrder') === 'desc' ? 'desc' : 'asc';
-  const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
+  const page = Number(url.searchParams.get("page") ?? 1);
+  const limit = Number(url.searchParams.get("limit") ?? 50);
+  const sortBy = url.searchParams.get("sortBy") ?? undefined;
+  const sortOrder =
+    url.searchParams.get("sortOrder") === "desc" ? "desc" : "asc";
+  const includeDeleted = url.searchParams.get("includeDeleted") === "true";
 
   const filters: ClaimFilters = {
-    userId: url.searchParams.get('userId') ?? undefined,
-    transactionId: url.searchParams.get('transactionId') ?? undefined,
-    type: url.searchParams.get('type') ?? undefined,
-    title: url.searchParams.get('title') ?? undefined,
-    status: url.searchParams.getAll('status'),
-    hasEvidence: url.searchParams.has('hasEvidence')
-      ? url.searchParams.get('hasEvidence') === 'true'
+    userId: url.searchParams.get("userId") ?? undefined,
+    transactionId: url.searchParams.get("transactionId") ?? undefined,
+    type: url.searchParams.get("type") ?? undefined,
+    title: url.searchParams.get("title") ?? undefined,
+    status: url.searchParams.getAll("status"),
+    hasEvidence: url.searchParams.has("hasEvidence")
+      ? url.searchParams.get("hasEvidence") === "true"
       : undefined,
-    hasImage: url.searchParams.has('hasImage')
-      ? url.searchParams.get('hasImage') === 'true'
+    hasImage: url.searchParams.has("hasImage")
+      ? url.searchParams.get("hasImage") === "true"
       : undefined,
-    createdFrom: url.searchParams.get('createdFrom') ?? undefined,
-    createdTo: url.searchParams.get('createdTo') ?? undefined,
+    createdFrom: url.searchParams.get("createdFrom") ?? undefined,
+    createdTo: url.searchParams.get("createdTo") ?? undefined,
   };
 
   return {
@@ -79,17 +80,19 @@ function buildListQuery(url: URL): ListQuery<ClaimFilters> {
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
-    const id = url.searchParams.get('id');
-    const stats = url.searchParams.has('stats');
-    const userId = url.searchParams.get('userId');
+    const id = url.searchParams.get("id");
+    const stats = url.searchParams.has("stats");
+    const userId = url.searchParams.get("userId");
 
     if (id) {
-      const populate = url.searchParams.getAll('populate');
+      const populate = url.searchParams.getAll("populate");
       const claim = await getClaimById(id, { populate });
-      if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
+      if (!claim)
+        return NextResponse.json({ error: "Claim not found" }, { status: 404 });
       return NextResponse.json(claim);
     }
 
@@ -109,87 +112,118 @@ export async function GET(req: NextRequest) {
     const result = await getClaims(query);
     return NextResponse.json(result);
   } catch (err: any) {
-    console.error('[GET] /api/claims error:', err);
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    console.error("[GET] /api/claims error:", err);
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
     const data = createClaimSchema.parse(body);
     const claim = await createClaim(data);
     return NextResponse.json(claim, { status: 201 });
   } catch (err: any) {
-    console.error('[POST] /api/claims error:', err);
+    console.error("[POST] /api/claims error:", err);
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation error', issues: err.issues }, { status: 400 });
+      return NextResponse.json(
+        { error: "Validation error", issues: err.issues },
+        { status: 400 },
+      );
     }
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
-    const id = url.searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Missing claim id' }, { status: 400 });
+    const id = url.searchParams.get("id");
+    if (!id)
+      return NextResponse.json({ error: "Missing claim id" }, { status: 400 });
 
     const body = await req.json();
     const data = updateClaimSchema.parse(body);
     const claim = await updateClaim(id, data);
     return NextResponse.json(claim);
   } catch (err: any) {
-    console.error('[PATCH] /api/claims error:', err);
+    console.error("[PATCH] /api/claims error:", err);
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation error', issues: err.issues }, { status: 400 });
+      return NextResponse.json(
+        { error: "Validation error", issues: err.issues },
+        { status: 400 },
+      );
     }
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function PUT(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
-    const id = url.searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Missing claim id' }, { status: 400 });
+    const id = url.searchParams.get("id");
+    if (!id)
+      return NextResponse.json({ error: "Missing claim id" }, { status: 400 });
 
     const body = await req.json();
     const { status, resolution } = statusSchema.parse(body);
     const claim = await updateClaimStatus(id, status, resolution);
     return NextResponse.json(claim);
   } catch (err: any) {
-    console.error('[PUT] /api/claims error:', err);
+    console.error("[PUT] /api/claims error:", err);
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Validation error', issues: err.issues }, { status: 400 });
+      return NextResponse.json(
+        { error: "Validation error", issues: err.issues },
+        { status: 400 },
+      );
     }
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
-    const id = url.searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Missing claim id' }, { status: 400 });
+    const id = url.searchParams.get("id");
+    if (!id)
+      return NextResponse.json({ error: "Missing claim id" }, { status: 400 });
 
     const claim = await deleteClaim(id);
     return NextResponse.json(claim);
   } catch (err: any) {
-    console.error('[DELETE] /api/claims error:', err);
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    console.error("[DELETE] /api/claims error:", err);
+    return NextResponse.json(
+      { error: err.message || "Server error" },
+      { status: 500 },
+    );
   }
 }
 

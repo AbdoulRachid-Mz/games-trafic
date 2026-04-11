@@ -33,11 +33,12 @@ const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: s
 export default async function PhaseDetailPage({ params }: PageProps) {
   const { tournamentId, editionId, phaseId } = await params;
 
-  const phaseRes = await getTournamentPhases({
-    filters: { id: phaseId },
-    pagination: { page: 1, limit: 1 },
+  const allPhasesRes = await getTournamentPhases({
+    filters: { editionId },
+    options: { sortBy: "order", sortOrder: "asc" },
   });
-  const phase = phaseRes.data[0] as TournamentPhase | undefined;
+  const allPhases = allPhasesRes.data;
+  const phase = allPhases.find((p) => p.id === phaseId);
 
   const groupsRes = await getPhaseGroups({
     filters: { phaseId },
@@ -124,7 +125,11 @@ export default async function PhaseDetailPage({ params }: PageProps) {
               </Typography>
             </div>
           </div>
-          <CreateGroupDialog phaseId={phaseId} nextOrder={groupsRes.data.length + 1} />
+          <CreateGroupDialog 
+            phaseId={phaseId} 
+            nextOrder={groupsRes.data.length + 1} 
+            previousPhases={allPhases.filter(p => (p.order || 0) < (phase?.order || 0)).map(p => ({ id: p.id, name: p.name || `Phase ${p.order}` }))}
+          />
         </CardHeader>
         <CardContent className="p-3">
           {groupsRes.data.length === 0 ? (

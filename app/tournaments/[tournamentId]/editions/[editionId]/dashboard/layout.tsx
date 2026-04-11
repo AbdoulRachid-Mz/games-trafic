@@ -24,7 +24,8 @@ import {
   Wallet,
   ListTree,
   LayoutGrid,
-  GitBranch
+  GitBranch,
+  UserCog
 } from "lucide-react";
 import { useActiveRoute } from "@/hooks/use-active-route";
 
@@ -80,6 +81,11 @@ export default function EditionDashboardLayout({
       icon: Users,
     },
     {
+      title: "Organisation participants",
+      url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants/organize`,
+      icon: UserCog,
+    },
+    {
       title: "Phases & Arbre",
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`,
       icon: ListTree,
@@ -126,6 +132,7 @@ export default function EditionDashboardLayout({
   );
   const editionManage = navData.filter(i =>
     i.url.endsWith(`/participants`) ||
+    i.url.endsWith(`/participants/organize`) ||
     i.url.endsWith(`/payments`) ||
     i.url.endsWith(`/settings`)
   );

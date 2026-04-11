@@ -27,6 +27,7 @@ import {
   getPhaseGroupParticipants,
   getBracketNodes,
   recalculateGroupStandings,
+  getTournamentPhases,
 } from "@/actions/phases";
 import { getEditionRegistrations } from "@/actions/tournaments";
 import { revalidatePath } from "next/cache";
@@ -90,25 +91,33 @@ export default async function GroupDetailPage({ params }: PageProps) {
 
   const participants = participantsRes.data as PhaseGroupParticipant[];
   const allRegs = regsRes.data as any[];
+  
+  // ─── Fetch Previous Phases & Qualified Participants ───────────────────────
+  const allPhasesRes = await getTournamentPhases({
+    filters: { editionId },
+    options: { sortBy: "order", sortOrder: "asc" },
+  });
+  const allPhases = allPhasesRes.data;
+  const currentPhaseOrder = (group?.phase as any)?.order || 0;
+  const previousPhases = allPhases.filter(p => (p.order || 0) < currentPhaseOrder);
 
-  // Determine allowed registrations for this phase
-  let allowedRegs = allRegs;
-  const phaseConfig = (group?.phase as any)?.config || {};
-  const source = phaseConfig.participantSource || "EDITION";
-
-  if (source.startsWith("PHASE_")) {
-    const sourcePhaseId = source.replace("PHASE_", "");
-    // Fetch qualified from source phase
-    const sourceParticipants = await getPhaseGroupParticipants({
-      filters: { phaseId: sourcePhaseId, qualified: true },
+  // Fetch qualified participants for each previous phase
+  const qualifiedByPhase: Record<string, { name: string, registrationIds: string[] }> = {};
+  
+  for (const phase of previousPhases) {
+    const qParticipants = await getPhaseGroupParticipants({
+      filters: { phaseId: phase.id, qualified: true },
       pagination: { limit: 1000, page: 1 },
     });
-    const qualifiedIds = (sourceParticipants.data as any[]).map(
-      (p) => p.registrationId,
-    );
-
-    allowedRegs = allRegs.filter((r) => qualifiedIds.includes(r.id));
+    qualifiedByPhase[phase.id] = {
+      name: phase.name || `Phase ${phase.order}`,
+      registrationIds: (qParticipants.data as any[]).map(p => p.registrationId),
+    };
   }
+
+  // Determine source from phase config
+  const phaseConfig = (group?.phase as any)?.config || {};
+  const participantSource = phaseConfig.participantSource || "EDITION";
 
   // Sort by points DESC, then goal diff, then goals scored
   const standings = [...participants].sort((a, b) => {
@@ -174,7 +183,7 @@ export default async function GroupDetailPage({ params }: PageProps) {
             </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full">
+        <div className="flex items-center flex-wrap gap-2 w-full">
           <GenerateGroupMatchesDialog
             groupId={groupId}
             editionId={editionId}
@@ -344,9 +353,11 @@ export default async function GroupDetailPage({ params }: PageProps) {
         <GroupParticipantsManagement
           groupId={groupId}
           editionId={editionId}
-          allEditionRegistrations={allowedRegs}
+          allEditionRegistrations={allRegs}
           groupParticipants={participants}
           maxParticipants={group?.participantCount || 0}
+          previousPhasesData={qualifiedByPhase}
+          defaultSource={participantSource}
         />
 
         {/* Bracket Nodes */}

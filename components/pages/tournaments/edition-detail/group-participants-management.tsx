@@ -56,6 +56,8 @@ interface GroupParticipantsManagementProps {
   allEditionRegistrations: any[];
   groupParticipants: any[];
   maxParticipants?: number;
+  previousPhasesData?: Record<string, { name: string, registrationIds: string[] }>;
+  defaultSource?: string;
 }
 
 export function GroupParticipantsManagement({
@@ -64,10 +66,13 @@ export function GroupParticipantsManagement({
   allEditionRegistrations,
   groupParticipants,
   maxParticipants = 0,
+  previousPhasesData = {},
+  defaultSource = "EDITION",
 }: GroupParticipantsManagementProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterSource, setFilterSource] = useState<string>(defaultSource);
   const [confirmAction, setConfirmAction] = useState<{ type: 'add' | 'remove', id: string, name: string, regId?: string } | null>(null);
   
   // Draft State
@@ -79,7 +84,16 @@ export function GroupParticipantsManagement({
   
   // Participants to show on the left (Available)
   const availableList = useMemo(() => {
-    return allEditionRegistrations.filter(reg => {
+    // 1. Get registrations based on filterSource
+    let sourceRegs = allEditionRegistrations;
+    if (filterSource.startsWith("PHASE_")) {
+      const sourcePhaseId = filterSource.replace("PHASE_", "");
+      const qualifiedIds = previousPhasesData[sourcePhaseId]?.registrationIds || [];
+      sourceRegs = allEditionRegistrations.filter(r => qualifiedIds.includes(r.id));
+    }
+
+    // 2. Filter out those already in the group or draft
+    return sourceRegs.filter(reg => {
       const isCurrentlyInGroup = currentGroupParticipantIds.has(reg.id);
       const isDraftAdded = draftAddIds.has(reg.id);
       const isDraftRemoved = groupParticipants.find(p => p.registrationId === reg.id && draftRemoveIds.has(p.id));
@@ -89,10 +103,11 @@ export function GroupParticipantsManagement({
       if (!isCurrentlyInGroup && isDraftAdded) return false;
 
       const nameMatch = reg.member?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        reg.member?.user?.username?.toLowerCase().includes(searchQuery.toLowerCase());
+                        reg.member?.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        reg.member?.team?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       return nameMatch;
     });
-  }, [allEditionRegistrations, currentGroupParticipantIds, draftAddIds, draftRemoveIds, groupParticipants, searchQuery]);
+  }, [allEditionRegistrations, filterSource, previousPhasesData, currentGroupParticipantIds, draftAddIds, groupParticipants, draftRemoveIds, searchQuery]);
 
   // Participants to show on the right (Group)
   const groupList = useMemo(() => {
@@ -190,9 +205,9 @@ export function GroupParticipantsManagement({
   return (
     <div className="space-y-6">
       {/* Control Bar */}
-      <div className="flex items-center justify-between bg-card p-4 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-4 flex-1 max-w-md">
-          <div className="relative flex-1">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-card p-4 rounded-xl border shadow-sm gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1 w-full max-w-2xl">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Filtrer les participants..." 
@@ -200,6 +215,21 @@ export function GroupParticipantsManagement({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold whitespace-nowrap text-muted-foreground uppercase tracking-widest">Source:</span>
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className="h-10 px-3 py-1 rounded-md border bg-background text-sm min-w-[150px] font-medium"
+            >
+              <option value="EDITION">Tous les participants</option>
+              {Object.entries(previousPhasesData).map(([id, data]) => (
+                <option key={id} value={`PHASE_${id}`}>
+                   Qualifiés: {data.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="flex items-center gap-3">

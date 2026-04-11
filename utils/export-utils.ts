@@ -43,6 +43,7 @@ export interface ExportConfig {
   // Métadonnées de l'application
   appInfo?: {
     name?: string
+    logo?: string
     version?: string
     contact?: {
       email: string
@@ -78,12 +79,13 @@ export interface ExportData {
 
 // Configuration par défaut de l'application
 export const DEFAULT_APP_INFO = {
-  name: "Game Trading Club",
-  version: "1.0.0",
+  name: "Game Trafics",
+  logo: "/icons/gt-primary.png",
+  version: "2.0.0",
   contact: {
-    email: "contact@gametradingclub.com",
-    phone: "+33 1 23 45 67 89",
-    address: "123 Rue du Gaming, 75000 Paris, France"
+    email: "[EMAIL_ADDRESS]",
+    phone: "+221 78 274 40 23",
+    address: "Tahoua, Niger"
   }
 }
 
@@ -320,6 +322,7 @@ export const exportToPDF = async (
       // Logo (si fourni)
       if (config.header.logo) {
         // Ici vous pourriez ajouter le logo - pour l'instant on laisse l'espace
+        doc.addImage(config.header.logo, 'PNG', margin, yPosition, 30, 30)
         yPosition += 15
       }
 

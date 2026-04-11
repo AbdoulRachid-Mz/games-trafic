@@ -98,6 +98,8 @@ import {
 import { TournamentCard } from "@/components/cards/tournament-card";
 import { StatsCard } from "@/components/ui/stats-card";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
+import Link from "next/link";
+import { ResponsiveTabs, type ResponsiveTab } from "@/components/ui/responsive-tabs";
 
 export function TournamentPageContent({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
@@ -212,8 +214,15 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
   
   const editions = tournament?.editions || [];
   const members = (tournament?.members as TournamentMember[]) || [];
+  
+  const tournamentTabs: ResponsiveTab[] = [
+    { value: "overview", label: "Aperçu", icon: <Eye className="h-4 w-4" /> },
+    { value: "editions", label: "Éditions", icon: <Calendar className="h-4 w-4" /> },
+    { value: "members", label: "Membres", icon: <Users2 className="h-4 w-4" /> },
+    { value: "comments", label: "Commentaires", icon: <MessageCircle className="h-4 w-4" /> },
+  ];
 
-  const displayedEditions = showAllEditions ? editions : editions.slice(0, 6);
+  const displayedEditions = editions.slice(0, 5);
   const displayedMembers = showAllMembers ? members : members.slice(0, 12);
 
   const handleJoinTournament = () => {
@@ -708,36 +717,14 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
           {/* Main Content Area */}
           <div className="lg:col-span-3">
             {/* Navigation Tabs */}
-            <Card className="mb-4 p-3">
-              <CardContent className="p-2">
-                <Tabs
-                  value={activeTab}
-                  onValueChange={setActiveTab}
-                  className="w-full"
-                >
-                  <TabsList className="grid grid-cols-4 w-full">
-                    <TabsTrigger value="overview" className="gap-2">
-                      <Eye className="h-4 w-4" />
-                      Aperçu
-                    </TabsTrigger>
-                    <TabsTrigger value="editions" className="gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Éditions
-                    </TabsTrigger>
-                    <TabsTrigger value="members" className="gap-2">
-                      <Users2 className="h-4 w-4" />
-                      Membres
-                    </TabsTrigger>
-                    {/* <TabsTrigger value="rules" className="gap-2">
-                      <Shield className="h-4 w-4" />
-                      Règles
-                    </TabsTrigger> */}
-                    <TabsTrigger value="comments" className="gap-2">
-                      <MessageCircle className="h-4 w-4" />
-                      Commentaires
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+            <Card className="mb-4 p-3 overflow-visible">
+              <CardContent className="p-0">
+                <ResponsiveTabs
+                   tabs={tournamentTabs}
+                   defaultValue={activeTab}
+                   onValueChange={setActiveTab}
+                   className="w-full"
+                />
               </CardContent>
             </Card>
 
@@ -1087,22 +1074,17 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
                   </div>
 
                   {/* Load More */}
-                  {editions.length > 6 && (
+                  {editions.length > 5 && (
                     <div className="text-center pt-6">
                       <Button
                         variant="outline"
-                        onClick={() => setShowAllEditions(!showAllEditions)}
+                        asChild
                         className="gap-2"
                       >
-                        {showAllEditions
-                          ? "Voir moins"
-                          : "Voir toutes les éditions"}
-                        <ChevronRight
-                          className={cn(
-                            "h-4 w-4 transition-transform",
-                            showAllEditions && "rotate-90",
-                          )}
-                        />
+                        <Link href={`/tournaments/${tournamentId}/editions`}>
+                          Voir toutes les éditions
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
                       </Button>
                     </div>
                   )}

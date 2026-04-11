@@ -132,7 +132,7 @@ export function ParticipantsOrganizeClient({
                 <Input 
                   type="number"
                   value={count}
-                  onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setCount(parseInt(e.target.value) || 0)}
                 />
               </div>
 

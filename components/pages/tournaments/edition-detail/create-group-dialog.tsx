@@ -11,23 +11,27 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
-import { createPhaseGroup } from "@/actions/phases";
+import { createPhaseGroup, getPhaseGroupParticipants, bulkCreatePhaseGroupParticipants } from "@/actions/phases";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CreateGroupDialogProps {
     phaseId: string;
     nextOrder: number;
+    previousPhases?: { id: string; name: string }[];
 }
 
 export function CreateGroupDialog({
     phaseId,
     nextOrder,
+    previousPhases = [],
 }: CreateGroupDialogProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
     const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -46,7 +50,7 @@ export function CreateGroupDialog({
         const matchesPerParticipant = parseInt(formData.get("matchesPerParticipant") as string) || 1;
 
         try {
-            await createPhaseGroup({
+            const newGroup = await createPhaseGroup({
                 phaseId,
                 name,
                 order: nextOrder,
@@ -60,8 +64,33 @@ export function CreateGroupDialog({
                 } as any
             } as any);
 
+            // Auto-add participants if selected
+            if (selectedPhases.length > 0 && newGroup?.id) {
+                const qualifiedRegIds = new Set<string>();
+                
+                await Promise.all(selectedPhases.map(async (pId) => {
+                    const res = await getPhaseGroupParticipants({
+                        filters: { phaseId: pId, qualified: true },
+                        pagination: { limit: 1000, page: 1 }
+                    });
+                    res.data.forEach((p: any) => {
+                        if (p.registrationId) qualifiedRegIds.add(p.registrationId);
+                    });
+                }));
+
+                if (qualifiedRegIds.size > 0) {
+                    await bulkCreatePhaseGroupParticipants(
+                        Array.from(qualifiedRegIds).map(regId => ({
+                            groupId: newGroup.id,
+                            registrationId: regId,
+                        } as any))
+                    );
+                }
+            }
+
             toast.success("Groupe créé avec succès");
             setOpen(false);
+            setSelectedPhases([]);
             router.refresh();
         } catch (error: any) {
             toast.error(error.message || "Erreur lors de la création");
@@ -133,6 +162,38 @@ export function CreateGroupDialog({
                             <Input type="number" id="matchesPerParticipant" name="matchesPerParticipant" defaultValue={1} />
                         </div>
                     </div>
+
+                    {previousPhases.length > 0 && (
+                        <div className="space-y-3 p-4 border rounded-lg bg-primary/5">
+                            <Label className="text-xs font-bold uppercase tracking-widest text-primary">Auto-seeding (Qualifiés)</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {previousPhases.map((phase) => (
+                                    <div key={phase.id} className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id={`phase-${phase.id}`} 
+                                            checked={selectedPhases.includes(phase.id)}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                    setSelectedPhases(prev => [...prev, phase.id]);
+                                                } else {
+                                                    setSelectedPhases(prev => prev.filter(id => id !== phase.id));
+                                                }
+                                            }}
+                                        />
+                                        <label
+                                            htmlFor={`phase-${phase.id}`}
+                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                        >
+                                            Ajouter les qualifiés de: {phase.name}
+                                        </label>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground italic">
+                                Les participants qualifiés de ces phases seront automatiquement ajoutés à ce groupe.
+                            </p>
+                        </div>
+                    )}
 
                     <DialogFooter>
                         <Button
