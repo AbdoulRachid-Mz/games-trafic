@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter
+  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ import {
   X,
   Users,
   LayoutGrid,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -50,11 +50,15 @@ export function PhaseOrganizeClient({
 }: PhaseOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  
+
   // Generation parameters
-  const [groupsCount, setGroupsCount] = useState(Math.ceil(sourceParticipants.length / 4) || 1);
+  const [groupsCount, setGroupsCount] = useState(
+    Math.ceil(sourceParticipants.length / 4) || 1,
+  );
   const [participantsPerGroup, setParticipantsPerGroup] = useState(4);
-  const [seedingMethod, setSeedingMethod] = useState<'RANDOM' | 'SEQUENTIAL' | 'SNAKE'>('RANDOM');
+  const [seedingMethod, setSeedingMethod] = useState<
+    "RANDOM" | "SEQUENTIAL" | "SNAKE"
+  >("RANDOM");
   const [generateMatches, setGenerateMatches] = useState(true);
   const [groupPrefix, setGroupPrefix] = useState("Groupe");
 
@@ -65,16 +69,22 @@ export function PhaseOrganizeClient({
           groupsCount,
           participantsPerGroup,
           seedingMethod,
+          generateGroups: true,
+          generateNodes: true,
           generateMatches,
-          groupPrefix
+          groupPrefix,
+          participantIds: sourceParticipants.map((p) => p.id),
+          isHomeAway: false,
         });
-        
+
         if (result.success) {
           toast.success(`${result.groupsCount} groupes générés avec succès.`);
           router.refresh();
         }
       } catch (error: any) {
-        toast.error(error.message || "Erreur lors de la génération automatique.");
+        toast.error(
+          error.message || "Erreur lors de la génération automatique.",
+        );
       }
     });
   };
@@ -82,7 +92,10 @@ export function PhaseOrganizeClient({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`} className="hover:text-primary transition-colors">
+        <Link
+          href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phaseId}`}
+          className="hover:text-primary transition-colors"
+        >
           {phaseName}
         </Link>
         <ChevronRight className="h-4 w-4" />
@@ -103,9 +116,11 @@ export function PhaseOrganizeClient({
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
               <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Préfixe des groupes</label>
-                <input 
-                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm" 
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Préfixe des groupes
+                </label>
+                <input
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm"
                   value={groupPrefix}
                   onChange={(e) => setGroupPrefix(e.target.value)}
                 />
@@ -113,28 +128,38 @@ export function PhaseOrganizeClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Nb de Groupes</label>
-                  <input 
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Nb de Groupes
+                  </label>
+                  <input
                     type="number"
-                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm" 
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm"
                     value={groupsCount}
-                    onChange={(e) => setGroupsCount(parseInt(e.target.value) || 1)}
+                    onChange={(e) =>
+                      setGroupsCount(parseInt(e.target.value) || 1)
+                    }
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Part. / Groupe</label>
-                  <input 
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Part. / Groupe
+                  </label>
+                  <input
                     type="number"
-                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm" 
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm"
                     value={participantsPerGroup}
-                    onChange={(e) => setParticipantsPerGroup(parseInt(e.target.value) || 1)}
+                    onChange={(e) =>
+                      setParticipantsPerGroup(parseInt(e.target.value) || 1)
+                    }
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Méthode de Seeding</label>
-                <select 
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Méthode de Seeding
+                </label>
+                <select
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm"
                   value={seedingMethod}
                   onChange={(e) => setSeedingMethod(e.target.value as any)}
@@ -146,22 +171,28 @@ export function PhaseOrganizeClient({
               </div>
 
               <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   id="gen-matches"
                   checked={generateMatches}
                   onChange={(e) => setGenerateMatches(e.target.checked)}
                 />
-                <label htmlFor="gen-matches" className="text-sm font-medium">Générer les matches immédiatement</label>
+                <label htmlFor="gen-matches" className="text-sm font-medium">
+                  Générer les matches immédiatement
+                </label>
               </div>
             </CardContent>
             <CardFooter className="pt-4 border-t bg-muted/30">
-              <Button 
-                className="w-full gap-2 font-bold" 
+              <Button
+                className="w-full gap-2 font-bold"
                 onClick={handleAutoGenerate}
                 disabled={isPending || sourceParticipants.length === 0}
               >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCcw className="h-4 w-4" />
+                )}
                 Générer la Structure
               </Button>
             </CardFooter>
@@ -174,8 +205,12 @@ export function PhaseOrganizeClient({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="text-2xl font-black text-primary">{sourceParticipants.length}</div>
-              <p className="text-xs text-muted-foreground">Participants disponibles pour cette phase.</p>
+              <div className="text-2xl font-black text-primary">
+                {sourceParticipants.length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Participants disponibles pour cette phase.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -185,7 +220,8 @@ export function PhaseOrganizeClient({
           <Card className="border-none shadow-xl">
             <CardHeader className="border-b">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <LayoutGrid className="h-4 w-4 text-primary" /> Structure Actuelle
+                <LayoutGrid className="h-4 w-4 text-primary" /> Structure
+                Actuelle
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
@@ -193,23 +229,38 @@ export function PhaseOrganizeClient({
                 <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-40 border-2 border-dashed rounded-xl">
                   <LayoutGrid className="h-12 w-12 mb-3" />
                   <p className="text-sm font-medium">Aucun groupe configuré</p>
-                  <p className="text-xs">Utilisez l'auto-génération ou créez des groupes manuellement.</p>
+                  <p className="text-xs">
+                    Utilisez l'auto-génération ou créez des groupes
+                    manuellement.
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {existingGroups.map((group) => (
-                    <div key={group.id} className="p-4 border rounded-xl hover:border-primary/50 transition-colors">
+                    <div
+                      key={group.id}
+                      className="p-4 border rounded-xl hover:border-primary/50 transition-colors"
+                    >
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-bold text-sm">{group.name}</span>
-                        <Badge variant="outline" className="text-[10px]">ORDRE {group.order}</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          ORDRE {group.order}
+                        </Badge>
                       </div>
                       <div className="flex items-center gap-4 text-[10px] text-muted-foreground uppercase font-medium">
                         <span>{group.participantCount || 0} Participants</span>
                         <span>{group.matchCount || 0} Matches</span>
                       </div>
                       <div className="mt-4">
-                        <Button variant="ghost" size="sm" className="w-full text-[10px] h-7 gap-1" asChild>
-                          <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-[10px] h-7 gap-1"
+                          asChild
+                        >
+                          <Link
+                            href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}`}
+                          >
                             Gérer le groupe <ChevronRight className="h-3 w-3" />
                           </Link>
                         </Button>
