@@ -31,6 +31,7 @@ import { createShop } from "@/actions/shops";
 import { getCurrentUserWallet } from "@/actions/wallets";
 import { useScreenSize } from "@/hooks/use-screen";
 import { useUserProfile } from "@/hooks/use-profile";
+import Image from "next/image";
 
 export default function CreateShopPage() {
   const router = useRouter();
@@ -45,12 +46,12 @@ export default function CreateShopPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [createdShopId, setCreatedShopId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: "",
+    name: user ? `Boutique de ${user?.fullName || ""}` : "",
     description: "",
-    profileImage: "",
-    coverImage: "",
-    country: "",
-    phoneNumber: "",
+    profileImage: "/icons/shop.png",
+    coverImage: "/images/icons/background/efootball.jpg",
+    country: user?.country || "",
+    phoneNumber: (user?.countryCode ?? "") + (user?.phoneNumber ?? "") || "",
     category: "gaming",
   });
 
@@ -86,7 +87,7 @@ export default function CreateShopPage() {
 
     if (!hasWallet) {
       setErrorMessage(
-        "Vous devez créer un wallet avant de pouvoir créer une boutique"
+        "Vous devez créer un wallet avant de pouvoir créer une boutique",
       );
       setShowErrorDialog(true);
       return;
@@ -154,15 +155,52 @@ export default function CreateShopPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Store className="h-10 w-10 text-primary" />
-              </div>
               <Typography variant="h2" weight="bold" gradient className="mb-2">
                 Images de la boutique
               </Typography>
               <Typography variant="body-base" theme="muted">
                 Ajoutez une photo de profil et une bannière
               </Typography>
+            </div>
+
+            {/* Zone d'upload superposés : cover en fond, profile en absolute centré en bas */}
+            <div className="relative w-full max-w-2xl mx-auto mb-8">
+              {/* Upload Cover (fond) */}
+              <div className="relative h-48 rounded-2xl overflow-hidden border border-border">
+                <AdvancedUpload
+                  value={formData.coverImage}
+                  onChange={(url) =>
+                    setFormData({ ...formData, coverImage: url })
+                  }
+                  maxSizeMB={3}
+                  className="absolute inset-0"
+                />
+                {!formData.coverImage && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                    <Store className="h-16 w-16 text-primary/30" />
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Profile (superposé) */}
+              <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2">
+                <div className="relative">
+                  <AdvancedUpload
+                    value={formData.profileImage}
+                    onChange={(url) =>
+                      setFormData({ ...formData, profileImage: url })
+                    }
+                    isRounded={true}
+                    maxSizeMB={2}
+                    className="w-24 h-24"
+                  />
+                  {!formData.profileImage && (
+                    <div className="absolute inset-0 rounded-full bg-primary/10 flex items-center justify-center border-4 border-background">
+                      <Store className="h-10 w-10 text-primary" />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
@@ -486,9 +524,10 @@ export default function CreateShopPage() {
                   <div className="relative rounded-xl overflow-hidden border">
                     <div className="h-40 bg-gradient-to-r from-primary/20 to-primary/10 relative">
                       {formData.coverImage ? (
-                        <img
+                        <Image
                           src={formData.coverImage}
                           alt="Bannière"
+                          fill={true}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -499,9 +538,11 @@ export default function CreateShopPage() {
                       <div className="absolute -bottom-10 left-6">
                         <div className="relative">
                           {formData.profileImage ? (
-                            <img
+                            <Image
                               src={formData.profileImage}
                               alt="Profil"
+                              width={80}
+                              height={80}
                               className="w-20 h-20 rounded-full border-4 border-background object-cover"
                             />
                           ) : (
@@ -560,7 +601,7 @@ export default function CreateShopPage() {
                           label: "Catégorie",
                           value:
                             quickCategories.find(
-                              (c) => c.id === formData.category
+                              (c) => c.id === formData.category,
                             )?.label || "",
                         },
                         {

@@ -1,8 +1,8 @@
 // app/tournaments/[tournamentId]/page.tsx
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
@@ -10,66 +10,32 @@ import {
   Calendar,
   MapPin,
   Share2,
-  Gamepad2,
-  Clock,
-  Shield,
+  Gamepad2, Shield,
   Award,
-  Star,
-  TrendingUp,
-  MessageCircle,
+  Star, MessageCircle,
   ChevronRight,
   Settings,
-  Eye,
-  Filter,
-  Grid,
+  Eye, Grid,
   List,
-  Plus,
-  MoreVertical,
-  Instagram,
-  Facebook,
-  Twitter,
-  Youtube,
-  Linkedin,
-  Check,
-  Zap,
-  DollarSign,
-  BarChart,
-  CheckCircleIcon,
-  Swords,
+  Plus, Check, BarChart, Swords,
   Target,
-  Crown,
-  Sword,
-  UserPlus,
+  Crown, UserPlus,
   Users2,
   Medal,
   Flag,
   PlayCircle,
   AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InteractionButton } from "@/components/shared/interaction-button";
 import { CommentsSection } from "@/components/comments/comments-section";
-// import { getTournamentById, getTournaments } from "@/actions/tournanents";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useScreenSize } from "@/hooks/use-screen";
 import { cn } from "@/lib/utils";
@@ -77,31 +43,34 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 // import { TournamentCard } from "@/components/pages/tournaments/tournament-card";
 import type {
-  TournamentWithRelations,
   Tournament,
-  TournamentMember,
+  TournamentMember
 } from "@/database/schema";
 import { toast } from "sonner";
 import { EditionCard } from "@/components/pages/tournaments/editions/edition-card";
 import { MemberCard } from "@/components/pages/tournaments/members/member-card";
 import { MembershipRequestDialog } from "@/components/pages/tournaments/tournament-detail/membership-request-dialog";
 import {
-  addTournamentMember,
-  getTournamentById,
-  getTournamentMembers,
-  getTournaments,
+  addTournamentMember, getTournamentMembers,
+  getTournaments
 } from "@/actions/tournaments";
 import {
-  useTournamentById,
-  useIsUserTournamentOrganizer,
+  useTournamentById
 } from "@/hooks/use-tournaments";
 import { TournamentCard } from "@/components/cards/tournament-card";
-import { StatsCard } from "@/components/ui/stats-card";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import Link from "next/link";
-import { ResponsiveTabs, type ResponsiveTab } from "@/components/ui/responsive-tabs";
+import {
+  ResponsiveTabs,
+  type ResponsiveTab,
+} from "@/components/ui/responsive-tabs";
+import { shareTournament } from "@/utils/share";
 
-export function TournamentPageContent({ tournamentId }: { tournamentId: string }) {
+export function TournamentPageContent({
+  tournamentId,
+}: {
+  tournamentId: string;
+}) {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthContext();
   const { isSmallScreen, isLargeScreen } = useScreenSize();
@@ -211,15 +180,27 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
     //   color: "text-orange-500",
     // },
   ];
-  
+
   const editions = tournament?.editions || [];
   const members = (tournament?.members as TournamentMember[]) || [];
-  
+
   const tournamentTabs: ResponsiveTab[] = [
     { value: "overview", label: "Aperçu", icon: <Eye className="h-4 w-4" /> },
-    { value: "editions", label: "Éditions", icon: <Calendar className="h-4 w-4" /> },
-    { value: "members", label: "Membres", icon: <Users2 className="h-4 w-4" /> },
-    { value: "comments", label: "Commentaires", icon: <MessageCircle className="h-4 w-4" /> },
+    {
+      value: "editions",
+      label: "Éditions",
+      icon: <Calendar className="h-4 w-4" />,
+    },
+    {
+      value: "members",
+      label: "Membres",
+      icon: <Users2 className="h-4 w-4" />,
+    },
+    {
+      value: "comments",
+      label: "Commentaires",
+      icon: <MessageCircle className="h-4 w-4" />,
+    },
   ];
 
   const displayedEditions = editions.slice(0, 5);
@@ -272,28 +253,75 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
 
   if (!tournament) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <Typography variant="h4" weight="bold" className="mb-2">
-              Tournoi non trouvé
-            </Typography>
-            <div className="flex justify-center items-center gap-4">
-              <Button onClick={() => router.push("/tournaments")}>
-                Explorer les tournois
-              </Button>
-              <Button
-                onClick={async () => {
-                  await router.refresh();
-                  window.location.reload();
-                }}
-              >
-                Actualiser
-              </Button>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background via-background to-muted/20">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="w-full max-w-lg"
+        >
+          <Card className="border-border/30 shadow-2xl shadow-primary/5 rounded-2xl overflow-hidden">
+            <div className="relative h-40 bg-gradient-to-br from-primary/10 via-purple-500/10 to-pink-500/10">
+              <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                >
+                  <Trophy className="h-16 w-16 text-primary/40 drop-shadow-lg" />
+                </motion.div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <CardContent className="p-8 text-center relative">
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-background to-muted border-4 border-border/30 shadow-lg flex items-center justify-center">
+                  <span className="text-3xl">🎮</span>
+                </div>
+              </div>
+
+              <div className="mt-10 space-y-3">
+                <Typography
+                  variant="h3"
+                  weight="bold"
+                  className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent"
+                >
+                  Tournoi introuvable
+                </Typography>
+                <Typography
+                  variant="body-base"
+                  className="text-muted-foreground max-w-sm mx-auto"
+                >
+                  Il semble que ce tournoi n’existe pas ou ait été supprimé.
+                </Typography>
+              </div>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  onClick={() => router.push("/tournaments")}
+                  className="gap-2 shadow-md hover:shadow-primary/20 transition-shadow"
+                >
+                  <Gamepad2 className="h-4 w-4" />
+                  Explorer les tournois
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await router.refresh();
+                    window.location.reload();
+                  }}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualiser
+                </Button>
+              </div>
+
+              <div className="mt-6 text-xs text-muted-foreground/70">
+                Si le problème persiste, contactez le support.
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     );
   }
@@ -442,117 +470,148 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
 
             {/* Action Buttons */}
             <div className="flex items-center max-md:w-full gap-3">
-              {isOrganizer ? (
-                <>
-                  <Button
-                    variant="default"
-                    className="gap-2 max-md:flex-1"
-                    onClick={() =>
-                      router.push(`/tournaments/${tournamentId}/dashboard`)
+              <ResponsiveTabs
+                tabs={
+                  isOrganizer
+                    ? [
+                        {
+                          value: "dashboard",
+                          label: "Dashboard",
+                          icon: <BarChart className="h-4 w-4" />,
+                        },
+                        {
+                          value: "new-edition",
+                          label: "Nouvelle édition",
+                          icon: <Plus className="h-4 w-4" />,
+                        },
+                        {
+                          value: "settings",
+                          label: "Paramètres",
+                          icon: <Settings className="h-4 w-4" />,
+                        },
+                        {
+                          value: "manage-members",
+                          label: "Gérer membres",
+                          icon: <Users2 className="h-4 w-4" />,
+                        },
+                      ]
+                    : [
+                        {
+                          value: "join",
+                          label: isMember
+                            ? "Déjà membre"
+                            : pendingRequest
+                            ? "En attente"
+                            : "Rejoindre",
+                          icon: <UserPlus className="h-4 w-4" />,
+                        },
+                        {
+                          value: "follow",
+                          label: "Suivre",
+                          icon: <Star className="h-4 w-4" />,
+                        },
+                        {
+                          value: "message",
+                          label: "Message",
+                          icon: <MessageCircle className="h-4 w-4" />,
+                        },
+                        {
+                          value: "share",
+                          label: "Partager",
+                          icon: <Share2 className="h-4 w-4" />,
+                        },
+                        {
+                          value: "report",
+                          label: "Signaler",
+                          icon: <AlertCircle className="h-4 w-4" />,
+                        },
+                      ]
+                }
+                defaultValue={
+                  isOrganizer ? "dashboard" : isMember ? "follow" : "join"
+                }
+                onValueChange={(value) => {
+                  if (isOrganizer) {
+                    switch (value) {
+                      case "dashboard":
+                        router.push(`/tournaments/${tournamentId}/dashboard`);
+                        break;
+                      case "new-edition":
+                        router.push(
+                          `/tournaments/${tournamentId}/dashboard/editions`
+                        );
+                        break;
+                      case "settings":
+                        router.push(
+                          `/tournaments/${tournamentId}/dashboard/settings`
+                        );
+                        break;
+                      case "manage-members":
+                        router.push(
+                          `/tournaments/${tournamentId}/dashboard/members`
+                        );
+                        break;
                     }
-                  >
-                    <BarChart className="h-4 w-4" />
-                    Dashboard
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="gap-2 max-md:flex-1"
-                    onClick={() =>
-                      router.push(
-                        `/tournaments/${tournamentId}/dashboard/editions`,
-                      )
+                  } else {
+                    switch (value) {
+                      case "join":
+                        handleJoinTournament();
+                        break;
+                      case "follow":
+                        // InteractionButton logic is handled via custom render below
+                        break;
+                      case "message":
+                        router.push(`/chats?tournament=${tournamentId}`);
+                        break;
+                      case "share":
+                        shareTournament(tournamentId, tournament.name, {
+                          successMessage: "Tournoi partagé avec succès",
+                          fallbackMessage: "Lien du tournoi copié dans le presse-papier",
+                          errorMessage: "Impossible de partager le tournoi"
+                        });
+                        break;
                     }
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nouvelle édition
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
+                  }
+                }}
+                desktopCount={isOrganizer ? 4 : 5}
+                tabletCount={isOrganizer ? 3 : 3}
+                mobileCount={isOrganizer ? 2 : 2}
+                className="w-full"
+              >
+                {(tab) => {
+                  if (!isOrganizer && tab.value === "follow") {
+                    return (
+                      <InteractionButton
+                        type="follow"
+                        entityType="TOURNAMENT"
+                        entityId={tournamentId}
+                        iconOnly={isSmallScreen}
+                        variant="outline"
+                        size={isSmallScreen ? "sm" : undefined}
+                        withConfetti
+                      />
+                    );
+                  }
+                  if (!isOrganizer && tab.value === "join") {
+                    return (
+                      <Button
+                        variant="default"
+                        className="gap-2"
+                        onClick={handleJoinTournament}
+                        disabled={isMember || pendingRequest}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        {isMember
+                          ? "Déjà membre"
+                          : pendingRequest
+                          ? "En attente"
+                          : "Rejoindre"}
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() =>
-                          router.push(
-                            `/tournaments/${tournamentId}/dashboard/settings`,
-                          )
-                        }
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Paramètres
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          router.push(
-                            `/tournaments/${tournamentId}/dashboard/members`,
-                          )
-                        }
-                      >
-                        <Users2 className="h-4 w-4 mr-2" />
-                        Gérer membres
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="default"
-                    className="gap-2"
-                    onClick={handleJoinTournament}
-                    disabled={isMember || pendingRequest}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    {isMember
-                      ? "Déjà membre"
-                      : pendingRequest
-                        ? "En attente"
-                        : "Rejoindre"}
-                  </Button>
-                  <InteractionButton
-                    type="follow"
-                    entityType="TOURNAMENT"
-                    entityId={tournamentId}
-                    iconOnly={isSmallScreen}
-                    variant="outline"
-                    size={isSmallScreen ? "sm" : undefined}
-                    withConfetti
-                  />
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() =>
-                      router.push(`/chats?tournament=${tournamentId}`)
-                    }
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    {!isSmallScreen && "Message"}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => console.log("Share tournament")}
-                      >
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Partager
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => console.log("Report tournament")}
-                      >
-                        <AlertCircle className="h-4 w-4 mr-2" />
-                        Signaler
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
+                    );
+                  }
+                  return null;
+                }}
+              </ResponsiveTabs>
             </div>
           </div>
         </div>
@@ -720,10 +779,10 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
             <Card className="mb-4 p-3 overflow-visible">
               <CardContent className="p-0">
                 <ResponsiveTabs
-                   tabs={tournamentTabs}
-                   defaultValue={activeTab}
-                   onValueChange={setActiveTab}
-                   className="w-full"
+                  tabs={tournamentTabs}
+                  defaultValue={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
                 />
               </CardContent>
             </Card>
@@ -1076,11 +1135,7 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
                   {/* Load More */}
                   {editions.length > 5 && (
                     <div className="text-center pt-6">
-                      <Button
-                        variant="outline"
-                        asChild
-                        className="gap-2"
-                      >
+                      <Button variant="outline" asChild className="gap-2">
                         <Link href={`/tournaments/${tournamentId}/editions`}>
                           Voir toutes les éditions
                           <ChevronRight className="h-4 w-4" />
@@ -1136,7 +1191,7 @@ export function TournamentPageContent({ tournamentId }: { tournamentId: string }
                           variant="outline"
                           onClick={() =>
                             router.push(
-                              `/tournaments/${tournamentId}/members/manage`,
+                              `/tournaments/${tournamentId}/dashboard/members`,
                             )
                           }
                         >

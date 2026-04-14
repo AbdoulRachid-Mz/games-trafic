@@ -144,6 +144,7 @@ function CreateTransactionContent({
           metadata: {
             shopId: product.shopId,
             sellerId: product.userId,
+            status: product.status,
           },
         };
       }
@@ -187,9 +188,6 @@ function CreateTransactionContent({
     }
   };
 
-  // Récupération des paramètres d'URL et fetch de l'entité
-  // Dans le composant CreateTransactionContent, mettre à jour loadTransactionFromParams
-
   useEffect(() => {
     const loadTransactionFromParams = async () => {
       const type = searchParams.get("type") as TransactionType;
@@ -197,21 +195,21 @@ function CreateTransactionContent({
       const entityId = searchParams.get("entityId");
       const targetId = searchParams.get("targetId");
       const itemId = searchParams.get("itemId");
-      const imageUrl = searchParams.get("image"); // Ajout du paramètre image
+      const idParam = searchParams.get("id");
+      const imageUrl = searchParams.get("image");
 
       if (type && TRANSACTION_CONFIGS[type]) {
         const config = TRANSACTION_CONFIGS[type];
-        const actualEntityId = entityId || targetId || itemId;
+        const actualEntityId = entityId || targetId || itemId || idParam;
 
         const newData: TransactionData = {
           type,
           amount: amount ? parseFloat(amount) : 0,
           metadata: {
-            ...(imageUrl && { image: imageUrl }), // Stocker l'image
+            ...(imageUrl && { image: imageUrl }),
           },
         };
 
-        // Pour DEPOSIT et WITHDRAWAL, on pré-rempli les détails si fournis
         const hasPaymentDetails =
           searchParams.get("paymentMethod") ||
           searchParams.get("paymentProvider") ||
@@ -248,11 +246,14 @@ function CreateTransactionContent({
             const entity = await fetchEntityByType(type, actualEntityId);
             if (entity) {
               newData.targetId = actualEntityId;
-              // Ajouter l'image si elle vient des paramètres
+              if (!newData.amount && entity.price) {
+                newData.amount = entity.price;
+              }
               if (imageUrl) {
                 entity.image = imageUrl;
               }
               newData.entity = entity as any;
+              
               if (type === "GAME_ITEM_PURCHASE" && entity.price) {
                 if (
                   newData.amount &&
@@ -263,19 +264,18 @@ function CreateTransactionContent({
                     originalAmount: newData.amount,
                   };
                 }
-                newData.amount = entity.price;
-              } else if (!newData.amount && entity.price) {
-                newData.amount = entity.price;
               }
+            } else {
+               newData.targetId = undefined;
             }
           } catch (error) {
             console.error("Error fetching entity:", error);
+            newData.targetId = undefined;
           }
         }
 
         setTransactionData(newData);
 
-        // Calculer les étapes initiales
         let initialStepIndex = 0;
         if (config) {
           if (type === "DEPOSIT") {
@@ -363,7 +363,7 @@ function CreateTransactionContent({
       const type = decoded.t;
       const entityId = decoded.id;
       const amount = decoded.a;
-      const imageUrl = decoded.i; // Récupérer l'image du QR
+      const imageUrl = decoded.i;
 
       const newData: TransactionData = {
         type,
@@ -371,7 +371,6 @@ function CreateTransactionContent({
         metadata: decoded.m || {},
       };
 
-      // Ajouter l'image si présente
       if (imageUrl) {
         newData.metadata.image = imageUrl;
       }
@@ -387,7 +386,6 @@ function CreateTransactionContent({
         const entity = await fetchEntityByType(type, entityId);
         if (entity) {
           newData.targetId = entityId;
-          // Ajouter l'image du QR si disponible
           if (imageUrl) {
             entity.image = imageUrl;
           }
@@ -726,7 +724,6 @@ function CreateTransactionContent({
   setIsLoading(true);
   try {
     await executeConfirm(false);
-    // After success, proceed to next step (transactionId is set in executeConfirm via setTransactionId)
     nextStep();
   } catch (error: any) {
     if (error?.message?.includes("déjà en cours")) {

@@ -55,6 +55,8 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const match: any = await getMatchById(matchId, {
     populate: [
       "edition", 
+      "edition.tournament",
+      "edition.tournament.members",
       "phase", 
       "group", 
       "bracketNode", 

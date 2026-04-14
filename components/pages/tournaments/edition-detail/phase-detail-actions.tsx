@@ -7,6 +7,7 @@ import { updateTournamentPhase } from "@/actions/phases";
 import { MarkCompleteDialog } from "./mark-complete-dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface PhaseDetailActionsProps {
     phaseId: string;
@@ -59,6 +60,20 @@ export function PhaseDetailActions({
                 )}
                 {isActive ? "Désactiver" : "Activer"}
             </Button>
+
+            {!isCompleted && (
+               <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
+                  asChild
+               >
+                  <Link href={`./phases/${phaseId}/organize`}>
+                     <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
+                     Générer Structure
+                  </Link>
+               </Button>
+            )}
 
             {isCompleted ? (
                 <Button

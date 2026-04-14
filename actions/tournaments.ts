@@ -296,19 +296,20 @@ export async function isUserTournamentOrganizer(
   userId: string,
 ): Promise<boolean> {
   try {
-    // 1. Vérifier si c'est le propriétaire
     const tournament = await db.query.tournaments.findFirst({
-      where: (tournaments, { eq }) => eq(tournaments.id, tournamentId),
-      columns: { organizerId: true },
+      where: (tournaments, { eq, or }) => 
+        or(eq(tournaments.id, tournamentId), eq(tournaments.slug, tournamentId)),
+      columns: { id: true, organizerId: true },
     });
 
-    if (tournament?.organizerId === userId) return true;
+    if (!tournament) return false;
+    if (tournament.organizerId === userId) return true;
 
     // 2. Vérifier si c'est un co-organisateur dans les membres
     const member = await db.query.tournamentMembers.findFirst({
       where: (tournamentMembers, { and, eq, or }) =>
         and(
-          eq(tournamentMembers.tournamentId, tournamentId),
+          eq(tournamentMembers.tournamentId, tournament.id),
           eq(tournamentMembers.userId, userId),
           or(
             eq(tournamentMembers.role, "ORGANIZER"),

@@ -48,16 +48,22 @@ import {
 } from "@/components/ui/select";
 
 type DraftPhase = {
-  id: string; // ID unique temporaire pour le frontend
+  id: string;
   name: string;
-  phaseType: "GROUP_STAGE" | "ELIMINATION";
+  phaseType: "GROUP_STAGE" | "ELIMINATION" | "ROUND_ROBIN" | "SWISS" | "KNOCKOUT";
   order: number;
   participantSource: "EDITION" | "PHASE_QUALIFIED" | "PHASE_ELIMINATED" | "ALL";
-  sourcePhaseId?: string; // Référence à l'ID temporaire d'une phase précédente
+  sourcePhaseId?: string;
   qualifiedCount?: number;
+  generateGroups: boolean;
+  generateNodes: boolean;
+  generateMatches: boolean;
+  isHomeAway?: boolean;
+  participantsPerGroup?: number;
+  groupsCount?: number;
+  roundsCount?: number;
 };
 
-// Générer un ID unique pour les phases en draft
 const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 interface OrganizeWizardClientProps {
@@ -75,7 +81,6 @@ export function OrganizeWizardClient({
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<"AUTO" | "MANUAL">("AUTO");
 
-  // Draft State for Manual Mode - with unique temp IDs
   const [draftPhases, setDraftPhases] = useState<DraftPhase[]>([
     {
       id: generateTempId(),
@@ -84,6 +89,10 @@ export function OrganizeWizardClient({
       order: 0,
       participantSource: "EDITION",
       qualifiedCount: 2,
+      generateGroups: true,
+      generateNodes: true,
+      generateMatches: true,
+      participantsPerGroup: 4,
     },
     {
       id: generateTempId(),
@@ -91,18 +100,24 @@ export function OrganizeWizardClient({
       phaseType: "ELIMINATION",
       order: 1,
       participantSource: "PHASE_QUALIFIED",
-      sourcePhaseId: undefined, // Sera défini quand la phase précédente existe
+      sourcePhaseId: undefined,
       qualifiedCount: 8,
+      generateGroups: false,
+      generateNodes: true,
+      generateMatches: true,
+      participantsPerGroup: 2,
     },
   ]);
 
-  // Auto Config State
   const [autoConfig, setAutoConfig] = useState({
+    preset: "CHAMPIONS" as "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM",
     includeGroups: true,
+    includeElimination: true,
     includeQuarterFinals: true,
     includeSemiFinals: true,
     includeFinal: true,
     groupsQualifiedCount: 2,
+    isHomeAway: false,
   });
 
   const [participantStrategy, setParticipantStrategy] = useState<
@@ -116,6 +131,12 @@ export function OrganizeWizardClient({
   const [randomize, setRandomize] = useState(true);
   const [groupsSize, setGroupsSize] = useState(4);
 
+  const [autoGenFlags, setAutoGenFlags] = useState({
+    generateGroups: true,
+    generateNodes: true,
+    generateMatches: true,
+  });
+
   const maxParticipants = edition?.maxParticipants || 0;
   const currentParticipantsCount = selectedRegIds.length;
   const isOverLimit =
@@ -123,14 +144,11 @@ export function OrganizeWizardClient({
   const existingPhasesCount = edition?.phases?.length || 0;
   const hasExistingPhases = existingPhasesCount > 0;
 
-  // Mettre à jour les sourcePhaseId après chaque modification des phases
-  // Utiliser useMemo pour éviter les boucles infinies
   const phasesWithSourceLinks = useMemo(() => {
     return draftPhases.map((phase, idx) => {
-      if (idx === 0) return phase; // Première phase pas de source
+      if (idx === 0) return phase;
       
       if (phase.participantSource !== "EDITION" && !phase.sourcePhaseId) {
-        // Lier automatiquement à la phase précédente
         const previousPhase = draftPhases[idx - 1];
         if (previousPhase) {
           return { ...phase, sourcePhaseId: previousPhase.id };
@@ -140,7 +158,6 @@ export function OrganizeWizardClient({
     });
   }, [draftPhases]);
 
-  // Synchroniser les phases avec les liens automatiques
   const updateDraftPhasesWithLinks = useCallback(() => {
     const updated = phasesWithSourceLinks;
     if (JSON.stringify(updated) !== JSON.stringify(draftPhases)) {
@@ -148,7 +165,6 @@ export function OrganizeWizardClient({
     }
   }, [phasesWithSourceLinks, draftPhases]);
 
-  // Exécuter la synchronisation après chaque modification
   const handleUpdateDraftPhase = useCallback((
     index: number,
     updates: Partial<DraftPhase>
@@ -160,10 +176,9 @@ export function OrganizeWizardClient({
     });
   }, []);
 
-  // Effet pour lier automatiquement les phases (exécuté une fois après modification)
-useEffect(() => {
-  updateDraftPhasesWithLinks();
-}, [draftPhases.length]);
+  useEffect(() => {
+    updateDraftPhasesWithLinks();
+  }, [updateDraftPhasesWithLinks]);
 
   const handleAddDraftPhase = () => {
     const newOrder = draftPhases.length;
@@ -176,6 +191,10 @@ useEffect(() => {
       participantSource: previousPhase ? "PHASE_QUALIFIED" : "EDITION",
       sourcePhaseId: previousPhase ? previousPhase.id : undefined,
       qualifiedCount: 2,
+      generateGroups: true,
+      generateNodes: true,
+      generateMatches: true,
+      isHomeAway: false,
     };
     setDraftPhases([...draftPhases, newPhase]);
   };
@@ -238,58 +257,62 @@ useEffect(() => {
 
   const buildAutoPhases = (): DraftPhase[] => {
     const phases: DraftPhase[] = [];
-    let lastPhaseId: string | null = null;
+    const { preset, groupsQualifiedCount, isHomeAway } = autoConfig;
+    const { generateGroups, generateNodes, generateMatches } = autoGenFlags;
 
-    if (autoConfig.includeGroups) {
-      const newId = generateTempId();
-      phases.push({
-        id: newId,
-        name: "Phase de groupes",
-        phaseType: "GROUP_STAGE",
-        order: phases.length,
-        participantSource: "EDITION",
-        qualifiedCount: autoConfig.groupsQualifiedCount,
-      });
-      lastPhaseId = newId;
-    }
-
-    if (autoConfig.includeQuarterFinals) {
-      const newId = generateTempId();
-      phases.push({
-        id: newId,
-        name: "Quarts de finale",
-        phaseType: "ELIMINATION",
-        order: phases.length,
-        participantSource: lastPhaseId ? "PHASE_QUALIFIED" : "EDITION",
-        sourcePhaseId: lastPhaseId || undefined,
-        qualifiedCount: 8,
-      });
-      lastPhaseId = newId;
-    }
-
-    if (autoConfig.includeSemiFinals) {
-      const newId = generateTempId();
-      phases.push({
-        id: newId,
-        name: "Demi-finales",
-        phaseType: "ELIMINATION",
-        order: phases.length,
-        participantSource: "PHASE_QUALIFIED",
-        sourcePhaseId: lastPhaseId || undefined,
-        qualifiedCount: 4,
-      });
-      lastPhaseId = newId;
-    }
-
-    if (autoConfig.includeFinal) {
+    if (preset === "LEAGUE") {
       phases.push({
         id: generateTempId(),
-        name: "Finale",
+        name: isHomeAway ? "Championnat (Aller-Retour)" : "Championnat",
+        phaseType: "ROUND_ROBIN",
+        order: 0,
+        participantSource: "EDITION",
+        generateGroups: true,
+        generateNodes: generateNodes,
+        generateMatches: generateMatches,
+        isHomeAway: isHomeAway,
+      });
+    } else if (preset === "SWISS") {
+      phases.push({
+        id: generateTempId(),
+        name: "Système Suisse",
+        phaseType: "SWISS",
+        order: 0,
+        participantSource: "EDITION",
+        generateGroups: true,
+        generateNodes: generateNodes,
+        generateMatches: generateMatches,
+      });
+    } else if (preset === "CHAMPIONS") {
+      let lastPhaseId = null;
+      
+      const groupsId = generateTempId();
+      phases.push({
+        id: groupsId,
+        name: "Phase de groupes",
+        phaseType: "GROUP_STAGE",
+        order: 0,
+        participantSource: "EDITION",
+        qualifiedCount: groupsQualifiedCount,
+        generateGroups: true,
+        generateNodes: generateNodes,
+        generateMatches: generateMatches,
+        isHomeAway: isHomeAway,
+      });
+      lastPhaseId = groupsId;
+
+      const eliminationId = generateTempId();
+      phases.push({
+        id: eliminationId,
+        name: "Phases finales",
         phaseType: "ELIMINATION",
-        order: phases.length,
+        order: 1,
         participantSource: "PHASE_QUALIFIED",
-        sourcePhaseId: lastPhaseId || undefined,
+        sourcePhaseId: lastPhaseId,
         qualifiedCount: 2,
+        generateGroups: false,
+        generateNodes: generateNodes,
+        generateMatches: generateMatches,
       });
     }
 
@@ -313,9 +336,7 @@ useEffect(() => {
 
     startTransition(async () => {
       try {
-        // Convertir les références d'IDs temporaires en indices pour la création
         const phasesForCreation = phasesToCreate.map((p, idx) => {
-          // Trouver l'index de la phase source si elle existe
           let sourcePhaseIndex = undefined;
           if (p.sourcePhaseId) {
             const sourceIndex = phasesToCreate.findIndex(
@@ -336,9 +357,15 @@ useEffect(() => {
             isDeleted: false,
             config: {
               participantSource: p.participantSource,
-              sourcePhaseIndex: sourcePhaseIndex, // Utiliser l'index plutôt que l'ID
+              sourcePhaseIndex: sourcePhaseIndex,
               qualifiedCount: p.qualifiedCount,
-              groupsSize: groupsSize,
+              groupsSize: p.participantsPerGroup || groupsSize,
+              groupsCount: p.groupsCount,
+              roundsCount: p.roundsCount,
+              generateGroups: p.generateGroups,
+              generateNodes: p.generateNodes,
+              generateMatches: p.generateMatches,
+              isHomeAway: p.isHomeAway,
             },
           };
         });
@@ -348,10 +375,13 @@ useEffect(() => {
           phasesForCreation,
           selectedRegIds,
           {
-            autoInitializeFirstPhase:
-              autoInit && (phasesToCreate[0]?.phaseType === "GROUP_STAGE" || phasesToCreate[0]?.phaseType === "ELIMINATION"),
+            autoInitializeFirstPhase: autoInit,
             groupsSize: groupsSize,
             randomizeDistribution: randomize,
+            generateGroups: phasesToCreate[0]?.generateGroups ?? true,
+            generateNodes: phasesToCreate[0]?.generateNodes ?? true,
+            generateMatches: phasesToCreate[0]?.generateMatches ?? true,
+            isHomeAway: phasesToCreate[0]?.isHomeAway ?? false,
           }
         );
 
@@ -374,7 +404,6 @@ useEffect(() => {
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Header with Mode Switch */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-2xl font-bold tracking-tight">
@@ -405,7 +434,6 @@ useEffect(() => {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Step 1: Structure */}
         <Card className="relative overflow-hidden border-primary/20 shadow-xl">
           {hasExistingPhases && (
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
@@ -438,6 +466,8 @@ useEffect(() => {
                 setAutoConfig={setAutoConfig}
                 groupsSize={groupsSize}
                 setGroupsSize={setGroupsSize}
+                autoGenFlags={autoGenFlags}
+                setAutoGenFlags={setAutoGenFlags}
               />
             ) : (
               <ManualModeConfig
@@ -449,7 +479,6 @@ useEffect(() => {
               />
             )}
 
-            {/* Participant Strategy */}
             <ParticipantStrategySection
               participantStrategy={participantStrategy}
               setParticipantStrategy={setParticipantStrategy}
@@ -461,7 +490,6 @@ useEffect(() => {
               getName={getName}
             />
 
-            {/* Auto-initialization */}
             <AutoInitSection
               autoInit={autoInit}
               setAutoInit={setAutoInit}
@@ -481,7 +509,6 @@ useEffect(() => {
           </CardContent>
         </Card>
 
-        {/* Step 2: Participant Selection */}
         <ParticipantSelectionCard
           editionRegistrations={edition?.registrations || []}
           participantStrategy={participantStrategy}
@@ -492,72 +519,91 @@ useEffect(() => {
         />
       </div>
 
-      {/* Info Banner */}
       <InfoBanner />
     </div>
   );
 }
 
-// ============================================================================
-// SOUS-COMPOSANTS (pour réduire la complexité et éviter les boucles)
-// ============================================================================
-
-function AutoModeConfig({ autoConfig, setAutoConfig, groupsSize, setGroupsSize }: any) {
+function AutoModeConfig({ autoConfig, setAutoConfig, groupsSize, setGroupsSize, autoGenFlags, setAutoGenFlags }: any) {
   return (
     <div className="space-y-4">
+      <div className="space-y-4">
+        <Label className="font-bold text-xs uppercase tracking-wider text-primary">Preset de tournoi</Label>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: "LEAGUE", label: "Championnat", icon: Zap },
+            { id: "CHAMPIONS", label: "LDC Style", icon: Layers },
+            { id: "SWISS", label: "Système Suisse", icon: ShieldCheck },
+            { id: "CUSTOM", label: "Personnalisé", icon: Settings2 }
+          ].map((p) => (
+            <Button
+              key={p.id}
+              variant={autoConfig.preset === p.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => setAutoConfig({ ...autoConfig, preset: p.id as any })}
+              className="gap-2"
+            >
+              <p.icon className="h-3.5 w-3.5" /> {p.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 rounded-xl border bg-card hover:border-primary/40 transition-all space-y-3">
           <Label className="font-bold text-xs uppercase tracking-wider text-primary">
-            Structure
+            Contenu à générer
           </Label>
           <div className="space-y-3 pt-1">
             <div className="flex items-center space-x-3">
               <Checkbox
-                id="groups"
-                checked={autoConfig.includeGroups}
+                id="gen-groups"
+                checked={autoGenFlags.generateGroups}
                 onCheckedChange={(v) =>
-                  setAutoConfig({ ...autoConfig, includeGroups: !!v })
+                  setAutoGenFlags({ ...autoGenFlags, generateGroups: !!v })
                 }
               />
-              <Label htmlFor="groups" className="text-sm font-medium cursor-pointer">
-                Groupes
+              <Label htmlFor="gen-groups" className="text-sm font-medium cursor-pointer">
+                Groupes / Divisions
               </Label>
             </div>
             <div className="flex items-center space-x-3">
               <Checkbox
-                id="qf"
-                checked={autoConfig.includeQuarterFinals}
+                id="gen-nodes"
+                checked={autoGenFlags.generateNodes}
                 onCheckedChange={(v) =>
-                  setAutoConfig({ ...autoConfig, includeQuarterFinals: !!v })
+                  setAutoGenFlags({ ...autoGenFlags, generateNodes: !!v })
                 }
               />
-              <Label htmlFor="qf" className="text-sm font-medium cursor-pointer">
-                Quarts
+              <Label htmlFor="gen-nodes" className="text-sm font-medium cursor-pointer">
+                Brackets / Rencontres
               </Label>
             </div>
             <div className="flex items-center space-x-3">
               <Checkbox
-                id="sf"
-                checked={autoConfig.includeSemiFinals}
+                id="gen-matches"
+                checked={autoGenFlags.generateMatches}
                 onCheckedChange={(v) =>
-                  setAutoConfig({ ...autoConfig, includeSemiFinals: !!v })
+                  setAutoGenFlags({ ...autoGenFlags, generateMatches: !!v })
                 }
               />
-              <Label htmlFor="sf" className="text-sm font-medium cursor-pointer">
-                Demies
+              <Label htmlFor="gen-matches" className="text-sm font-medium cursor-pointer">
+                Matches (Horaires/Scores)
               </Label>
             </div>
-            <div className="flex items-center space-x-3">
-              <Checkbox
-                id="f"
-                checked={autoConfig.includeFinal}
-                onCheckedChange={(v) =>
-                  setAutoConfig({ ...autoConfig, includeFinal: !!v })
-                }
-              />
-              <Label htmlFor="f" className="text-sm font-medium cursor-pointer">
-                Finale
-              </Label>
+            <div className="pt-2 border-t mt-2">
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="home-away"
+                  checked={autoConfig.isHomeAway}
+                  onCheckedChange={(v) =>
+                    setAutoConfig({ ...autoConfig, isHomeAway: !!v })
+                  }
+                />
+                <Label htmlFor="home-away" className="text-sm font-bold text-primary cursor-pointer">
+                  Aller-Retour
+                </Label>
+              </div>
             </div>
           </div>
         </div>
@@ -594,7 +640,7 @@ function AutoModeConfig({ autoConfig, setAutoConfig, groupsSize, setGroupsSize }
                 id="groupsSize"
                 type="number"
                 min={2}
-                max={16}
+                max={64}
                 className="w-20 h-8 text-center"
                 value={groupsSize}
                 onChange={(e) => setGroupsSize(parseInt(e.target.value) || 4)}
@@ -620,7 +666,7 @@ function ManualModeConfig({
         <Label className="font-bold text-xs uppercase tracking-wider text-primary">
           Séquence des phases
         </Label>
-        <Button size="xs" variant="outline" onClick={onAddPhase} className="h-7 gap-1">
+        <Button size="sm" variant="outline" onClick={onAddPhase} className="h-7 gap-1">
           <Plus className="h-3 w-3" /> Ajouter
         </Button>
       </div>
@@ -700,8 +746,11 @@ function PhaseConfigCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="ROUND_ROBIN">Ligue / Round Robin</SelectItem>
               <SelectItem value="GROUP_STAGE">Phase de groupes</SelectItem>
               <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
+              <SelectItem value="SWISS">Système Suisse</SelectItem>
+              <SelectItem value="KNOCKOUT">Matchs à élimination</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -737,6 +786,78 @@ function PhaseConfigCard({
               )}
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      <div className="pt-3 border-t space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-[10px] font-bold uppercase text-primary">Générer enfant</Label>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                checked={phase.generateGroups}
+                onCheckedChange={(v) => onUpdate({ generateGroups: !!v })}
+              />
+              <span className="text-[10px] font-medium">Groupes</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                checked={phase.generateNodes}
+                onCheckedChange={(v) => onUpdate({ generateNodes: !!v })}
+              />
+              <span className="text-[10px] font-medium">Nodes</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                checked={phase.generateMatches}
+                onCheckedChange={(v) => onUpdate({ generateMatches: !!v })}
+              />
+              <span className="text-[10px] font-medium">Matches</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 bg-primary/5 p-3 rounded-lg border border-primary/10">
+          {(phase.phaseType === "ROUND_ROBIN" || phase.phaseType === "GROUP_STAGE") && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground">Participants par groupe</Label>
+                <Input 
+                  type="number" 
+                  className="h-7 text-[10px]" 
+                  value={phase.participantsPerGroup || 4}
+                  onChange={(e) => onUpdate({ participantsPerGroup: parseInt(e.target.value) || 4 })}
+                />
+                <p className="text-[8px] text-muted-foreground italic">Mettre le total pour une Ligue unique</p>
+              </div>
+              <div className="flex items-center gap-2 pt-4">
+                <Checkbox
+                  id={`home-away-${phase.id}`}
+                  checked={phase.isHomeAway}
+                  onCheckedChange={(v) => onUpdate({ isHomeAway: !!v })}
+                />
+                <Label htmlFor={`home-away-${phase.id}`} className="text-[10px] font-bold cursor-pointer">Aller-Retour</Label>
+              </div>
+            </>
+          )}
+          
+          {phase.phaseType === "SWISS" && (
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Nombre de Rounds</Label>
+              <Input 
+                type="number" 
+                className="h-7 text-[10px]" 
+                value={phase.roundsCount || 5}
+                onChange={(e) => onUpdate({ roundsCount: parseInt(e.target.value) || 5 })}
+              />
+            </div>
+          )}
+
+          {(phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT") && (
+            <div className="space-y-1.5 col-span-2">
+              <p className="text-[10px] text-muted-foreground italic">Structure d'arbre automatique basée sur le nombre de qualifiés.</p>
+            </div>
+          )}
         </div>
       </div>
 

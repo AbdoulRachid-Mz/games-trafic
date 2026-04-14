@@ -1366,6 +1366,7 @@ export const bracketNodes = pgTable('bracket_nodes', {
   }),
 
   isDeleted: boolean('is_deleted').default(false),
+  isCompleted: boolean('is_completed').default(false),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -2217,6 +2218,46 @@ export const apiRateLimits = pgTable('api_rate_limits', {
   index('rate_limits_expires_idx').on(table.expiresAt),
 ]);
 
+
+// signals table
+export const signals = pgTable('signals', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+
+  reporterId: text('reporter_id')
+    .notNull()
+    .references(() => users.id),
+
+  // 🔗 Cible générique
+  targetType: text('target_type').notNull(),
+  targetId: text('target_id'),
+
+  // 🔗 Catégorie liée à ta table categories
+  categoryId: text('category_id')
+    .references(() => categories.id),
+
+  isDeleted: boolean('is_deleted').default(false),
+
+  title: text('title'),
+  description: text('description').notNull(),
+
+  attachments: text('attachments').array().default([]),
+
+  severity: text('severity').default('MEDIUM'),
+
+  status: text('status').default('OPEN'),
+
+  assignedTo: text('assigned_to').references(() => users.id),
+  resolvedBy: text('resolved_by').references(() => users.id),
+
+  resolution: text('resolution'),
+  resolvedAt: timestamp('resolved_at'),
+
+  metadata: jsonb('metadata').default({}),
+
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // ============================================================================
 // RELATIONS DRIZZLE COMPLÈTES
 // ============================================================================
@@ -2350,6 +2391,13 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
 export const entityCategoriesRelations = relations(entityCategories, ({ one }) => ({
   category: one(categories, { fields: [entityCategories.categoryId], references: [categories.id] }),
   // Les relations vers les autres entités sont gérées par leur entityId/entityType
+}));
+
+// signals relations
+export const signalsRelations = relations(signals, ({ one }) => ({
+  reporter: one(users, { fields: [signals.reporterId], references: [users.id] }),
+  target: one(users, { fields: [signals.targetId], references: [users.id] }),
+  category: one(categories, { fields: [signals.categoryId], references: [categories.id] }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -2793,6 +2841,9 @@ export type CategoryWithChildren = Category & {
 export type EntityCategory = typeof entityCategories.$inferSelect;
 export type NewEntityCategory = typeof entityCategories.$inferInsert;
 
+export type Signal = typeof signals.$inferSelect;
+export type NewSignal = typeof signals.$inferInsert;
+
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
@@ -3050,6 +3101,12 @@ export type GameClipWithRelations = GameClip & {
   author?: UserMini;
   shop?: ShopMini;
   game?: GameMini;
+};
+
+export type SignalWithRelations = Signal & {
+  reporter?: UserMini;
+  target?: UserMini;
+  category?: CategoryMini;
 };
 
 export type MessageWithRelations = Message & {

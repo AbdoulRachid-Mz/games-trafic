@@ -198,12 +198,21 @@ export function GenerateGroupMatchesDialog({
 
   const isGenerationPossible = participantsCount >= 2;
   const isDisabled = !isGenerationPossible || loading;
+  const hasMatches = existingMatchesCount > 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2" disabled={!isGenerationPossible}>
-          <RefreshCw className="h-4 w-4" /> Générer matches (Brackets)
+        <Button 
+          variant={hasMatches ? "ghost" : "outline"} 
+          className={cn("gap-2", hasMatches ? "text-muted-foreground text-xs h-8" : "border-primary/20 bg-primary/5 text-primary")} 
+          disabled={!isGenerationPossible}
+        >
+          {hasMatches ? (
+            <><RefreshCw className="h-3.5 w-3.5" /> Régénérer ({existingMatchesCount} matches)</>
+          ) : (
+            <><Swords className="h-4 w-4" /> Générer les matchs</>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">

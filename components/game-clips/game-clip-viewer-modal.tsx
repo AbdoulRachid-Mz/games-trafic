@@ -29,7 +29,7 @@ export function GameClipViewerModal({
           <DialogTitle>Game Clips Viewer</DialogTitle>
         </VisuallyHidden>
         <div className="h-full w-full">
-          <GameClipReel clips={clips} initialClipId={initialClipId} />
+          <GameClipReel clips={clips} onClipChange={(clipId) => { /* optional handler */ }} />
         </div>
       </DialogContent>
     </Dialog>

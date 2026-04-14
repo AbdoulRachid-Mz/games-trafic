@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { TransactionType, TransactionEntity } from "@/types/transaction-types";
-import { ArrowLeft, ArrowRight, Wallet, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, Wallet, Info, AlertTriangle } from "lucide-react";
 
 interface TransactionAmountInputProps {
   amount: number;
@@ -95,6 +95,9 @@ export function TransactionAmountInput({
     });
   }, [gameAccount, gamePassword, additionalInfo, isGameItem, onMetadataChange]);
 
+  const status = entity?.metadata?.status || (entity as any)?.status;
+  const isUnavailable = status && status !== "NON_VENDU";
+
   const hasSufficientBalance =
     isDeposit ||
     (walletBalance !== undefined && fees.totalAmount <= walletBalance);
@@ -133,34 +136,55 @@ export function TransactionAmountInput({
           )}
 
           {entity && (
-            <div className="mb-8 p-4 bg-primary/5 rounded-xl border border-primary/10 flex items-center justify-between">
-              <div>
-                <Typography variant="h5" weight="bold" className="text-primary">
-                  {entity.name}
-                </Typography>
-                {entity.description && (
-                  <Typography
-                    variant="caption1"
-                    className="text-muted-foreground"
-                  >
-                    {entity.description}
+            <div className="space-y-4 mb-8">
+              <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 flex items-center justify-between">
+                <div>
+                  <Typography variant="h5" weight="bold" className="text-primary">
+                    {entity.name}
                   </Typography>
-                )}
+                  {entity.description && (
+                    <Typography
+                      variant="caption1"
+                      className="text-muted-foreground"
+                    >
+                      {entity.description}
+                    </Typography>
+                  )}
+                </div>
+                <div className="text-right">
+                  <Typography
+                    variant="h4"
+                    weight="bold"
+                    className="text-foreground"
+                  >
+                    {entity.price?.toFixed(2)}{" "}
+                    <span className="text-sm font-bold text-muted-foreground">
+                      GTC
+                    </span>
+                  </Typography>
+                </div>
               </div>
-              <div className="text-right">
-                <Typography
-                  variant="h4"
-                  weight="bold"
-                  className="text-foreground"
-                >
-                  {entity.price?.toFixed(2)}{" "}
-                  <span className="text-sm font-bold text-muted-foreground">
-                    GTC
-                  </span>
-                </Typography>
-              </div>
+
+              {isUnavailable && (
+                <div className={cn(
+                  "p-4 rounded-xl border flex items-center gap-3",
+                  status === "RESERVE" 
+                    ? "bg-amber-500/10 border-amber-500/20 text-amber-700" 
+                    : "bg-rose-500/10 border-rose-500/20 text-rose-700"
+                )}>
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <Typography variant="body-sm" weight="bold">
+                    {status === "RESERVE" 
+                      ? "Attention: Ce compte est déjà réservé par un autre utilisateur." 
+                      : status === "VENDU" 
+                        ? "Erreur: Ce compte a déjà été vendu." 
+                        : `Attention: Ce compte n'est pas disponible (Statut: ${status})`}
+                  </Typography>
+                </div>
+              )}
             </div>
           )}
+
           {isGameItem &&
             typeof originalAmount === "number" &&
             originalAmount > 0 &&
@@ -360,7 +384,8 @@ export function TransactionAmountInput({
             (!amount && !entity?.price) ||
             (amount <= 0 && !entity?.price) ||
             !hasSufficientBalance ||
-            (isVip && !!alreadyVip)
+            (isVip && !!alreadyVip) ||
+            isUnavailable
           }
           className="flex-1 h-12 gap-2 text-base font-bold rounded-xl shadow-lg shadow-primary/20"
         >

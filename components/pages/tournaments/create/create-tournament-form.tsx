@@ -15,11 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Typography } from "@/components/ui/typography";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
   Gamepad2,
   Users,
@@ -41,7 +37,11 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { AdvancedUpload } from "@/components/ui/advanced-upload";
 import { generateTournamentDescription } from "@/lib/tournaments/description";
 import { getTournamentPreviewData } from "@/lib/tournaments/preview";
-import { createTournament, createTournamentEdition } from "@/actions/tournaments";
+import {
+  createTournament,
+  createTournamentEdition,
+} from "@/actions/tournaments";
+import Image from "next/image";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface TournamentFormData {
@@ -74,27 +74,6 @@ interface TournamentFormData {
   whatsappGroup: string;
 }
 
-const initialData: TournamentFormData = {
-  name: "",
-  description: "",
-  profileImage: "",
-  coverImage: "",
-  game: "",
-  platform: "",
-  gameMode: "1v1",
-  maxParticipants: 32,
-  minParticipants: 2,
-  startDate: "",
-  isPublic: true,
-  inviteOnly: false,
-  requiresAccessCode: false,
-  accessCode: "",
-  contactEmail: "",
-  contactPhone: "",
-  discordServer: "",
-  whatsappGroup: "",
-};
-
 const steps = [
   { id: 1, title: "Images", icon: ImageIcon, description: "Profil & Cover" },
   { id: 2, title: "Identité", icon: Gamepad2, description: "Nom & Jeu" },
@@ -104,14 +83,33 @@ const steps = [
 
 export function CreateTournamentForm() {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<TournamentFormData>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuthContext();
   const router = useRouter();
+  const [formData, setFormData] = useState<TournamentFormData>({
+    name: user ? `Tournoi de ${user?.fullName || ""}` : "",
+    description: "",
+    profileImage: "/icons/tournament-500.png",
+    coverImage: "/images/icons/background/bg-controller.jpg",
+    game: "EOOTBALL PES",
+    platform: "MOBILE",
+    gameMode: "1v1",
+    maxParticipants: 32,
+    minParticipants: 4,
+    startDate: "",
+    isPublic: true,
+    inviteOnly: false,
+    requiresAccessCode: false,
+    accessCode: "",
+    contactEmail: user?.email || "",
+    contactPhone: (user?.countryCode ?? "") + (user?.phoneNumber ?? "") || "",
+    discordServer: "",
+    whatsappGroup: "",
+  });
 
   const updateField = <K extends keyof TournamentFormData>(
     field: K,
-    value: TournamentFormData[K]
+    value: TournamentFormData[K],
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -133,8 +131,7 @@ export function CreateTournamentForm() {
       }
 
       const platformValue =
-        formData.platform &&
-          platformEnum.enumValues.includes(formData.platform)
+        formData.platform && platformEnum.enumValues.includes(formData.platform)
           ? formData.platform
           : undefined;
 
@@ -147,14 +144,16 @@ export function CreateTournamentForm() {
       const tournamentData: NewTournament = {
         name: formData.name,
         slug,
-        description: formData.description || generateTournamentDescription({
-          name: formData.name,
-          game: formData.game,
-          platform: formData.platform,
-          maxParticipants: formData.maxParticipants,
-          startDate: formData.startDate,
-          cashprize: 0,
-        }),
+        description:
+          formData.description ||
+          generateTournamentDescription({
+            name: formData.name,
+            game: formData.game,
+            platform: formData.platform,
+            maxParticipants: formData.maxParticipants,
+            startDate: formData.startDate,
+            cashprize: 0,
+          }),
         game: formData.game,
         platform: platformValue ?? null,
         gameMode: formData.gameMode || null,
@@ -204,7 +203,10 @@ export function CreateTournamentForm() {
     <div className="max-w-4xl mx-auto py-8 px-4">
       {/* Header & Progress */}
       <div className="mb-12">
-        <Typography variant="h1" className="text-3xl font-bold mb-6 text-center">
+        <Typography
+          variant="h1"
+          className="text-3xl font-bold mb-6 text-center"
+        >
           Créer un nouveau tournoi
         </Typography>
 
@@ -228,9 +230,10 @@ export function CreateTournamentForm() {
                 <div
                   className={`
                     w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300
-                    ${isActive
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-secondary text-muted-foreground border-transparent"
+                    ${
+                      isActive
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-secondary text-muted-foreground border-transparent"
                     }
                     ${isCurrent ? "ring-4 ring-primary/20 scale-110" : ""}
                   `}
@@ -238,7 +241,9 @@ export function CreateTournamentForm() {
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="text-center hidden sm:block">
-                  <span className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                  <span
+                    className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}
+                  >
                     {s.title}
                   </span>
                 </div>
@@ -263,25 +268,9 @@ export function CreateTournamentForm() {
               {/* ── Step 1: Images ── */}
               {step === 1 && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Image de profil</Label>
-                      <AdvancedUpload
-                        value={formData.profileImage}
-                        onChange={(url) => updateField("profileImage", url)}
-                        uploadPath="tournaments/profile"
-                        uploadPreset="games_trafics"
-                        emptyPreview={
-                          <div className="text-center">
-                            <Typography variant="caption2" theme="muted">Uploadez une image de profil</Typography>
-                          </div>
-                        }
-                        isRounded
-                        previewClassName="w-32 h-32"
-                        showInternalSelection
-                        internalImagesFolder="images/tournaments/profile"
-                      />
-                    </div>
+                  {/* Wrapper for stacked uploads */}
+                  <div className="relative">
+                    {/* Cover upload */}
                     <div className="space-y-2">
                       <Label>Image de couverture</Label>
                       <AdvancedUpload
@@ -289,14 +278,38 @@ export function CreateTournamentForm() {
                         onChange={(url) => updateField("coverImage", url)}
                         uploadPath="tournaments/cover"
                         uploadPreset="games_trafics"
+                        // className="max-h-[300px]"
                         emptyPreview={
                           <div className="text-center">
-                            <Typography variant="caption2" theme="muted">Uploadez une image de couverture</Typography>
+                            <Typography variant="caption2" theme="muted">
+                              Uploadez une image de couverture
+                            </Typography>
                           </div>
                         }
                         previewClassName="min-h-[180px]"
                         showInternalSelection
                         internalImagesFolder="images/tournaments/cover"
+                      />
+                    </div>
+
+                    {/* Profile upload overlay */}
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
+                      <AdvancedUpload
+                        value={formData.profileImage}
+                        onChange={(url) => updateField("profileImage", url)}
+                        uploadPath="tournaments/profile"
+                        uploadPreset="games_trafics"
+                        emptyPreview={
+                          <div className="text-center">
+                            <Typography variant="caption2" theme="muted">
+                              Uploadez une image de profil
+                            </Typography>
+                          </div>
+                        }
+                        isRounded
+                        previewClassName="w-32 h-32"
+                        showInternalSelection
+                        internalImagesFolder="images/tournaments/profile"
                       />
                     </div>
                   </div>
@@ -322,10 +335,18 @@ export function CreateTournamentForm() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Jeu *</Label>
-                      <Select value={formData.game} onValueChange={(val) => updateField("game", val)}>
-                        <SelectTrigger><SelectValue placeholder="Choisir un jeu" /></SelectTrigger>
+                      <Select
+                        value={formData.game}
+                        onValueChange={(val) => updateField("game", val)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir un jeu" />
+                        </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="FIFA 24">EA FC 24</SelectItem>
+                          <SelectItem value="EFOOTBALL PES">
+                            EA Football PES
+                          </SelectItem>
+                          <SelectItem value="FIFA 24">EA FIFA</SelectItem>
                           <SelectItem value="COD">Call of Duty</SelectItem>
                           <SelectItem value="LOL">League of Legends</SelectItem>
                           <SelectItem value="CR">Clash Royale</SelectItem>
@@ -334,13 +355,27 @@ export function CreateTournamentForm() {
                     </div>
                     <div className="space-y-2">
                       <Label>Plateforme</Label>
-                      <Select value={formData.platform} onValueChange={(val) => updateField("platform", val as (typeof platformEnum.enumValues)[number])}>
-                        <SelectTrigger><SelectValue placeholder="Choisir une plateforme" /></SelectTrigger>
+                      <Select
+                        value={formData.platform}
+                        onValueChange={(val) =>
+                          updateField(
+                            "platform",
+                            val as (typeof platformEnum.enumValues)[number],
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir une plateforme" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="PC">PC</SelectItem>
-                          <SelectItem value="PLAYSTATION">PlayStation</SelectItem>
+                          <SelectItem value="PLAYSTATION">
+                            PlayStation
+                          </SelectItem>
                           <SelectItem value="XBOX">Xbox</SelectItem>
-                          <SelectItem value="NINTENDO_SWITCH">Nintendo Switch</SelectItem>
+                          <SelectItem value="NINTENDO_SWITCH">
+                            Nintendo Switch
+                          </SelectItem>
                           <SelectItem value="MOBILE">Mobile</SelectItem>
                           <SelectItem value="VR">VR</SelectItem>
                           <SelectItem value="OTHER">Autre</SelectItem>
@@ -353,8 +388,13 @@ export function CreateTournamentForm() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Mode de jeu</Label>
-                      <Select value={formData.gameMode} onValueChange={(val) => updateField("gameMode", val)}>
-                        <SelectTrigger><SelectValue placeholder="Mode" /></SelectTrigger>
+                      <Select
+                        value={formData.gameMode}
+                        onValueChange={(val) => updateField("gameMode", val)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Mode" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="1v1">1 vs 1</SelectItem>
                           <SelectItem value="2v2">2 vs 2</SelectItem>
@@ -367,9 +407,13 @@ export function CreateTournamentForm() {
                       <Label>Participants max</Label>
                       <Select
                         value={formData.maxParticipants.toString()}
-                        onValueChange={(val) => updateField("maxParticipants", parseInt(val))}
+                        onValueChange={(val) =>
+                          updateField("maxParticipants", parseInt(val))
+                        }
                       >
-                        <SelectTrigger><SelectValue placeholder="Participants" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Participants" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="8">8 joueurs</SelectItem>
                           <SelectItem value="16">16 joueurs</SelectItem>
@@ -387,7 +431,9 @@ export function CreateTournamentForm() {
                           type="datetime-local"
                           className="pl-9"
                           value={formData.startDate}
-                          onChange={(e) => updateField("startDate", e.target.value)}
+                          onChange={(e) =>
+                            updateField("startDate", e.target.value)
+                          }
                         />
                       </div>
                     </div>
@@ -401,24 +447,31 @@ export function CreateTournamentForm() {
                       placeholder="Décrivez votre tournoi, les règles spécifiques, etc."
                       className="min-h-[100px]"
                       value={formData.description}
-                      onChange={(e) => updateField("description", e.target.value)}
+                      onChange={(e) =>
+                        updateField("description", e.target.value)
+                      }
                     />
                     {!formData.description.trim() && formData.name.trim() && (
                       <div className="mt-2 p-3 rounded-lg border border-border/50 bg-secondary/20">
                         <div className="flex items-center justify-between gap-3">
-                          <Typography variant="caption1" theme="muted">Suggestion automatique</Typography>
+                          <Typography variant="caption1" theme="muted">
+                            Suggestion automatique
+                          </Typography>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() =>
-                              updateField("description", generateTournamentDescription({
-                                name: formData.name,
-                                game: formData.game,
-                                platform: formData.platform,
-                                maxParticipants: formData.maxParticipants,
-                                startDate: formData.startDate,
-                                cashprize: 0,
-                              }))
+                              updateField(
+                                "description",
+                                generateTournamentDescription({
+                                  name: formData.name,
+                                  game: formData.game,
+                                  platform: formData.platform,
+                                  maxParticipants: formData.maxParticipants,
+                                  startDate: formData.startDate,
+                                  cashprize: 0,
+                                }),
+                              )
                             }
                           >
                             Utiliser
@@ -447,33 +500,49 @@ export function CreateTournamentForm() {
                     <div className="space-y-4 p-4 rounded-lg border">
                       <div className="flex items-center gap-3">
                         <Eye className="h-5 w-5 text-primary" />
-                        <Typography variant="body-base" weight="bold">Visibilité</Typography>
+                        <Typography variant="body-base" weight="bold">
+                          Visibilité
+                        </Typography>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className="text-sm">Tournoi public</Label>
-                          <p className="text-xs text-muted-foreground">Visible par tous</p>
+                          <p className="text-xs text-muted-foreground">
+                            Visible par tous
+                          </p>
                         </div>
-                        <Switch checked={formData.isPublic} onCheckedChange={(v) => updateField("isPublic", v)} />
+                        <Switch
+                          checked={formData.isPublic}
+                          onCheckedChange={(v) => updateField("isPublic", v)}
+                        />
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className="text-sm">Sur invitation</Label>
-                          <p className="text-xs text-muted-foreground">Seuls les invités peuvent rejoindre</p>
+                          <p className="text-xs text-muted-foreground">
+                            Seuls les invités peuvent rejoindre
+                          </p>
                         </div>
-                        <Switch checked={formData.inviteOnly} onCheckedChange={(v) => updateField("inviteOnly", v)} />
+                        <Switch
+                          checked={formData.inviteOnly}
+                          onCheckedChange={(v) => updateField("inviteOnly", v)}
+                        />
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className="text-sm">Code d&apos;accès</Label>
-                          <p className="text-xs text-muted-foreground">Exiger un code pour rejoindre</p>
+                          <p className="text-xs text-muted-foreground">
+                            Exiger un code pour rejoindre
+                          </p>
                         </div>
                         <Switch
                           checked={formData.requiresAccessCode}
-                          onCheckedChange={(v) => updateField("requiresAccessCode", v)}
+                          onCheckedChange={(v) =>
+                            updateField("requiresAccessCode", v)
+                          }
                         />
                       </div>
 
@@ -486,7 +555,9 @@ export function CreateTournamentForm() {
                               className="pl-9"
                               placeholder="Code d'accès"
                               value={formData.accessCode}
-                              onChange={(e) => updateField("accessCode", e.target.value)}
+                              onChange={(e) =>
+                                updateField("accessCode", e.target.value)
+                              }
                             />
                           </div>
                         </div>
@@ -497,7 +568,9 @@ export function CreateTournamentForm() {
                     <div className="space-y-4 p-4 rounded-lg border">
                       <div className="flex items-center gap-3">
                         <MessageCircle className="h-5 w-5 text-primary" />
-                        <Typography variant="body-base" weight="bold">Contact</Typography>
+                        <Typography variant="body-base" weight="bold">
+                          Contact
+                        </Typography>
                       </div>
 
                       <div className="space-y-3">
@@ -507,7 +580,9 @@ export function CreateTournamentForm() {
                             type="email"
                             placeholder="contact@example.com"
                             value={formData.contactEmail}
-                            onChange={(e) => updateField("contactEmail", e.target.value)}
+                            onChange={(e) =>
+                              updateField("contactEmail", e.target.value)
+                            }
                           />
                         </div>
                         <div className="space-y-1">
@@ -516,7 +591,9 @@ export function CreateTournamentForm() {
                             type="tel"
                             placeholder="+33 6 12 34 56 78"
                             value={formData.contactPhone}
-                            onChange={(e) => updateField("contactPhone", e.target.value)}
+                            onChange={(e) =>
+                              updateField("contactPhone", e.target.value)
+                            }
                           />
                         </div>
                         <div className="space-y-1">
@@ -524,7 +601,9 @@ export function CreateTournamentForm() {
                           <Input
                             placeholder="https://discord.gg/..."
                             value={formData.discordServer}
-                            onChange={(e) => updateField("discordServer", e.target.value)}
+                            onChange={(e) =>
+                              updateField("discordServer", e.target.value)
+                            }
                           />
                         </div>
                         <div className="space-y-1">
@@ -532,7 +611,9 @@ export function CreateTournamentForm() {
                           <Input
                             placeholder="https://chat.whatsapp.com/..."
                             value={formData.whatsappGroup}
-                            onChange={(e) => updateField("whatsappGroup", e.target.value)}
+                            onChange={(e) =>
+                              updateField("whatsappGroup", e.target.value)
+                            }
                           />
                         </div>
                       </div>
@@ -555,7 +636,12 @@ export function CreateTournamentForm() {
                   <div className="relative rounded-xl overflow-hidden border">
                     <div className="h-40 bg-gradient-to-r from-primary/20 to-primary/10 relative">
                       {formData.coverImage ? (
-                        <img src={formData.coverImage} alt="Couverture" className="w-full h-full object-cover" />
+                        <Image
+                          src={formData.coverImage}
+                          fill={true}
+                          alt="Couverture"
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <ImageIcon className="h-16 w-16 text-primary/30" />
@@ -563,9 +649,11 @@ export function CreateTournamentForm() {
                       )}
                       <div className="absolute -bottom-10 left-6">
                         {formData.profileImage ? (
-                          <img
+                          <Image
                             src={formData.profileImage}
                             alt="Profil"
+                            width={80}
+                            height={80}
                             className="w-20 h-20 rounded-full border-4 border-background object-cover"
                           />
                         ) : (
@@ -579,8 +667,13 @@ export function CreateTournamentForm() {
                       <Typography variant="h3" weight="bold" className="mb-2">
                         {getTournamentPreviewData(formData).title}
                       </Typography>
-                      {(formData.description.trim() || formData.name.trim()) && (
-                        <Typography variant="body-base" theme="muted" className="mb-4">
+                      {(formData.description.trim() ||
+                        formData.name.trim()) && (
+                        <Typography
+                          variant="body-base"
+                          theme="muted"
+                          className="mb-4"
+                        >
                           {formData.description.trim() ||
                             generateTournamentDescription({
                               name: formData.name,
@@ -593,19 +686,22 @@ export function CreateTournamentForm() {
                         </Typography>
                       )}
                       <div className="flex flex-wrap gap-3">
-                        {getTournamentPreviewData(formData).badges.map((b, i) => (
-                          <span
-                            key={i}
-                            className={`inline-flex items-center px-2.5 py-1 rounded border text-xs ${b.variant === "outline"
-                                ? "border-border"
-                                : b.variant === "secondary"
-                                  ? "bg-secondary text-foreground border-transparent"
-                                  : "bg-primary text-primary-foreground border-transparent"
+                        {getTournamentPreviewData(formData).badges.map(
+                          (b, i) => (
+                            <span
+                              key={i}
+                              className={`inline-flex items-center px-2.5 py-1 rounded border text-xs ${
+                                b.variant === "outline"
+                                  ? "border-border"
+                                  : b.variant === "secondary"
+                                    ? "bg-secondary text-foreground border-transparent"
+                                    : "bg-primary text-primary-foreground border-transparent"
                               }`}
-                          >
-                            {b.label}
-                          </span>
-                        ))}
+                            >
+                              {b.label}
+                            </span>
+                          ),
+                        )}
                       </div>
                     </div>
                   </div>
@@ -613,19 +709,31 @@ export function CreateTournamentForm() {
                   {/* Summary grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="p-3 rounded-lg border text-center">
-                      <div className="text-xs text-muted-foreground">Plateforme</div>
-                      <div className="font-medium text-sm mt-1">{formData.platform || "—"}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Plateforme
+                      </div>
+                      <div className="font-medium text-sm mt-1">
+                        {formData.platform || "—"}
+                      </div>
                     </div>
                     <div className="p-3 rounded-lg border text-center">
                       <div className="text-xs text-muted-foreground">Mode</div>
-                      <div className="font-medium text-sm mt-1">{formData.gameMode || "—"}</div>
+                      <div className="font-medium text-sm mt-1">
+                        {formData.gameMode || "—"}
+                      </div>
                     </div>
                     <div className="p-3 rounded-lg border text-center">
-                      <div className="text-xs text-muted-foreground">Participants</div>
-                      <div className="font-medium text-sm mt-1">{formData.maxParticipants}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Participants
+                      </div>
+                      <div className="font-medium text-sm mt-1">
+                        {formData.maxParticipants}
+                      </div>
                     </div>
                     <div className="p-3 rounded-lg border text-center">
-                      <div className="text-xs text-muted-foreground">Visibilité</div>
+                      <div className="text-xs text-muted-foreground">
+                        Visibilité
+                      </div>
                       <div className="font-medium text-sm mt-1">
                         {formData.isPublic ? "Public" : "Privé"}
                         {formData.inviteOnly && " · Invitation"}
@@ -654,7 +762,11 @@ export function CreateTournamentForm() {
               onClick={nextStep}
               className="gap-2 bg-primary hover:bg-primary/90"
               disabled={step === 2 && !canAdvanceStep2}
-              title={step === 2 && !canAdvanceStep2 ? "Renseignez le nom, le jeu et la date" : undefined}
+              title={
+                step === 2 && !canAdvanceStep2
+                  ? "Renseignez le nom, le jeu et la date"
+                  : undefined
+              }
             >
               Suivant
               <ArrowRight className="h-4 w-4" />

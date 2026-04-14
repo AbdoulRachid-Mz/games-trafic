@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import {
@@ -16,7 +17,8 @@ import {
   Trophy,
   GamepadIcon,
   Star,
-  Filter,
+  Filter, 
+  AlertTriangle,
 } from "lucide-react";
 import { TransactionType } from "@/types/transaction-types";
 import { cn } from "@/lib/utils";
@@ -47,6 +49,7 @@ export function TransactionEntitySelector({
 }: TransactionEntitySelectorProps) {
   const [search, setSearch] = useState("");
   const { user } = useAuthContext();
+  const router = useRouter();
 
   // Mapper les types de transactions vers les EntityType
   const entityTypeMap: Record<TransactionType, EntityType | null> = {
@@ -70,10 +73,11 @@ export function TransactionEntitySelector({
     setSearchTerm,
   } = useEntityList<any>({
     entityType: (entityType || "products") as any, // Fallback to products
-    defaultLimit: 50,
+    defaultLimit: (type === "PRODUCT_PURCHASE" || type === "GAME_ITEM_PURCHASE") ? 20 : 50,
     enabled: !!entityType,
     defaultFilters: {
-      isActive: true,
+      isActive: true, 
+      isVisible: true,
       // Filtres spécifiques selon le type
       ...(type === "PRODUCT_PURCHASE" && { status: "NON_VENDU" }),
       ...(type === "THEME_PURCHASE" && { isPremium: true }),
@@ -150,7 +154,7 @@ export function TransactionEntitySelector({
         notOwnProduct
       );
     });
-  }, [entities, search]);
+  }, [entities, search, type, user]);
 
   const mappedEntities = useMemo(() => {
     return filteredEntities.map((entity: any) => {
@@ -264,143 +268,164 @@ export function TransactionEntitySelector({
                   )}
                 </div>
               ) : (
-                mappedEntities.map((entity, index) => (
-                  <motion.div
-                    key={entity.id}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <button
-                      onClick={() => {
-                        // Adapter l'entité selon le type pour inclure le prix fixe
-                        if (type === "TOURNAMENT_PARTICIPATION") {
-                          const price = parseFloat(entity.entryFee || "0");
-                          const mapped = {
-                            id: entity.id,
-                            name: entity.name || `Édition #${entity.editionNumber}`,
-                            description: entity.description || "",
-                            price: price,
-                            currency: entity.prizeCurrency || "GTC",
-                            image: undefined,
-                            metadata: {
-                              tournamentId: entity.tournamentId,
-                              editionNumber: entity.editionNumber,
-                              startDate: entity.startDate,
-                              currentParticipants: entity.currentParticipants,
-                              maxParticipants: entity.maxParticipants,
-                            },
-                          } as TransactionEntity;
-                          onSelect(mapped);
-                        } else {
-                          onSelect(entity as TransactionEntity);
-                        }
-                      }}
-                      disabled={
-                        entity.metadata?.status &&
-                        entity.metadata.status !== "NON_VENDU"
-                      }
-                      className={cn(
-                        "w-full text-left p-4 rounded-2xl border transition-all duration-300 group relative overflow-hidden",
-                        "hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 bg-background/30 hover:bg-background/60",
-                        entity.metadata?.status &&
-                          entity.metadata.status !== "NON_VENDU"
-                          ? "opacity-60 grayscale cursor-not-allowed"
-                          : ""
-                      )}
+                mappedEntities.map((entity, index) => {
+                  const status = entity.status || entity.metadata?.status;
+                  const isUnavailable = status && status !== "NON_VENDU";
+                  
+                  return (
+                    <motion.div
+                      key={entity.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
                     >
-                      <div className="relative z-10 flex items-start gap-4">
-                        {/* Image/Icon Placeholder */}
-                        <div
-                          className={cn(
-                            "w-16 h-16 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105",
-                            "bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10"
-                          )}
-                        >
-                          {entity.image ? (
-                            <img
-                              src={entity.image}
-                              alt={entity.name}
-                              className="w-full h-full object-cover rounded-xl"
-                            />
-                          ) : (
-                            <Icon className="w-8 h-8 text-primary" />
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <Typography
-                                variant="body-base"
-                                weight="bold"
-                                className="truncate group-hover:text-primary transition-colors"
-                              >
-                                {entity.name}
-                              </Typography>
-                            </div>
-                            {entity.price !== undefined && (
-                              <div className="text-right shrink-0">
-                                <Typography
-                                  variant="h5"
-                                  weight="bold"
-                                  className="text-primary truncate"
-                                >
-                                  {(
-                                    (type === "TOURNAMENT_PARTICIPATION"
-                                      ? parseFloat(entity.entryFee || "0")
-                                      : entity.price || 0) as number
-                                  ).toFixed(2)}{" "}
-                                  <span className="text-xs opacity-70">
-                                    GTC
-                                  </span>
-                                </Typography>
-                              </div>
+                      <button
+                        onClick={() => {
+                          // Adapter l'entité selon le type pour inclure le prix fixe
+                          if (type === "TOURNAMENT_PARTICIPATION") {
+                            const price = parseFloat(entity.entryFee || "0");
+                            const mapped = {
+                              id: entity.id,
+                              name: entity.name || `Édition #${entity.editionNumber}`,
+                              description: entity.description || "",
+                              price: price,
+                              currency: entity.prizeCurrency || "GTC",
+                              image: undefined,
+                              metadata: {
+                                tournamentId: entity.tournamentId,
+                                editionNumber: entity.editionNumber,
+                                startDate: entity.startDate,
+                                currentParticipants: entity.currentParticipants,
+                                maxParticipants: entity.maxParticipants,
+                              },
+                            } as TransactionEntity;
+                            onSelect(mapped);
+                          } else {
+                            onSelect(entity as TransactionEntity);
+                          }
+                        }}
+                        disabled={isUnavailable}
+                        className={cn(
+                          "w-full text-left p-4 rounded-2xl border transition-all duration-300 group relative overflow-hidden",
+                          "hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 bg-background/30 hover:bg-background/60",
+                          isUnavailable ? "opacity-60 grayscale cursor-not-allowed" : ""
+                        )}
+                      >
+                        <div className="relative z-10 flex items-start gap-4">
+                          {/* Image/Icon Placeholder */}
+                          <div
+                            className={cn(
+                              "w-16 h-16 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105",
+                              "bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/10"
+                            )}
+                          >
+                            {entity.image ? (
+                              <img
+                                src={entity.image}
+                                alt={entity.name}
+                                className="w-full h-full object-cover rounded-xl"
+                              />
+                            ) : (
+                              <Icon className="w-8 h-8 text-primary" />
                             )}
                           </div>
 
-                          <div className="mt-1 flex flex-wrap gap-2 items-center">
-                            {entity.metadata?.isFeatured && (
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200"
-                              >
-                                <Star className="h-3 w-3 mr-1 fill-current" />
-                                Populaire
-                              </Badge>
-                            )}
-                            {entity.metadata?.seller && (
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <Typography
+                                  variant="body-base"
+                                  weight="bold"
+                                  className="truncate group-hover:text-primary transition-colors"
+                                >
+                                  {entity.name}
+                                </Typography>
+                              </div>
+                              {entity.price !== undefined && (
+                                <div className="text-right shrink-0">
+                                  <Typography
+                                    variant="h5"
+                                    weight="bold"
+                                    className="text-primary truncate"
+                                  >
+                                    {(
+                                      (type === "TOURNAMENT_PARTICIPATION"
+                                        ? parseFloat(entity.entryFee || "0")
+                                        : entity.price || 0) as number
+                                    ).toFixed(2)}{" "}
+                                    <span className="text-xs opacity-70">
+                                      GTC
+                                    </span>
+                                  </Typography>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="mt-1 flex flex-wrap gap-2 items-center">
+                              {entity.metadata?.isFeatured && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-200"
+                                >
+                                  <Star className="h-3 w-3 mr-1 fill-current" />
+                                  Populaire
+                                </Badge>
+                              )}
+                              {isUnavailable && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px] font-bold",
+                                    status === "RESERVE" 
+                                      ? "bg-amber-500/10 text-amber-600 border-amber-200" 
+                                      : "bg-rose-500/10 text-rose-600 border-rose-200"
+                                  )}
+                                >
+                                  {status === "RESERVE" ? "Réservé" : "Vendu"}
+                                </Badge>
+                              )}
+                              {entity.metadata?.seller && (
+                                <Typography
+                                  variant="caption1"
+                                  theme="muted"
+                                  className="flex items-center gap-1"
+                                >
+                                  Par{" "}
+                                  <span className="font-medium text-foreground">
+                                    {entity.metadata.seller}
+                                  </span>
+                                </Typography>
+                              )}
+                            </div>
+
+                            {entity.description && (
                               <Typography
                                 variant="caption1"
                                 theme="muted"
-                                className="flex items-center gap-1"
+                                className="line-clamp-2 mt-2"
                               >
-                                Par{" "}
-                                <span className="font-medium text-foreground">
-                                  {entity.metadata.seller}
-                                </span>
+                                {entity.description}
                               </Typography>
                             )}
                           </div>
-
-                          {entity.description && (
-                            <Typography
-                              variant="caption1"
-                              theme="muted"
-                              className="line-clamp-2 mt-2"
-                            >
-                              {entity.description}
-                            </Typography>
-                          )}
                         </div>
-                      </div>
-                    </button>
-                  </motion.div>
-                ))
+                      </button>
+                    </motion.div>
+                  );
+                })
               )}
             </div>
 
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border/50 flex flex-col gap-3">
+              {(type === "PRODUCT_PURCHASE" || type === "GAME_ITEM_PURCHASE") && (
+                <Button
+                  variant="ghost"
+                  className="w-full text-primary hover:text-primary hover:bg-primary/10 font-bold h-12 rounded-xl border border-primary/20"
+                  onClick={() => router.push(type === "PRODUCT_PURCHASE" ? "/marketplace" : "/games")}
+                >
+                  Voir tous les {type === "PRODUCT_PURCHASE" ? "produits" : "items"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={onBack}

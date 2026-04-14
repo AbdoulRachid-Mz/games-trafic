@@ -1604,6 +1604,63 @@ export interface EntityCategoryFilters extends BaseFilters {
   createdTo?: Date | string;
 }
 
+// Signals - Basé sur la table `signals`
+// export interface SignalFilters extends BaseFilters {
+//   id?: string;
+//   reporterId?: string;
+//   targetType?: string;
+//   targetId?: string;
+//   categoryId?: string;
+//   title?: string;
+//   description?: string;
+//   offset?: number;
+//   attachments?: string[];
+//   severity?: string;
+//   status?: string;
+//   assignedTo?: string;
+//   resolvedBy?: string;
+//   resolution?: string;
+//   createdFrom?: Date | string;
+//   createdTo?: Date | string;
+// }
+
+// signal type
+export type SignalType = "SPAM" | "INAPPROPRIATE" | "OTHER";
+
+// signal status
+export type SignalStatus = "PENDING" | "PROCESSED" | "RESOLVED";
+
+export interface CreateSignalInput {
+  userId: string;
+  type: SignalType;
+
+  targetId?: string;
+  targetType: SignalType;
+
+  title: string;
+  description?: string;
+
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateSignalInput {
+  title?: string;
+  description?: string;
+  status?: SignalStatus;
+  metadata?: Record<string, any>;
+}
+
+export interface SignalFilters {
+  userId?: string;
+  type?: SignalType;
+  status?: SignalStatus;
+  limit?: number;
+  offset?: number;
+  orderBy?: "createdAt" | "updatedAt";
+  order?: "asc" | "desc";
+}
+
 // ============================================================================
 // OPTIONS DE REQUÊTE COMBINÉES
 // ============================================================================

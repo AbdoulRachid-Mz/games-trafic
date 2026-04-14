@@ -92,6 +92,13 @@
       "when": 1774992863939,
       "tag": "0012_quiet_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1776199206349,
+      "tag": "0013_rich_molten_man",
+      "breakpoints": true
     }
   ]
 }

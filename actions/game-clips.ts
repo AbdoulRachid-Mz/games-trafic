@@ -6,7 +6,7 @@ import {
   gameClips,
   users,
   shops,
-  games,
+  games, 
   interactions,
   messages
 } from "@/database/schema";
@@ -238,15 +238,6 @@ export async function createGameClip({ data, userId }: CreateGameClipParams) {
       .limit(1);
     if (!game) throw new Error("Game not found");
   }
-
-  // Check daily limit based on user type
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const [todaysClipsCount] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(gameClips)
-
 
   // Create clip
   const result = await db

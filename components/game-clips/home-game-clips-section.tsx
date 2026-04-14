@@ -1,10 +1,9 @@
-// @/components/game-clips/home-game-clips-section.tsx
+// components/game-clips/home-game-clips-section.tsx
 "use client";
 
 import React from "react";
 import { useGameClips } from "@/hooks/use-game-clips";
 import { Typography } from "@/components/ui/typography";
-import { GameClipCreationDialog } from "./game-clip-creation-dialog";
 import { cn } from "@/lib/utils";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -17,19 +16,15 @@ export function HomeGameClipsSection() {
   const { clips, loading } = useGameClips({
     sortBy: "createdAt",
     sortOrder: "desc",
-    limit: 5, // Limité aux 5 derniers comme demandé
+    limit: 5,
   });
 
   const handleClipClick = (clipId: string) => {
     router.push(`/game-clips?activeClipId=${clipId}`);
   };
 
-  const handleSeeMore = () => {
-    router.push("/game-clips");
-  };
-
   const handleCreate = () => {
-    router.push("/game-clips?create=true");
+    router.push("/game-clips/create");
   };
 
   return (
@@ -48,7 +43,7 @@ export function HomeGameClipsSection() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleSeeMore}
+              onClick={() => router.push("/game-clips")}
               className="text-primary hover:text-primary/80 text-xs font-bold gap-1 p-0 h-auto"
             >
               Voir tout <ChevronRight className="h-3 w-3" />
@@ -101,20 +96,12 @@ export function HomeGameClipsSection() {
             ))}
 
             {/* Loading Skeletons */}
-            {loading &&
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex flex-col items-center gap-2">
-                  <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/5 border border-white/5 animate-pulse" />
-                  <div className="h-2 w-8 bg-white/5 rounded animate-pulse" />
-                </div>
-              ))}
-
-            {/* No Clips empty state button */}
-            {!loading && clips.length === 0 && (
-              <div className="flex items-center justify-center py-2">
-                <Typography variant="caption1" className="text-white/40 italic">Partagez le premier clip !</Typography>
+            {loading && Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/5 border border-white/5 animate-pulse" />
+                <div className="h-2 w-8 bg-white/5 rounded animate-pulse" />
               </div>
-            )}
+            ))}
           </div>
           <ScrollBar orientation="horizontal" className="hidden" />
         </ScrollArea>

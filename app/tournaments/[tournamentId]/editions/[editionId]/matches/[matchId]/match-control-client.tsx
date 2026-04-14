@@ -62,7 +62,7 @@ export function MatchControlClient({
   const isCoOrganizer = match.edition?.tournament?.members?.some(
     (m: any) => m.userId === user?.id && m.isCoOrganizer
   );
-  const isOrganizer = isOrganizerProp ?? (isOwner || isCoOrganizer);
+  const isOrganizer = isOrganizerProp || isOwner || isCoOrganizer;
   
   const isParticipant1 = user?.id === match.participant1?.member?.userId;
   const isParticipant2 = user?.id === match.participant2?.member?.userId;

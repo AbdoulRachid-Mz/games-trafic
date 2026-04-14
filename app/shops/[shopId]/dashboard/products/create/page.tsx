@@ -18,7 +18,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Typography } from "@/components/ui/typography";
 import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
 import { Badge } from "@/components/ui/badge";
-import { Package, ArrowLeft, ArrowRight, CheckCircle2, Shield, Lock } from "lucide-react";
+import {
+  Package,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Shield,
+  Lock,
+} from "lucide-react";
 import { createProduct } from "@/actions/products";
 import { encryptData } from "@/lib/encryption";
 
@@ -53,7 +60,7 @@ export default function CreateProductPage() {
 
   const updateField = <K extends keyof ProductFormData>(
     key: K,
-    value: ProductFormData[K]
+    value: ProductFormData[K],
   ) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
@@ -69,10 +76,10 @@ export default function CreateProductPage() {
     setIsSubmitting(true);
     try {
       const shopId = params.shopId as string;
-      
+
       // Chiffrer le mot de passe s'il est fourni
-      const encryptedPassword = formData.accountPassword 
-        ? encryptData(formData.accountPassword) 
+      const encryptedPassword = formData.accountPassword
+        ? encryptData(formData.accountPassword)
         : undefined;
 
       const product = await createProduct({
@@ -81,7 +88,9 @@ export default function CreateProductPage() {
         price: formData.price,
         currency: formData.currency,
         description: formData.description,
-        featuredImage: formData.featuredImage || (formData.images.length > 0 ? formData.images[0] : ""),
+        featuredImage:
+          formData.featuredImage ||
+          (formData.images.length > 0 ? formData.images[0] : ""),
         images: formData.images.filter(Boolean),
         accountLogin: formData.accountLogin || undefined,
         encryptedPassword,
@@ -222,25 +231,32 @@ export default function CreateProductPage() {
                       Accès au compte
                     </Typography>
                     <Typography variant="body-sm" theme="muted">
-                      Informations de connexion (facultatif mais recommandé pour les comptes)
+                      Informations de connexion (facultatif mais recommandé pour
+                      les comptes)
                     </Typography>
                   </div>
-                  
+
                   <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex gap-3 items-start mb-6">
                     <Lock className="h-5 w-5 text-amber-600 mt-0.5" />
                     <Typography variant="caption1" className="text-amber-800">
-                      Ces informations seront <strong>chiffrées</strong> et uniquement visibles par l'acheteur après la confirmation de la vente.
+                      Ces informations seront <strong>chiffrées</strong> et
+                      uniquement visibles par l'acheteur après la confirmation
+                      de la vente.
                     </Typography>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="accountLogin">Nom d'utilisateur / Email</Label>
+                      <Label htmlFor="accountLogin">
+                        Nom d'utilisateur / Email
+                      </Label>
                       <Input
                         id="accountLogin"
                         placeholder="Ex: player_one@gmail.com"
                         value={formData.accountLogin}
-                        onChange={(e) => updateField("accountLogin", e.target.value)}
+                        onChange={(e) =>
+                          updateField("accountLogin", e.target.value)
+                        }
                       />
                     </div>
                     <div className="space-y-2">
@@ -250,7 +266,9 @@ export default function CreateProductPage() {
                         type="password"
                         placeholder="••••••••"
                         value={formData.accountPassword}
-                        onChange={(e) => updateField("accountPassword", e.target.value)}
+                        onChange={(e) =>
+                          updateField("accountPassword", e.target.value)
+                        }
                       />
                     </div>
                   </div>
@@ -294,7 +312,7 @@ export default function CreateProductPage() {
                           {formData.price || "0.00"} {formData.currency}
                         </Typography>
                       </div>
-                      
+
                       {formData.description && (
                         <Typography
                           variant="body-base"
@@ -304,14 +322,17 @@ export default function CreateProductPage() {
                           {formData.description}
                         </Typography>
                       )}
-                      
+
                       <div className="flex flex-wrap gap-2 items-center">
                         <Badge variant="secondary" className="gap-1">
                           <Package className="h-3 w-3" />
                           {formData.images.length} image(s)
                         </Badge>
                         {formData.accountLogin && (
-                          <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200 gap-1">
+                          <Badge
+                            variant="outline"
+                            className="text-green-600 bg-green-50 border-green-200 gap-1"
+                          >
                             <Shield className="h-3 w-3" />
                             Accès inclus
                           </Badge>

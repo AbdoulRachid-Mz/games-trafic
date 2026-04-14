@@ -10,6 +10,7 @@ import type { TournamentPhase, PhaseGroup } from "@/database/schema";
 import { PhaseDetailActions } from "@/components/pages/tournaments/edition-detail/phase-detail-actions";
 import { GroupItemActions } from "@/components/pages/tournaments/edition-detail/group-item-actions";
 import { CreateGroupDialog } from "@/components/pages/tournaments/edition-detail/create-group-dialog";
+import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/edition-detail/generate-group-matches-dialog";
 
 interface PageProps {
   params: Promise<{
@@ -157,13 +158,22 @@ export default async function PhaseDetailPage({ params }: PageProps) {
                     </div>
                   </div>
 
-                  <GroupItemActions
-                    group={group}
-                    basePath={basePath}
-                    isFirst={idx === 0}
-                    isLast={idx === groupsRes.data.length - 1}
-                    phaseId={phaseId}
-                  />
+                  <div className="flex items-center gap-3">
+                    {(!group.matchCount || group.matchCount === 0) && (
+                      <GenerateGroupMatchesDialog
+                        groupId={group.id}
+                        editionId={editionId}
+                        phaseId={phaseId}
+                      />
+                    )}
+                    <GroupItemActions
+                      group={group}
+                      basePath={basePath}
+                      isFirst={idx === 0}
+                      isLast={idx === groupsRes.data.length - 1}
+                      phaseId={phaseId}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

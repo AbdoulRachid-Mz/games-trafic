@@ -32,6 +32,7 @@ import { getOrdersByShopId, approveOrderShop, rejectOrder } from "@/actions/orde
 import { getProductById } from "@/actions/products";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useOrdersByShopId } from "@/hooks/use-orders";
+import Image from "next/image";
 
 type UiOrder = {
   id: string;
@@ -218,7 +219,9 @@ export default function ShopOrdersPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {o.productImage && (
-                          <img
+                          <Image
+                            width={40}
+                            height={40}
                             src={o.productImage}
                             alt={o.productName}
                             className="w-10 h-10 rounded-lg object-cover"

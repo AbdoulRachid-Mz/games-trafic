@@ -24,43 +24,82 @@ export function checkDuplicateMatch(
   );
 }
 
+/**
+ * Génère les matchs de type Round Robin en utilisant l'algorithme du ruban (Circle Method).
+ * Cela permet de grouper les matchs par "Journées" où chaque participant joue au plus une fois.
+ */
 export function generateRoundRobinMatches(
   participants: Participant[]
 ): Match[] {
   const matches: Match[] = [];
-  let round = 1;
+  const n = participants.length;
+  if (n < 2) return [];
 
-  for (let i = 0; i < participants.length; i++) {
-    for (let j = i + 1; j < participants.length; j++) {
-      matches.push({
-        id: generateId("match"),
-        playerA: participants[i],
-        playerB: participants[j],
-        round,
-      });
-      round++;
+  const players = [...participants];
+  if (n % 2 !== 0) {
+    players.push({ id: "BYE", name: "Exempt", status: "PENDING" });
+  }
+
+  const numRounds = players.length - 1;
+  const half = players.length / 2;
+
+  for (let round = 1; round <= numRounds; round++) {
+    for (let i = 0; i < half; i++) {
+      const p1 = players[i];
+      const p2 = players[players.length - 1 - i];
+
+      if (p1.id !== "BYE" && p2.id !== "BYE") {
+        matches.push({
+          id: generateId("match"),
+          playerA: p1,
+          playerB: p2,
+          round,
+        });
+      }
     }
+
+    // Faire tourner les joueurs (garder le premier fixe)
+    const last = players.pop()!;
+    players.splice(1, 0, last);
   }
 
   return matches;
 }
 
+/**
+ * Génère les matchs de groupe avec option Aller Simple ou Aller-Retour.
+ * Groupé par journées.
+ */
 export function generateGroupMatches(
   participants: any[],
   opts?: { returnType?: "single" | "double" }
 ) {
-  const matches = opts?.returnType === "double" 
-    ? generateHomeAwayMatches(participants)
-    : generateRoundRobinMatches(participants);
+  const firstHalf = generateRoundRobinMatches(participants);
+  let allMatches = [...firstHalf];
+
+  if (opts?.returnType === "double") {
+    const numFirstHalfRounds = Math.max(...firstHalf.map(m => m.round), 0);
+    const secondHalf = firstHalf.map(m => ({
+      ...m,
+      id: generateId("match"),
+      playerA: m.playerB,
+      playerB: m.playerA,
+      round: m.round + numFirstHalfRounds
+    }));
+    allMatches = [...allMatches, ...secondHalf];
+  }
     
   // Map .playerA to .participant1 to match the expected output
-  return matches.map((m) => ({
+  return allMatches.map((m) => ({
     ...m,
     participant1: m.playerA,
     participant2: m.playerB,
   }));
 }
 
+/**
+ * Génère les matchs d'élimination directe pour un tour donné.
+ */
 export function generateEliminationMatches(
   participants: Participant[],
   currentRound: number
@@ -69,7 +108,8 @@ export function generateEliminationMatches(
 
   for (let i = 0; i < participants.length; i += 2) {
     const playerA = participants[i];
-    const playerB = participants[i + 1];
+    const playerB = participants[i + 1] || null; // Gérer les BYE si impaire
+    
     matches.push({
       id: generateId("match"),
       playerA,
@@ -82,25 +122,22 @@ export function generateEliminationMatches(
 }
 
 /**
- * Génère les matchs aller-retour entre tous les participants.
- * Chaque paire joue deux fois (A vs B ET B vs A).
+ * Système Suisse : Initialisation (Seeding)
+ * En mode Suisse, les rounds suivants sont générés dynamiquement après chaque round.
+ * Ici on fournit juste la base pour le premier round.
+ */
+export function generateSwissFirstRound(participants: Participant[]): Match[] {
+  // Similaire à un round de tournoi mais basé sur le rang
+  return generateEliminationMatches(participants, 1);
+}
+
+/**
+ * Génère les matchs aller-retour (Ancienne méthode, conservée pour compatibilité si besoin mais dépréciée par generateGroupMatches)
  */
 export function generateHomeAwayMatches(participants: Participant[]): Match[] {
-  const matches: Match[] = [];
-  let round = 1;
-
-  for (let i = 0; i < participants.length; i++) {
-    for (let j = 0; j < participants.length; j++) {
-      if (i === j) continue;
-      matches.push({
-        id: generateId("match"),
-        playerA: participants[i],
-        playerB: participants[j],
-        round,
-      });
-      round++;
-    }
-  }
-
-  return matches;
+  return generateGroupMatches(participants, { returnType: "double" }).map(m => ({
+    ...m,
+    playerA: (m as any).participant1,
+    playerB: (m as any).participant2,
+  }));
 }
