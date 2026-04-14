@@ -26,9 +26,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useSignals, useUpdateSignal, useDeleteSignal } from "@/hooks/use-signals";
+import { SignalFilters, SignalStatus } from "@/types/api";
 
 export default function AdminSignalsPage() {
-  const [filter, setFilter] = useState<any>({});
+  const [filter, setFilter] = useState<SignalFilters>({});
 
   const { data, isLoading, refetch } = useSignals(filter);
 
@@ -37,7 +38,7 @@ export default function AdminSignalsPage() {
 
   const handleStatusUpdate = async (id: string, status: string) => {
     updateMutation.mutate(
-      { id, input: { status: status as any } },
+      { id, input: { status: status as SignalStatus } },
       {
         onSuccess: () => {
           toast.success("Statut mis à jour");
@@ -127,14 +128,14 @@ export default function AdminSignalsPage() {
                   <TableCell colSpan={6} className="h-16 animate-pulse bg-muted/10" />
                 </TableRow>
               ))
-            ) : data && data.length === 0 ? (
+            ) : data && data.data.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
                   Aucun signalement trouvé.
                 </TableCell>
               </TableRow>
             ) : (
-              data?.map((signal: any) => (
+              data && data.data?.map((signal: any) => (
                 <TableRow key={signal.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <div className="flex items-center gap-2">
