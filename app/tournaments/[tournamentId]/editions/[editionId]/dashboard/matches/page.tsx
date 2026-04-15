@@ -1,35 +1,25 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/dashboard/matches/page.tsx
-import { Metadata } from "next";
-import { getTournamentPhases, getMatches, getEditionDetailTree } from "@/actions/tournaments";
+"use client";
+
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import Link from "next/link";
-import { 
-  Swords, 
-  Calendar, 
-  Clock, 
-  Search, 
-  Filter, 
-  ArrowRight, 
-  ChevronLeft, 
+import {
+  Swords,
+  Calendar,
+  Clock, ArrowRight,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
   User as UserIcon,
-  AlertCircle,
-  Download,
-  FolderTree,
+  AlertCircle, FolderTree,
   ListTree,
-  Grid3X3,
-  LayoutGrid,
-  Trophy,
-  Users,
-  Zap
+  Grid3X3, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -37,27 +27,9 @@ import { fr } from "date-fns/locale";
 import Image from "next/image";
 import { MatchesDashboardFilters } from "@/components/pages/tournaments/edition-detail/matches-dashboard-filters";
 import { ExportMatchesButton } from "@/components/pages/tournaments/edition-detail/export-matches-button";
-import { useState } from "react";
-
-export const metadata: Metadata = {
-  title: "Gestion des Matchs - Dashboard",
-};
-
-interface PageProps {
-  params: Promise<{
-    tournamentId: string;
-    editionId: string;
-  }>;
-  searchParams: Promise<{
-    page?: string;
-    phaseId?: string;
-    groupId?: string;
-    bracketNodeId?: string;
-    status?: string;
-    search?: string;
-    view?: "list" | "tree" | "grid";
-  }>;
-}
+import { useQuery } from "@tanstack/react-query";
+import { getTournamentPhases, getMatches, getEditionDetailTree } from "@/actions/tournaments";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const s = status || "PENDING";
@@ -257,36 +229,54 @@ function MatchTreeNode({ node, tournamentId, editionId, depth = 0 }: { node: any
   );
 }
 
-export default async function MatchesDashboardPage({ params, searchParams }: PageProps) {
-  const { tournamentId, editionId } = await params;
-  const { page = "1", phaseId, groupId, bracketNodeId, status, search, view = "list" } = await searchParams;
+export default function MatchesDashboardPage({ params }: { params: { tournamentId: string; editionId: string } }) {
+  const { tournamentId, editionId } = params;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  const page = searchParams.get("page") || "1";
+  const phaseId = searchParams.get("phaseId") || undefined;
+  const groupId = searchParams.get("groupId") || undefined;
+  const bracketNodeId = searchParams.get("bracketNodeId") || undefined;
+  const status = searchParams.get("status") || undefined;
+  const search = searchParams.get("search") || undefined;
+  const view = (searchParams.get("view") as "list" | "tree" | "grid") || "list";
   
   const currentPage = parseInt(page);
   const limit = 20;
 
-  // Fetch data
-  const [phasesRes, matchesRes, editionTree] = await Promise.all([
-    getTournamentPhases({ filters: { editionId } }),
-    getMatches({
+  // Fetch data with React Query
+  const { data: phasesRes, isLoading: phasesLoading } = useQuery({
+    queryKey: ["tournament-phases", editionId],
+    queryFn: () => getTournamentPhases({ filters: { editionId } }),
+  });
+  
+  const { data: matchesRes, isLoading: matchesLoading } = useQuery({
+    queryKey: ["matches", editionId, phaseId, groupId, bracketNodeId, status, search, currentPage],
+    queryFn: () => getMatches({
       filters: { 
         editionId, 
-        phaseId: phaseId || undefined,
-        groupId: groupId || undefined,
-        bracketNodeId: bracketNodeId || undefined,
+        phaseId,
+        groupId,
+        bracketNodeId,
         statuses: status ? [status] as any : undefined,
-        search: search || undefined
+        search
       },
       pagination: { page: currentPage, limit },
       options: { sortBy: "scheduledTime", sortOrder: "asc" }
     }),
-    getEditionDetailTree(editionId).catch(() => null)
-  ]);
+  });
+  
+  const { data: editionTree, isLoading: treeLoading } = useQuery({
+    queryKey: ["edition-tree", editionId],
+    queryFn: () => getEditionDetailTree(editionId).catch(() => null),
+  });
 
-  const phases = phasesRes.data || [];
-  const matches = matchesRes.data || [];
-  const { pagination } = matchesRes;
-
-  const sp = await searchParams;
+  const phases = phasesRes?.data || [];
+  const matches = matchesRes?.data || [];
+  const pagination = matchesRes?.pagination || { total: 0, totalPages: 0, hasPrev: false, hasNext: false };
+  const isLoading = phasesLoading || matchesLoading || treeLoading;
 
   // Build tree structure for tree view
   const buildTreeView = () => {
@@ -314,6 +304,41 @@ export default async function MatchesDashboardPage({ params, searchParams }: Pag
 
   const treeData = buildTreeView();
 
+  const updateParams = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  if (isLoading && !matches.length) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="h-8 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-32 bg-muted animate-pulse rounded mt-2" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-24 bg-muted animate-pulse rounded" />
+            <div className="h-8 w-8 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+        <div className="h-20 bg-muted animate-pulse rounded-xl" />
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -331,31 +356,25 @@ export default async function MatchesDashboardPage({ params, searchParams }: Pag
               variant={view === "list" ? "secondary" : "ghost"} 
               size="sm" 
               className="h-7 px-2"
-              asChild
+              onClick={() => updateParams({ view: "list" })}
             >
-              <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), view: "list" })}`}>
-                <ListTree className="h-3.5 w-3.5" />
-              </Link>
+              <ListTree className="h-3.5 w-3.5" />
             </Button>
             <Button 
               variant={view === "tree" ? "secondary" : "ghost"} 
               size="sm" 
               className="h-7 px-2"
-              asChild
+              onClick={() => updateParams({ view: "tree" })}
             >
-              <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), view: "tree" })}`}>
-                <FolderTree className="h-3.5 w-3.5" />
-              </Link>
+              <FolderTree className="h-3.5 w-3.5" />
             </Button>
             <Button 
               variant={view === "grid" ? "secondary" : "ghost"} 
               size="sm" 
               className="h-7 px-2"
-              asChild
+              onClick={() => updateParams({ view: "grid" })}
             >
-              <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), view: "grid" })}`}>
-                <Grid3X3 className="h-3.5 w-3.5" />
-              </Link>
+              <Grid3X3 className="h-3.5 w-3.5" />
             </Button>
           </div>
 
@@ -475,11 +494,9 @@ export default async function MatchesDashboardPage({ params, searchParams }: Pag
             variant="outline" 
             size="icon" 
             disabled={!pagination.hasPrev}
-            asChild
+            onClick={() => updateParams({ page: (currentPage - 1).toString() })}
           >
-            <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), page: (currentPage - 1).toString() })}`}>
-              <ChevronLeft className="h-4 w-4" />
-            </Link>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           
           <div className="flex items-center gap-1">
@@ -501,11 +518,9 @@ export default async function MatchesDashboardPage({ params, searchParams }: Pag
                   variant={pageNum === currentPage ? "default" : "outline"} 
                   size="sm"
                   className="w-9 h-9"
-                  asChild
+                  onClick={() => updateParams({ page: pageNum.toString() })}
                 >
-                  <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), page: pageNum.toString() })}`}>
-                    {pageNum}
-                  </Link>
+                  {pageNum}
                 </Button>
               );
             })}
@@ -515,11 +530,9 @@ export default async function MatchesDashboardPage({ params, searchParams }: Pag
             variant="outline" 
             size="icon" 
             disabled={!pagination.hasNext}
-            asChild
+            onClick={() => updateParams({ page: (currentPage + 1).toString() })}
           >
-            <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(sp)), page: (currentPage + 1).toString() })}`}>
-              <ChevronRight className="h-4 w-4" />
-            </Link>
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       )}
