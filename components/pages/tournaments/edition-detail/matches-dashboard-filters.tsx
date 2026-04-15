@@ -1,81 +1,146 @@
+// @/components/pages/tournaments/edition-detail/matches-dashboard-filters.tsx
 "use client";
 
 import React from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface MatchesDashboardFiltersProps {
   search?: string;
   status?: string;
   phaseId?: string;
+  groupId?: string;
+  phases?: any[];
 }
 
-export function MatchesDashboardFilters({ search, status, phaseId }: MatchesDashboardFiltersProps) {
+export function MatchesDashboardFilters({ 
+  search, 
+  status, 
+  phaseId, 
+  groupId, 
+  phases = [] 
+}: MatchesDashboardFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const val = e.currentTarget.value;
-      const params = new URLSearchParams(searchParams.toString());
-      if (val) {
-        params.set("search", val);
-      } else {
-        params.delete("search");
-      }
-      params.set("page", "1");
-      router.push(`${pathname}?${params.toString()}`);
-    }
-  };
-
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const updateParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (val === "ALL") {
-      params.delete("status");
-    } else {
-      params.set("status", val);
-    }
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value && value !== "ALL") {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
     params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const handleReset = () => {
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      updateParams({ search: e.currentTarget.value || null });
+    }
+  };
+
+  const clearFilters = () => {
     router.push(pathname);
   };
 
+  const hasActiveFilters = !!(search || (status && status !== "ALL") || phaseId || groupId);
+
   return (
-    <div className="flex flex-wrap items-center gap-4 w-full">
-      <div className="flex-1 min-w-[200px] relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <input 
-          className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:ring-1 focus:ring-primary outline-none"
-          placeholder="Rechercher un participant..."
-          defaultValue={search}
-          onKeyDown={handleSearch}
-        />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[200px] relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input 
+            className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:ring-1 focus:ring-primary outline-none"
+            placeholder="Rechercher par joueur, équipe, code match..."
+            defaultValue={search}
+            onKeyDown={handleSearch}
+          />
+        </div>
+
+        <Select
+          defaultValue={status || "ALL"}
+          onValueChange={(value) => updateParams({ status: value === "ALL" ? null : value })}
+        >
+          <SelectTrigger className="w-[160px] h-10">
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Tous les statuts</SelectItem>
+            <SelectItem value="PENDING">En attente</SelectItem>
+            <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+            <SelectItem value="COMPLETED">Terminé</SelectItem>
+            <SelectItem value="PENDING_REVIEW">À valider</SelectItem>
+            <SelectItem value="DISPUTED">Litige</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {phases.length > 0 && (
+          <Select
+            defaultValue={phaseId || "ALL"}
+            onValueChange={(value) => updateParams({ phaseId: value === "ALL" ? null : value, groupId: null })}
+          >
+            <SelectTrigger className="w-[180px] h-10">
+              <SelectValue placeholder="Phase" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Toutes les phases</SelectItem>
+              {phases.map((phase) => (
+                <SelectItem key={phase.id} value={phase.id}>{phase.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 gap-1">
+            <X className="h-4 w-4" />
+            Effacer
+          </Button>
+        )}
       </div>
 
-      <select 
-        className="h-10 px-3 rounded-md border border-input bg-background text-sm outline-none w-full sm:w-auto"
-        defaultValue={status || "ALL"}
-        onChange={handleStatusChange}
-      >
-        <option value="ALL">Tous les statuts</option>
-        <option value="PENDING">En attente</option>
-        <option value="IN_PROGRESS">En cours</option>
-        <option value="COMPLETED">Terminé</option>
-        <option value="PENDING_REVIEW">A valider</option>
-        <option value="DISPUTED">Litige</option>
-      </select>
-
-      {phaseId && (
-        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleReset}>
-          Réinitialiser
-        </Button>
+      {/* Active filters badges */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap gap-2 pt-2 border-t">
+          {search && (
+            <Badge variant="secondary" className="gap-1">
+              Recherche: {search}
+              <button onClick={() => updateParams({ search: null })} className="ml-1 hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {status && status !== "ALL" && (
+            <Badge variant="secondary" className="gap-1">
+              Statut: {status === "PENDING" ? "En attente" : status === "IN_PROGRESS" ? "En cours" : status === "COMPLETED" ? "Terminé" : status === "DISPUTED" ? "Litige" : status}
+              <button onClick={() => updateParams({ status: null })} className="ml-1 hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {phaseId && phases.find(p => p.id === phaseId) && (
+            <Badge variant="secondary" className="gap-1">
+              Phase: {phases.find(p => p.id === phaseId)?.name}
+              <button onClick={() => updateParams({ phaseId: null })} className="ml-1 hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+        </div>
       )}
     </div>
   );

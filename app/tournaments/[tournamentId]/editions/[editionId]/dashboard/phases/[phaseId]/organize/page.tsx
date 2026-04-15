@@ -1,3 +1,4 @@
+// app/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/[phaseId]/organize/page.tsx
 import { db } from "@/lib/db";
 import { eq, and, exists } from "drizzle-orm";
 import { tournamentPhases, phaseGroups, phaseGroupParticipants, editionRegistrations } from "@/database/schema";
@@ -41,6 +42,18 @@ export default async function PhaseOrganizePage({ params }: PageProps) {
         ),
         eq(phaseGroupParticipants.qualified, true)
       ),
+      with: {
+        registration: {
+          with: {
+            member: {
+              with: {
+                user: true,
+                team: true,
+              },
+            },
+          },
+        },
+      },
     });
   } else {
     sourceParticipants = await db.query.editionRegistrations.findMany({
@@ -48,6 +61,14 @@ export default async function PhaseOrganizePage({ params }: PageProps) {
         eq(editionRegistrations.editionId, editionId),
         eq(editionRegistrations.status, 'REGISTERED')
       ),
+      with: {
+        member: {
+          with: {
+            user: true,
+            team: true,
+          },
+        },
+      },
     });
   }
 
@@ -73,6 +94,8 @@ export default async function PhaseOrganizePage({ params }: PageProps) {
         editionId={editionId}
         phaseId={phaseId}
         phaseName={phase.name}
+        phaseType={phase.phaseType || "GROUP_STAGE"}
+        phaseConfig={phaseConfig}
         sourceParticipants={sourceParticipants}
         existingGroups={existingGroups}
       />

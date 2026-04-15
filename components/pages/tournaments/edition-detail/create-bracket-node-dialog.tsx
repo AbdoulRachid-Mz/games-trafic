@@ -1,3 +1,4 @@
+// @/components/pages/tournaments/edition-detail/create-bracket-node-dialog.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,7 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, AlertCircle, Layers } from "lucide-react";
+import { Loader2, Plus, AlertCircle, Layers, Info } from "lucide-react";
 import { createBracketNode } from "@/actions/phases";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -19,74 +20,71 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { validateGroupCapacityAction } from "@/actions/validation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CreateBracketNodeDialogProps {
   phaseId: string;
   groupId: string;
+  phaseType?: string;
   defaultOrder?: number;
   groupOrder?: number;
-  /** Nombre maximum de nodes dans ce groupe */
   maxNodes?: number;
-  /** Nombre actuel de nodes */
   currentNodesCount?: number;
+  inheritedConfig?: {
+    nodeType?: "ROUND_ROBIN" | "ELIMINATION" | "SWISS";
+    matchFormat?: "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5";
+    generateMatches?: boolean;
+  };
 }
 
 export function CreateBracketNodeDialog({
   phaseId,
   groupId,
+  phaseType = "GROUP_STAGE",
   defaultOrder = 0,
   groupOrder = 0,
   maxNodes = 20,
   currentNodesCount = 0,
+  inheritedConfig,
 }: CreateBracketNodeDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [capacityError, setCapacityError] = useState<string | null>(null);
+  const [nodeType, setNodeType] = useState<"ROUND_ROBIN" | "ELIMINATION" | "SWISS">(
+    inheritedConfig?.nodeType || (phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "ELIMINATION")
+  );
+  const [matchFormat, setMatchFormat] = useState<"BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5">(
+    inheritedConfig?.matchFormat || "BEST_OF_1"
+  );
+  const [generateMatches, setGenerateMatches] = useState(inheritedConfig?.generateMatches !== false);
+  const [roundsCount, setRoundsCount] = useState(5);
+  
   const router = useRouter();
 
   const isAtCapacity = currentNodesCount >= maxNodes;
   const remainingSlots = maxNodes - currentNodesCount;
 
-  // Dans le useEffect
-  useEffect(() => {
-    if (open) {
-      if (isAtCapacity) {
-        setCapacityError(
-          `Limite de nodes atteinte (${currentNodesCount}/${maxNodes})`,
-        );
-      } else if (groupId) {
-        validateGroupCapacityAction(groupId, 1).then((result) => {
-          if (!result.isValid) {
-            setCapacityError(result.errors[0]);
-          } else {
-            setCapacityError(null);
-          }
-        });
-      } else {
-        setCapacityError(null);
-      }
-    }
-  }, [open, isAtCapacity, currentNodesCount, maxNodes, groupId]);
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (isAtCapacity) {
-      toast.error(
-        `Impossible d'ajouter un node : limite de ${maxNodes} nodes atteinte`,
-      );
+      toast.error(`Impossible d'ajouter un node : limite de ${maxNodes} nodes atteinte`);
       return;
     }
 
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const nodeCode =
-      ((formData.get("nodeCode") as string) || "").trim() ||
-      `G${groupOrder}-N${Date.now().toString().slice(-4)}`;
+    const nodeCode = ((formData.get("nodeCode") as string) || "").trim() ||
+      `${nodeType === "ROUND_ROBIN" ? "J" : "N"}${(currentNodesCount + 1)}`;
     const round = Number(formData.get("round") || 1);
-    const matchNumber = Number(formData.get("matchNumber") || 1);
+    const matchNumber = Number(formData.get("matchNumber") || currentNodesCount + 1);
     const bracketType = (formData.get("bracketType") as string) || "UPPER";
 
     try {
@@ -97,13 +95,16 @@ export function CreateBracketNodeDialog({
         round,
         matchNumber,
         bracketType,
-        order: defaultOrder,
+        order: defaultOrder + currentNodesCount,
+        nodeType: "MATCH",
         metadata: {
           participants: [],
           requiresMatch: true,
-          generateMatches: true,
-          matchesCount: 1,
-          format: 'BEST_OF_1'
+          generateMatches,
+          matchesCount: nodeType === "ROUND_ROBIN" ? 1 : 1,
+          format: matchFormat,
+          nodeType,
+          roundsCount: nodeType === "SWISS" ? roundsCount : undefined,
         },
       } as any);
 
@@ -140,22 +141,42 @@ export function CreateBracketNodeDialog({
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5 text-primary" />
             Nouveau nœud de bracket
           </DialogTitle>
           <DialogDescription>
-            Créez un nouveau nœud dans le bracket. Les participants pourront y
-            être assignés ensuite.
+            Créez un nouveau nœud dans le bracket. Les participants pourront y être assignés ensuite.
           </DialogDescription>
         </DialogHeader>
 
-        {capacityError && (
+        {/* Configuration héritée */}
+        {inheritedConfig && Object.keys(inheritedConfig).length > 0 && (
+          <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-1 text-[10px] text-primary font-bold uppercase mb-2">
+              <Info className="h-3 w-3" /> Configuration héritée
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {inheritedConfig.nodeType && (
+                <Badge variant="secondary" className="text-[9px]">
+                  Type: {inheritedConfig.nodeType}
+                </Badge>
+              )}
+              {inheritedConfig.matchFormat && (
+                <Badge variant="secondary" className="text-[9px]">
+                  Format: {inheritedConfig.matchFormat}
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isAtCapacity && (
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{capacityError}</span>
+            <span>Limite de {maxNodes} nodes atteinte</span>
           </div>
         )}
 
@@ -172,7 +193,7 @@ export function CreateBracketNodeDialog({
             <Input
               id="nodeCode"
               name="nodeCode"
-              placeholder="ex: QF1, SF2, F"
+              placeholder="ex: QF1, J1, R1"
               className="font-mono"
             />
             <p className="text-[10px] text-muted-foreground">
@@ -200,6 +221,67 @@ export function CreateBracketNodeDialog({
                 min={1}
                 defaultValue={currentNodesCount + 1}
               />
+            </div>
+          </div>
+
+          {/* Configuration spécifique au type de nœud */}
+          <div className="space-y-3 p-3 rounded-lg bg-muted/30">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Configuration du nœud
+            </Label>
+            
+            <div className="space-y-2">
+              <Label className="text-[10px] text-muted-foreground">Type d'organisation</Label>
+              <Select value={nodeType} onValueChange={(v: any) => setNodeType(v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ROUND_ROBIN">Round Robin (Journées)</SelectItem>
+                  <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
+                  <SelectItem value="SWISS">Système Suisse</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {nodeType === "SWISS" && (
+              <div className="space-y-2">
+                <Label className="text-[10px] text-muted-foreground">Nombre de rounds</Label>
+                <Input
+                  type="number"
+                  min={3}
+                  max={11}
+                  step={2}
+                  value={roundsCount}
+                  onChange={(e) => setRoundsCount(parseInt(e.target.value) || 5)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-[10px] text-muted-foreground">Format des matchs</Label>
+              <Select value={matchFormat} onValueChange={(v: any) => setMatchFormat(v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BEST_OF_1">BO1 (un match)</SelectItem>
+                  <SelectItem value="BEST_OF_3">BO3 (meilleur des 3)</SelectItem>
+                  <SelectItem value="BEST_OF_5">BO5 (meilleur des 5)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="generate-matches"
+                checked={generateMatches}
+                onCheckedChange={(v) => setGenerateMatches(!!v)}
+              />
+              <Label htmlFor="generate-matches" className="text-xs cursor-pointer">
+                Générer les matches automatiquement
+              </Label>
             </div>
           </div>
 

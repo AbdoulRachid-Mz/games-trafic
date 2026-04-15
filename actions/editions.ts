@@ -832,3 +832,170 @@ function getMatchStatusLabel(status: string): string {
   };
   return labels[status] || status;
 }
+
+// Ajouter dans actions/editions.ts
+
+export type ExportFormat = "csv" | "json" | "pdf" | "excel";
+
+export interface ExportMatchesFilters {
+  editionId: string;
+  phaseId?: string;
+  groupId?: string;
+  bracketNodeId?: string;
+  status?: string;
+  search?: string;
+}
+
+/**
+ * Export des matchs avec support des filtres et différents formats
+ */
+export async function exportMatchesToFormat(
+  editionId: string,
+  format: ExportFormat,
+  filters?: ExportMatchesFilters
+): Promise<{
+  success: boolean;
+  data?: string;
+  error?: string;
+  filename?: string;
+  count?: number;
+}> {
+  try {
+    // Construire les filtres
+    const matchFilters: any = { editionId };
+    if (filters?.phaseId) matchFilters.phaseId = filters.phaseId;
+    if (filters?.groupId) matchFilters.groupId = filters.groupId;
+    if (filters?.bracketNodeId) matchFilters.bracketNodeId = filters.bracketNodeId;
+    if (filters?.status) matchFilters.statuses = [filters.status];
+    if (filters?.search) matchFilters.search = filters.search;
+
+    // Récupérer les matchs enrichis
+    const matchesRes = await getMatchesWithParticipants({
+      filters: matchFilters,
+      pagination: { page: 1, limit: 5000 },
+      options: { sortBy: "scheduledTime", sortOrder: "asc" }
+    });
+
+    const matches = matchesRes.data;
+    const totalCount = matchesRes.pagination.total;
+
+    // Transformer les données pour l'export
+    const exportData = matches.map((m: any) => ({
+      "Match #": m.matchNumber || "N/A",
+      "Code": m.matchCode || "N/A",
+      "Phase": m.phase?.name || "N/A",
+      "Groupe": m.group?.name || "N/A",
+      "Round": m.round || 1,
+      "Joueur 1": m.participant1?.member?.displayName || m.participant1?.member?.user?.username || m.participant1?.member?.team?.name || "TBD",
+      "Tag 1": m.participant1?.member?.gameTag || "N/A",
+      "Joueur 2": m.participant2?.member?.displayName || m.participant2?.member?.user?.username || m.participant2?.member?.team?.name || "TBD",
+      "Tag 2": m.participant2?.member?.gameTag || "N/A",
+      "Score": m.score1 !== null && m.score2 !== null ? `${m.score1} - ${m.score2}` : "N/A",
+      "Vainqueur": m.winnerRegistrationId === m.participant1RegistrationId ? "J1" : m.winnerRegistrationId === m.participant2RegistrationId ? "J2" : "N/A",
+      "Statut": getMatchStatusLabel(m.status),
+      "Date planifiée": m.scheduledTime ? new Date(m.scheduledTime).toLocaleString("fr-FR") : "N/A",
+      "Date réelle": m.actualStartTime ? new Date(m.actualStartTime).toLocaleString("fr-FR") : "N/A",
+      "Durée (min)": m.duration || "N/A",
+      "Stream": m.streamLink || "N/A",
+      "Litige": m.disputed ? "Oui" : "Non",
+    }));
+
+    let data: string | undefined;
+    let filename: string | undefined;
+    let blob: Blob | undefined;
+
+    const timestamp = Date.now();
+    const filePrefix = `matches_${editionId}${filters?.phaseId ? `_phase_${filters.phaseId.slice(0, 8)}` : ""}${filters?.groupId ? `_group_${filters.groupId.slice(0, 8)}` : ""}`;
+
+    if (format === "csv") {
+      const parser = new Parser();
+      data = parser.parse(exportData);
+      filename = `${filePrefix}_${timestamp}.csv`;
+      blob = new Blob([data], { type: "text/csv;charset=utf-8" });
+    } else if (format === "json") {
+      data = JSON.stringify(exportData, null, 2);
+      filename = `${filePrefix}_${timestamp}.json`;
+      blob = new Blob([data], { type: "application/json" });
+    } else if (format === "excel") {
+      // Pour Excel, on utilise une librairie comme xlsx
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Matchs");
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      filename = `${filePrefix}_${timestamp}.xlsx`;
+      data = URL.createObjectURL(blob);
+    } else if (format === "pdf") {
+      const doc = new jsPDF({ orientation: "landscape" });
+      
+      // En-tête
+      doc.setFontSize(16);
+      doc.text(`Calendrier des matchs - Édition ${editionId}`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`, 14, 25);
+      
+      // Filtres actifs
+      let filterY = 35;
+      if (filters?.phaseId) {
+        doc.setFontSize(9);
+        doc.text(`Phase: ${filters.phaseId.slice(0, 8)}...`, 14, filterY);
+        filterY += 5;
+      }
+      if (filters?.status) {
+        doc.text(`Statut: ${filters.status}`, 14, filterY);
+        filterY += 5;
+      }
+      
+      // Statistiques
+      const totalMatches = exportData.length;
+      const completedMatches = exportData.filter((m) => m.Statut === "Terminé").length;
+      const pendingMatches = exportData.filter((m) => m.Statut === "En attente").length;
+      
+      doc.setFontSize(9);
+      doc.text(`Total: ${totalMatches} matchs | Terminés: ${completedMatches} | En attente: ${pendingMatches}`, 14, filterY + 5);
+      
+      // Tableau des matchs
+      const tableData = exportData.map((row) => [
+        row["Match #"].toString(),
+        row["Phase"],
+        row["Groupe"],
+        row["Round"].toString(),
+        row["Joueur 1"].substring(0, 20),
+        row["Joueur 2"].substring(0, 20),
+        row["Score"],
+        row["Statut"],
+        row["Date planifiée"].substring(0, 16),
+      ]);
+      
+      autoTable(doc, {
+        head: [["#", "Phase", "Groupe", "R", "Joueur 1", "Joueur 2", "Score", "Statut", "Date"]],
+        body: tableData,
+        startY: filterY + 15,
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontSize: 8 },
+        alternateRowStyles: { fillColor: [240, 240, 240] },
+        columnStyles: {
+          0: { cellWidth: 15 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 10 },
+          4: { cellWidth: 40 },
+          5: { cellWidth: 40 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 25 },
+          8: { cellWidth: 35 },
+        },
+      });
+      
+      blob = doc.output("blob");
+      filename = `${filePrefix}_${timestamp}.pdf`;
+      data = URL.createObjectURL(blob);
+    }
+
+    return { success: true, data, filename, count: totalCount };
+  } catch (error) {
+    console.error("Export matches failed:", error);
+    return { success: false, error: String(error) };
+  }
+}

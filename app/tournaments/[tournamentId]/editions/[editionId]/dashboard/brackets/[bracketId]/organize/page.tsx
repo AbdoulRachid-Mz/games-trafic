@@ -1,19 +1,19 @@
+// app/tournaments/[tournamentId]/editions/[editionId]/dashboard/brackets/[bracketId]/organize/page.tsx
 import { Metadata } from "next";
 import {
   getBracketNodeById,
   getMatchesWithParticipants,
   getPhaseGroupParticipants,
+  getTournamentPhaseById,
 } from "@/actions/phases";
-import { getEditionRegistrations, getMatches } from "@/actions/tournaments";
+import { getEditionRegistrations } from "@/actions/tournaments";
 import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, Swords, Settings } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { BracketNodeMatchesOrganizeClient } from "@/components/pages/tournaments/edition-detail/bracket-node-matches-organize-client";
 
 export const metadata: Metadata = {
-  title: "Organisation du Match de Bracket",
+  title: "Organisation des Matchs du Bracket",
 };
 
 export default async function BracketNodeOrganizePage({
@@ -26,10 +26,16 @@ export default async function BracketNodeOrganizePage({
   }>;
 }) {
   const { tournamentId, editionId, bracketId } = await params;
+  
   const node = (await getBracketNodeById(bracketId, {
     populate: ["phase", "group"],
   })) as any;
+  
   if (!node) notFound();
+
+  // Récupération de la phase pour la configuration héritée
+  const phase = node.phaseId ? await getTournamentPhaseById(node.phaseId) : null;
+  const phaseConfig = (phase?.config as any) || {};
 
   const regsRes = await getEditionRegistrations({
     filters: { editionId },
@@ -44,10 +50,10 @@ export default async function BracketNodeOrganizePage({
       })
     : { data: [] };
 
-   const matchesRes = await getMatchesWithParticipants({
-      filters: { editionId, bracketNodeId: bracketId },
-      pagination: { page: 1, limit: 1000 },
-    });
+  const matchesRes = await getMatchesWithParticipants({
+    filters: { editionId, bracketNodeId: bracketId },
+    pagination: { page: 1, limit: 1000 },
+  });
 
   return (
     <div className="space-y-6">
@@ -62,8 +68,7 @@ export default async function BracketNodeOrganizePage({
             </Link>
           </div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Settings className="h-6 w-6 text-primary" /> Organiser le Match
-            (Bulk)
+            <Settings className="h-6 w-6 text-primary" /> Organiser les Matchs
           </h1>
           <p className="text-muted-foreground text-sm">
             Gérez en masse les matchs pour le nœud{" "}

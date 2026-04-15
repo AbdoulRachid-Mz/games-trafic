@@ -1,9 +1,8 @@
-//@/components/pages/tournaments/edition-detail/edition-matches-tab.tsx
+// @/components/pages/tournaments/edition-detail/edition-matches-tab.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useMatchList, useEditionMatchStats } from "@/hooks/use-match-manager";
-import { useEditionManager } from "@/hooks/use-edition-manager";
 import { useUserRegistration } from "@/hooks/use-editions";
 import { MatchCard } from "@/components/cards/match-card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +17,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   FileJson,
   FileDown,
   FileText,
@@ -30,13 +40,21 @@ import {
   ChevronRight,
   Download,
   CheckCircle2,
+  Calendar,
+  Eye,
+  Loader2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
+import { toast } from "sonner";
+import { exportMatchesToFormat } from "@/actions/editions";
 
 interface EditionMatchesTabProps {
   editionId: string;
+  tournamentId?: string;
   activePhaseId?: string;
   currentUserId?: string;
   isAdmin?: boolean;
@@ -44,6 +62,7 @@ interface EditionMatchesTabProps {
 
 export function EditionMatchesTab({
   editionId,
+  tournamentId,
   activePhaseId,
   currentUserId,
   isAdmin,
@@ -52,54 +71,147 @@ export function EditionMatchesTab({
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
-  const limit = 12;
+  const [myMatchesPage, setMyMatchesPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const limit = 10; // Matches par page pour "mes matchs"
 
   // --- HOOKS ---
-  const { data: userReg } = useUserRegistration(editionId, currentUserId);
+  const { data: userReg, isLoading: regLoading } = useUserRegistration(
+    editionId,
+    currentUserId,
+  );
   const { data: stats, isLoading: statsLoading } =
     useEditionMatchStats(editionId);
-  const { exportMatches } = useEditionManager(editionId);
 
-  // 1. All Matches query
-  const filters: any = { editionId };
-  if (activePhaseId) filters.phaseId = activePhaseId;
-  if (statusFilter !== "ALL") filters.statuses = [statusFilter];
+  // 1. Tous les matchs (pour les filtres et la section "autres matchs")
+  const allFilters: any = { editionId };
+  if (activePhaseId) allFilters.phaseId = activePhaseId;
+  if (statusFilter !== "ALL") allFilters.statuses = [statusFilter];
 
   const {
-    data: matchesRes,
-    isLoading,
+    data: allMatchesRes,
+    isLoading: allMatchesLoading,
     refetch,
   } = useMatchList({
-    filters,
-    pagination: { page, limit },
+    filters: allFilters,
+    pagination: { page: 1, limit: 100 },
+    options: { sortBy: "scheduledTime", sortOrder: "desc" },
+  });
+
+  // 2. Mes matchs (filtrés par l'utilisateur)
+  const myMatchesFilters: any = { editionId };
+  if (userReg?.id) myMatchesFilters.memberRegistrationId = userReg.id;
+  if (activePhaseId) myMatchesFilters.phaseId = activePhaseId;
+  if (statusFilter !== "ALL") myMatchesFilters.statuses = [statusFilter];
+
+  const {
+    data: myMatchesRes,
+    isLoading: myMatchesLoading,
+    refetch: refetchMyMatches,
+  } = useMatchList({
+    filters: myMatchesFilters,
+    pagination: { page: myMatchesPage, limit },
     options: { sortBy: "scheduledTime", sortOrder: "asc" },
   });
 
-  // 2. My Matches query (for priority section)
-  const { data: myMatchesRes, isLoading: myMatchesLoading } = useMatchList({
-    filters: { ...filters, memberRegistrationId: userReg?.id },
-    pagination: { page: 1, limit: 5 },
-    options: { sortBy: "scheduledTime", sortOrder: "asc" },
-  });
-
-  const matches = matchesRes?.data || [];
+  const allMatches = allMatchesRes?.data || [];
   const myMatches = myMatchesRes?.data || [];
-  const pagination = matchesRes?.pagination;
+  const myMatchesTotal = myMatchesRes?.pagination?.total || 0;
+  const myMatchesTotalPages = Math.ceil(myMatchesTotal / limit);
+
+  // Filtrer les matchs où l'utilisateur n'est pas participant
+  const otherMatches = useMemo(() => {
+    const myMatchIds = new Set(myMatches.map((m: any) => m.id));
+    return allMatches.filter((m: any) => !myMatchIds.has(m.id));
+  }, [allMatches, myMatches]);
 
   // --- HANDLERS ---
-  const handleExport = (type: "pdf" | "csv" | "json") => {
-    exportMatches.mutate(type);
+  const handleExport = useCallback(
+    async (format: "pdf" | "csv" | "json" | "excel", scope: "all" | "my") => {
+      setIsExporting(true);
+      try {
+        const filters: any = { editionId };
+        if (activePhaseId) filters.phaseId = activePhaseId;
+        if (statusFilter !== "ALL") filters.statuses = [statusFilter];
+        if (scope === "my" && userReg?.id)
+          filters.memberRegistrationId = userReg.id;
+
+        const result = await exportMatchesToFormat(editionId, format, filters);
+
+        if (result.success && result.data) {
+          const blob = await fetch(result.data).then((r) => r.blob());
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute(
+            "download",
+            result.filename ||
+              `matches_export.${format === "excel" ? "xlsx" : format}`,
+          );
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(url);
+
+          toast.success(`Export ${format.toUpperCase()} réussi`, {
+            description: `${result.count || 0} matchs exportés`,
+          });
+        } else {
+          toast.error(result.error || "Erreur lors de l'export");
+        }
+      } catch (error: any) {
+        toast.error(error.message || "Erreur lors de l'export");
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [editionId, activePhaseId, statusFilter, userReg],
+  );
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "COMPLETED":
+        return <CheckCircle2 className="h-3 w-3 text-emerald-500" />;
+      case "IN_PROGRESS":
+        return <Clock className="h-3 w-3 text-blue-500 animate-pulse" />;
+      case "DISPUTED":
+        return <AlertCircle className="h-3 w-3 text-amber-500" />;
+      default:
+        return <Calendar className="h-3 w-3 text-muted-foreground" />;
+    }
   };
 
-  // --- RENDER HELPERS ---
+  // Match stats pour le carousel
   const matchStats = [
-    { label: "Total Matchs", value: stats?.total || 0, icon: <Trophy className="h-4 w-4" />, color: "text-blue-500" },
-    { label: "Terminés", value: stats?.completed || 0, icon: <CheckCircle2 className="h-4 w-4" />, color: "text-green-500" },
-    { label: "En cours", value: stats?.inProgress || 0, icon: <Clock className="h-4 w-4" />, color: "text-yellow-500" },
-    { label: "Litiges", value: stats?.disputed || 0, icon: <AlertCircle className="h-4 w-4" />, color: "text-red-500" },
+    {
+      label: "Total",
+      value: stats?.total || 0,
+      icon: <Trophy className="h-4 w-4" />,
+      color: "text-blue-500",
+    },
+    {
+      label: "Terminés",
+      value: stats?.completed || 0,
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      color: "text-emerald-500",
+    },
+    {
+      label: "En cours",
+      value: stats?.inProgress || 0,
+      icon: <Clock className="h-4 w-4" />,
+      color: "text-yellow-500",
+    },
+    {
+      label: "Litiges",
+      value: stats?.disputed || 0,
+      icon: <AlertCircle className="h-4 w-4" />,
+      color: "text-red-500",
+    },
   ];
 
-  if (isLoading && page === 1) {
+  const isLoading = regLoading || allMatchesLoading || myMatchesLoading;
+
+  if (isLoading && !allMatches.length && !myMatches.length) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -107,9 +219,9 @@ export function EditionMatchesTab({
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
+            <Skeleton key={i} className="h-32 rounded-xl" />
           ))}
         </div>
       </div>
@@ -119,32 +231,255 @@ export function EditionMatchesTab({
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* 📊 STATS CAROUSEL */}
-      <StatsCarousel 
-        data={matchStats.map(s => ({
+      <StatsCarousel
+        data={matchStats.map((s) => ({
           label: s.label,
           value: s.value,
           icon: s.icon,
-          className: cn("border-none bg-muted/30", s.color)
+          className: cn("border-none bg-muted/30", s.color),
         }))}
         className="p-4"
         itemsPerView={{ mobile: 2, md: 4, lg: 4 }}
       />
 
-      {/* 🔥 MY MATCHES SECTION (Priority) */}
-      {!showOnlyMyMatches && myMatches.length > 0 && page === 1 && (
+      {/* 🔥 MES MATCHS SECTION */}
+      {userReg?.id && myMatchesTotal > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <span className="text-lg">🔥</span>
-              <Typography variant="h5" weight="bold">Mes Matches Prioritaires</Typography>
-              <Badge variant="default" className="bg-primary/10 text-primary border-primary/20">VOUS</Badge>
+              <Typography variant="h5" weight="bold">
+                Mes matchs
+              </Typography>
+              <Badge
+                variant="default"
+                className="bg-primary/10 text-primary border-primary/20 text-[9px]"
+              >
+                {myMatchesTotal} match(s)
+              </Badge>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setShowOnlyMyMatches(true)}>
-              Voir tous mes matches
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Export mes matchs */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1"
+                    disabled={isExporting}
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                    <span className="text-xs hidden sm:inline">Exporter</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Mes matchs</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExport("excel", "my")}>
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("csv", "my")}>
+                    CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("json", "my")}>
+                    JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("pdf", "my")}>
+                    PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {showOnlyMyMatches && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowOnlyMyMatches(false)}
+                  className="h-8 gap-1"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span className="text-xs">Fermer</span>
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {myMatches.map((match: any) => (
+
+          {/* Liste des matchs */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {myMatches
+              .slice(0, showOnlyMyMatches ? limit : 4)
+              .map((match: any) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  onUpdate={() => {
+                    refetch();
+                    refetchMyMatches();
+                  }}
+                />
+              ))}
+          </div>
+
+          {/* Pagination pour mes matchs (si mode "voir tous") */}
+          {showOnlyMyMatches && myMatchesTotalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={myMatchesPage === 1}
+                onClick={() => setMyMatchesPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {myMatchesPage} / {myMatchesTotalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={myMatchesPage === myMatchesTotalPages}
+                onClick={() =>
+                  setMyMatchesPage((p) => Math.min(myMatchesTotalPages, p + 1))
+                }
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Bouton "Voir tous mes matchs" */}
+          {!showOnlyMyMatches && myMatchesTotal > 4 && (
+            <div className="text-center pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowOnlyMyMatches(true)}
+                className="gap-1"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                Voir tous mes {myMatchesTotal} matchs
+              </Button>
+            </div>
+          )}
+
+          <Separator className="my-6 opacity-50" />
+        </div>
+      )}
+
+      {/* 📋 AUTRES MATCHS (où l'utilisateur n'est pas participant) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            <Typography variant="h5" weight="bold">
+              Matchs de l'édition
+            </Typography>
+            <Badge variant="outline" className="text-[9px]">
+              {allMatches.length} matchs
+            </Badge>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filtre par statut */}
+            <Select
+              value={statusFilter}
+              onValueChange={(val) => {
+                setStatusFilter(val);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-[140px] text-xs">
+                <Filter className="h-3 w-3 mr-2" />
+                <SelectValue placeholder="État" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tous les états</SelectItem>
+                <SelectItem value="PENDING">Programmé</SelectItem>
+                <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+                <SelectItem value="COMPLETED">Terminé</SelectItem>
+                <SelectItem value="DISPUTED">Litige</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Bouton Export */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1"
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  <span className="text-xs hidden sm:inline">Exporter</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Tous les matchs</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleExport("excel", "all")}>
+                  Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("csv", "all")}>
+                  CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("json", "all")}>
+                  JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("pdf", "all")}>
+                  PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Bouton voir tous les matchs */}
+            {tournamentId && (
+              <Button size="sm" variant="outline" asChild className="gap-1">
+                <Link
+                  href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  <span className="text-xs hidden sm:inline">
+                    Page complète
+                  </span>
+                </Link>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Liste des matchs (excluant les matchs de l'utilisateur si non en mode "mes matchs" uniquement) */}
+        {otherMatches.length === 0 ? (
+          <div className="p-12 text-center bg-card border border-dashed rounded-2xl flex flex-col items-center justify-center space-y-3">
+            <div className="bg-muted p-4 rounded-full">
+              <Trophy className="h-8 w-8 text-muted-foreground opacity-50" />
+            </div>
+            <Typography variant="h6" className="text-muted-foreground">
+              Aucun match trouvé
+            </Typography>
+            {statusFilter !== "ALL" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStatusFilter("ALL")}
+              >
+                Réinitialiser les filtres
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {otherMatches.slice(0, 10).map((match: any) => (
               <MatchCard
                 key={match.id}
                 match={match}
@@ -154,207 +489,40 @@ export function EditionMatchesTab({
               />
             ))}
           </div>
-          <Separator className="my-8 opacity-50" />
-        </div>
-      )}
+        )}
 
-      {/* 🔍 ACTION BAR */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="flex flex-col gap-1">
-           <Typography variant="h5" weight="bold">
-             {showOnlyMyMatches ? "Mes Matches" : "Tous les Matches"}
-           </Typography>
-           <Typography variant="caption1" theme="muted">
-             {pagination?.total || 0} match(s) trouvé(s)
-           </Typography>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <div className="flex bg-muted p-1 rounded-lg">
-            <button
-              onClick={() => {
-                setShowOnlyMyMatches(false);
-                setPage(1);
-              }}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                !showOnlyMyMatches
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Tous
-            </button>
-            <button
-              disabled={!currentUserId || !userReg}
-              onClick={() => {
-                setShowOnlyMyMatches(true);
-                setPage(1);
-              }}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                showOnlyMyMatches
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground disabled:opacity-50",
-              )}
-            >
-              Moi
-            </button>
-          </div>
-
-          <Select
-            value={statusFilter}
-            onValueChange={(val) => {
-              setStatusFilter(val);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="h-9 w-[150px] text-xs">
-              <Filter className="h-3 w-3 mr-2" />
-              <SelectValue placeholder="État" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tous les états</SelectItem>
-              <SelectItem value="PENDING">Programmé</SelectItem>
-              <SelectItem value="IN_PROGRESS">En cours</SelectItem>
-              <SelectItem value="COMPLETED">Terminé</SelectItem>
-              <SelectItem value="DISPUTED">Litige</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select onValueChange={(val) => handleExport(val as any)}>
-            <SelectTrigger className="h-9 w-32 text-xs border-primary/20 hover:bg-primary/5">
-              <Download className="h-3.5 w-3.5 mr-2" />
-              <span>Export</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pdf">PDF</SelectItem>
-              <SelectItem value="csv">CSV</SelectItem>
-              <SelectItem value="json">JSON</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* 🎮 MATCHES GRID */}
-      {matches.length === 0 ? (
-        <div className="p-12 text-center bg-card border border-dashed rounded-2xl flex flex-col items-center justify-center space-y-3">
-          <div className="bg-muted p-4 rounded-full">
-            <Trophy className="h-8 w-8 text-muted-foreground opacity-50" />
-          </div>
-          <Typography variant="h6" className="text-muted-foreground">
-            {showOnlyMyMatches
-              ? "Vous n'avez aucun match filtré."
-              : "Aucun match trouvé."}
-          </Typography>
-          {(statusFilter !== "ALL" || showOnlyMyMatches) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setStatusFilter("ALL");
-                setShowOnlyMyMatches(false);
-              }}
-            >
-              Réinitialiser les filtres
+        {/* Lien vers la page complète des matchs */}
+        {tournamentId && otherMatches.length > 10 && (
+          <div className="text-center pt-4">
+            <Button variant="outline" asChild className="gap-2">
+              <Link
+                href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}
+              >
+                Voir tous les {allMatches.length} matchs
+                <ChevronRight className="h-4 w-4" />
+              </Link>
             </Button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {(showOnlyMyMatches ? matches : matches.filter((m: any) => !myMatches.some((my: any) => my.id === m.id))).map((match: any) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              currentUserId={currentUserId}
-              isAdmin={isAdmin}
-              onUpdate={() => refetch()}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* 📄 PAGINATION */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={!pagination.hasPrev}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(
-              (p) => (
-                <Button
-                  key={p}
-                  variant={page === p ? "default" : "ghost"}
-                  size="sm"
-                  className="w-8 h-8 p-0"
-                  onClick={() => setPage(p)}
-                >
-                  {p}
-                </Button>
-              ),
-            )}
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() =>
-              setPage((p) => Math.min(pagination.totalPages, p + 1))
-            }
-            disabled={!pagination.hasNext}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        )}
+
+        {/* Message si aucun match en dehors des siens */}
+        {userReg?.id && myMatchesTotal > 0 && otherMatches.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p>Aucun autre match programmé pour le moment.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Indicateur de chargement pour les matchs */}
+      {isLoading && allMatches.length === 0 && myMatches.length === 0 && (
+        <div className="text-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground mt-2">
+            Chargement des matchs...
+          </p>
         </div>
       )}
-    </div>
-  );
-}
-
-// --- UTILS ---
-function StatCard({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  color: string;
-}) {
-  const colors: any = {
-    blue: "text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-800",
-    green:
-      "text-green-600 bg-green-50 border-green-100 dark:bg-green-900/20 dark:border-green-800",
-    yellow:
-      "text-yellow-600 bg-yellow-50 border-yellow-100 dark:bg-yellow-900/20 dark:border-yellow-800",
-    red: "text-red-600 bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-800",
-  };
-
-  return (
-    <div
-      className={cn(
-        "p-4 rounded-xl border flex items-center justify-between shadow-sm",
-        colors[color],
-      )}
-    >
-      <div className="space-y-0.5">
-        <Typography variant="body-sm" className="opacity-80 leading-none">
-          {label}
-        </Typography>
-        <Typography variant="h5" weight="bold" className="leading-tight">
-          {value}
-        </Typography>
-      </div>
-      <div className="p-2.5 rounded-lg bg-background/50 backdrop-blur-sm shadow-sm border border-current/10">
-        {icon}
-      </div>
     </div>
   );
 }

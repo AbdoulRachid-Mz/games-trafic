@@ -1,3 +1,5 @@
+// app/tournaments/[tournamentId]/editions/[editionId]/matches/page.tsx
+import { Metadata } from "next";
 import { EditionMatchesClient } from "./edition-matches-client";
 import { getTournamentEditionWithRelations } from "@/actions/editions";
 
@@ -8,15 +10,22 @@ interface PageProps {
   }>;
 }
 
-export default async function EditionMatchesPage({ params }: PageProps) {
-  const { editionId } = await params;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { tournamentId, editionId } = await params;
+  const edition = await getTournamentEditionWithRelations(editionId);
   
-  // Minimal data loading if needed, but we can do it all in the client component
-  // to benefit from the interactive filters.
+  return {
+    title: `Matchs - ${edition?.name || `Édition ${edition?.editionNumber}`} | Game Trafics`,
+    description: `Calendrier et résultats des matchs du tournoi`,
+  };
+}
+
+export default async function EditionMatchesPage({ params }: PageProps) {
+  const { tournamentId, editionId } = await params;
   
   return (
-    <div className="space-y-8">
-      <EditionMatchesClient editionId={editionId} />
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <EditionMatchesClient editionId={editionId} tournamentId={tournamentId} />
     </div>
   );
 }

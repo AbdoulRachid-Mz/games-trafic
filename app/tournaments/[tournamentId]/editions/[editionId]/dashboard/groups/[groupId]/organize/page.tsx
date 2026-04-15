@@ -59,6 +59,7 @@ export default async function GroupNodesOrganizePage({
       <GroupNodesOrganizeClient
         groupId={groupId}
         phaseId={group.phaseId}
+        phaseType={group.phase?.type || ""}
         existingNodes={nodesRes.data as any[]}
         groupParticipants={participants as any[]}
         allRegistrations={regsRes.data as any[]}

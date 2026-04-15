@@ -1,3 +1,4 @@
+// @/components/pages/tournaments/edition-detail/create-match-dialog.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,7 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Swords, AlertCircle, Users } from "lucide-react";
+import { Loader2, Plus, Swords, AlertCircle, Users, Info } from "lucide-react";
 import { createMatch } from "@/actions/tournaments";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -19,13 +20,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { validateGroupCapacity } from "@/lib/tournaments/bulk-validation";
- // ✅ UTILISER LE HOOK (ou une action)
-import { useGroupCapacity } from "@/hooks/use-bulk-validation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CreateMatchDialogProps {
   editionId: string;
   phaseId: string;
+  phaseType?: string;
   groupId: string | null;
   bracketNodeId: string | null;
   participants: Array<{
@@ -36,15 +43,21 @@ interface CreateMatchDialogProps {
   }>;
   defaultRound?: number;
   defaultMatchNumber?: number;
-  /** Nombre maximum de matchs dans ce contexte */
   maxMatches?: number;
-  /** Nombre actuel de matchs */
   currentMatchesCount?: number;
+  inheritedConfig?: {
+    matchFormat?: "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5" | "HOME_AWAY";
+    generateMatches?: boolean;
+    pointsPerWin?: number;
+    pointsPerDraw?: number;
+    pointsPerLoss?: number;
+  };
 }
 
 export function CreateMatchDialog({
   editionId,
   phaseId,
+  phaseType = "GROUP_STAGE",
   groupId,
   bracketNodeId,
   participants,
@@ -52,37 +65,37 @@ export function CreateMatchDialog({
   defaultMatchNumber = 1,
   maxMatches = 100,
   currentMatchesCount = 0,
+  inheritedConfig,
 }: CreateMatchDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
+  const [matchFormat, setMatchFormat] = useState<"BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5" | "HOME_AWAY">(
+    inheritedConfig?.matchFormat || "BEST_OF_1"
+  );
+  const [generateScoreInputs, setGenerateScoreInputs] = useState(false);
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const router = useRouter();
 
   const isAtCapacity = currentMatchesCount >= maxMatches;
   const remainingSlots = maxMatches - currentMatchesCount;
 
- 
-
- // Utilise ton hook au lieu du useEffect manuel
-  const { data: validation, isLoading } = useGroupCapacity(groupId || "", 1);
-
-  // Check if all bracket participants already have matches
-  const [showWarning, setShowWarning] = useState(false);
-  const [hasConfirmedWarning, setHasConfirmedWarning] = useState(false);
-
   useEffect(() => {
     if (open) {
       if (isAtCapacity) {
         setCapacityError(`Limite de matchs atteinte (${currentMatchesCount}/${maxMatches})`);
-      } else if (validation && !validation.isValid) {
-        setCapacityError(validation.errors[0]);
       } else {
         setCapacityError(null);
       }
     }
-  }, [open, isAtCapacity, validation, currentMatchesCount, maxMatches]);
+  }, [open, isAtCapacity, currentMatchesCount, maxMatches]);
+
+  const getParticipantDisplay = (participant: typeof participants[0]) => {
+    return participant.teamName 
+      ? `${participant.displayName} (${participant.teamName})`
+      : participant.displayName;
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -102,42 +115,38 @@ export function CreateMatchDialog({
       return;
     }
 
-    // Check if participants already have matches in this bracket
-    if (bracketNodeId && !hasConfirmedWarning) {
-       const p1HasMatch = (currentMatchesCount > 0); // Simplified check for now
-       // In a real scenario, we'd check if p1/p2 are in existing matches of this bracket
-       // But based on the prompt: "on vérifie si tous les participants du bracket (dans la config) ont leur matche"
-       // We'll show the warning if we have enough matches already
-       if (currentMatchesCount >= participants.length / 2) {
-          setShowWarning(true);
-          return;
-       }
-    }
-
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const round = Number(formData.get("round") || defaultRound);
     const matchNumber = Number(formData.get("matchNumber") || defaultMatchNumber);
     const scheduledTime = formData.get("scheduledTime") ? new Date(formData.get("scheduledTime") as string) : undefined;
-    const format = (formData.get("format") as string) || "BEST_OF_1";
+    const isDoubleMatch = formData.get("isDoubleMatch") === "on";
 
     try {
-      await createMatch({
-        editionId,
-        phaseId,
-        groupId: groupId as any,
-        bracketNodeId: bracketNodeId as any,
-        round,
-        matchNumber,
-        participant1RegistrationId: p1,
-        participant2RegistrationId: p2,
-        scheduledTime,
-        status: "PENDING",
-        metadata: { format },
-      } as any);
+      const matchesToCreate = isDoubleMatch ? 2 : 1;
+      
+      for (let i = 0; i < matchesToCreate; i++) {
+        await createMatch({
+          editionId,
+          phaseId,
+          groupId: groupId as any,
+          bracketNodeId: bracketNodeId as any,
+          round: isDoubleMatch && i === 1 ? round + 1 : round,
+          matchNumber: matchNumber + i,
+          participant1RegistrationId: isDoubleMatch && i === 1 ? p2 : p1,
+          participant2RegistrationId: isDoubleMatch && i === 1 ? p1 : p2,
+          scheduledTime,
+          status: "PENDING",
+          metadata: { 
+            format: matchFormat,
+            leg: i + 1,
+            totalLegs: matchesToCreate,
+          },
+        } as any);
+      }
 
-      toast.success("Match créé avec succès");
+      toast.success(`${matchesToCreate} match(s) créé(s) avec succès`);
       setOpen(false);
       setP1("");
       setP2("");
@@ -149,14 +158,19 @@ export function CreateMatchDialog({
     }
   };
 
-  const getParticipantDisplay = (participant: typeof participants[0]) => {
-    return participant.teamName 
-      ? `${participant.displayName} (${participant.teamName})`
-      : participant.displayName;
+  const getMatchCountOptions = () => {
+    if (phaseType === "ELIMINATION") {
+      return [
+        { value: "1", label: "Match unique" },
+        { value: "3", label: "BO3 (meilleur des 3)" },
+        { value: "5", label: "BO5 (meilleur des 5)" },
+      ];
+    }
+    return [
+      { value: "1", label: "Match unique" },
+      { value: "2", label: "Aller-Retour" },
+    ];
   };
-
-  // Filtrer les participants déjà utilisés dans d'autres matchs? (optionnel)
-  const availableParticipants = participants;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -175,7 +189,7 @@ export function CreateMatchDialog({
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Swords className="h-5 w-5 text-primary" />
@@ -185,6 +199,27 @@ export function CreateMatchDialog({
             Créez une confrontation entre deux participants.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Configuration héritée */}
+        {inheritedConfig && Object.keys(inheritedConfig).length > 0 && (
+          <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-1 text-[10px] text-primary font-bold uppercase mb-2">
+              <Info className="h-3 w-3" /> Configuration héritée
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {inheritedConfig.matchFormat && (
+                <Badge variant="secondary" className="text-[9px]">
+                  Format: {inheritedConfig.matchFormat}
+                </Badge>
+              )}
+              {inheritedConfig.pointsPerWin !== undefined && (
+                <Badge variant="secondary" className="text-[9px]">
+                  Points: V{inheritedConfig.pointsPerWin}/N{inheritedConfig.pointsPerDraw}/D{inheritedConfig.pointsPerLoss}
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
         
         {capacityError && (
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
@@ -207,145 +242,124 @@ export function CreateMatchDialog({
           </div>
         )}
 
-        {showWarning ? (
-          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-3">
-             <div className="flex items-center gap-2 text-amber-700">
-               <AlertCircle className="h-5 w-5" />
-               <p className="text-sm font-bold">Tous les participants ont déjà été programmés</p>
-             </div>
-             <p className="text-xs text-amber-600">
-               Voulez-vous créer le match quand même ? 
-               (Le nombre de matchs programmés est déjà suffisant pour couvrir tous les participants du bracket).
-             </p>
-             <div className="flex gap-2">
-               <Button 
-                 size="sm" 
-                 variant="outline" 
-                 className="h-8 border-amber-500/20 text-amber-700 hover:bg-amber-500/10"
-                 onClick={() => setShowWarning(false)}
-               >
-                 Annuler
-               </Button>
-               <Button 
-                 size="sm" 
-                 className="h-8 bg-amber-600 hover:bg-amber-700 text-white"
-                 onClick={() => {
-                    setHasConfirmedWarning(true);
-                    setShowWarning(false);
-                    // trigger form submission manually would be tricky here without form ref
-                    // but we can just set state and let user click again or trigger via ref
-                 }}
-               >
-                 Oui, continuer
-               </Button>
-             </div>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="p1">Joueur 1</Label>
+              <Select value={p1} onValueChange={setP1} disabled={participants.length < 2}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Sélectionner..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {participants.map((p) => (
+                    <SelectItem key={p.registrationId} value={p.registrationId}>
+                      {getParticipantDisplay(p)}
+                      {p.isQualified && " (✓ qualifié)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="p2">Joueur 2</Label>
+              <Select value={p2} onValueChange={setP2} disabled={participants.length < 2}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Sélectionner..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {participants.map((p) => (
+                    <SelectItem key={p.registrationId} value={p.registrationId}>
+                      {getParticipantDisplay(p)}
+                      {p.isQualified && " (✓ qualifié)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="p1">Joueur 1</Label>
-                <select
-                  id="p1"
-                  value={p1}
-                  onChange={(e) => setP1(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  required
-                  disabled={participants.length < 2}
-                >
-                  <option value="">Sélectionner...</option>
-                  {availableParticipants.map((p) => (
-                    <option key={p.registrationId} value={p.registrationId}>
-                      {getParticipantDisplay(p)}
-                      {p.isQualified && " (✓ qualifié)"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="p2">Joueur 2</Label>
-                <select
-                  id="p2"
-                  value={p2}
-                  onChange={(e) => setP2(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  required
-                  disabled={participants.length < 2}
-                >
-                  <option value="">Sélectionner...</option>
-                  {availableParticipants.map((p) => (
-                    <option key={p.registrationId} value={p.registrationId}>
-                      {getParticipantDisplay(p)}
-                      {p.isQualified && " (✓ qualifié)"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="round">Round</Label>
-                <Input
-                  id="round"
-                  name="round"
-                  type="number"
-                  min={1}
-                  defaultValue={defaultRound}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="matchNumber">Match #</Label>
-                <Input
-                  id="matchNumber"
-                  name="matchNumber"
-                  type="number"
-                  min={1}
-                  defaultValue={currentMatchesCount + 1}
-                />
-              </div>
-            </div>
-
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="scheduledTime">Date & Heure (Optionnel)</Label>
-              <Input id="scheduledTime" name="scheduledTime" type="datetime-local" />
+              <Label htmlFor="round">Round</Label>
+              <Input
+                id="round"
+                name="round"
+                type="number"
+                min={1}
+                defaultValue={defaultRound}
+              />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="format">Format du match</Label>
-              <select
-                id="format"
-                name="format"
-                defaultValue="BEST_OF_1"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="BEST_OF_1">Aller simple (BO1)</option>
-                <option value="BEST_OF_3">Meilleur des 3 (BO3)</option>
-                <option value="BEST_OF_5">Meilleur des 5 (BO5)</option>
-                <option value="HOME_AWAY">Aller-retour</option>
-              </select>
+              <Label htmlFor="matchNumber">Match #</Label>
+              <Input
+                id="matchNumber"
+                name="matchNumber"
+                type="number"
+                min={1}
+                defaultValue={currentMatchesCount + 1}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="scheduledTime">Date & Heure (Optionnel)</Label>
+            <Input id="scheduledTime" name="scheduledTime" type="datetime-local" />
+          </div>
+
+          <div className="space-y-3 p-3 rounded-lg bg-muted/30">
+            <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Configuration du match
+            </Label>
+            
+            <div className="space-y-2">
+              <Label className="text-[10px] text-muted-foreground">Format</Label>
+              <Select value={matchFormat} onValueChange={(v: any) => setMatchFormat(v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BEST_OF_1">BO1 (un match)</SelectItem>
+                  <SelectItem value="BEST_OF_3">BO3 (meilleur des 3)</SelectItem>
+                  <SelectItem value="BEST_OF_5">BO5 (meilleur des 5)</SelectItem>
+                  {phaseType !== "ELIMINATION" && (
+                    <SelectItem value="HOME_AWAY">Aller-Retour</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
-            <DialogFooter className="pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={loading}
-              >
-                Annuler
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={loading || !!capacityError || participants.length < 2} 
-                className="gap-2"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
-                Créer le match
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="double-match"
+                name="isDoubleMatch"
+                checked={generateScoreInputs}
+                onCheckedChange={(v) => setGenerateScoreInputs(!!v)}
+              />
+              <Label htmlFor="double-match" className="text-xs cursor-pointer">
+                Match aller-retour (deux confrontations)
+              </Label>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={loading}
+            >
+              Annuler
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={loading || !!capacityError || participants.length < 2 || !p1 || !p2 || p1 === p2} 
+              className="gap-2"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
+              Créer le match
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

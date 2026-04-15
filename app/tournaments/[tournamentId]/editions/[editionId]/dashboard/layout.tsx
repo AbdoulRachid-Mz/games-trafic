@@ -130,9 +130,9 @@ export default function EditionDashboardLayout({
     i.url.endsWith(`/matches`) ||
     i.url.endsWith(`/organize`)
   );
+  
   const editionManage = navData.filter(i =>
     i.url.endsWith(`/participants`) ||
-    i.url.endsWith(`/participants/organize`) ||
     i.url.endsWith(`/payments`) ||
     i.url.endsWith(`/settings`)
   );
