@@ -435,31 +435,40 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
   
   const phases = phasesRes?.data || [];
   const matches = matchesRes?.data || [];
-  const phasesWithMatches = editionTree?.phases || [];
+  
+  // Filter tree data based on selected phase
+  const phasesWithMatches = useMemo(() => {
+    const allPhases = editionTree?.phases || [];
+    if (selectedPhaseId === "all") return allPhases;
+    return allPhases.filter((p: any) => p.id === selectedPhaseId);
+  }, [editionTree, selectedPhaseId]);
   
   const isLoading = isLoadingTree || isLoadingPhases || isLoadingMatches;
   
   // Export handlers
   const handleExport = useCallback(async (format: "csv" | "json" | "pdf" | "excel", scope: "all" | "phase") => {
-    const filters: any = { editionId };
-    if (scope === "phase" && selectedPhaseId !== "all") {
-      filters.phaseId = selectedPhaseId;
-    }
-    
     try {
+      const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
+      
+      const filters: any = { editionId };
+      if (scope === "phase" && selectedPhaseId !== "all") {
+        filters.phaseId = selectedPhaseId;
+      }
+      
       const result = await exportMatchesToFormat(editionId, format, filters);
       if (result.success && result.data) {
-        const blob = await fetch(result.data).then(r => r.blob());
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", result.filename || `matches_export.${format}`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        const rawData = JSON.parse(result.data);
+        const config = {
+          filename: result.filename || `matches_${scope}_${editionId}`,
+          title: scope === "phase" ? `Matchs - Phase ${selectedPhaseId}` : "Tous les matchs",
+          subtitle: `Édition: ${editionId.slice(0, 8)}`,
+        };
+
+        const tableData = createExportData(rawData, "matches");
+        await exportToFormat(format, tableData, config);
+
         toast.success(`Export ${format.toUpperCase()} réussi`, {
-          description: `${result.count || 0} matchs exportés`
+          description: `${result.count || rawData.length} matchs exportés`
         });
       } else {
         toast.error(result.error || "Erreur lors de l'export");
@@ -601,12 +610,43 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
       {/* Tree view - Organisation par phases > groupes > brackets */}
       {!isLoading && viewMode === "tree" && (
         <div className="space-y-6">
+          {/* Phase Selector for Tree View */}
+          {phases.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
+              <Button
+                variant={selectedPhaseId === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedPhaseId("all")}
+                className={cn(
+                  "flex-shrink-0 h-9 px-4 rounded-full transition-all",
+                  selectedPhaseId === "all" ? "shadow-md scale-105" : "hover:bg-primary/5"
+                )}
+              >
+                Toutes les phases
+              </Button>
+              {phases.map((phase: any) => (
+                <Button
+                  key={phase.id}
+                  variant={selectedPhaseId === phase.id ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedPhaseId(phase.id)}
+                  className={cn(
+                    "flex-shrink-0 h-9 px-4 rounded-full transition-all",
+                    selectedPhaseId === phase.id ? "shadow-md scale-105" : "hover:bg-primary/5"
+                  )}
+                >
+                  {phase.name}
+                </Button>
+              ))}
+            </div>
+          )}
+
           {phasesWithMatches.length === 0 ? (
             <Card className="border-dashed py-12">
               <CardContent className="text-center">
                 <Trophy className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
                 <Typography variant="body-base" theme="muted">
-                  Aucun match n'est encore programmé pour cette édition.
+                  Aucun match n'est encore programmé pour cette phase.
                 </Typography>
               </CardContent>
             </Card>

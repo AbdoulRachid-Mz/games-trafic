@@ -143,6 +143,10 @@ export default function TransactionDetailPage() {
 
   const handleDownloadReceipt = () => {
     if (!transaction) return;
+    if (transaction.status !== "COMPLETED") {
+      toast.error("Le reçu n'est disponible que pour les transactions complétées.");
+      return;
+    }
 
     generateEnhancedReceipt({
       transactionId: transaction.id,
@@ -215,6 +219,7 @@ export default function TransactionDetailPage() {
             variant="outline"
             onClick={handleDownloadReceipt}
             className="gap-2"
+            disabled={transaction.status !== "COMPLETED"}
           >
             <Download className="h-4 w-4" />
             Reçu PDF

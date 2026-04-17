@@ -27,9 +27,10 @@ const ESSENTIAL_RESOURCES = [
 
   // 🖼️ fallback image offline
   "/icons/offline.png",
+  "/icons/gt-primary.png",
 
   // Fonts
-  "/fonts/"
+  "/fonts/",
 ];
 
 
@@ -42,6 +43,8 @@ const NEVER_CACHE_PATTERNS = [
   /auth\//,
   /sign-in/,
   /sign-up/,
+
+
   
   // WebSockets et temps réel
   /socket/,
@@ -55,6 +58,7 @@ const NEVER_CACHE_PATTERNS = [
   // Dev
   /_next\/webpack/,
   /_next\/static\/hmr/,
+    /\/_next\/static\//,
   
   // Service Worker lui-même
   /sw\.js$/,
@@ -66,6 +70,7 @@ const CACHE_PATTERNS = [
   /\.(?:js|css|woff|woff2|ttf|png|jpg|jpeg|svg|ico|webp)$/i,
   /\/images\//,
   /\/fonts\//,
+  /\/icons\//,
 ];
 
 // Installation
@@ -148,7 +153,7 @@ async function handleImageRequest(request) {
     // Offline fallback
     if (cached) return cached;
 
-    return caches.match("/images/image-offline.png");
+    return caches.match("/icons/offline.png");
   }
 }
 
@@ -386,8 +391,65 @@ self.addEventListener("sync", (event) => {
 });
 
 async function syncOfflineData() {
-  // Implémentation de la synchro des données hors ligne
-  console.log("🔄 Synchro des données hors ligne");
+  try {
+    console.log("🔄 Synchronisation des données hors ligne en cours...");
+
+    // Récupérer les requêtes en attente depuis IndexedDB ou localStorage
+    const pendingRequests = await getPendingRequests();
+
+    if (pendingRequests.length === 0) {
+      console.log("✅ Aucune donnée en attente de synchronisation.");
+      return;
+    }
+
+    console.log(`📤 ${pendingRequests.length} requêtes à synchroniser.`);
+
+    // Traiter chaque requête en attente
+    for (const request of pendingRequests) {
+      try {
+        const response = await fetch(request.url, {
+          method: request.method || 'POST',
+          headers: request.headers || { 'Content-Type': 'application/json' },
+          body: request.body ? JSON.stringify(request.body) : undefined,
+        });
+
+        if (response.ok) {
+          console.log(`✅ Requête synchronisée: ${request.url}`);
+          await removePendingRequest(request.id);
+        } else {
+          console.warn(`⚠️ Échec de la synchronisation: ${request.url}`, response.status);
+        }
+      } catch (error) {
+        console.error(`❌ Erreur lors de la synchronisation de ${request.url}:`, error);
+      }
+    }
+
+    // Notifier les clients de la fin de la synchronisation
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'SYNC_COMPLETE',
+        count: pendingRequests.length,
+      });
+    });
+
+    console.log("🔄 Synchronisation terminée.");
+  } catch (error) {
+    console.error("❌ Erreur lors de la synchronisation hors ligne:", error);
+  }
+}
+
+// Helper: Récupérer les requêtes en attente (simulé avec localStorage)
+async function getPendingRequests() {
+  const data = localStorage.getItem('offlineRequests');
+  return data ? JSON.parse(data) : [];
+}
+
+// Helper: Supprimer une requête synchronisée
+async function removePendingRequest(id) {
+  const requests = await getPendingRequests();
+  const updated = requests.filter(req => req.id !== id);
+  localStorage.setItem('offlineRequests', JSON.stringify(updated));
 }
 
 self.addEventListener("periodicsync", (event) => {
@@ -398,5 +460,107 @@ self.addEventListener("periodicsync", (event) => {
 });
 
 async function periodicSync() {
-  // Implémentation de la synchro périodique
+  try {
+    console.log("⏰ Début de la synchronisation périodique");
+
+    // 1. Nettoyer les caches d'images expirées
+    const imageCache = await caches.open(IMAGE_CACHE);
+    const imageRequests = await imageCache.keys();
+    
+    const now = Date.now();
+    
+    await Promise.all(
+      imageRequests.map(async (request) => {
+        const response = await imageCache.match(request);
+        if (response) {
+          const dateHeader = response.headers.get("date");
+          if (dateHeader) {
+            const age = now - new Date(dateHeader).getTime();
+            if (age > MAX_IMAGE_AGE) {
+              console.log("🗑️ Image expirée supprimée:", request.url);
+              await imageCache.delete(request);
+            }
+          }
+        }
+      })
+    );
+
+    // 2. Mettre à jour les ressources essentielles
+    const cache = await caches.open(CACHE_NAME);
+    const essentialPromises = ESSENTIAL_RESOURCES.map(async (url) => {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        if (response.ok) {
+          const cachedResponse = await cache.match(url);
+          if (!cachedResponse) {
+            console.log("📦 Mise en cache ressource essentielle manquante:", url);
+            const fullResponse = await fetch(url);
+            if (fullResponse.ok) {
+              await cache.put(url, fullResponse);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("⚠️ Impossible de vérifier la ressource:", url, error);
+      }
+    });
+
+    await Promise.allSettled(essentialPromises);
+
+    // 3. Nettoyer le cache runtime des entrées non utilisées depuis longtemps
+    const runtimeCache = await caches.open(RUNTIME_CACHE);
+    const runtimeRequests = await runtimeCache.keys();
+    const oneMonthAgo = now - (30 * 24 * 60 * 60 * 1000);
+
+    await Promise.all(
+      runtimeRequests.map(async (request) => {
+        const response = await runtimeCache.match(request);
+        if (response) {
+          const dateHeader = response.headers.get("date");
+          if (dateHeader && new Date(dateHeader).getTime() < oneMonthAgo) {
+            console.log("🧹 Suppression entrée runtime obsolète:", request.url);
+            await runtimeCache.delete(request);
+          }
+        }
+      })
+    );
+
+    // 4. Précharger les ressources critiques pour la PWA
+    const criticalResources = [
+      "/offline",
+      "/icons/icon-192.png",
+      "/icons/icon-512.png",
+      "/icons/gt-primary.png",
+    ];
+
+    const preloadPromises = criticalResources.map(async (url) => {
+      try {
+        const cached = await cache.match(url);
+        if (!cached) {
+          const response = await fetch(url);
+          if (response.ok) {
+            await cache.put(url, response.clone());
+            console.log("✅ Ressource critique préchargée:", url);
+          }
+        }
+      } catch (error) {
+        console.warn("⚠️ Échec préchargement:", url, error);
+      }
+    });
+
+    await Promise.allSettled(preloadPromises);
+
+    // 5. Envoyer un message aux clients pour informer de la fin
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'PERIODIC_SYNC_COMPLETE',
+        timestamp: now
+      });
+    });
+
+    console.log("✅ Synchronisation périodique terminée avec succès");
+  } catch (error) {
+    console.error("❌ Erreur lors de la synchronisation périodique:", error);
+  }
 }

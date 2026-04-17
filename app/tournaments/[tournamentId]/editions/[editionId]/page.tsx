@@ -127,6 +127,7 @@ export default async function EditionPage({ params }: PageProps) {
                 t: "TOURNAMENT_PARTICIPATION",
                 id: edition.id,
                 a: entryFee,
+                i: tournament.profileImage || "/icons/tournament-500.png",
                 m: { tournamentId, editionNumber: edition.editionNumber }
               })}
               label={edition.name || `Édition #${edition.editionNumber}`}

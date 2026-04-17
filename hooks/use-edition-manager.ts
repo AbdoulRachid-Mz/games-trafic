@@ -75,22 +75,22 @@ export function useEditionManager(editionId: string, tournamentId?: string) {
 
   // ---- EXPORT PARTICIPANTS ----
   const exportParticipants = useMutation({
-    mutationFn: async (format: "csv" | "json" | "pdf") => {
-      const result = await exportEditionParticipants(editionId, format);
+    mutationFn: async (format: "csv" | "json" | "pdf" | "excel") => {
+      const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
+      
+      const result = await exportEditionParticipants(editionId, format as any);
       if (!result.success || !result.data) {
         throw new Error(result.error || "Erreur lors de l'export");
       }
 
-      // Déclencher le téléchargement côté client
-      const blob = await (await fetch(result.data)).blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", result.filename || `export_participants.${format}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const rawData = JSON.parse(result.data);
+      const config = {
+        filename: result.filename || `participants_${editionId}`,
+        title: "Liste des participants",
+      };
+
+      const tableData = createExportData(rawData, "tournamentMembers");
+      await exportToFormat(format as any, tableData, config);
 
       return result;
     },
@@ -104,22 +104,22 @@ export function useEditionManager(editionId: string, tournamentId?: string) {
 
   // ---- EXPORT MATCHES ----
   const exportMatches = useMutation({
-    mutationFn: async (format: "csv" | "json" | "pdf") => {
-      const result = await exportEditionMatches(editionId, format);
+    mutationFn: async (format: "csv" | "json" | "pdf" | "excel") => {
+      const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
+
+      const result = await exportEditionMatches(editionId, format as any);
       if (!result.success || !result.data) {
         throw new Error(result.error || "Erreur lors de l'export");
       }
 
-      // Déclencher le téléchargement côté client
-      const blob = await (await fetch(result.data)).blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", result.filename || `export_matchs.${format}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const rawData = JSON.parse(result.data);
+      const config = {
+        filename: result.filename || `matches_${editionId}`,
+        title: "Calendrier des matchs",
+      };
+
+      const tableData = createExportData(rawData, "matches");
+      await exportToFormat(format as any, tableData, config);
 
       return result;
     },

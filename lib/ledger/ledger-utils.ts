@@ -192,6 +192,7 @@ export interface ExecuteTransactionParams {
     toAccountId: string;
     amount: number;
     type: NewWalletTransaction["type"];
+    status?: WalletTransaction["status"];
     description?: string;
     metadata?: Record<string, any>;
     userId?: string;
@@ -302,7 +303,7 @@ export async function executeTransaction(
             netAmount: netAmount.toFixed(2),
             balanceAfter: newFromBalance.toFixed(2),
             type,
-            status: "COMPLETED",
+            status: params.status || "COMPLETED",
             description: description || `Transaction ${type}`,
             metadata: {
                 ...metadata,

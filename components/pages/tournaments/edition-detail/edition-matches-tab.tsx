@@ -2,13 +2,10 @@
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
-import { useMatchList, useEditionMatchStats } from "@/hooks/use-match-manager";
-import { useUserRegistration } from "@/hooks/use-editions";
-import { MatchCard } from "@/components/cards/match-card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -23,26 +20,20 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  FileJson,
-  FileDown,
-  FileText,
-  Filter,
-  Users,
-  Trophy,
-  Clock,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   Download,
-  CheckCircle2,
-  Calendar,
-  Eye,
   Loader2,
+  Filter,
+  Trophy,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  Users,
+  Calendar,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,6 +42,9 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { toast } from "sonner";
 import { exportMatchesToFormat } from "@/actions/editions";
+import { useMatchList, useEditionMatchStats } from "@/hooks/use-match-manager";
+import { useUserRegistration } from "@/hooks/use-editions";
+import { MatchCard } from "@/components/cards/match-card";
 
 interface EditionMatchesTabProps {
   editionId: string;
@@ -58,24 +52,28 @@ interface EditionMatchesTabProps {
   activePhaseId?: string;
   currentUserId?: string;
   isAdmin?: boolean;
+  phases?: any[];
 }
 
 export function EditionMatchesTab({
   editionId,
   tournamentId,
-  activePhaseId,
+  activePhaseId: initialPhaseId,
   currentUserId,
   isAdmin,
+  phases = [],
 }: EditionMatchesTabProps) {
-  // --- STATE ---
-  const [page, setPage] = useState(1);
+  // États
+  const [activePhaseId, setActivePhaseId] = useState(initialPhaseId || phases[0]?.id || "");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
+  const [allMatchesPage, setAllMatchesPage] = useState(1);
   const [myMatchesPage, setMyMatchesPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
-  const limit = 10; // Matches par page pour "mes matchs"
 
-  // --- HOOKS ---
+  const limit = 20;
+
+  // Hooks
   const { data: userReg, isLoading: regLoading } = useUserRegistration(
     editionId,
     currentUserId,
@@ -83,53 +81,58 @@ export function EditionMatchesTab({
   const { data: stats, isLoading: statsLoading } =
     useEditionMatchStats(editionId);
 
-  // 1. Tous les matchs (pour les filtres et la section "autres matchs")
-  const allFilters: any = { editionId };
-  if (activePhaseId) allFilters.phaseId = activePhaseId;
-  if (statusFilter !== "ALL") allFilters.statuses = [statusFilter];
+  // Filtres communs
+  const baseFilters: any = { editionId };
+  if (activePhaseId) baseFilters.phaseId = activePhaseId;
+  if (statusFilter !== "ALL") baseFilters.statuses = [statusFilter];
 
+  // Tous les matchs (paginated)
   const {
     data: allMatchesRes,
     isLoading: allMatchesLoading,
-    refetch,
+    refetch: refetchAll,
   } = useMatchList({
-    filters: allFilters,
-    pagination: { page: 1, limit: 100 },
+    filters: baseFilters,
+    pagination: { page: allMatchesPage, limit },
     options: { sortBy: "scheduledTime", sortOrder: "desc" },
   });
 
-  // 2. Mes matchs (filtrés par l'utilisateur)
-  const myMatchesFilters: any = { editionId };
-  if (userReg?.id) myMatchesFilters.memberRegistrationId = userReg.id;
-  if (activePhaseId) myMatchesFilters.phaseId = activePhaseId;
-  if (statusFilter !== "ALL") myMatchesFilters.statuses = [statusFilter];
+  // Mes matchs
+  const myFilters: any = { ...baseFilters };
+  if (userReg?.id) myFilters.memberRegistrationId = userReg.id;
 
   const {
     data: myMatchesRes,
     isLoading: myMatchesLoading,
-    refetch: refetchMyMatches,
+    refetch: refetchMy,
   } = useMatchList({
-    filters: myMatchesFilters,
+    filters: myFilters,
     pagination: { page: myMatchesPage, limit },
     options: { sortBy: "scheduledTime", sortOrder: "asc" },
   });
 
   const allMatches = allMatchesRes?.data || [];
+  const allPagination = allMatchesRes?.pagination || {
+    total: 0,
+    totalPages: 0,
+    hasPrev: false,
+    hasNext: false,
+  };
   const myMatches = myMatchesRes?.data || [];
-  const myMatchesTotal = myMatchesRes?.pagination?.total || 0;
-  const myMatchesTotalPages = Math.ceil(myMatchesTotal / limit);
+  const myPagination = myMatchesRes?.pagination || {
+    total: 0,
+    totalPages: 0,
+    hasPrev: false,
+    hasNext: false,
+  };
 
-  // Filtrer les matchs où l'utilisateur n'est pas participant
-  const otherMatches = useMemo(() => {
-    const myMatchIds = new Set(myMatches.map((m: any) => m.id));
-    return allMatches.filter((m: any) => !myMatchIds.has(m.id));
-  }, [allMatches, myMatches]);
-
-  // --- HANDLERS ---
+  // Export
   const handleExport = useCallback(
-    async (format: "pdf" | "csv" | "json" | "excel", scope: "all" | "my") => {
+    async (format: "csv" | "json" | "pdf" | "excel", scope: "all" | "my") => {
       setIsExporting(true);
       try {
+        const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
+        
         const filters: any = { editionId };
         if (activePhaseId) filters.phaseId = activePhaseId;
         if (statusFilter !== "ALL") filters.statuses = [statusFilter];
@@ -137,24 +140,20 @@ export function EditionMatchesTab({
           filters.memberRegistrationId = userReg.id;
 
         const result = await exportMatchesToFormat(editionId, format, filters);
-
+        
         if (result.success && result.data) {
-          const blob = await fetch(result.data).then((r) => r.blob());
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.setAttribute(
-            "download",
-            result.filename ||
-              `matches_export.${format === "excel" ? "xlsx" : format}`,
-          );
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          window.URL.revokeObjectURL(url);
+          const rawData = JSON.parse(result.data);
+          const config = {
+            filename: result.filename || `matches_${scope}_${editionId}`,
+            title: scope === "my" ? "Mes matchs" : "Tous les matchs",
+            subtitle: `Édition: ${editionId.slice(0, 8)}`,
+          };
+
+          const tableData = createExportData(rawData, "matches");
+          await exportToFormat(format, tableData, config);
 
           toast.success(`Export ${format.toUpperCase()} réussi`, {
-            description: `${result.count || 0} matchs exportés`,
+            description: `${result.count || rawData.length} matchs exportés`,
           });
         } else {
           toast.error(result.error || "Erreur lors de l'export");
@@ -168,20 +167,6 @@ export function EditionMatchesTab({
     [editionId, activePhaseId, statusFilter, userReg],
   );
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return <CheckCircle2 className="h-3 w-3 text-emerald-500" />;
-      case "IN_PROGRESS":
-        return <Clock className="h-3 w-3 text-blue-500 animate-pulse" />;
-      case "DISPUTED":
-        return <AlertCircle className="h-3 w-3 text-amber-500" />;
-      default:
-        return <Calendar className="h-3 w-3 text-muted-foreground" />;
-    }
-  };
-
-  // Match stats pour le carousel
   const matchStats = [
     {
       label: "Total",
@@ -209,19 +194,20 @@ export function EditionMatchesTab({
     },
   ];
 
-  const isLoading = regLoading || allMatchesLoading || myMatchesLoading;
+  const isLoading =
+    regLoading || statsLoading || allMatchesLoading || myMatchesLoading;
 
   if (isLoading && !allMatches.length && !myMatches.length) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+            <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
           ))}
         </div>
         <div className="grid grid-cols-1 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+            <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />
           ))}
         </div>
       </div>
@@ -230,7 +216,7 @@ export function EditionMatchesTab({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* 📊 STATS CAROUSEL */}
+      {/* Stats */}
       <StatsCarousel
         data={matchStats.map((s) => ({
           label: s.label,
@@ -242,8 +228,41 @@ export function EditionMatchesTab({
         itemsPerView={{ mobile: 2, md: 4, lg: 4 }}
       />
 
-      {/* 🔥 MES MATCHS SECTION */}
-      {userReg?.id && myMatchesTotal > 0 && (
+      {/* Phase Selector (Horizontal Scroll/Tabs) */}
+      {phases.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Trophy className="h-4 w-4 text-primary" />
+            <Typography variant="body-sm" weight="bold" theme="muted" className="uppercase tracking-wider">
+              Phases du tournoi
+            </Typography>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
+            {phases.map((phase) => (
+              <Button
+                key={phase.id}
+                variant={activePhaseId === phase.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setActivePhaseId(phase.id);
+                  setAllMatchesPage(1);
+                  setMyMatchesPage(1);
+                }}
+                className={cn(
+                  "flex-shrink-0 h-9 px-4 rounded-full transition-all",
+                  activePhaseId === phase.id ? "shadow-md scale-105" : "hover:bg-primary/5"
+                )}
+              >
+                {phase.name}
+              </Button>
+            ))}
+          </div>
+          <Separator className="opacity-50" />
+        </div>
+      )}
+
+      {/* Mes matchs */}
+      {userReg?.id && myPagination.total > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
@@ -251,15 +270,11 @@ export function EditionMatchesTab({
               <Typography variant="h5" weight="bold">
                 Mes matchs
               </Typography>
-              <Badge
-                variant="default"
-                className="bg-primary/10 text-primary border-primary/20 text-[9px]"
-              >
-                {myMatchesTotal} match(s)
+              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs rounded-full">
+                {myPagination.total}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              {/* Export mes matchs */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -280,7 +295,7 @@ export function EditionMatchesTab({
                   <DropdownMenuLabel>Mes matchs</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleExport("excel", "my")}>
-                    Excel (.xlsx)
+                    Excel
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleExport("csv", "my")}>
                     CSV
@@ -293,108 +308,94 @@ export function EditionMatchesTab({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
-              {showOnlyMyMatches && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowOnlyMyMatches(false)}
-                  className="h-8 gap-1"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  <span className="text-xs">Fermer</span>
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* Liste des matchs */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {myMatches
-              .slice(0, showOnlyMyMatches ? limit : 4)
-              .map((match: any) => (
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  currentUserId={currentUserId}
-                  isAdmin={isAdmin}
-                  onUpdate={() => {
-                    refetch();
-                    refetchMyMatches();
-                  }}
-                />
-              ))}
+            {myMatches.map((match: any) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                onUpdate={() => {
+                  refetchAll();
+                  refetchMy();
+                }}
+              />
+            ))}
           </div>
 
-          {/* Pagination pour mes matchs (si mode "voir tous") */}
-          {showOnlyMyMatches && myMatchesTotalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4">
+          {myPagination.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"
-                disabled={myMatchesPage === 1}
+                disabled={!myPagination.hasPrev}
                 onClick={() => setMyMatchesPage((p) => Math.max(1, p - 1))}
+                className="h-8 w-8 p-0"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {myMatchesPage} / {myMatchesTotalPages}
-              </span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, myPagination.totalPages) }).map((_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={myMatchesPage === pageNum ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setMyMatchesPage(pageNum)}
+                      className="h-8 w-8 p-0 text-xs"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                {myPagination.totalPages > 5 && <span className="text-muted-foreground text-xs">...</span>}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={myMatchesPage === myMatchesTotalPages}
+                disabled={!myPagination.hasNext}
                 onClick={() =>
-                  setMyMatchesPage((p) => Math.min(myMatchesTotalPages, p + 1))
+                  setMyMatchesPage((p) =>
+                    Math.min(myPagination.totalPages, p + 1),
+                  )
                 }
+                className="h-8 w-8 p-0"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
-
-          {/* Bouton "Voir tous mes matchs" */}
-          {!showOnlyMyMatches && myMatchesTotal > 4 && (
-            <div className="text-center pt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowOnlyMyMatches(true)}
-                className="gap-1"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                Voir tous mes {myMatchesTotal} matchs
-              </Button>
-            </div>
-          )}
-
-          <Separator className="my-6 opacity-50" />
+          
+          <Separator className="my-8 opacity-50" />
         </div>
       )}
 
-      {/* 📋 AUTRES MATCHS (où l'utilisateur n'est pas participant) */}
-      <div className="space-y-4">
+      {/* Tous les matchs (Aperçu) */}
+      <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
+            <Calendar className="h-5 w-5 text-primary" />
             <Typography variant="h5" weight="bold">
-              Matchs de l'édition
+              Tous les matchs
             </Typography>
-            <Badge variant="outline" className="text-[9px]">
-              {allMatches.length} matchs
+            <Badge variant="outline" className="text-xs rounded-full">
+              {allPagination.total}
             </Badge>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Filtre par statut */}
+          <div className="flex flex-wrap items-center gap-2">
             <Select
               value={statusFilter}
               onValueChange={(val) => {
                 setStatusFilter(val);
-                setPage(1);
+                setAllMatchesPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-[140px] text-xs">
+              <SelectTrigger className="h-9 w-[130px] text-xs bg-card">
                 <Filter className="h-3 w-3 mr-2" />
                 <SelectValue placeholder="État" />
               </SelectTrigger>
@@ -407,7 +408,6 @@ export function EditionMatchesTab({
               </SelectContent>
             </Select>
 
-            {/* Bouton Export */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -428,7 +428,7 @@ export function EditionMatchesTab({
                 <DropdownMenuLabel>Tous les matchs</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleExport("excel", "all")}>
-                  Excel (.xlsx)
+                  Excel
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleExport("csv", "all")}>
                   CSV
@@ -441,88 +441,62 @@ export function EditionMatchesTab({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Bouton voir tous les matchs */}
-            {tournamentId && (
-              <Button size="sm" variant="outline" asChild className="gap-1">
-                <Link
-                  href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  <span className="text-xs hidden sm:inline">
-                    Page complète
-                  </span>
-                </Link>
-              </Button>
-            )}
           </div>
         </div>
 
-        {/* Liste des matchs (excluant les matchs de l'utilisateur si non en mode "mes matchs" uniquement) */}
-        {otherMatches.length === 0 ? (
-          <div className="p-12 text-center bg-card border border-dashed rounded-2xl flex flex-col items-center justify-center space-y-3">
-            <div className="bg-muted p-4 rounded-full">
-              <Trophy className="h-8 w-8 text-muted-foreground opacity-50" />
-            </div>
-            <Typography variant="h6" className="text-muted-foreground">
-              Aucun match trouvé
-            </Typography>
-            {statusFilter !== "ALL" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setStatusFilter("ALL")}
-              >
-                Réinitialiser les filtres
-              </Button>
-            )}
-          </div>
+        {allMatches.length === 0 ? (
+          <Card className="border-dashed py-12 bg-muted/5">
+            <CardContent className="text-center">
+              <div className="bg-muted p-4 rounded-full w-fit mx-auto mb-4">
+                <Calendar className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+              <Typography variant="body-base" theme="muted">
+                Aucun match trouvé pour cette phase ou ce filtre.
+              </Typography>
+              {statusFilter !== "ALL" && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="mt-2 text-primary"
+                  onClick={() => setStatusFilter("ALL")}
+                >
+                  Voir tous les matchs de cette phase
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {otherMatches.slice(0, 10).map((match: any) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-                onUpdate={() => refetch()}
-              />
-            ))}
-          </div>
-        )}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {allMatches.map((match: any) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  onUpdate={() => refetchAll()}
+                />
+              ))}
+            </div>
 
-        {/* Lien vers la page complète des matchs */}
-        {tournamentId && otherMatches.length > 10 && (
-          <div className="text-center pt-4">
-            <Button variant="outline" asChild className="gap-2">
-              <Link
-                href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}
-              >
-                Voir tous les {allMatches.length} matchs
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        )}
-
-        {/* Message si aucun match en dehors des siens */}
-        {userReg?.id && myMatchesTotal > 0 && otherMatches.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p>Aucun autre match programmé pour le moment.</p>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-4 bg-muted/20 rounded-xl border border-dashed">
+              <div className="text-sm text-muted-foreground">
+                <Typography variant="body-sm">
+                  Affichage des <strong>{allMatches.length}</strong> derniers matchs sur <strong>{allPagination.total}</strong>.
+                </Typography>
+              </div>
+              {tournamentId && (
+                <Button variant="default" size="sm" asChild className="gap-2 shadow-lg shadow-primary/20">
+                  <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}>
+                    Voir tout le calendrier
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
-
-      {/* Indicateur de chargement pour les matchs */}
-      {isLoading && allMatches.length === 0 && myMatches.length === 0 && (
-        <div className="text-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-          <p className="text-sm text-muted-foreground mt-2">
-            Chargement des matchs...
-          </p>
-        </div>
-      )}
     </div>
   );
 }

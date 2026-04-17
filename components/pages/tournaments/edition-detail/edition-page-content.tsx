@@ -134,9 +134,11 @@ export function EditionPageContent({
       content: (
         <EditionMatchesTab 
           editionId={edition.id}
+          tournamentId={edition.tournamentId}
           activePhaseId={activePhaseId}
           currentUserId={user?.id}
           isAdmin={isOrganizer}
+          phases={phases}
         />
       ),
     },

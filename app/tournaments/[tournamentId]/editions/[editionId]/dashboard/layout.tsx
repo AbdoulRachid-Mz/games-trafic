@@ -86,7 +86,7 @@ export default function EditionDashboardLayout({
       icon: UserCog,
     },
     {
-      title: "Phases & Arbre",
+      title: "Phases",
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`,
       icon: ListTree,
     },
@@ -96,7 +96,7 @@ export default function EditionDashboardLayout({
       icon: LayoutGrid,
     },
     {
-      title: "Brackets",
+      title: "Rencontres",
       url: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/brackets`,
       icon: GitBranch,
     },

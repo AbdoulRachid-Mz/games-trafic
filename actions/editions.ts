@@ -148,14 +148,30 @@ export async function joinEdition(
   };
 }> {
   try {
-    // 1. Get Edition
+    // 1. Get Edition with tournament info
     const edition = await db.query.tournamentEditions.findFirst({
       where: eq(tournamentEditions.id, editionId),
+      with: { tournament: true }
     });
 
-    if (!edition) throw new Error("Edition not found");
+    if (!edition) throw new Error("Edition introuvable");
 
-    // 2. Check/Create Tournament Member using the new members action
+    // 2. Performance checks
+    if (edition.tournament?.organizerId === userId) {
+      return { success: false, message: "L'organisateur ne peut pas s'inscrire à sa propre compétition." };
+    }
+
+    if (edition.status !== "UPCOMING") {
+      return { success: false, message: "Les inscriptions sont fermées. Le tournoi a déjà commencé ou est terminé." };
+    }
+
+    const currentParticipants = edition.currentParticipants || 0;
+    const maxParticipants = edition.maxParticipants || 0;
+    if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
+      return { success: false, message: "Désolé, cette édition est déjà complète." };
+    }
+
+    // 3. Check/Create Tournament Member using the new members action
     const { getTournamentMembers, addTournamentMember } =
       await import("./members");
 
@@ -582,62 +598,8 @@ export async function exportEditionParticipants(
       data = JSON.stringify(exportData, null, 2);
       filename = `participants_${editionId}_${Date.now()}.json`;
       contentType = "application/json";
-    } else if (format === "pdf") {
-      // Génération PDF avec jspdf
-      const doc = new jsPDF({ orientation: "landscape" });
-
-      // En-tête
-      doc.setFontSize(16);
-      doc.text(`Liste des participants - Édition ${editionId}`, 14, 15);
-      doc.setFontSize(10);
-      doc.text(
-        `Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`,
-        14,
-        25,
-      );
-
-      // Tableau
-      const tableData = exportData.map((row) => [
-        row["Nom"],
-        row["Email"],
-        row["Équipe"],
-        row["Statut"],
-        row["Check-in"],
-        row["Payé"],
-        row["Matches joués"].toString(),
-        row["Victoires"].toString(),
-        row["Défaites"].toString(),
-        // row['Points'].toString(),
-        row["Position"],
-        row["Date inscription"].toString(),
-      ]);
-
-      autoTable(doc, {
-        head: [
-          [
-            "Nom",
-            "Email",
-            "Équipe",
-            "Statut",
-            "Check-in",
-            "Payé",
-            "MJ",
-            "V",
-            "D",
-            "Position",
-            "Date inscription",
-          ],
-        ],
-        body: tableData,
-        startY: 35,
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontSize: 9 },
-        alternateRowStyles: { fillColor: [240, 240, 240] },
-      });
-
-      data = doc.output("datauristring");
-      filename = `participants_${editionId}_${Date.now()}.pdf`;
-      contentType = "application/pdf";
+      data = JSON.stringify(exportData);
+      filename = `participants_${editionId}_${Date.now()}`;
     }
 
     return { success: true, data, filename, error: undefined };
@@ -733,84 +695,8 @@ export async function exportEditionMatches(
       data = JSON.stringify(exportData, null, 2);
       filename = `matches_${editionId}_${Date.now()}.json`;
       contentType = "application/json";
-    } else if (format === "pdf") {
-      // Génération PDF avec jspdf
-      const doc = new jsPDF({ orientation: "landscape" });
-
-      // En-tête
-      doc.setFontSize(16);
-      doc.text(`Calendrier des matchs - Édition ${editionId}`, 14, 15);
-      doc.setFontSize(10);
-      doc.text(
-        `Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`,
-        14,
-        25,
-      );
-
-      // Statistiques rapides
-      const totalMatches = exportData.length;
-      const completedMatches = exportData.filter(
-        (m) => m.Statut === "Terminé",
-      ).length;
-      const pendingMatches = exportData.filter(
-        (m) => m.Statut === "Programmé",
-      ).length;
-
-      doc.setFontSize(9);
-      doc.text(
-        `Total: ${totalMatches} matchs | Terminés: ${completedMatches} | À venir: ${pendingMatches}`,
-        14,
-        35,
-      );
-
-      // Tableau des matchs
-      const tableData = exportData.map((row) => [
-        row["Match #"].toString(),
-        row["Phase"],
-        row["Groupe"],
-        row["Round"].toString(),
-        row["Joueur 1"].substring(0, 20),
-        row["Joueur 2"].substring(0, 20),
-        row["Score"],
-        row["Statut"],
-        row["Date planifiée"].substring(0, 16),
-      ]);
-
-      autoTable(doc, {
-        head: [
-          [
-            "#",
-            "Phase",
-            "Groupe",
-            "R",
-            "Joueur 1",
-            "Joueur 2",
-            "Score",
-            "Statut",
-            "Date",
-          ],
-        ],
-        body: tableData,
-        startY: 45,
-        styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontSize: 8 },
-        alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: {
-          0: { cellWidth: 15 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 10 },
-          4: { cellWidth: 40 },
-          5: { cellWidth: 40 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 25 },
-          8: { cellWidth: 35 },
-        },
-      });
-
-      data = doc.output("datauristring");
-      filename = `matches_${editionId}_${Date.now()}.pdf`;
-      contentType = "application/pdf";
+      data = JSON.stringify(exportData);
+      filename = `matches_${editionId}_${Date.now()}`;
     }
 
     return { success: true, data, filename };
@@ -844,6 +730,7 @@ export interface ExportMatchesFilters {
   bracketNodeId?: string;
   status?: string;
   search?: string;
+  phaseName?: string;
 }
 
 /**
@@ -900,102 +787,93 @@ export async function exportMatchesToFormat(
       "Litige": m.disputed ? "Oui" : "Non",
     }));
 
-    let data: string | undefined;
-    let filename: string | undefined;
-    let blob: Blob | undefined;
-
-    const timestamp = Date.now();
-    const filePrefix = `matches_${editionId}${filters?.phaseId ? `_phase_${filters.phaseId.slice(0, 8)}` : ""}${filters?.groupId ? `_group_${filters.groupId.slice(0, 8)}` : ""}`;
-
-    if (format === "csv") {
-      const parser = new Parser();
-      data = parser.parse(exportData);
-      filename = `${filePrefix}_${timestamp}.csv`;
-      blob = new Blob([data], { type: "text/csv;charset=utf-8" });
-    } else if (format === "json") {
-      data = JSON.stringify(exportData, null, 2);
-      filename = `${filePrefix}_${timestamp}.json`;
-      blob = new Blob([data], { type: "application/json" });
-    } else if (format === "excel") {
-      // Pour Excel, on utilise une librairie comme xlsx
-      const XLSX = await import("xlsx");
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Matchs");
-      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      filename = `${filePrefix}_${timestamp}.xlsx`;
-      data = URL.createObjectURL(blob);
-    } else if (format === "pdf") {
-      const doc = new jsPDF({ orientation: "landscape" });
-      
-      // En-tête
-      doc.setFontSize(16);
-      doc.text(`Calendrier des matchs - Édition ${editionId}`, 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Généré le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`, 14, 25);
-      
-      // Filtres actifs
-      let filterY = 35;
-      if (filters?.phaseId) {
-        doc.setFontSize(9);
-        doc.text(`Phase: ${filters.phaseId.slice(0, 8)}...`, 14, filterY);
-        filterY += 5;
-      }
-      if (filters?.status) {
-        doc.text(`Statut: ${filters.status}`, 14, filterY);
-        filterY += 5;
-      }
-      
-      // Statistiques
-      const totalMatches = exportData.length;
-      const completedMatches = exportData.filter((m) => m.Statut === "Terminé").length;
-      const pendingMatches = exportData.filter((m) => m.Statut === "En attente").length;
-      
-      doc.setFontSize(9);
-      doc.text(`Total: ${totalMatches} matchs | Terminés: ${completedMatches} | En attente: ${pendingMatches}`, 14, filterY + 5);
-      
-      // Tableau des matchs
-      const tableData = exportData.map((row) => [
-        row["Match #"].toString(),
-        row["Phase"],
-        row["Groupe"],
-        row["Round"].toString(),
-        row["Joueur 1"].substring(0, 20),
-        row["Joueur 2"].substring(0, 20),
-        row["Score"],
-        row["Statut"],
-        row["Date planifiée"].substring(0, 16),
-      ]);
-      
-      autoTable(doc, {
-        head: [["#", "Phase", "Groupe", "R", "Joueur 1", "Joueur 2", "Score", "Statut", "Date"]],
-        body: tableData,
-        startY: filterY + 15,
-        styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontSize: 8 },
-        alternateRowStyles: { fillColor: [240, 240, 240] },
-        columnStyles: {
-          0: { cellWidth: 15 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 10 },
-          4: { cellWidth: 40 },
-          5: { cellWidth: 40 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 25 },
-          8: { cellWidth: 35 },
-        },
-      });
-      
-      blob = doc.output("blob");
-      filename = `${filePrefix}_${timestamp}.pdf`;
-      data = URL.createObjectURL(blob);
-    }
-
-    return { success: true, data, filename, count: totalCount };
+    return { 
+      success: true, 
+      data: JSON.stringify(exportData), 
+      filename: `matches_${editionId}_${Date.now()}`,
+      count: totalCount 
+    };
   } catch (error) {
     console.error("Export matches failed:", error);
     return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Récupère les meilleures statistiques individuelles pour une édition
+ */
+export async function getEditionBestPlayersStats(editionId: string) {
+  try {
+    const participants = await db.query.phaseGroupParticipants.findMany({
+      where: (t, { eq }) => eq(t.isDeleted, false),
+      with: {
+        registration: {
+          with: {
+            member: {
+              with: {
+                user: { columns: { username: true, fullName: true, profileImage: true, image: true } },
+                team: { columns: { name: true, logo: true } }
+              }
+            }
+          }
+        },
+        group: { with: { phase: true } }
+      }
+    });
+
+    // On ne garde que les participants de cette édition (filtrer manuellement car relation complexe via groupes)
+    const validParticipants = participants.filter(p => p.group?.phase?.editionId === editionId);
+
+    if (validParticipants.length === 0) return null;
+
+    // Agréger les stats par registrationId (un joueur peut être dans plusieurs phases)
+    const statsMap = new Map();
+
+    validParticipants.forEach(p => {
+      const regId = p.registrationId as string;
+      if (!statsMap.has(regId)) {
+        statsMap.set(regId, {
+          registration: p.registration,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          wins: 0,
+          played: 0,
+          points: 0,
+        });
+      }
+      const s = statsMap.get(regId);
+      s.goalsFor += p.scoreFor || 0;
+      s.goalsAgainst += p.scoreAgainst || 0;
+      s.wins += p.matchesWon || 0;
+      s.played += p.matchesPlayed || 0;
+      s.points += p.points || 0;
+    });
+
+    const aggregated = Array.from(statsMap.values());
+
+    // Top Buteurs (Attaque)
+    const topScorers = [...aggregated]
+      .sort((a, b) => b.goalsFor - a.goalsFor)
+      .slice(0, 5);
+
+    // Meilleures Défenses (minimum 2 matchs joués pour être crédible)
+    const bestDefense = [...aggregated]
+      .filter(a => a.played >= 2)
+      .sort((a, b) => a.goalsAgainst - b.goalsAgainst)
+      .slice(0, 5);
+
+    // Plus de victoires
+    const mostWins = [...aggregated]
+      .sort((a, b) => b.wins - a.wins)
+      .slice(0, 5);
+
+    return {
+      topScorers,
+      bestDefense,
+      mostWins,
+    };
+  } catch (error) {
+    console.error("Error getting best players stats:", error);
+    return null;
   }
 }

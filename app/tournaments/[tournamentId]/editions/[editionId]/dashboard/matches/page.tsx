@@ -19,7 +19,9 @@ import {
   User as UserIcon,
   AlertCircle, FolderTree,
   ListTree,
-  Grid3X3, Zap
+  Grid3X3, Zap,
+  Layers,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -155,67 +157,81 @@ function MatchCard({ match, tournamentId, editionId }: { match: any; tournamentI
 }
 
 function MatchTreeNode({ node, tournamentId, editionId, depth = 0 }: { node: any; tournamentId: string; editionId: string; depth?: number }) {
-  const [isOpen, setIsOpen] = useState(depth < 2);
-  const hasChildren = node.children && node.children.length > 0;
+  const [isOpen, setIsOpen] = useState(depth < 1); // Only first level open by default
+  const hasChildren = (node.children && node.children.length > 0) || (node.matches && node.matches.length > 0);
   const matches = node.matches || [];
-  const isBracketNode = node.bracketNodeId || node.nodeType === "MATCH";
 
   return (
-    <div className="ml-4" style={{ marginLeft: depth * 16 }}>
+    <div className="space-y-1">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-          {hasChildren || matches.length > 0 ? (
+        <div className={cn(
+          "flex items-center gap-2 py-2.5 px-3 rounded-xl transition-all border",
+          isOpen ? "bg-muted/50 border-primary/20" : "bg-card hover:bg-muted/30 border-transparent shadow-sm"
+        )}>
+          {hasChildren ? (
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full shrink-0">
+                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
             </CollapsibleTrigger>
           ) : (
-            <div className="w-6" />
+            <div className="w-7 shrink-0" />
           )}
           
-          <div className="flex-1 flex items-center gap-3">
-            {isBracketNode ? (
-              <Zap className="h-4 w-4 text-primary" />
-            ) : (
-              <FolderTree className="h-4 w-4 text-muted-foreground" />
-            )}
-            <span className="font-medium text-sm">{node.name || node.nodeCode || "Matchs"}</span>
-            <Badge variant="outline" className="text-[9px]">
-              {matches.length} match{matches.length > 1 ? "s" : ""}
+          <div className="flex-1 flex items-center gap-3 overflow-hidden">
+            <div className={cn(
+              "p-1.5 rounded-lg shrink-0",
+              node.type === "phase" ? "bg-primary/10 text-primary" : 
+              node.type === "group" ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+              "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400"
+            )}>
+              {node.type === "phase" ? <Layers className="h-4 w-4" /> : 
+               node.type === "group" ? <Users className="h-4 w-4" /> : 
+               <Zap className="h-4 w-4" />}
+            </div>
+            <div className="truncate">
+              <span className="font-bold text-sm block truncate">{node.name || node.nodeCode || "Matchs"}</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
+                {node.type === "phase" ? "Phase" : node.type === "group" ? "Groupe" : "Node"}
+              </span>
+            </div>
+            <Badge variant="secondary" className="text-[10px] h-4 leading-none">
+              {matches.length}
             </Badge>
           </div>
           
           {matches.length > 0 && (
-            <Button size="sm" variant="ghost" className="h-7 text-[10px]" asChild>
+            <Button size="sm" variant="outline" className="h-7 px-3 text-[10px] rounded-full border-primary/30 text-primary hover:bg-primary hover:text-white" asChild>
               <Link href={`?${new URLSearchParams({ bracketNodeId: node.id, view: "list" })}`}>
-                Voir <ArrowRight className="h-3 w-3 ml-1" />
+                Gérer la liste
               </Link>
             </Button>
           )}
         </div>
         
         <CollapsibleContent>
-          <div className="space-y-1 pl-4 border-l-2 border-border/50 ml-3">
+          <div className="mt-2 space-y-2 pl-6 border-l-2 border-primary/10 ml-6 py-2">
             {matches.map((match: any) => (
-              <div key={match.id} className="py-1.5 px-3 rounded-lg hover:bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-xs">
-                    <Swords className="h-3 w-3 text-muted-foreground" />
-                    <span className="font-mono">#{match.matchNumber}</span>
-                    <span>
-                      {match.participant1?.member?.displayName?.slice(0, 15) || "TBD"} vs{" "}
-                      {match.participant2?.member?.displayName?.slice(0, 15) || "TBD"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={match.status} />
-                    <Button size="sm" variant="ghost" className="h-7 text-[10px]" asChild>
+              <div key={match.id} className="flex items-center justify-between p-2 rounded-lg bg-card border hover:border-primary/20 transition-all">
+                <div className="flex items-center gap-3 overflow-hidden">
+                   <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+                     {match.matchNumber}
+                   </div>
+                   <div className="text-[11px] font-medium truncate">
+                      {match.participant1?.member?.displayName || "TBD"} 
+                      <span className="mx-1 text-muted-foreground opacity-30 italic">vs</span> 
+                      {match.participant2?.member?.displayName || "TBD"}
+                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                   <div className="text-[10px] font-black mr-2">
+                     {match.score1 ?? "-"} : {match.score2 ?? "-"}
+                   </div>
+                   <Button size="sm" variant="ghost" className="h-6 w-6 p-0 rounded-full" asChild>
                       <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
-                        Détail
+                        <ArrowRight className="h-3 w-3" />
                       </Link>
-                    </Button>
-                  </div>
+                   </Button>
                 </div>
               </div>
             ))}
@@ -313,8 +329,16 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
         params.delete(key);
       }
     });
+
+    // Reset pagination when filter changes
+    if (!updates.page) params.set("page", "1");
+    
     router.push(`${pathname}?${params.toString()}`);
   };
+
+  // Phase & Group Tabs logic
+  const activePhase = phases.find(p => p.id === phaseId);
+  const activePhaseGroups = activePhase ? (editionTree?.phases?.find((p: any) => p.id === phaseId)?.groups || []) : [];
 
   if (isLoading && !matches.length) {
     return (
@@ -351,36 +375,98 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
         
         <div className="flex items-center gap-2">
           {/* View Toggle */}
-          <div className="flex bg-muted p-1 rounded-lg border">
+          <div className="flex bg-muted/50 p-1.5 rounded-xl border border-primary/10 shadow-inner">
             <Button 
               variant={view === "list" ? "secondary" : "ghost"} 
               size="sm" 
-              className="h-7 px-2"
+              className={cn("h-8 px-4 rounded-lg text-xs font-bold gap-2", view === "list" && "shadow-sm border")}
               onClick={() => updateParams({ view: "list" })}
             >
               <ListTree className="h-3.5 w-3.5" />
+              Liste
             </Button>
             <Button 
               variant={view === "tree" ? "secondary" : "ghost"} 
               size="sm" 
-              className="h-7 px-2"
+              className={cn("h-8 px-4 rounded-lg text-xs font-bold gap-2", view === "tree" && "shadow-sm border")}
               onClick={() => updateParams({ view: "tree" })}
             >
               <FolderTree className="h-3.5 w-3.5" />
+              Arbre
             </Button>
             <Button 
               variant={view === "grid" ? "secondary" : "ghost"} 
               size="sm" 
-              className="h-7 px-2"
+              className={cn("h-8 px-4 rounded-lg text-xs font-bold gap-2", view === "grid" && "shadow-sm border")}
               onClick={() => updateParams({ view: "grid" })}
             >
               <Grid3X3 className="h-3.5 w-3.5" />
+              Grille
             </Button>
           </div>
 
           {/* Export Button */}
           <ExportMatchesButton editionId={editionId} />
         </div>
+      </div>
+
+      {/* Navigation Horizontale (Nodes) */}
+      <div className="space-y-4">
+        {/* Phase Tabs */}
+        {phases.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
+            <Button
+              variant={!phaseId ? "default" : "outline"}
+              size="sm"
+              onClick={() => updateParams({ phaseId: null, groupId: null, bracketNodeId: null })}
+              className={cn(
+                "flex-shrink-0 h-9 px-5 rounded-full",
+                !phaseId && "shadow-lg shadow-primary/20"
+              )}
+            >
+              Toutes les phases
+            </Button>
+            {phases.map((phase: any) => (
+              <Button
+                key={phase.id}
+                variant={phaseId === phase.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => updateParams({ phaseId: phase.id, groupId: null, bracketNodeId: null })}
+                className={cn(
+                  "flex-shrink-0 h-9 px-5 rounded-full transition-all",
+                  phaseId === phase.id && "shadow-lg shadow-primary/20 scale-105"
+                )}
+              >
+                {phase.name}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Group Tabs (Contextual) */}
+        {phaseId && activePhaseGroups.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-6 border-l-4 border-primary/20 bg-muted/20 py-3 rounded-xl">
+             <Button
+                variant={!groupId ? "default" : "ghost"}
+                size="xs"
+                onClick={() => updateParams({ groupId: null, bracketNodeId: null })}
+                className="flex-shrink-0 h-7 px-3 rounded-full text-[10px] uppercase tracking-wider font-black"
+              >
+                Tous les groupes
+              </Button>
+              {activePhaseGroups.map((group: any) => (
+                <Button
+                  key={group.id}
+                  variant={groupId === group.id ? "default" : "ghost"}
+                  size="xs"
+                  onClick={() => updateParams({ groupId: group.id, bracketNodeId: null })}
+                  className="flex-shrink-0 h-7 px-3 rounded-full text-[10px] uppercase tracking-wider font-black"
+                >
+                  {group.name}
+                </Button>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Filters Bar */}

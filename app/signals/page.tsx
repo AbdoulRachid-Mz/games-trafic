@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { SignalType } from "@/types/api";
 import { useCreateSignal } from "@/hooks/use-signals";
+import { useAuthContext } from "@/contexts/auth-context";
 
 export default function SignalsPage() {
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,9 @@ export default function SignalsPage() {
     targetType: "BUG",
     severity: "MEDIUM",
   });
+
+  const { user } = useAuthContext();
+
 
   const createSignalMutation = useCreateSignal();
 
@@ -44,7 +48,7 @@ export default function SignalsPage() {
 
       // Get userId from session or auth context - this is a placeholder
       // In a real app, you'd get this from your auth provider
-      const userId = "anonymous"; // TODO: Replace with actual user ID from auth
+      const userId = user?.id || "anonymous"; // TODO: Replace with actual user ID from auth
 
       await createSignalMutation.mutateAsync({
         userId,

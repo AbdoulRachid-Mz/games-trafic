@@ -667,7 +667,7 @@ function CreateTransactionContent({
           order.error || "Erreur lors de la création de la commande",
         );
       }
-      setTransactionId(order.orderId || null);
+      setTransactionId(order.transactionId || null);
       toast.success("Commande créée ! Elle sera validée par la boutique.");
       await refreshProfile();
       nextStep();

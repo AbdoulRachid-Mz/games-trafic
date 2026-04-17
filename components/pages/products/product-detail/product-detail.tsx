@@ -87,7 +87,8 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     ? currentProduct.images[selectedImageIndex]
     : "/placeholder-product.jpg";
 
-  const isOwner = user && currentProduct && (user.id === currentProduct.userId);
+  const isShopOwner = user && currentProduct.shop && user.id === currentProduct.shop.ownerId;
+  const isOwner = user && currentProduct && (user.id === currentProduct.userId || isShopOwner);
   const isAvailable = currentProduct.status === "NON_VENDU" || currentProduct.status === "RESERVE";
   const images = currentProduct.images && currentProduct.images.length > 0 ? currentProduct.images : [mainImage];
 
@@ -99,7 +100,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     }
 
     if (isOwner) {
-      toast.error("Vous ne pouvez pas acheter votre propre compte.");
+      toast.error("Vous ne pouvez pas acheter votre propre produit ou un produit de votre boutique.");
       return;
     }
 
@@ -109,15 +110,10 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     }
 
     const params = new URLSearchParams({
-      type: "PURCHASE",
+      type: "PRODUCT_PURCHASE",
+      id: currentProduct.id,
       amount: currentProduct.price.toString(),
       image: currentProduct.featuredImage || currentProduct.images?.[0] || "",
-      entityData: JSON.stringify({
-        productId: currentProduct.id,
-        productName: currentProduct.name,
-        shopId: currentProduct.shopId,
-        productType: "ACCOUNT"
-      }),
       recipientId: currentProduct.userId || currentProduct.shop?.ownerId || "",
     });
 
@@ -441,6 +437,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                           t: "PRODUCT_PURCHASE",
                           id: currentProduct.id,
                           a: typeof currentProduct.price === "number" ? currentProduct.price : parseFloat(currentProduct.price as string),
+                          i: currentProduct.featuredImage || currentProduct.images?.[0] || "",
                           m: { name: currentProduct.name }
                         })}
                         label={currentProduct.name}

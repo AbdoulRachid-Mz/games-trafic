@@ -2224,7 +2224,6 @@ export const signals = pgTable('signals', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
 
   reporterId: text('reporter_id')
-    .notNull()
     .references(() => users.id),
 
   // 🔗 Cible générique

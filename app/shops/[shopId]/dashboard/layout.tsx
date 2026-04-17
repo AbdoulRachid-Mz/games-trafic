@@ -50,10 +50,6 @@ export default function ShopDashboardLayout({
     ...navData.overviewItems,
     ...navData.productItems,
     ...navData.orderItems,
-    ...navData.customerItems,
-    ...navData.analyticsItems,
-    ...navData.marketingItems,
-    ...navData.appearanceItems,
     ...navData.paymentItems,
     ...navData.settingsItems,
   ];
@@ -109,51 +105,7 @@ export default function ShopDashboardLayout({
           ))}
         </SidebarGroup>
 
-        <SidebarGroup label="Clients" sidebarBgType="gradient">
-          {navData.customerItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-
-        <SidebarGroup label="Analyses" sidebarBgType="gradient">
-          {navData.analyticsItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-
-        <SidebarGroup label="Marketing" sidebarBgType="gradient">
-          {navData.marketingItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-
-        <SidebarGroup label="Apparence" sidebarBgType="gradient">
-          {navData.appearanceItems.map((item) => (
-            <SidebarItem
-              key={item.title}
-              {...item}
-              isActive={isActive(item.url, false)}
-              sidebarBgType="gradient"
-            />
-          ))}
-        </SidebarGroup>
-
-        <SidebarGroup label="Paiements" sidebarBgType="gradient">
+        <SidebarGroup label="Finances" sidebarBgType="gradient">
           {navData.paymentItems.map((item) => (
             <SidebarItem
               key={item.title}

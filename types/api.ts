@@ -1639,6 +1639,7 @@ export interface CreateSignalInput {
 
   title: string;
   description?: string;
+  severity?: SignalType;
 
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   metadata?: Record<string, any>;

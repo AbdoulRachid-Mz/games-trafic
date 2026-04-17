@@ -647,7 +647,24 @@ export const exportData = async (
   }
 
   const filename = `${finalConfig.filename}.${getFileExtension(format)}`
-  saveAs(blob, filename)
+  
+  if (typeof window !== 'undefined') {
+    saveAs(blob, filename)
+  }
+}
+
+// Download helper
+export const downloadFile = (blob: Blob, filename: string) => {
+  if (typeof window === 'undefined') return;
+  
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
+  setTimeout(() => window.URL.revokeObjectURL(url), 100);
 }
 
 // Helper functions

@@ -21,6 +21,8 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getEditionRegistrations, updateEditionRegistration, updateRegistrationPayment, getTournamentEditions } from "@/actions/tournaments";
 import { refundTransaction } from "@/actions/transactions";
+import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { EditionWalletCard } from "./edition-wallet-card";
 import { TournamentPayoutDialog } from "@/components/pages/tournaments/payments/payout-dialog";
 import {
   EditionRegistration,
@@ -56,6 +58,11 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
   const edition = editionRes.data?.[0] as any;
   const isPayingEdition = !!edition && parseFloat(edition.entryFee || "0") > 0;
 
+  let balance = 0;
+  if (edition?.financialAccountId) {
+     balance = await getAccountBalance(edition.financialAccountId);
+  }
+
   const registrationsResponse = await getEditionRegistrations({
     filters: { editionId },
     pagination: { limit: 100, page: 1 },
@@ -77,7 +84,14 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
     }));
 
   return (
-    <Card>
+    <div className="space-y-6">
+      <EditionWalletCard 
+         editionId={edition.id} 
+         editionStatus={edition.status} 
+         balance={balance} 
+      />
+
+      <Card>
       <CardHeader>
         <CardTitle>Historique des Paiements</CardTitle>
         <CardDescription>
@@ -226,5 +240,6 @@ export default async function DashboardPaymentsPage({ params }: PageProps) {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { MemberCard } from "@/components/cards/member-card";
 import { useEditionManager } from "@/hooks/use-edition-manager";
+import { EditionBestPlayersStats } from "./edition-best-players-stats";
+import { Star } from "lucide-react";
 
 interface EditionParticipantsListProps {
   participants: any[];
@@ -94,6 +96,17 @@ export function EditionParticipantsList({
               <List className="h-4 w-4" />
             </Button>
           </div>
+
+          <EditionBestPlayersStats 
+            editionId={editionId}
+            trigger={
+              <Button variant="outline" size="sm" className="h-10 px-4 whitespace-nowrap gap-2 bg-card hover:bg-muted border-dashed border-primary/30">
+                <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                <span className="hidden sm:inline">Stats & Hall of Fame</span>
+                <span className="sm:hidden text-xs">Stats</span>
+              </Button>
+            }
+          />
 
           <Select onValueChange={(val: string) => handleExport(val as any)}>
             <SelectTrigger className="h-10 px-4 w-full sm:w-[160px] bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-sm">

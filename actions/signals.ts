@@ -9,21 +9,23 @@ import { revalidatePath } from "next/cache";
 
 
 // Create a new signal
-export async function createSignal(input: CreateSignalInput) {  
-  // 🔒 Validation minimale
+export async function createSignal(input: CreateSignalInput) {
   if (!input.title || input.title.length < 5) {
     throw new Error("Titre invalide");
   }
 
   const now = new Date();
 
-  // 🔥 Anti-spam (ex: max 5 signals / heure)
+  const reporterCondition = input.userId
+    ? eq(signals.reporterId, input.userId)
+    : sql`${signals.reporterId} IS NULL`;
+
   const recentSignals = await db
     .select()
     .from(signals)
     .where(
       and(
-        eq(signals.reporterId, input.userId),
+        reporterCondition,
         sql`${signals.createdAt} > NOW() - INTERVAL '1 hour'`,
       ),
     );
@@ -35,16 +37,17 @@ export async function createSignal(input: CreateSignalInput) {
   const [signal] = await db
     .insert(signals)
     .values({
-      reporterId: input.userId,
+      reporterId: input.userId || null,
       targetId: input.targetId,
       targetType: input.targetType,
 
       title: input.title,
       description: input.description || "",
 
-      // priority column does not exist in signals table, removed
+      severity: input.severity || "MEDIUM",
       metadata: input.metadata || {},
-      status: "PENDING",
+
+      status: "OPEN",
 
       createdAt: now,
       updatedAt: now,

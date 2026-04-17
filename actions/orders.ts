@@ -6,6 +6,7 @@ import {
   products,
   shops,
   userWallets,
+  walletTransactions,
 } from '@/database/schema';
 import { and, count, eq, inArray, sql, SQL } from 'drizzle-orm';
 import { OrderFilters, OrderStats, OrderStatus, PaginationResponse } from '@/types/api';
@@ -29,7 +30,7 @@ export async function createProductOrder(
     totalAmount?: number;
   },
   options?: { allowDuplicate?: boolean }
-): Promise<{ success: boolean; orderId?: string; error?: string }> {
+): Promise<{ success: boolean; orderId?: string; error?: string; transactionId?: string }> {
   try {
     const user = await getCurrentUser();
     if (!user) throw new Error("Non authentifié");
@@ -43,7 +44,7 @@ export async function createProductOrder(
 
       if (!product) throw new Error("Produit non trouvé");
       if (product.status !== 'NON_VENDU') throw new Error("Produit non disponible");
-      if (product.shop?.ownerId === user.id) throw new Error("Vous ne pouvez pas acheter votre propre produit");
+      if (product.shop?.ownerId === user.id || product.userId === user.id) throw new Error("Vous ne pouvez pas acheter votre propre produit");
 
       if (!options?.allowDuplicate) {
         const existing = await tx
@@ -80,7 +81,25 @@ export async function createProductOrder(
         throw new Error(`Solde insuffisant. Requis: ${price} GTC, Disponible: ${balance} GTC`);
       }
 
-      // 4. Create Order
+      // 4. Debit immediately to Escrow
+      const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
+      const { transaction } = await executeTransaction({
+        tx,
+        fromAccountId: buyerWallet.financialAccountId,
+        toAccountId: escrowAccount.id,
+        amount: price,
+        type: 'ORDER_PURCHASE',
+        status: 'PENDING',
+        description: `Réservation du produit: ${product.name}`,
+        userId: user.id,
+        walletId: buyerWallet.id,
+        metadata: {
+          productId: product.id,
+          shopId: product.shopId
+        }
+      });
+
+      // 5. Create Order
       const [newOrder] = await tx.insert(orders).values({
         productId: product.id,
         buyerId: user.id,
@@ -88,16 +107,20 @@ export async function createProductOrder(
         price: price.toFixed(2),
         status: 'PENDING',
         buyerInstructions: data.buyerInstructions,
+        walletTransactionId: transaction.id,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
 
-      // 5. Mark product as reserved
+      // Update tx metadata with order id after creation
+      await tx.update(orders).set({  }).where(eq(orders.id, newOrder.id)); // No-op, just to ensure consistency if needed later
+
+      // 6. Mark product as reserved
       await tx.update(products)
         .set({ status: 'RESERVE' })
         .where(eq(products.id, product.id));
 
-      return { success: true, orderId: newOrder.id };
+      return { success: true, orderId: newOrder.id, transactionId: transaction.id };
     });
   } catch (error: any) {
     console.error("Error creating order:", error);
@@ -170,38 +193,19 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         shopAccountId = fa.id;
       }
 
-      // 2. Move funds from Buyer to Escrow (admin validation)
+      // 2. Original transaction is already in escrow, update its status
       const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
-      const buyerWallet = await tx.query.userWallets.findFirst({
-        where: eq(userWallets.userId, order.buyerId)
-      });
-      if (!buyerWallet?.financialAccountId) {
-        throw new Error("Wallet acheteur introuvable");
-      }
-
       const amount = parseFloat(order.price);
-      const buyerBalance = await getAccountBalance(buyerWallet.financialAccountId);
-      if (buyerBalance < amount) {
-        throw new Error("Solde insuffisant pour valider la commande");
-      }
 
-      const { transaction } = await executeTransaction({
-        fromAccountId: buyerWallet.financialAccountId,
-        toAccountId: escrowAccount.id,
-        amount: amount,
-        type: 'ORDER_PURCHASE',
-        description: `Achat du produit: ${order.product?.name || 'Produit'} (Commande #${order.id.slice(0, 8)})`,
-        userId: order.buyerId,
-        walletId: buyerWallet.id,
-        metadata: {
-          orderId: order.id,
-          productId: order.productId,
-          shopId: order.shopId
-        }
-      });
+      if (order.walletTransactionId) {
+        await tx.update(walletTransactions)
+          .set({ status: 'COMPLETED' })
+          .where(eq(walletTransactions.id, order.walletTransactionId));
+      }
 
       // 3. Move funds from Escrow to Shop
-      await executeTransaction({
+      const { transaction: shopTransaction } = await executeTransaction({
+        tx,
         fromAccountId: escrowAccount.id,
         toAccountId: shopAccountId!,
         amount: amount,
@@ -213,7 +217,6 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
       // 4. Finalize Order and Product
       await tx.update(orders).set({
         status: 'COMPLETED',
-        walletTransactionId: transaction.id,
         updatedAt: new Date()
       }).where(eq(orders.id, order.id));
       await tx.update(products).set({

@@ -567,6 +567,7 @@ export default function TransactionsPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
                     >
                       <Card className="hover:shadow-md transition-shadow p-3">
                         <CardContent className="p-2">
@@ -646,6 +647,7 @@ export default function TransactionsPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
                     >
                       <Card className="hover:shadow-md transition-shadow p-3">
                         <CardContent className="p-2">
@@ -725,6 +727,7 @@ export default function TransactionsPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
                     >
                       <Card className="hover:shadow-md transition-shadow p-3">
                         <CardContent className="p-2">
@@ -804,6 +807,7 @@ export default function TransactionsPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
                     >
                       <Card className="hover:shadow-md transition-shadow p-3">
                         <CardContent className="p-2">

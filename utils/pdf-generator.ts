@@ -111,3 +111,93 @@ function getTransactionLabel(type: string): string {
   };
   return labels[type] || type;
 }
+
+/**
+ * Générateur PDF générique pour l'application
+ */
+export async function generatePDFReport(
+  title: string,
+  headers: string[],
+  body: string[][],
+  config: {
+    filename?: string;
+    subtitle?: string;
+    orientation?: 'p' | 'l';
+    unit?: 'mm' | 'pt' | 'px';
+    format?: string;
+  } = {}
+) {
+  const { jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+
+  const doc = new jsPDF({
+    orientation: config.orientation || 'p',
+    unit: config.unit || 'mm',
+    format: config.format || 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 15;
+
+  // Header Background
+  doc.setFillColor(99, 102, 241); // Indigo-500
+  doc.rect(0, 0, pageWidth, 25, 'F');
+
+  // Title
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(title, margin, 16);
+
+  // Subtitle
+  if (config.subtitle) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(config.subtitle, margin, 21);
+  }
+
+  // Application Info
+  doc.setFontSize(8);
+  doc.text("GAMES TRAFICS", pageWidth - margin, 16, { align: "right" });
+  doc.text(new Date().toLocaleDateString('fr-FR'), pageWidth - margin, 21, { align: "right" });
+
+  // Table
+  autoTable(doc, {
+    startY: 35,
+    head: [headers],
+    body: body,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [79, 70, 229], // Indigo-600
+      textColor: 255,
+      fontSize: 8,
+      fontStyle: 'bold',
+      halign: 'center',
+    },
+    styles: {
+      fontSize: 7,
+      cellPadding: 2,
+      overflow: 'linebreak',
+    },
+    alternateRowStyles: {
+      fillColor: [249, 250, 251], // Gray-50
+    },
+    margin: { left: margin, right: margin, bottom: 20 },
+    didDrawPage: (data) => {
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      const currentPage = data.pageNumber;
+      doc.setTextColor(156, 163, 175); // Gray-400
+      doc.setFontSize(7);
+      doc.text(
+        `Page ${currentPage} sur ${pageCount} - Document généré par Games Trafics`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: "center" }
+      );
+    }
+  });
+
+  const finalFilename = config.filename || `report-${Date.now()}.pdf`;
+  doc.save(finalFilename);
+}

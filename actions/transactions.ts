@@ -365,12 +365,16 @@ export async function createTransaction(
     throw new Error(`Type de transaction non supporté: ${data.type}`);
   }
 
+  const pendingTypes = ["PRODUCT_PURCHASE", "TOURNAMENT_PARTICIPATION"];
+  const initialStatus = pendingTypes.includes(data.type) ? "PENDING" : "COMPLETED";
+
   // 🚀 Utiliser executeTransaction pour garantir la double-entry
   const result = await executeTransaction({
     fromAccountId,
     toAccountId,
     amount,
     type: data.type,
+    status: initialStatus,
     description: data.description,
     metadata: data.metadata,
     userId: user.id,

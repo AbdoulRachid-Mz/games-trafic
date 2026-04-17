@@ -938,6 +938,13 @@ export async function transferBetweenIdentities(params: {
         });
         if (!edition) throw new Error("Édition introuvable");
         if (edition.tournament?.organizerId !== user.id) throw new Error("Accès refusé (Non organisateur)");
+        
+        // REQUISITION: On vérifie si une édition en cours et que le crédit à virer ne touche pas au crédit de cette édition.
+        // Puisque chaque édition gère son propre compte, on exige que l'édition soit terminée (COMPLETED).
+        if (edition.status !== 'COMPLETED' && edition.status !== 'CANCELLED') {
+           throw new Error("L'édition doit être terminée (COMPLETED) pour récupérer les fonds.");
+        }
+
         fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId!) });
       }
 

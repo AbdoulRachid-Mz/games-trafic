@@ -43,21 +43,23 @@ export function ExportMatchesButton({ editionId, phaseId, groupId, bracketNodeId
 
     startTransition(async () => {
       try {
+        const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
+        
         const result = await exportMatchesToFormat(editionId, format, filters);
+        
         if (result.success && result.data) {
-          // Télécharger le fichier
-          const blob = await fetch(result.data).then(r => r.blob());
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.setAttribute("download", result.filename || `matches_export.${format}`);
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          window.URL.revokeObjectURL(url);
-          
+          const rawData = JSON.parse(result.data);
+          const config = {
+            filename: result.filename || `matches_${scope}_${editionId}`,
+            title: scope === "all" ? "Tous les matchs" : `Matchs - ${scope}`,
+            subtitle: `Édition: ${editionId.slice(0, 8)}`,
+          };
+
+          const tableData = createExportData(rawData, "matches");
+          await exportToFormat(format, tableData, config);
+
           toast.success(`Export ${format.toUpperCase()} réussi`, {
-            description: `${result.count || 0} matchs exportés`
+            description: `${result.count || rawData.length} matchs exportés`
           });
         } else {
           toast.error(result.error || "Erreur lors de l'export");

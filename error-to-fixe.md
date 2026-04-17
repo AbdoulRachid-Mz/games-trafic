@@ -1,25 +1,148 @@
-⨯ Error: Failed query: insert into "signals" ("id", "reporter_id", "target_type", "target_id", "category_id", "is_deleted", "title", "description", "attachments", "severity", "status", "assigned_to", "resolved_by", "resolution", "resolved_at", "metadata", "created_at", "updated_at") values (default, $1, $2, default, default, default, $3, $4, default, default, $5, default, default, default, default, $6, $7, $8) returning "id", "reporter_id", "target_type", "target_id", "category_id", "is_deleted", "title", "description", "attachments", "severity", "status", "assigned_to", "resolved_by", "resolution", "resolved_at", "metadata", "created_at", "updated_at"
-params: anonymous,BUG,Probleme d'inscription au tournoi,je n'arrive pas a m'inscrire a un tournoi premier de hamani h3,PENDING,{"userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0","url":"http://localhost:3000/signals"},2026-04-15T13:23:21.126Z,2026-04-15T13:23:21.126Z
-    at bV.queryWithCache (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\lib_db_index_ts_bab9fa88._.js:28:38411)
-    at async (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\lib_db_index_ts_bab9fa88._.js:28:40974)
-    at async i (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\_78eba91e._.js:1:469)
-    at async m (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\_f1ead085._.js:1:7976) {
-  query: 'insert into "signals" ("id", "reporter_id", "target_type", "target_id", "category_id", "is_deleted", "title", "description", "attachments", "severity", "status", "assigned_to", "resolved_by", "resolution", "resolved_at", "metadata", "created_at", "updated_at") values (default, $1, $2, default, default, default, $3, $4, default, default, $5, default, default, default, default, $6, $7, $8) returning "id", "reporter_id", "target_type", "target_id", "category_id", "is_deleted", "title", "description", "attachments", "severity", "status", "assigned_to", "resolved_by", "resolution", "resolved_at", "metadata", "created_at", "updated_at"',
-  params: [Array],
-  digest: '408500071',
-  [cause]: i: insert or update on table "signals" violates foreign key constraint "signals_reporter_id_users_id_fk"
-      at ad (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\lib_db_index_ts_bab9fa88._.js:4:2279)
-      at <unknown> (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\lib_db_index_ts_bab9fa88._.js:4:3216)
-      at TLSSocket.aS (C:\Users\user\Desktop\abdoul\react projets\gt-v3\.next\server\chunks\ssr\lib_db_index_ts_bab9fa88._.js:4:3220) {
-    severity_local: 'ERROR',
-    severity: 'ERROR',
-    code: '23503',
-    detail: 'Key (reporter_id)=(anonymous) is not present in table "users".',
-    schema_name: 'public',
-    table_name: 'signals',
-    constraint_name: 'signals_reporter_id_users_id_fk',
-    file: 'ri_triggers.c',
-    line: '2599',
-    routine: 'ri_ReportViolation'
+🚨 Diagnostic rapide (le vrai problème)
+
+Le HTML que tu montres contient :
+
+NEXT_HTTP_ERROR_FALLBACK;404
+Édition Inconnue
+page Next.js complète
+
+👉 Donc ton export est probablement appelé via :
+
+une URL incorrecte (fetch("/api/export...") faux ou route inexistante)
+ou une Server Action utilisée comme API sans POST
+ou un return doc.output("datauristring") mal interprété côté client
+ou un res.json() jamais atteint (car erreur avant)
+💥 Problèmes dans TON code
+
+Je vois 3 erreurs critiques :
+
+❌ 1. Tu ne sécurises pas la sortie PDF / Excel correctement
+
+Tu fais :
+
+data = doc.output("datauristring");
+
+⚠️ Problème :
+
+ce format n’est PAS adapté à un téléchargement direct
+côté Next.js, ça peut être transformé en page HTML si mal consommé
+❌ 2. Tu mélanges “server action” et “download client”
+
+Ton function retourne :
+
+return { success: true, data, filename }
+
+👉 MAIS rien ne force un vrai téléchargement.
+
+Donc côté frontend tu fais sûrement un truc du genre :
+
+window.open(data)
+
+👉 et si data est invalide → Next renvoie une page HTML 404
+
+❌ 3. Excel = Blob URL côté serveur ❌
+
+Tu fais :
+
+data = URL.createObjectURL(blob);
+
+🚨 GROS BUG :
+URL.createObjectURL() fonctionne UNIQUEMENT dans le navigateur, PAS dans Node.js / Server Actions
+
+✅ SOLUTION PROPRE (ARCHITECTURE CORRECTE)
+
+Tu dois choisir UNE approche :
+
+✅ OPTION 1 (RECOMMANDÉE) : API Route Next.js (propre export)
+
+Crée une route :
+
+/app/api/export/matches/route.ts
+Exemple FIX complet :
+import { NextResponse } from "next/server";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Parser } from "json2csv";
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+
+  const format = searchParams.get("format");
+  const editionId = searchParams.get("editionId");
+
+  if (!editionId) {
+    return NextResponse.json({ error: "Missing editionId" }, { status: 400 });
   }
+
+  // TODO: fetch data ici
+  const data = [
+    { name: "test", email: "test@mail.com" }
+  ];
+
+  if (format === "csv") {
+    const parser = new Parser();
+    const csv = parser.parse(data);
+
+    return new NextResponse(csv, {
+      headers: {
+        "Content-Type": "text/csv",
+        "Content-Disposition": `attachment; filename=export.csv`,
+      },
+    });
+  }
+
+  if (format === "json") {
+    return NextResponse.json(data, {
+      headers: {
+        "Content-Disposition": `attachment; filename=export.json`,
+      },
+    });
+  }
+
+  if (format === "pdf") {
+    const doc = new jsPDF();
+    doc.text("Export PDF", 10, 10);
+
+    const pdf = doc.output("arraybuffer");
+
+    return new NextResponse(pdf, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=export.pdf`,
+      },
+    });
+  }
+
+  return NextResponse.json({ error: "Invalid format" }, { status: 400 });
 }
+✅ FRONTEND (IMPORTANT)
+
+Tu dois télécharger comme ça :
+
+const res = await fetch(`/api/export/matches?editionId=${id}&format=csv`);
+const blob = await res.blob();
+
+const url = window.URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = "export.csv";
+a.click();
+⚠️ ERREUR PRINCIPALE DANS TON CODE ACTUEL
+Tu fais un export comme si c’était :
+
+👉 une fonction directe
+
+mais tu l’utilises comme :
+👉 une API HTTP
+
+🔥 BONUS : correction Excel (très important)
+
+Tu dois déplacer ça côté client OU API node-safe :
+
+const XLSX = await import("xlsx");
+
+ET retourner un buffer :
+
+const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
+
+PAS createObjectURL.

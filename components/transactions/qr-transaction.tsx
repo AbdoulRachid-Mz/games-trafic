@@ -28,7 +28,7 @@ export function QrTransaction() {
       if (typeof decoded.a === "number") {
         params.set("amount", decoded.a.toString());
       }
-      // router.push(`/wallet/transactions/create?${params.toString()}`);
+      router.push(`/wallet/transactions/create?${params.toString()}`);
     } catch {
       toast.error("QR invalide");
     }

@@ -89,6 +89,43 @@ export const defaultDockLinks: DockLinkConfig[] = [
   { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
 ];
 
+export const defaultFABActions: FABAction[] = [
+  {
+    id: "goto-market",
+    label: "Découvrir",
+    type: "link",
+    url: "/marketplace",
+  },
+  {
+    id: "qr-scanner",
+    label: "Scanner QR",
+    type: "link",
+    url: "/wallet/transactions/qr",
+    requireWallet: true,
+  },
+  {
+    id: "create-shop",
+    label: "Créer une boutique",
+    type: "link",
+    url: "/shops/create",
+    requiresAuth: true,
+  },
+  {
+    id: "create-tournament",
+    label: "Créer un tournoi",
+    type: "link",
+    url: "/tournaments/create",
+    requiresAuth: true,
+  },
+  {
+    id: "send-signal",
+    label: "Signaler un problème",
+    type: "link",
+    url: "/signals/create",
+    requiresAuth: false,
+  },
+];
+
 // =============================================
 // CONFIGURATION HIÉRARCHIQUE SANS CONFLITS
 // =============================================
@@ -198,6 +235,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     showAIAssistant: false,
     styleGroup: "profile",
     showOnTap: false,
+    hideTopMiddleOnScroll: true,
   },
   {
     path: ["/wallet", "/wallet/**"],
@@ -235,15 +273,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
     ],
     floatingActions: true,
-    fabActions: [
-      {
-        id: "qr-scanner",
-        label: "Scanner QR",
-        type: "link",
-        url: "/wallet/transactions/qr",
-        requireWallet: true,
-      },
-    ],
+    fabActions: defaultFABActions,
     requireAuth: true,
     styleGroup: "wallet",
   },
@@ -273,6 +303,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     requireAuth: true,
     styleGroup: "chat",
     showOnTap: false,
+    hideTopMiddleOnScroll: true,
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: true },
       { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
@@ -291,20 +322,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
       },
     ],
     floatingActions: true,
-    fabActions: [
-      {
-        id: "goto-market",
-        label: "Découvrir",
-        type: "link",
-        url: "/marketplace",
-      },
-      {
-        id: "create-shop",
-        label: "Créer une boutique",
-        type: "link",
-        url: "/shops/create",
-      },
-    ],
+    fabActions: defaultFABActions,
   },
 
   // =============================================
@@ -320,35 +338,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     floatingActions: true,
-    fabActions: [
-      {
-        id: "goto-market",
-        label: "Découvrir",
-        type: "link",
-        url: "/marketplace",
-      },
-      {
-        id: "qr-scanner",
-        label: "Scanner QR",
-        type: "link",
-        url: "/wallet/transactions/qr",
-        requireWallet: true,
-      },
-      {
-        id: "create-shop",
-        label: "Créer une boutique",
-        type: "link",
-        url: "/shops/create",
-        requiresAuth: true,
-      },
-      {
-        id: "create-tournament",
-        label: "Créer un tournoi",
-        type: "link",
-        url: "/tournaments/create",
-        requiresAuth: true,
-      },
-    ],
+    fabActions: defaultFABActions,
     dockLinks: defaultDockLinks,
     activeFabActionId: "goto-market",
     menu: true,
@@ -371,6 +361,9 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     menu: true,
     menuOrder: 2,
     showOnTap: true,
+    activeFabActionId: "qr-scanner",
+    hideTopMiddleOnScroll: true,
+    fabActions: defaultFABActions,
   },
   {
     path: "/marketplace/[productId]",
@@ -382,7 +375,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: false,
     showOnTap: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "qr-scanner",
     dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
   {
     path: "/shops",
@@ -394,9 +390,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     floatingActions: true,
     showOnTap: true,
+    hideTopMiddleOnScroll: true,
     dockLinks: defaultDockLinks,
+    activeFabActionId: "create-shop",
     menu: true,
     menuOrder: 3,
+    fabActions: defaultFABActions,
   },
   {
     path: "/shops/[shopId]",
@@ -408,7 +407,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     hideFloatingActions: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "goto-market",
     dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
   {
     path: "/tournaments",
@@ -421,7 +423,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     menu: true,
     menuOrder: 4,
+    hideTopMiddleOnScroll: true,
     dockLinks: defaultDockLinks,
+    activeFabActionId: "create-tournament",
+    fabActions: defaultFABActions,
   },
   {
     path: "/tournaments/[tournamentId]",
@@ -433,6 +438,7 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     hideFloatingActions: true,
     breadcrumbs: false,
+    activeFabActionId: "create-tournament",
     dockLinks: [
       { href: "/", label: "Accueil", icon: "home", requireAuth: true },
       {
@@ -454,6 +460,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         requireAuth: true,
       },
     ],
+    hideTopMiddleOnScroll: true,
+    fabActions: defaultFABActions,
   },
   //detail edition
   {
@@ -469,7 +477,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: true,
     navigationLinks: true,
     hideFloatingActions: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "create-tournament",
     dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
   {
     path: ["/themes", "/themes/**"],
@@ -482,8 +493,11 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     navigationLinks: true,
     menu: true,
     menuOrder: 6,
+    hideTopMiddleOnScroll: true,
     showOnTap: true,
+    activeFabActionId: "qr-scanner",
     dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
   {
     path: ["/blogs", "/blogs/**"],
@@ -495,7 +509,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     showOnTap: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "create-shop",
     dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
   {
     path: ["/services", "/services/**"],
@@ -507,7 +524,10 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     rightBar: false,
     navigationLinks: true,
     showOnTap: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "create-shop",
     dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
 
   // =============================================
@@ -546,7 +566,19 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: "/partners",
     name: "Partners",
-    excludeLayout: true,
+    excludeLayout: false,
+    breadcrumbs: true,
+    footer: true,
+    topMiddle: true,
+    leftBar: true,
+    rightBar: false,
+    navigationLinks: true,
+    floatingActions: true,
+    showOnTap: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "create-shop",
+    dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
 ];
 

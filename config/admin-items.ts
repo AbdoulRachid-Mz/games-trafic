@@ -263,6 +263,15 @@ export const intermediateAdminRoutes: AdminRoute[] = [
     isFinancial: true,
   },
   {
+    id: "signals",
+    label: "Signals",
+    path: "/admin/signals",
+    icon: CreditCard,
+    description: "Signals",
+    requiredLevel: "B",
+    isFinancial: true,
+  },
+  {
     id: "requests",
     label: "Demandes",
     path: "/admin/requests",
