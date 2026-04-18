@@ -154,7 +154,19 @@ export function EditionPageContent({
               <p className="text-muted-foreground">
                 {edition.name || "Aucune description disponible pour cette édition."}
               </p>
-              {edition.description && <p className="mt-2">{edition.description}</p>}
+              {edition.description && (
+                edition.description.length > 60
+                  ? (
+                      <p className="mt-2">
+                        {edition.description.length > 100
+                          ? edition.description.substring(0, 60) + "..."
+                          : edition.description}
+                      </p>
+                    )
+                  : (
+                      <p className="mt-2">{edition.description}</p>
+                    )
+              )}
             </div>
 
             {edition.editionRules && (

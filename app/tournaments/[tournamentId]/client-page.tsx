@@ -432,7 +432,9 @@ export function TournamentPageContent({
                   variant="body-lg"
                   className="max-w-3xl mb-4 text-muted-foreground"
                 >
-                  {tournament.description}
+                  {tournament.description.length > 60
+                    ? tournament.description.substring(0, 60) + "..."
+                    : tournament.description}
                 </Typography>
               )}
 
