@@ -1,7 +1,7 @@
 // @/components/pages/tournaments/edition-detail/group-nodes-organize-client.tsx
 "use client";
 
-import { useState, useTransition, useCallback, useMemo } from "react";
+import { useState, useTransition, useCallback, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { bulkCreateBracketNodes, deleteBracketNode, generateBracketMatches } from "@/actions/phases";
+import { bulkCreateBracketNodes, deleteBracketNode, generateMatchesAction, getStructurePreviewAction } from "@/actions/phases";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -116,31 +116,46 @@ export function GroupNodesOrganizeClient({
   const [generateMatches, setGenerateMatches] = useState(inheritedConfig.generateMatches);
   const [participantsPerNode, setParticipantsPerNode] = useState(inheritedConfig.participantsPerNode);
 
-  // Calcul de la structure optimale
-  const optimalStructure = useMemo(() => {
-    const participantCount = groupParticipants.length;
-    
-    if (nodeType === "ROUND_ROBIN") {
-      const totalMatches = (participantCount * (participantCount - 1)) / 2;
-      const rounds = participantCount - 1;
-      const matchesPerRound = Math.floor(participantCount / 2);
-      return { totalMatches, rounds, matchesPerRound, optimalNodes: rounds };
-    }
-    
-    if (nodeType === "ELIMINATION") {
-      const totalRounds = Math.ceil(Math.log2(participantCount));
-      const totalMatches = participantCount - 1;
-      const firstRoundMatches = Math.pow(2, totalRounds - 1);
-      return { totalMatches, rounds: totalRounds, matchesPerRound: firstRoundMatches, optimalNodes: totalMatches };
-    }
-    
-    if (nodeType === "SWISS") {
-      const totalMatches = roundsCount * Math.floor(participantCount / 2);
-      return { totalMatches, rounds: roundsCount, matchesPerRound: Math.floor(participantCount / 2), optimalNodes: roundsCount };
-    }
-    
-    return { totalMatches: 0, rounds: 0, matchesPerRound: 0, optimalNodes: 0 };
-  }, [nodeType, groupParticipants.length, roundsCount]);
+  const [serverPreview, setServerPreview] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  // Mettre à jour le preview via le serveur
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (groupParticipants.length === 0) return;
+      
+      setIsPreviewLoading(true);
+      try {
+        const config = {
+          nodesType: nodeType,
+          roundsCount,
+          generateMatches,
+          isHomeAway: !!groupConfig?.isHomeAway,
+          groupsCount: 1,
+        };
+
+        const previewData = await getStructurePreviewAction(
+          editionId,
+          [{
+            name: "Groupe Actuel",
+            phaseType: phaseType as any,
+            order: 0,
+            config
+          }],
+          groupParticipants.map(p => p.registrationId)
+        );
+        
+        setServerPreview(previewData?.phases?.[0]?.groups?.[0] || null);
+      } catch (error) {
+        console.error("Preview error:", error);
+      } finally {
+        setIsPreviewLoading(false);
+      }
+    };
+
+    const timer = setTimeout(updatePreview, 500);
+    return () => clearTimeout(timer);
+  }, [nodeType, roundsCount, generateMatches, editionId, groupId, phaseType, groupParticipants, groupConfig]);
 
   const getName = (id: string | null | undefined) => {
     if (!id) return "À déterminer";
@@ -278,7 +293,7 @@ export function GroupNodesOrganizeClient({
       nodeType,
       config: {
         generateMatches,
-        matchesCount: nodeType === "ROUND_ROBIN" ? optimalStructure.matchesPerRound : 1,
+        matchesCount: nodeType === "ROUND_ROBIN" ? (serverPreview?.matchesCount || 1) / (serverPreview?.rounds || 1) : 1,
         matchFormat,
         roundsCount: nodeType === "SWISS" ? roundsCount : undefined,
       },
@@ -356,10 +371,12 @@ export function GroupNodesOrganizeClient({
   const handleGenerateMatchesForNode = async (nodeId: string) => {
     startTransition(async () => {
       try {
-        const result = await generateBracketMatches(nodeId, { forceRecreate: false });
+        const result = await generateMatchesAction("NODE", nodeId);
         if (result.success) {
-          toast.success(`${result.count} match(s) généré(s)`);
+          toast.success("Matchs générés avec succès");
           router.refresh();
+        } else {
+          toast.error(result.error || "Erreur lors de la génération");
         }
       } catch (error: any) {
         toast.error(error.message || "Erreur lors de la génération des matchs");
@@ -531,22 +548,28 @@ export function GroupNodesOrganizeClient({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Participants:</span>
-                <span className="font-bold">{groupParticipants.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Matchs:</span>
-                <span className="font-bold">{optimalStructure.totalMatches}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Rounds:</span>
-                <span className="font-bold">{optimalStructure.rounds}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Nœuds recommandés:</span>
-                <span className="font-bold">{optimalStructure.optimalNodes}</span>
-              </div>
+              {isPreviewLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              ) : serverPreview ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Participants:</span>
+                    <span className="font-bold">{groupParticipants.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Matchs:</span>
+                    <span className="font-bold text-primary">{serverPreview.matchesCount}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Rounds/Journées:</span>
+                    <span className="font-bold">{serverPreview.rounds || 1}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Aucun aperçu disponible</p>
+              )}
             </CardContent>
           </Card>
         </div>

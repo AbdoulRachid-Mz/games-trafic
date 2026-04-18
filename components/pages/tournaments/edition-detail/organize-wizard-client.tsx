@@ -47,7 +47,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { organizeEditionStructure } from "@/actions/phases";
+import { organizeEditionStructure, getStructurePreviewAction } from "@/actions/phases";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -153,31 +153,6 @@ const generateTempId = () =>
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-
-/**
- * Calcule le nombre de participants qualifiés pour la phase suivante
- */
-function calculateQualifiedCount(
-  participantsCount: number,
-  phaseType: PhaseType,
-  config: DraftPhase["config"],
-): number {
-  if (phaseType === "ROUND_ROBIN") {
-    return (
-      config.advanceCount || Math.min(4, Math.floor(participantsCount / 2))
-    );
-  }
-  if (phaseType === "GROUP_STAGE") {
-    const groupsCount = config.groupsCount || 1;
-    const perGroup = config.advanceCount || 2;
-    return groupsCount * perGroup;
-  }
-  if (phaseType === "ELIMINATION" || phaseType === "KNOCKOUT") {
-    const nextPower = Math.pow(2, Math.ceil(Math.log2(participantsCount)));
-    return Math.min(nextPower, participantsCount);
-  }
-  return participantsCount;
-}
 
 /**
  * Calcule la structure d'un bracket ROUND_ROBIN (journées)
@@ -294,141 +269,6 @@ function buildPhasesForApi(
       },
     };
   });
-}
-
-/**
- * Génère le preview de la structure
- */
-function generateStructurePreview(
-  phases: DraftPhase[],
-  totalParticipants: number,
-  existingPhasesCount: number = 0,
-): StructurePreview {
-  let remainingParticipants = totalParticipants;
-  const preview: StructurePreview = {
-    phases: [],
-    totalMatches: 0,
-    totalParticipants: totalParticipants,
-  };
-
-  for (let i = 0; i < phases.length; i++) {
-    const phase = phases[i];
-    const phasePreview: StructurePreview["phases"][0] = {
-      id: phase.id,
-      name: phase.name,
-      type: phase.phaseType,
-      groups: [],
-    };
-
-    const participantsForPhase =
-      i === 0
-        ? totalParticipants
-        : calculateQualifiedCount(
-            remainingParticipants,
-            phase.phaseType,
-            phase.config,
-          );
-
-    if (phase.phaseType === "ROUND_ROBIN") {
-      const structure = calculateRoundRobinStructure(
-        participantsForPhase,
-        phase.config.isHomeAway || false,
-      );
-
-      const nodePrefix = phase.config.nodePrefix || "Journée";
-
-      // Un seul groupe pour le championnat
-      const nodes: { name: string; matchesCount: number }[] = [];
-      for (let r = 1; r <= structure.rounds; r++) {
-        nodes.push({
-          name: `${nodePrefix} ${r}`,
-          matchesCount: structure.matchesPerRound,
-        });
-      }
-
-      phasePreview.groups.push({
-        name: "Classement",
-        participantCount: participantsForPhase,
-        nodes,
-      });
-      preview.totalMatches += structure.totalMatches;
-
-      remainingParticipants = phase.config.advanceCount
-        ? phase.config.advanceCount
-        : Math.min(8, participantsForPhase);
-    } else if (phase.phaseType === "GROUP_STAGE") {
-      const groupCount =
-        phase.config.groupsCount || Math.ceil(participantsForPhase / 4);
-      const participantsPerGroup = Math.ceil(participantsForPhase / groupCount);
-      const structure = calculateRoundRobinStructure(
-        participantsPerGroup,
-        false,
-      );
-
-      for (let g = 0; g < groupCount; g++) {
-        phasePreview.groups.push({
-          name: `Groupe ${String.fromCharCode(65 + g)}`,
-          participantCount: participantsPerGroup,
-          nodes: [
-            {
-              name: "Poule unique",
-              matchesCount: structure.totalMatches,
-            },
-          ],
-        });
-        preview.totalMatches += structure.totalMatches;
-      }
-      remainingParticipants = (phase.config.advanceCount || 2) * groupCount;
-    } else if (
-      phase.phaseType === "ELIMINATION" ||
-      phase.phaseType === "KNOCKOUT"
-    ) {
-      const structure = calculateEliminationStructure(participantsForPhase);
-      const nodes: { name: string; matchesCount: number }[] = [];
-      let matchesThisRound = structure.firstRoundMatches;
-
-      for (let r = 1; r <= structure.rounds; r++) {
-        let roundName = "";
-        if (r === structure.rounds) roundName = "Finale";
-        else if (r === structure.rounds - 1) roundName = "Demi-finale";
-        else if (r === structure.rounds - 2) roundName = "Quart de finale";
-        else if (r === structure.rounds - 3) roundName = "Huitième de finale";
-        else roundName = `${Math.pow(2, structure.rounds - r)}ème de finale`;
-
-        nodes.push({
-          name: roundName,
-          matchesCount: matchesThisRound,
-        });
-        matchesThisRound = Math.ceil(matchesThisRound / 2);
-      }
-
-      phasePreview.groups.push({
-        name: "Tableau principal",
-        participantCount: participantsForPhase,
-        nodes,
-      });
-      preview.totalMatches += structure.totalMatches;
-      remainingParticipants = 1;
-    } else if (phase.phaseType === "SWISS") {
-      const roundsCount = phase.config.roundsCount || 5;
-      phasePreview.groups.push({
-        name: "Système Suisse",
-        participantCount: participantsForPhase,
-        nodes: Array.from({ length: roundsCount }, (_, i) => ({
-          name: `Round ${i + 1}`,
-          matchesCount: Math.floor(participantsForPhase / 2),
-        })),
-      });
-      preview.totalMatches +=
-        roundsCount * Math.floor(participantsForPhase / 2);
-      remainingParticipants =
-        phase.config.advanceCount || Math.min(8, participantsForPhase);
-    }
-
-    preview.phases.push(phasePreview);
-  }
-
-  return preview;
 }
 
 // ============================================================================
@@ -552,6 +392,7 @@ export function OrganizeWizardClient({
     preset: "LEAGUE" as "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM",
     isHomeAway: false,
     groupsQualifiedCount: 2,
+    groupsCount: 4,
     nodePrefix: "Journée",
   });
 
@@ -564,6 +405,8 @@ export function OrganizeWizardClient({
 
   const [autoInit, setAutoInit] = useState(true);
   const [randomize, setRandomize] = useState(true);
+  const [serverPreview, setServerPreview] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const maxParticipants = edition?.maxParticipants || 0;
   const currentParticipantsCount = selectedRegIds.length;
@@ -600,35 +443,37 @@ export function OrganizeWizardClient({
       // Phase de groupes
       phases.push({
         id: generateTempId(),
-        name: "Phase de groupes",
+        name: autoConfig.isHomeAway ? "Phase de groupes (A/R)" : "Phase de groupes",
         phaseType: "GROUP_STAGE",
         order: 0,
         participantSource: "EDITION",
-        qualifiedCount: groupsQualifiedCount * 4,
+        qualifiedCount: groupsQualifiedCount * autoConfig.groupsCount,
         generateGroups: true,
         generateNodes: true,
         generateMatches: true,
         config: {
           ...DEFAULT_PHASE_CONFIGS.GROUP_STAGE,
-          groupsCount: 4,
+          groupsCount: autoConfig.groupsCount,
           advanceCount: groupsQualifiedCount,
+          isHomeAway: autoConfig.isHomeAway,
           nodePrefix: "Groupe",
         },
       });
       // Phase d'élimination
       phases.push({
         id: generateTempId(),
-        name: "Phases finales",
+        name: autoConfig.isHomeAway ? "Phases finales (A/R)" : "Phases finales",
         phaseType: "ELIMINATION",
         order: 1,
         participantSource: "PHASE_QUALIFIED",
         sourcePhaseId: phases[0].id,
-        qualifiedCount: 2,
+        qualifiedCount: 1, // Winner
         generateGroups: false,
         generateNodes: true,
         generateMatches: true,
         config: {
           ...DEFAULT_PHASE_CONFIGS.ELIMINATION,
+          isHomeAway: autoConfig.isHomeAway,
           nodePrefix: "Round",
         },
       });
@@ -654,21 +499,46 @@ export function OrganizeWizardClient({
     return phases;
   }, [autoConfig]);
 
-  // Calculer le preview
-  const structurePreview = useMemo(() => {
-    const phasesToPreview = mode === "AUTO" ? buildAutoPhases() : draftPhases;
-    return generateStructurePreview(
-      phasesToPreview,
-      currentParticipantsCount,
-      existingPhasesCount,
-    );
-  }, [
-    mode,
-    draftPhases,
-    autoConfig,
-    currentParticipantsCount,
-    existingPhasesCount,
-  ]);
+  // Mettre à jour le preview via le serveur
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (selectedRegIds.length < 2) return;
+      
+      setIsPreviewLoading(true);
+      try {
+        const phasesToPreview = mode === "AUTO" ? buildAutoPhases() : draftPhases;
+        
+        // Formatter pour l'API StructureEngine
+        const phasesForApi = buildPhasesForPreview(phasesToPreview);
+        
+        const preview = await getStructurePreviewAction(
+          editionId,
+          phasesForApi,
+          selectedRegIds
+        );
+        setServerPreview(preview);
+      } catch (error) {
+        console.error("Preview update error:", error);
+      } finally {
+        setIsPreviewLoading(false);
+      }
+    };
+
+    const timer = setTimeout(updatePreview, 500); // Debounce
+    return () => clearTimeout(timer);
+  }, [mode, draftPhases, autoConfig, selectedRegIds, editionId, buildAutoPhases]);
+
+  /**
+   * Formate les phases draft pour l'API de preview
+   */
+  function buildPhasesForPreview(phases: DraftPhase[]): any[] {
+    return phases.map((p, idx) => ({
+      name: p.name,
+      phaseType: p.phaseType,
+      order: idx,
+      config: p.config
+    }));
+  }
 
   // Validation de la configuration
   const validateConfig = useCallback((): {
@@ -691,6 +561,8 @@ export function OrganizeWizardClient({
         );
       }
 
+      // Removed strict power-of-2 validation to allow BYEs and flexible brackets
+      /*
       if (phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT") {
         const participantsForPhase =
           i === 0
@@ -705,6 +577,7 @@ export function OrganizeWizardClient({
           );
         }
       }
+      */
 
       if (
         i > 0 &&
@@ -805,6 +678,8 @@ export function OrganizeWizardClient({
       hasExistingPhases,
     );
 
+    const totalMatches = serverPreview?.totalMatches || 0;
+
     startTransition(async () => {
       try {
         const result = await organizeEditionStructure(
@@ -813,18 +688,14 @@ export function OrganizeWizardClient({
           selectedRegIds,
           {
             autoInitializeFirstPhase: autoInit,
-            groupsSize: phasesToCreate[0]?.config.participantsPerGroup || 4,
             randomizeDistribution: randomize,
-            generateGroups: phasesToCreate[0]?.generateGroups ?? true,
-            generateNodes: phasesToCreate[0]?.generateNodes ?? true,
-            generateMatches: phasesToCreate[0]?.generateMatches ?? true,
-            isHomeAway: phasesToCreate[0]?.config.isHomeAway ?? false,
+            clearExisting: true, // Dans le wizard, on repart généralement de zéro
           },
         );
 
         if (result.success) {
           toast.success("Structure déployée avec succès !", {
-            description: `${phasesToCreate.length} phase(s) créée(s), ${structurePreview.totalMatches} match(s) généré(s)`,
+            description: `${phasesToCreate.length} phase(s) créée(s), ${totalMatches} match(s) généré(s)`,
             duration: 5000,
           });
 
@@ -854,7 +725,7 @@ export function OrganizeWizardClient({
     tournamentId,
     existingPhasesCount,
     hasExistingPhases,
-    structurePreview.totalMatches,
+    serverPreview,
     router,
   ]);
 
@@ -998,8 +869,9 @@ export function OrganizeWizardClient({
           phasesCount={
             mode === "AUTO" ? buildAutoPhases().length : draftPhases.length
           }
-          totalMatches={structurePreview.totalMatches}
+          totalMatches={serverPreview?.totalMatches || 0}
           onClick={handleDeploy}
+          isLoading={isPreviewLoading}
         />
       )}
 
@@ -1007,7 +879,7 @@ export function OrganizeWizardClient({
       <PreviewDialog
         open={showPreview}
         onOpenChange={setShowPreview}
-        preview={structurePreview}
+        preview={serverPreview}
         phases={mode === "AUTO" ? buildAutoPhases() : draftPhases}
         onConfirm={handleDeploy}
         isPending={isPending}
@@ -1017,7 +889,7 @@ export function OrganizeWizardClient({
       <ConfirmDialog
         open={showConfirmDialog}
         onOpenChange={setShowConfirmDialog}
-        preview={structurePreview}
+        preview={serverPreview}
         phases={mode === "AUTO" ? buildAutoPhases() : draftPhases}
         onConfirm={confirmDeploy}
         isPending={isPending}
@@ -1147,36 +1019,91 @@ function AutoModeConfig({
       )}
 
       {autoConfig.preset === "CHAMPIONS" && (
-        <div className="space-y-4 p-4 rounded-xl bg-muted/30">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-bold">Aller-Retour en groupes</Label>
-            <Checkbox
-              checked={autoConfig.isHomeAway}
-              onCheckedChange={(v) =>
-                setAutoConfig({ ...autoConfig, isHomeAway: !!v })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">Qualifiés par groupe</Label>
-            <div className="flex items-center gap-3">
-              <Slider
-                value={[autoConfig.groupsQualifiedCount]}
-                onValueChange={(v) =>
-                  setAutoConfig({ ...autoConfig, groupsQualifiedCount: v[0] })
+        <>
+          <div className="space-y-4 p-4 rounded-xl bg-muted/30">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-bold">Aller-Retour en groupes</Label>
+              <Checkbox
+                checked={autoConfig.isHomeAway}
+                onCheckedChange={(v) =>
+                  setAutoConfig({ ...autoConfig, isHomeAway: !!v })
                 }
-                min={1}
-                max={4}
-                step={1}
-                className="flex-1"
               />
-              <span className="w-8 text-center font-bold text-sm">
-                {autoConfig.groupsQualifiedCount}
-              </span>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Nombre de groupes</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[autoConfig.groupsCount || 1]}
+                  onValueChange={(v) =>
+                    setAutoConfig({ ...autoConfig, groupsCount: v[0] })
+                  }
+                  min={1}
+                  max={16}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="w-8 text-center font-bold text-sm">
+                  {autoConfig.groupsCount}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Qualifiés par groupe</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[autoConfig.groupsQualifiedCount]}
+                  onValueChange={(v) =>
+                    setAutoConfig({ ...autoConfig, groupsQualifiedCount: v[0] })
+                  }
+                  min={1}
+                  max={4}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="w-8 text-center font-bold text-sm">
+                  {autoConfig.groupsQualifiedCount}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Dynamic Knockout Preview Box inside CHAMPIONS config */}
+          {(() => {
+            const qualifiedTotal = (autoConfig.groupsCount || 4) * autoConfig.groupsQualifiedCount;
+            const rounds = Math.ceil(Math.log2(qualifiedTotal));
+            const stages = [];
+            
+            if (rounds >= 1 && qualifiedTotal >= 2) stages.unshift("Finale");
+            if (rounds >= 2 && qualifiedTotal >= 4) stages.unshift("Demi-finale");
+            if (rounds >= 3 && qualifiedTotal >= 8) stages.unshift("Quart de finale");
+            if (rounds >= 4 && qualifiedTotal >= 16) stages.unshift("Huitièmes");
+            if (rounds >= 5 && qualifiedTotal >= 32) stages.unshift("Seizièmes");
+
+            return (
+              <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 mt-2">
+                 <Label className="text-xs font-bold text-primary flex items-center gap-2 mb-3">
+                   <ShieldCheck className="h-4 w-4" />
+                   Structure Phase Finale générée ({qualifiedTotal} qualifiés)
+                 </Label>
+                 <div className="flex items-center flex-wrap gap-2 text-sm">
+                   {stages.map((stage, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-muted-foreground font-medium">
+                        <div className="px-2 py-1 bg-background border rounded text-xs shadow-sm">{stage}</div>
+                        {idx < stages.length - 1 && <ArrowRight className="h-3 w-3" />}
+                      </div>
+                   ))}
+                   {stages.length === 0 && <span className="text-xs text-destructive">Il faut au moins 2 qualifiés au total.</span>}
+                 </div>
+                 <p className="text-[10px] text-muted-foreground mt-3 leading-tight">
+                   Les phases finales débuteront automatiquement selon le nombre de qualifiés calculé ({autoConfig.groupsQualifiedCount} par groupe × {autoConfig.groupsCount} groupes).
+                 </p>
+              </div>
+            );
+          })()}
+        </>
       )}
 
       {autoConfig.preset === "SWISS" && (
@@ -1987,26 +1914,32 @@ function FloatingDeployButton({
   phasesCount,
   totalMatches,
   onClick,
+  isLoading,
 }: any) {
   if (currentParticipantsCount < 2) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
       <Button
         size="lg"
         className={cn(
-          "h-14 px-6 rounded-full shadow-2xl gap-3 font-bold text-base transition-all duration-300",
+          "h-14 w-full rounded-full shadow-2xl gap-3 font-bold text-base transition-all duration-300",
           isOverLimit
             ? "bg-destructive hover:bg-destructive/90"
             : "shadow-primary/30 hover:scale-105",
         )}
-        disabled={isPending || phasesCount === 0 || isOverLimit}
+        disabled={isPending || phasesCount === 0 || isOverLimit || isLoading}
         onClick={onClick}
       >
         {isPending ? (
           <>
             <RefreshCw className="w-5 h-5 animate-spin" />
             Déploiement...
+          </>
+        ) : isLoading ? (
+          <>
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            Calcul de l'aperçu...
           </>
         ) : isOverLimit ? (
           <>
@@ -2051,7 +1984,7 @@ function PreviewDialog({
             <div className="grid grid-cols-4 gap-3">
               <div className="bg-primary/5 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">
-                  {preview.totalParticipants}
+                  {preview?.totalParticipants || 0}
                 </div>
                 <div className="text-[10px] text-muted-foreground">
                   Participants
@@ -2062,26 +1995,25 @@ function PreviewDialog({
                 <div className="text-[10px] text-muted-foreground">Phases</div>
               </div>
               <div className="bg-primary/5 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold">{preview.totalMatches}</div>
+                <div className="text-2xl font-bold">{preview?.totalMatches || 0}</div>
                 <div className="text-[10px] text-muted-foreground">Matchs</div>
               </div>
               <div className="bg-primary/5 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">
-                  {preview.phases.reduce(
+                  {preview?.phases?.reduce(
                     (acc: number, p: any) =>
-                      acc +
-                      p.groups.reduce((gacc: number, g: any) => gacc + g.nodes.length, 0),
+                      acc + (p.groups?.length || 0),
                     0,
-                  )}
+                  ) || 0}
                 </div>
                 <div className="text-[10px] text-muted-foreground">
-                  Journées/Rounds
+                  Groupes
                 </div>
               </div>
             </div>
 
             {/* Détail des phases */}
-            {preview.phases.map((phase: any, idx: number) => (
+            {preview?.phases?.map((phase: any, idx: number) => (
               <div key={idx} className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 p-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -2090,52 +2022,49 @@ function PreviewDialog({
                     </div>
                     <span className="font-bold">{phase.name}</span>
                     <Badge variant="outline" className="text-[9px]">
-                      {phase.type === "ROUND_ROBIN"
-                        ? "Championnat"
-                        : phase.type === "GROUP_STAGE"
-                          ? "Groupes"
-                          : phase.type === "ELIMINATION"
-                            ? "Élimination"
-                            : phase.type}
+                      {phase.type}
                     </Badge>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {phase.groups.reduce(
-                      (acc: number, g: any) => acc + g.participantCount,
-                      0,
-                    )}{" "}
-                    participants
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      {phase.participantCount} participants
+                    </span>
+                    <Badge variant="default" className="text-[9px] bg-primary/20 text-primary border-none">
+                      {phase.matchesCount} matchs
+                    </Badge>
                   </div>
                 </div>
 
-                <div className="p-3 space-y-3">
+                <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                   {phase.groups.map((group: any, gIdx: number) => (
                     <div
                       key={gIdx}
-                      className="border-l-2 border-primary/30 pl-3"
+                      className="border rounded-lg p-3 bg-card/50"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold">
                           {group.name}
                         </span>
-                        <Badge variant="secondary" className="text-[9px]">
-                          {group.participantCount} participants
-                        </Badge>
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          {group.participantCount} part.
+                        </span>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {group.nodes.map((node: any, nIdx: number) => (
-                          <Badge
-                            key={nIdx}
-                            variant="outline"
-                            className="text-[9px]"
-                          >
-                            {node.name} ({node.matchesCount} match
-                            {node.matchesCount > 1 ? "s" : ""})
-                          </Badge>
-                        ))}
+                      <div className="flex items-center justify-between">
+                         <div className="text-[10px] text-muted-foreground">
+                          {group.rounds ? `${group.rounds} rounds` : 'Poule unique'}
+                        </div>
+                        <Badge variant={group.matchesCount > 0 ? "secondary" : "outline"} className="text-[9px] h-4">
+                          {group.matchesCount} match{group.matchesCount > 1 ? 's' : ''}
+                        </Badge>
                       </div>
                     </div>
                   ))}
+                </div>
+                <div className="px-3 pb-3">
+                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                     <Zap className="h-2.5 w-2.5 text-primary" />
+                     {phase.seedingNote}
+                   </p>
                 </div>
               </div>
             ))}
@@ -2187,8 +2116,8 @@ function ConfirmDialog({
             <p className="text-sm font-medium">Récapitulatif</p>
             <ul className="text-xs text-muted-foreground mt-2 space-y-1">
               <li>• {phases.length} phase(s)</li>
-              <li>• {preview.totalParticipants} participant(s)</li>
-              <li>• {preview.totalMatches} match(s) à jouer</li>
+              <li>• {preview?.totalParticipants || 0} participant(s)</li>
+              <li>• {preview?.totalMatches || 0} match(s) à jouer</li>
             </ul>
           </div>
           <p className="text-xs text-center text-muted-foreground">

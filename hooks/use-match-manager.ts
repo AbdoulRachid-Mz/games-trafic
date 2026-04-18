@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  generatePhaseMatches as generateMatchesAction,
+  generateMatchesAction,
   getMatchesWithParticipants,
   getEditionMatchStats,
   getPhaseGroupParticipants,
@@ -30,19 +30,25 @@ export function useMatchManager(phaseId?: string) {
     });
   };
 
-  const generatePhaseMatches = useMutation({
+  const generateMatches = useMutation({
     mutationFn: async ({
-      phaseId,
-      config,
+      type,
+      id,
+      options = {},
     }: {
-      phaseId: string;
-      config?: { forceRecreate?: boolean; groupId?: string };
+      type: "PHASE" | "GROUP" | "NODE";
+      id: string;
+      options?: any;
     }) => {
-      return generateMatchesAction(phaseId, config);
+      return generateMatchesAction(type, id, options);
     },
-    onSuccess: () => {
-      toast.success("Matchs générés avec succès.");
-      invalidate();
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success("Matchs générés avec succès.");
+        invalidate();
+      } else {
+        toast.error(res.error || "Erreur lors de la génération des matchs.");
+      }
     },
     onError: (err: Error) => {
       toast.error(err.message || "Erreur lors de la génération des matchs.");
@@ -50,7 +56,7 @@ export function useMatchManager(phaseId?: string) {
   });
 
   return {
-    generatePhaseMatches,
+    generateMatches,
   };
 }
 

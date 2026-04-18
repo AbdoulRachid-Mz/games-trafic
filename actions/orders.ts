@@ -112,8 +112,9 @@ export async function createProductOrder(
         updatedAt: new Date(),
       }).returning();
 
-      // Update tx metadata with order id after creation
-      await tx.update(orders).set({  }).where(eq(orders.id, newOrder.id)); // No-op, just to ensure consistency if needed later
+      // Update tx metadata if needed later
+      // The below line was removed because an empty set({}) throws 'No values to set' in Drizzle
+      // await tx.update(orders).set({  }).where(eq(orders.id, newOrder.id));
 
       // 6. Mark product as reserved
       await tx.update(products)
@@ -204,6 +205,12 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
       }
 
       // 3. Move funds from Escrow to Shop
+      const ownerWallet = await tx.query.userWallets.findFirst({
+        where: eq(userWallets.userId, order.shop!.ownerId)
+      });
+
+      if (!ownerWallet) throw new Error("Wallet du propriétaire de la boutique introuvable");
+
       const { transaction: shopTransaction } = await executeTransaction({
         tx,
         fromAccountId: escrowAccount.id,
@@ -211,7 +218,8 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         amount: amount,
         type: 'TRANSFER',
         description: `Paiement pour commande #${order.id.slice(0, 8)}`,
-        metadata: { orderId: order.id, type: 'SHOP_PAYOUT' }
+        metadata: { orderId: order.id, type: 'SHOP_PAYOUT' },
+        walletId: ownerWallet.id
       });
 
       // 4. Finalize Order and Product

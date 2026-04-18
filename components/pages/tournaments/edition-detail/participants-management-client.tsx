@@ -10,7 +10,7 @@ import { fr } from "date-fns/locale";
 import { User as UserIcon, Phone, MessageCircle, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ParticipantRowActions } from "@/components/pages/tournaments/edition-detail/participant-row-actions";
-import { AddParticipantDialog } from "@/components/pages/tournaments/edition-detail/add-participant-dialog";
+import { AddParticipantForm } from "@/components/pages/tournaments/edition-detail/add-participant-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { deleteEditionRegistrationAction, addEditionParticipantAction } from "@/actions/editions";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FileDown, Search, Download, FileJson, FileText, FileSpreadsheet, Settings2 } from "lucide-react";
 import { exportToCSV, exportToJSON, exportToPDF } from "@/lib/utils/member-export-utils";
+import { DynamicActionMenu, MenuItemAction } from "@/components/shared/dynamic-action-menu";
 import Link from "next/link";
 
 export function ParticipantsManagementClient({
@@ -112,8 +113,65 @@ export function ParticipantsManagementClient({
     }
   };
 
+  const menuActions: MenuItemAction[] = [
+    {
+      id: "add-participant",
+      paramKey: "action",
+      paramValue: "add",
+      label: "Ajouter un participant",
+      icon: Plus,
+      variant: "default",
+      overlayType: "dialog",
+      renderContent: <AddParticipantForm editionId={editionId} tournamentId={tournamentId} />
+    },
+    {
+      id: "organize-bulk",
+      paramKey: "action",
+      paramValue: "organize",
+      label: "Organiser en masse",
+      icon: Settings2,
+      variant: "outline",
+      href: `/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants/organize`
+    },
+    {
+      id: "export-pdf",
+      paramKey: "action",
+      paramValue: "export_pdf",
+      label: "Exporter en PDF",
+      icon: FileText,
+      variant: "outline",
+      onClick: () => handleExport('pdf')
+    },
+    {
+      id: "export-csv",
+      paramKey: "action",
+      paramValue: "export_csv",
+      label: "Exporter en CSV",
+      icon: FileSpreadsheet,
+      variant: "outline",
+      onClick: () => handleExport('csv')
+    }
+  ];
+
+  if (selectedParticipants.length > 0) {
+    menuActions.push({
+      id: "bulk-remove",
+      paramKey: "action",
+      paramValue: "bulk_remove",
+      label: `Retirer (${selectedParticipants.length})`,
+      icon: Trash2,
+      variant: "destructive",
+      onClick: () => {
+        if (confirm(`Voulez-vous retirer les ${selectedParticipants.length} participant(s) sélectionné(s) ?`)) {
+          handleBulkRemove();
+        }
+      }
+    });
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      <DynamicActionMenu actions={menuActions} floatingPosition="bottom-6 right-6" />
       {/* SECTION 1: PARTICIPANTS DE L'ÉDITION */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-5 px-6">
@@ -131,49 +189,6 @@ export function ParticipantsManagementClient({
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 gap-2">
-                  <Download className="h-4 w-4" />
-                  Exporter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Format d'export</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleExport('pdf')} className="gap-2">
-                  <FileText className="h-4 w-4 text-red-500" /> PDF (Imprimable)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('csv')} className="gap-2">
-                  <FileSpreadsheet className="h-4 w-4 text-green-600" /> CSV (Excel)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('json')} className="gap-2">
-                  <FileJson className="h-4 w-4 text-amber-500" /> JSON
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {selectedParticipants.length > 0 && (
-              <ConfirmationDialog
-                title="Retirer les participants"
-                description={`Êtes-vous sûr de vouloir retirer les ${selectedParticipants.length} participant(s) sélectionné(s) ? S'ils ont des matchs ou font partie de groupes, l'action sera bloquée.`}
-                onConfirm={handleBulkRemove}
-              >
-                 <Button variant="destructive" size="sm" disabled={isDeleting} className="h-9">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Retirer ({selectedParticipants.length})
-                 </Button>
-              </ConfirmationDialog>
-            )}
-            <AddParticipantDialog editionId={editionId} tournamentId={tournamentId} />
-            
-            <Button variant="outline" size="sm" className="h-9 gap-2" asChild>
-              <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/participants/organize`}>
-                <Settings2 className="h-4 w-4" />
-                Organiser en masse
-              </Link>
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">

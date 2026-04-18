@@ -47,10 +47,12 @@ export function UpdateMatchDialog({
     const scheduledTime = formData.get("scheduledTime") ? new Date(formData.get("scheduledTime") as string) : undefined;
 
     try {
+      const hasScores = score1 !== null && score2 !== null;
       await updateMatch(match.id, {
         score1: score1 as any,
         score2: score2 as any,
         scheduledTime,
+        ...(hasScores && { status: "COMPLETED" })
       } as any);
 
       toast.success("Match mis à jour");

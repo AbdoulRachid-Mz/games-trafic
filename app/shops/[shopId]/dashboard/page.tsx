@@ -1,4 +1,4 @@
-// app/(main)/shops/[id]/page.tsx
+// app/(main)/shops/[shopId]/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -111,18 +111,24 @@ export default function ShopOverviewPage() {
       const previousEnd = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
       const [shopStats, orderStats, productStats, ledgerStats, previousLedgerStats] = await Promise.all([
-        getShopStatsById(params.id as string),
-        getShopOrderStats(params.id as string),
-        getProductStats({ shopId: params.id as string }),
-        getShopLedgerStats(params.id as string, {
+        getShopStatsById(params.shopId as string),
+        getShopOrderStats(params.shopId as string),
+        getProductStats({ shopId: params.shopId as string }),
+        getShopLedgerStats(params.shopId as string, {
           startDate: currentStart.toISOString(),
           endDate: now.toISOString(),
         }),
-        getShopLedgerStats(params.id as string, {
+        getShopLedgerStats(params.shopId as string, {
           startDate: previousStart.toISOString(),
           endDate: previousEnd.toISOString(),
         }),
       ]);
+
+// ... (omitted similar replacements found by tool)
+// I will use AllowMultiple: true to catch all params.id in this file
+// Actually, I should check if there are other params.id that are valid.
+// In [shopId]/dashboard/page.tsx, params.shopId is the correct name.
+
 
       const revenueChange = previousLedgerStats.income
         ? ((ledgerStats.income - previousLedgerStats.income) / previousLedgerStats.income) * 100
@@ -168,7 +174,7 @@ export default function ShopOverviewPage() {
     setIsTransferring(true);
     try {
       const res = await transferBetweenIdentities({
-        fromIdentityId: params.id as string,
+        fromIdentityId: params.shopId as string,
         fromType: "SHOP",
         toIdentityId: user.id,
         toType: "USER",

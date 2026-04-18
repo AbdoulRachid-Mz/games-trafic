@@ -1,7 +1,8 @@
 // @/components/cards/product-card.tsx
 "use client";
 
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
+import { encodeTransactionQR } from "@/utils/qr-utils";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -66,6 +67,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const router = useRouter();
   const isGrid = viewMode === "grid";
   const isList = viewMode === "list";
   const isCompact = viewMode === "compact";
@@ -110,6 +112,17 @@ export function ProductCard({
     e.stopPropagation();
     if (onBuy) {
       onBuy(product.id);
+    } else {
+      const entryFee = typeof product.price === "number" ? product.price : parseFloat(product.price as string);
+      
+      const encodedData = encodeTransactionQR({
+        t: "PRODUCT_PURCHASE",
+        id: product.id,
+        a: entryFee,
+        i: images[0] || "/placeholder-game.jpg",
+        m: { shopId: product.shop?.id || product?.shop?.id }
+      });
+      router.push(`/wallet/transactions/create?data=${encodedData}`);
     }
   };
 

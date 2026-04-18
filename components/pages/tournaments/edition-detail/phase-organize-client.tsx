@@ -1,7 +1,7 @@
 // @/components/pages/tournaments/edition-detail/phase-organize-client.tsx
 "use client";
 
-import { useState, useTransition, useCallback, useMemo } from "react";
+import { useState, useTransition, useCallback, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { autoGeneratePhaseStructureAction, generatePhaseMatches } from "@/actions/phases";
+import { organizeEditionStructure, generateMatchesAction, getStructurePreviewAction } from "@/actions/phases";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import Link from "next/link";
@@ -139,40 +139,81 @@ export function PhaseOrganizeClient({
     return Math.ceil(sourceParticipants.length / participantsPerGroup);
   }, [phaseType, sourceParticipants.length, participantsPerGroup]);
 
-  // Prévisualisation de la structure
-  const structurePreview = useMemo(() => {
-    const actualGroupsCount = groupsCount || optimalGroupsCount;
-    const perGroup = Math.ceil(sourceParticipants.length / actualGroupsCount);
-    const totalMatches = actualGroupsCount * calculateMatchesForGroup(perGroup, nodesType, isHomeAway, roundsCount);
-    
-    return {
-      groupsCount: actualGroupsCount,
-      participantsPerGroup: perGroup,
-      totalMatches,
-      totalRounds: nodesType === "ROUND_ROBIN" ? (perGroup - 1) * (isHomeAway ? 2 : 1) : roundsCount,
+  const [serverPreview, setServerPreview] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+  // Mettre à jour le preview via le serveur
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (sourceParticipants.length === 0) return;
+      
+      setIsPreviewLoading(true);
+      try {
+        const actualGroupsCount = groupsCount || optimalGroupsCount;
+        const config = {
+          groupsCount: actualGroupsCount,
+          advanceCount,
+          isHomeAway,
+          seedingMethod,
+          generateMatches,
+          nodesType,
+          roundsCount
+        };
+
+        const previewData = await getStructurePreviewAction(
+          editionId,
+          [{
+            name: phaseName,
+            phaseType: phaseType as any,
+            order: 0,
+            config
+          }],
+          sourceParticipants.map(p => p.id)
+        );
+        
+        setServerPreview(previewData?.phases?.[0] || null);
+      } catch (error) {
+        console.error("Preview error:", error);
+      } finally {
+        setIsPreviewLoading(false);
+      }
     };
-  }, [groupsCount, optimalGroupsCount, sourceParticipants.length, nodesType, isHomeAway, roundsCount]);
+
+    const timer = setTimeout(updatePreview, 500);
+    return () => clearTimeout(timer);
+  }, [groupsCount, optimalGroupsCount, advanceCount, isHomeAway, seedingMethod, generateMatches, nodesType, roundsCount, editionId, phaseId, phaseName, phaseType, sourceParticipants]);
 
   const handleAutoGenerate = () => {
     const actualGroupsCount = groupsCount || optimalGroupsCount;
-    const perGroup = Math.ceil(sourceParticipants.length / actualGroupsCount);
     
     startTransition(async () => {
       try {
-        const result = await autoGeneratePhaseStructureAction(phaseId, {
-          groupsCount: actualGroupsCount,
-          participantsPerGroup: perGroup,
-          seedingMethod,
-          generateGroups: true,
-          generateNodes: defaultConfig.generateNodes,
-          generateMatches,
-          groupPrefix,
-          participantIds: sourceParticipants.map((p) => p.id),
-          isHomeAway,
-        });
+        // On utilise organizeEditionStructure mais pour une seule phase (celle-ci)
+        const result = await organizeEditionStructure(
+          editionId,
+          [{
+            name: phaseName,
+            phaseType: phaseType as any,
+            order: 0, // Dans ce mode on réorganise souvent la phase
+            config: {
+              groupsCount: actualGroupsCount,
+              advanceCount,
+              isHomeAway,
+              seedingMethod,
+              generateGroups: true,
+              generateNodes: true,
+              generateMatches,
+              nodePrefix: groupPrefix,
+            }
+          }],
+          sourceParticipants.map((p) => p.id),
+          {
+            clearExisting: true, // On remplace la structure actuelle de cette phase
+          }
+        );
 
         if (result.success) {
-          toast.success(`${result.groupsCount} groupe(s) généré(s) avec succès.`);
+          toast.success("Structure générée avec succès.");
           router.refresh();
         }
       } catch (error: any) {
@@ -184,10 +225,12 @@ export function PhaseOrganizeClient({
   const handleGenerateMatches = () => {
     startTransition(async () => {
       try {
-        const result = await generatePhaseMatches(phaseId, { forceRecreate: false });
+        const result = await generateMatchesAction("PHASE", phaseId, { forceRecreate: false });
         if (result.success) {
-          toast.success(`${result.count} match(s) généré(s).`);
+          toast.success("Matchs générés avec succès.");
           router.refresh();
+        } else {
+          toast.error(result.error || "Erreur lors de la génération des matchs.");
         }
       } catch (error: any) {
         toast.error(error.message || "Erreur lors de la génération des matchs.");
@@ -598,18 +641,27 @@ export function PhaseOrganizeClient({
                 Participants disponibles pour cette phase
               </p>
               <div className="mt-3 pt-3 border-t">
-                <div className="flex justify-between text-xs">
-                  <span>Prévisualisation:</span>
-                  <span className="font-medium">{structurePreview.groupsCount} groupe(s)</span>
-                </div>
-                <div className="flex justify-between text-xs mt-1">
-                  <span>Matchs estimés:</span>
-                  <span className="font-medium">{structurePreview.totalMatches}</span>
-                </div>
-                <div className="flex justify-between text-xs mt-1">
-                  <span>Rounds:</span>
-                  <span className="font-medium">{structurePreview.totalRounds}</span>
-                </div>
+                {isPreviewLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  </div>
+                ) : serverPreview ? (
+                  <>
+                    <div className="flex justify-between text-xs">
+                      <span>Groupes:</span>
+                      <span className="font-medium">{serverPreview.groups.length}</span>
+                    </div>
+                    <div className="flex justify-between text-xs mt-1">
+                      <span>Matchs estimés:</span>
+                      <span className="font-medium text-primary font-bold">{serverPreview.matchesCount}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2 italic">
+                      {serverPreview.seedingNote}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">Aperçu indisponible</p>
+                )}
               </div>
             </CardContent>
           </Card>

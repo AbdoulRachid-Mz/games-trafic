@@ -58,7 +58,9 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import Image from "next/image";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface EditionMatchesClientProps {
   editionId: string;
@@ -72,9 +74,11 @@ function ParticipantAvatar({ participant, size = "md" }: { participant: any; siz
     md: "h-10 w-10",
     lg: "h-12 w-12"
   };
+
+  const router = useRouter();
   
   const name = participant?.member?.displayName || participant?.member?.user?.username || "?";
-  const image = participant?.member?.avatar || participant?.member?.user?.profileImage;
+  const image = participant?.member?.avatar || participant?.member?.user?.profileImage || "icons/avatar.png";
   
   return (
     <div className={cn("shrink-0 relative rounded-full bg-muted border-2 border-background shadow-sm flex items-center justify-center overflow-hidden", sizeClasses[size])}>
@@ -91,6 +95,8 @@ function ParticipantAvatar({ participant, size = "md" }: { participant: any; siz
 function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: any) {
   const isUserParticipant = match.participant1?.member?.userId === userId || match.participant2?.member?.userId === userId;
   
+  const router = useRouter();
+
   const getScoreClass = () => {
     if (!match.score1 || !match.score2) return "";
     if (match.score1 > match.score2) return "text-emerald-600 font-bold";
@@ -110,94 +116,86 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
     const { label, className, icon: Icon } = config[status] || config.PENDING;
     return <Badge variant="outline" className={cn("text-[10px] uppercase font-bold gap-1", className)}><Icon className="h-3 w-3" />{label}</Badge>;
   };
+
+  const cardContent = (
+    <CardContent className="p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-[9px]">
+            #{match.matchNumber}
+          </Badge>
+          {match.group?.name && (
+            <Badge variant="secondary" className="text-[9px]">
+              {match.group.name}
+            </Badge>
+          )}
+        </div>
+        {getStatusBadge()}
+      </div>
+      
+      {/* Participants */}
+      <div className="flex items-center justify-between gap-3">
+        {/* Participant 1 */}
+        <div className="flex-1 text-center" >
+          <div className="flex justify-center mb-2">
+            <ParticipantAvatar participant={match.participant1} size="md" />
+          </div>
+          <div className="font-medium text-sm truncate" onClick={() => router.push(`/tournaments/${match.tournamentId}/members/${match.participant1?.member?.id}`)}>
+            {match.participant1?.member?.displayName || 
+             match.participant1?.member?.user?.username || 
+             "TBD"}
+          </div>
+          {match.participant1?.member?.team?.name && (
+            <div className="text-[10px] text-muted-foreground truncate">
+              {match.participant1.member.team.name}
+            </div>
+          )}
+        </div>
+        
+        {/* Score */}
+        <div className="shrink-0 flex flex-col items-center gap-1">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg font-bold text-lg">
+            <span className={getScoreClass()}>{match.score1 ?? "-"}</span>
+            <span className="text-muted-foreground text-sm">-</span>
+            <span className={getScoreClass()}>{match.score2 ?? "-"}</span>
+          </div>
+          {match.scheduledTime && (
+            <div className="text-[10px] text-muted-foreground">
+              {format(new Date(match.scheduledTime), "dd/MM HH:mm")}
+            </div>
+          )}
+        </div>
+        
+        {/* Participant 2 */}
+        <div className="flex-1 text-center">
+          <div className="flex justify-center mb-2">
+            <ParticipantAvatar participant={match.participant2} size="md" />
+          </div>
+          <div className="font-medium text-sm truncate">
+            {match.participant2?.member?.displayName || 
+             match.participant2?.member?.user?.username || 
+             "TBD"}
+          </div>
+          {match.participant2?.member?.team?.name && (
+            <div className="text-[10px] text-muted-foreground truncate">
+              {match.participant2.member.team.name}
+            </div>
+          )}
+        </div>
+      </div>
+    </CardContent>
+  );
   
   return (
-    <Card className={cn("transition-all hover:shadow-md", isUserParticipant && "border-primary/50 bg-primary/5")}>
-      <CardContent className="p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[9px]">
-              #{match.matchNumber}
-            </Badge>
-            {match.group?.name && (
-              <Badge variant="secondary" className="text-[9px]">
-                {match.group.name}
-              </Badge>
-            )}
-          </div>
-          {getStatusBadge()}
-        </div>
-        
-        {/* Participants */}
-        <div className="flex items-center justify-between gap-3">
-          {/* Participant 1 */}
-          <div className="flex-1 text-center">
-            <div className="flex justify-center mb-2">
-              <ParticipantAvatar participant={match.participant1} size="md" />
-            </div>
-            <div className="font-medium text-sm truncate">
-              {match.participant1?.member?.displayName || 
-               match.participant1?.member?.user?.username || 
-               "TBD"}
-            </div>
-            {match.participant1?.member?.team?.name && (
-              <div className="text-[10px] text-muted-foreground truncate">
-                {match.participant1.member.team.name}
-              </div>
-            )}
-            {match.participant1?.member?.userId === userId && (
-              <Badge variant="default" className="mt-1 h-4 text-[8px]">Vous</Badge>
-            )}
-          </div>
-          
-          {/* Score */}
-          <div className="shrink-0 flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg font-bold text-lg">
-              <span className={getScoreClass()}>{match.score1 ?? "-"}</span>
-              <span className="text-muted-foreground text-sm">-</span>
-              <span className={getScoreClass()}>{match.score2 ?? "-"}</span>
-            </div>
-            {match.scheduledTime && (
-              <div className="text-[10px] text-muted-foreground">
-                {format(new Date(match.scheduledTime), "dd/MM HH:mm")}
-              </div>
-            )}
-          </div>
-          
-          {/* Participant 2 */}
-          <div className="flex-1 text-center">
-            <div className="flex justify-center mb-2">
-              <ParticipantAvatar participant={match.participant2} size="md" />
-            </div>
-            <div className="font-medium text-sm truncate">
-              {match.participant2?.member?.displayName || 
-               match.participant2?.member?.user?.username || 
-               "TBD"}
-            </div>
-            {match.participant2?.member?.team?.name && (
-              <div className="text-[10px] text-muted-foreground truncate">
-                {match.participant2.member.team.name}
-              </div>
-            )}
-            {match.participant2?.member?.userId === userId && (
-              <Badge variant="default" className="mt-1 h-4 text-[8px]">Vous</Badge>
-            )}
-          </div>
-        </div>
-        
-        {/* Actions */}
-        {isAdmin && (
-          <div className="mt-3 pt-3 border-t flex justify-end">
-            <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-              <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
-                Gérer le match
-              </Link>
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
+      <Card className={cn(
+        "transition-all hover:shadow-xl hover:border-primary/50 cursor-pointer h-full group", 
+        isUserParticipant && "border-primary/50 bg-primary/5 shadow-primary/5"
+      )}>
+        {cardContent}
+      </Card>
+    </Link>
   );
 }
 
@@ -415,6 +413,7 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
   const { user } = useAuthContext();
   const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("all");
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
   
   // Fetch data
   const { data: edition } = useEdition(editionId);
@@ -442,6 +441,16 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
     if (selectedPhaseId === "all") return allPhases;
     return allPhases.filter((p: any) => p.id === selectedPhaseId);
   }, [editionTree, selectedPhaseId]);
+
+  const groupsInSelectedPhase = useMemo(() => {
+    if (selectedPhaseId === "all") return [];
+    const phase = editionTree?.phases?.find((p: any) => p.id === selectedPhaseId);
+    return phase?.groups || [];
+  }, [editionTree, selectedPhaseId]);
+
+  useEffect(() => {
+    setSelectedGroupId("all");
+  }, [selectedPhaseId]);
   
   const isLoading = isLoadingTree || isLoadingPhases || isLoadingMatches;
   
@@ -609,31 +618,25 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
       
       {/* Tree view - Organisation par phases > groupes > brackets */}
       {!isLoading && viewMode === "tree" && (
-        <div className="space-y-6">
-          {/* Phase Selector for Tree View */}
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Phase Selector */}
           {phases.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
+            <div className="bg-card/50 p-2 rounded-2xl border flex items-center gap-2 overflow-x-auto scrollbar-hide">
               <Button
-                variant={selectedPhaseId === "all" ? "default" : "outline"}
+                variant={selectedPhaseId === "all" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setSelectedPhaseId("all")}
-                className={cn(
-                  "flex-shrink-0 h-9 px-4 rounded-full transition-all",
-                  selectedPhaseId === "all" ? "shadow-md scale-105" : "hover:bg-primary/5"
-                )}
+                className={cn("rounded-xl transition-all font-bold", selectedPhaseId === "all" && "shadow-lg")}
               >
                 Toutes les phases
               </Button>
               {phases.map((phase: any) => (
                 <Button
                   key={phase.id}
-                  variant={selectedPhaseId === phase.id ? "default" : "outline"}
+                  variant={selectedPhaseId === phase.id ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setSelectedPhaseId(phase.id)}
-                  className={cn(
-                    "flex-shrink-0 h-9 px-4 rounded-full transition-all",
-                    selectedPhaseId === phase.id ? "shadow-md scale-105" : "hover:bg-primary/5"
-                  )}
+                  className={cn("rounded-xl transition-all font-bold", selectedPhaseId === phase.id && "shadow-lg")}
                 >
                   {phase.name}
                 </Button>
@@ -641,26 +644,86 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
             </div>
           )}
 
+          {/* Group Selector with StatsCarousel */}
+          {selectedPhaseId !== "all" && groupsInSelectedPhase.length > 0 && (
+            <div className="space-y-3">
+              <Typography variant="body-sm" weight="bold" theme="muted" className="px-2 uppercase tracking-widest">
+                Groupes
+              </Typography>
+              <StatsCarousel 
+                mode="auto" 
+                itemsPerView={{ mobile: 2, md: 3, lg: 4, xl: 5 }}
+                gap={10}
+                className="pb-2"
+              >
+                <Button
+                  variant={selectedGroupId === "all" ? "default" : "outline"}
+                  className={cn("w-full h-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all", 
+                    selectedGroupId === "all" ? "border-primary shadow-lg shadow-primary/20" : "hover:border-primary/50 hover:bg-primary/5")
+                  }
+                  onClick={() => setSelectedGroupId("all")}
+                >
+                  <Layers className="h-4 w-4" />
+                  <span className="text-[10px] font-black uppercase">Tous</span>
+                </Button>
+                {groupsInSelectedPhase.map((group: any) => (
+                  <Button
+                    key={group.id}
+                    variant={selectedGroupId === group.id ? "default" : "outline"}
+                    className={cn("w-full h-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all", 
+                      selectedGroupId === group.id ? "border-primary shadow-lg shadow-primary/20" : "hover:border-primary/50 hover:bg-primary/5")
+                    }
+                    onClick={() => setSelectedGroupId(group.id)}
+                  >
+                    <Users className="h-4 w-4" />
+                    <span className="text-[10px] font-black uppercase truncate max-w-full px-2">{group.name}</span>
+                  </Button>
+                ))}
+              </StatsCarousel>
+            </div>
+          )}
+
           {phasesWithMatches.length === 0 ? (
-            <Card className="border-dashed py-12">
+            <Card className="border-dashed py-20 bg-muted/20">
               <CardContent className="text-center">
-                <Trophy className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                <Typography variant="body-base" theme="muted">
-                  Aucun match n'est encore programmé pour cette phase.
+                <Trophy className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
+                <Typography variant="body-lg" theme="muted" weight="medium">
+                  Aucun match n'est encore programmé.
                 </Typography>
               </CardContent>
             </Card>
           ) : (
-            phasesWithMatches.map((phase: any) => (
-              <PhaseSection
-                key={phase.id}
-                phase={phase}
-                tournamentId={tournamentId}
-                editionId={editionId}
-                userId={user?.id}
-                isAdmin={isOrganizer}
-              />
-            ))
+            <div className="space-y-12">
+              {phasesWithMatches.map((phase: any) => (
+                <div key={phase.id} className="space-y-6">
+                  {/* Only show phase header if viewing all phases */}
+                  {selectedPhaseId === "all" && (
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent to-border" />
+                      <Typography variant="h4" weight="bold" className="uppercase tracking-tighter text-muted-foreground/50">
+                        {phase.name}
+                      </Typography>
+                      <div className="h-px flex-1 bg-gradient-to-l from-transparent to-border" />
+                    </div>
+                  )}
+                  
+                  <div className="space-y-8">
+                    {(phase.groups || [])
+                      .filter((g: any) => selectedGroupId === "all" || g.id === selectedGroupId)
+                      .map((group: any) => (
+                        <GroupSection
+                          key={group.id}
+                          group={group}
+                          tournamentId={tournamentId}
+                          editionId={editionId}
+                          userId={user?.id}
+                          isAdmin={isOrganizer}
+                        />
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

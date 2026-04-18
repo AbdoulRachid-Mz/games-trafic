@@ -455,6 +455,11 @@ export async function getShopContext(shopId: string): Promise<ShopContext | null
  */
 export async function getShopFinancialStats(shopId: string) {
   try {
+    if (!shopId) {
+      console.warn('getShopFinancialStats called with missing shopId');
+      return { balance: 0, transactionsCount: 0 };
+    }
+
     const shop = await getShopById(shopId);
     if (!shop || !shop.financialAccountId) {
       return { balance: 0, transactionsCount: 0 };
@@ -490,6 +495,11 @@ export async function getShopFinancialStats(shopId: string) {
  */
 export async function getShopLedgerStats(shopId: string, params?: { startDate?: string; endDate?: string }) {
   try {
+    if (!shopId) {
+      console.warn('getShopLedgerStats called with missing shopId');
+      return { income: 0, expense: 0, total: 0, pending: 0 };
+    }
+
     const shop = await getShopById(shopId);
     if (!shop || !shop.financialAccountId) {
       return { income: 0, expense: 0, total: 0, pending: 0 };

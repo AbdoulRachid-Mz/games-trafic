@@ -390,6 +390,8 @@ function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
     match.participant1?.member?.userId === currentUserId ||
     match.participant2?.member?.userId === currentUserId;
 
+  const router = useRouter();
+
   const canAdminValidate = isAdmin && match.status !== "COMPLETED";
 
   const handleAdminValidate = async () => {
@@ -406,104 +408,105 @@ function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
   };
 
   return (
-    <Card
-      className={cn(
-        "hover:shadow-md transition-all group",
-        isMyMatch && "border-l-4 border-l-primary bg-primary/5",
-      )}
-    >
-      <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-4 flex-wrap flex-1">
-            {/* Heure */}
-            <div className="flex items-center gap-1 text-sm font-mono bg-muted px-2 py-1 rounded">
-              <Clock className="h-3 w-3" />
-              {match.scheduledTime
-                ? format(new Date(match.scheduledTime), "HH:mm", { locale: fr })
-                : "Horaire TBD"}
+      <Card
+        className={cn(
+          "hover:shadow-lg transition-all group cursor-pointer border-2 hover:border-primary/50",
+          isMyMatch && "border-l-4 border-l-primary bg-primary/5",
+        )}
+        onClick={() => router.push(`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`)}
+      >
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-4 flex-wrap flex-1">
+              {/* Heure */}
+              <div className="flex items-center gap-1 text-sm font-mono bg-muted px-2 py-1 rounded">
+                <Clock className="h-3 w-3" />
+                {match.scheduledTime
+                  ? format(new Date(match.scheduledTime), "HH:mm", { locale: fr })
+                  : "Horaire TBD"}
+              </div>
+
+              {/* Participants */}
+              <div className="flex items-center gap-3">
+                <span className="font-bold">
+                  {match.participant1?.member?.displayName || "TBD"}
+                </span>
+                <span className="text-muted-foreground text-xs font-black">
+                  VS
+                </span>
+                <span className="font-bold">
+                  {match.participant2?.member?.displayName || "TBD"}
+                </span>
+              </div>
+
+              {/* Badges */}
+              <div className="flex gap-2">
+                <Badge variant="outline" className="text-[10px]">
+                  {match.phase?.name || "Phase"}
+                </Badge>
+                {match.group?.name && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {match.group.name}
+                  </Badge>
+                )}
+                {isMyMatch && (
+                  <Badge variant="default" className="text-[10px]">
+                    VOUS
+                  </Badge>
+                )}
+              </div>
             </div>
 
-            {/* Participants */}
             <div className="flex items-center gap-3">
-              <span className="font-bold">
-                {match.participant1?.member?.displayName || "TBD"}
-              </span>
-              <span className="text-muted-foreground text-xs font-black">
-                VS
-              </span>
-              <span className="font-bold">
-                {match.participant2?.member?.displayName || "TBD"}
-              </span>
-            </div>
+              {/* Score */}
+              {match.status === "COMPLETED" &&
+                match.score1 !== null &&
+                match.score2 !== null && (
+                  <div className="flex items-center gap-2 font-bold px-3 py-1 bg-primary/5 rounded-lg border border-primary/10">
+                    <span
+                      className={cn(
+                        match.winnerRegistrationId ===
+                          match.participant1RegistrationId && "text-primary",
+                      )}
+                    >
+                      {match.score1}
+                    </span>
+                    <span className="opacity-30">-</span>
+                    <span
+                      className={cn(
+                        match.winnerRegistrationId ===
+                          match.participant2RegistrationId && "text-primary",
+                      )}
+                    >
+                      {match.score2}
+                    </span>
+                  </div>
+                )}
 
-            {/* Badges */}
-            <div className="flex gap-2">
-              <Badge variant="outline" className="text-[10px]">
-                {match.phase?.name || "Phase"}
-              </Badge>
-              {match.group?.name && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {match.group.name}
-                </Badge>
-              )}
-              {isMyMatch && (
-                <Badge variant="default" className="text-[10px]">
-                  VOUS
-                </Badge>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Score */}
-            {match.status === "COMPLETED" &&
-              match.score1 !== null &&
-              match.score2 !== null && (
-                <div className="flex items-center gap-2 font-bold px-3 py-1 bg-primary/5 rounded-lg border border-primary/10">
-                  <span
-                    className={cn(
-                      match.winnerRegistrationId ===
-                        match.participant1RegistrationId && "text-primary",
-                    )}
+              <div className="flex items-center gap-2">
+                {canAdminValidate && (
+                  <ConfirmationDialog
+                    title="Validation Administrateur"
+                    description="Valider officiellement le score actuel ?"
+                    onConfirm={handleAdminValidate}
+                    confirmLabel="Valider"
+                    variant="default"
                   >
-                    {match.score1}
-                  </span>
-                  <span className="opacity-30">-</span>
-                  <span
-                    className={cn(
-                      match.winnerRegistrationId ===
-                        match.participant2RegistrationId && "text-primary",
-                    )}
-                  >
-                    {match.score2}
-                  </span>
-                </div>
-              )}
-
-            <div className="flex items-center gap-2">
-              {canAdminValidate && (
-                <ConfirmationDialog
-                  title="Validation Administrateur"
-                  description="Valider officiellement le score actuel ?"
-                  onConfirm={handleAdminValidate}
-                  confirmLabel="Valider"
-                  variant="default"
-                >
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10">
-                    <ShieldAlert className="h-4 w-4" />
-                  </Button>
-                </ConfirmationDialog>
-              )}
-              
-              <Link href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`}>
+                    <div onClick={(e) => e.preventDefault()}>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10">
+                        <ShieldAlert className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </ConfirmationDialog>
+                )}
+                
                 <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
-              </Link>
+              </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
   );
 }

@@ -151,24 +151,35 @@ export async function joinEdition(
     // 1. Get Edition with tournament info
     const edition = await db.query.tournamentEditions.findFirst({
       where: eq(tournamentEditions.id, editionId),
-      with: { tournament: true }
+      with: { tournament: true },
     });
 
     if (!edition) throw new Error("Edition introuvable");
 
     // 2. Performance checks
     if (edition.tournament?.organizerId === userId) {
-      return { success: false, message: "L'organisateur ne peut pas s'inscrire à sa propre compétition." };
+      return {
+        success: false,
+        message:
+          "L'organisateur ne peut pas s'inscrire à sa propre compétition.",
+      };
     }
 
     if (edition.status !== "UPCOMING") {
-      return { success: false, message: "Les inscriptions sont fermées. Le tournoi a déjà commencé ou est terminé." };
+      return {
+        success: false,
+        message:
+          "Les inscriptions sont fermées. Le tournoi a déjà commencé ou est terminé.",
+      };
     }
 
     const currentParticipants = edition.currentParticipants || 0;
     const maxParticipants = edition.maxParticipants || 0;
     if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
-      return { success: false, message: "Désolé, cette édition est déjà complète." };
+      return {
+        success: false,
+        message: "Désolé, cette édition est déjà complète.",
+      };
     }
 
     // 3. Check/Create Tournament Member using the new members action
@@ -633,73 +644,22 @@ export async function exportEditionMatches(
   filename?: string;
 }> {
   try {
-    // 1. Récupérer les matchs enrichis
+    // 🔒 sécurité critique
+    if (!editionId) {
+      throw new Error("editionId is required for export");
+    }
+
+    // 1. Récupérer les matchs
     const matchesRes = await getMatchesWithParticipants({
       filters: { editionId },
       pagination: { page: 1, limit: 1000 },
     });
 
-    const matches = matchesRes.data;
-
-    // 2. Transformer les données pour l'export
-    const exportData = matches.map((m: any) => ({
-      "Match #": m.matchNumber || "N/A",
-      Code: m.matchCode || "N/A",
-      Phase: m.phase?.name || "N/A",
-      Groupe: m.group?.name || "N/A",
-      Round: m.round || 1,
-      "Joueur 1":
-        m.participant1?.member?.displayName ||
-        m.participant1?.member?.user?.username ||
-        m.participant1?.member?.team?.name ||
-        "TBD",
-      "Tag 1": m.participant1?.member?.gameTag || "N/A",
-      "Joueur 2":
-        m.participant2?.member?.displayName ||
-        m.participant2?.member?.user?.username ||
-        m.participant2?.member?.team?.name ||
-        "TBD",
-      "Tag 2": m.participant2?.member?.gameTag || "N/A",
-      Score:
-        m.score1 !== null && m.score2 !== null
-          ? `${m.score1} - ${m.score2}`
-          : "N/A",
-      Vainqueur:
-        m.winnerRegistrationId === m.participant1RegistrationId
-          ? "J1"
-          : m.winnerRegistrationId === m.participant2RegistrationId
-            ? "J2"
-            : "N/A",
-      Statut: getMatchStatusLabel(m.status),
-      "Date planifiée": m.scheduledTime
-        ? new Date(m.scheduledTime).toLocaleString("fr-FR")
-        : "N/A",
-      "Date réelle": m.actualStartTime
-        ? new Date(m.actualStartTime).toLocaleString("fr-FR")
-        : "N/A",
-      "Durée (min)": m.duration || "N/A",
-      Stream: m.streamLink || "N/A",
-      Litige: m.disputed ? "Oui" : "Non",
-    }));
-
-    let data: string | undefined;
-    let filename: string | undefined;
-    let contentType: string | undefined;
-
-    if (format === "csv") {
-      const parser = new Parser();
-      data = parser.parse(exportData);
-      filename = `matches_${editionId}_${Date.now()}.csv`;
-      contentType = "text/csv";
-    } else if (format === "json") {
-      data = JSON.stringify(exportData, null, 2);
-      filename = `matches_${editionId}_${Date.now()}.json`;
-      contentType = "application/json";
-      data = JSON.stringify(exportData);
-      filename = `matches_${editionId}_${Date.now()}`;
-    }
-
-    return { success: true, data, filename };
+    return { 
+      success: true, 
+      data: JSON.stringify(matchesRes.data), 
+      filename: `matches_${editionId}_${Date.now()}` 
+    };
   } catch (error) {
     console.error("Export matches failed:", error);
     return { success: false, error: String(error) };
@@ -739,7 +699,7 @@ export interface ExportMatchesFilters {
 export async function exportMatchesToFormat(
   editionId: string,
   format: ExportFormat,
-  filters?: ExportMatchesFilters
+  filters?: ExportMatchesFilters,
 ): Promise<{
   success: boolean;
   data?: string;
@@ -752,7 +712,8 @@ export async function exportMatchesToFormat(
     const matchFilters: any = { editionId };
     if (filters?.phaseId) matchFilters.phaseId = filters.phaseId;
     if (filters?.groupId) matchFilters.groupId = filters.groupId;
-    if (filters?.bracketNodeId) matchFilters.bracketNodeId = filters.bracketNodeId;
+    if (filters?.bracketNodeId)
+      matchFilters.bracketNodeId = filters.bracketNodeId;
     if (filters?.status) matchFilters.statuses = [filters.status];
     if (filters?.search) matchFilters.search = filters.search;
 
@@ -760,38 +721,14 @@ export async function exportMatchesToFormat(
     const matchesRes = await getMatchesWithParticipants({
       filters: matchFilters,
       pagination: { page: 1, limit: 5000 },
-      options: { sortBy: "scheduledTime", sortOrder: "asc" }
+      options: { sortBy: "scheduledTime", sortOrder: "asc" },
     });
 
-    const matches = matchesRes.data;
-    const totalCount = matchesRes.pagination.total;
-
-    // Transformer les données pour l'export
-    const exportData = matches.map((m: any) => ({
-      "Match #": m.matchNumber || "N/A",
-      "Code": m.matchCode || "N/A",
-      "Phase": m.phase?.name || "N/A",
-      "Groupe": m.group?.name || "N/A",
-      "Round": m.round || 1,
-      "Joueur 1": m.participant1?.member?.displayName || m.participant1?.member?.user?.username || m.participant1?.member?.team?.name || "TBD",
-      "Tag 1": m.participant1?.member?.gameTag || "N/A",
-      "Joueur 2": m.participant2?.member?.displayName || m.participant2?.member?.user?.username || m.participant2?.member?.team?.name || "TBD",
-      "Tag 2": m.participant2?.member?.gameTag || "N/A",
-      "Score": m.score1 !== null && m.score2 !== null ? `${m.score1} - ${m.score2}` : "N/A",
-      "Vainqueur": m.winnerRegistrationId === m.participant1RegistrationId ? "J1" : m.winnerRegistrationId === m.participant2RegistrationId ? "J2" : "N/A",
-      "Statut": getMatchStatusLabel(m.status),
-      "Date planifiée": m.scheduledTime ? new Date(m.scheduledTime).toLocaleString("fr-FR") : "N/A",
-      "Date réelle": m.actualStartTime ? new Date(m.actualStartTime).toLocaleString("fr-FR") : "N/A",
-      "Durée (min)": m.duration || "N/A",
-      "Stream": m.streamLink || "N/A",
-      "Litige": m.disputed ? "Oui" : "Non",
-    }));
-
-    return { 
-      success: true, 
-      data: JSON.stringify(exportData), 
+    return {
+      success: true,
+      data: JSON.stringify(matchesRes.data),
       filename: `matches_${editionId}_${Date.now()}`,
-      count: totalCount 
+      count: matchesRes.pagination.total,
     };
   } catch (error) {
     console.error("Export matches failed:", error);
@@ -811,25 +748,34 @@ export async function getEditionBestPlayersStats(editionId: string) {
           with: {
             member: {
               with: {
-                user: { columns: { username: true, fullName: true, profileImage: true, image: true } },
-                team: { columns: { name: true, logo: true } }
-              }
-            }
-          }
+                user: {
+                  columns: {
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  },
+                },
+                team: { columns: { name: true, logo: true } },
+              },
+            },
+          },
         },
-        group: { with: { phase: true } }
-      }
+        group: { with: { phase: true } },
+      },
     });
 
     // On ne garde que les participants de cette édition (filtrer manuellement car relation complexe via groupes)
-    const validParticipants = participants.filter(p => p.group?.phase?.editionId === editionId);
+    const validParticipants = participants.filter(
+      (p) => p.group?.phase?.editionId === editionId,
+    );
 
     if (validParticipants.length === 0) return null;
 
     // Agréger les stats par registrationId (un joueur peut être dans plusieurs phases)
     const statsMap = new Map();
 
-    validParticipants.forEach(p => {
+    validParticipants.forEach((p) => {
       const regId = p.registrationId as string;
       if (!statsMap.has(regId)) {
         statsMap.set(regId, {
@@ -858,7 +804,7 @@ export async function getEditionBestPlayersStats(editionId: string) {
 
     // Meilleures Défenses (minimum 2 matchs joués pour être crédible)
     const bestDefense = [...aggregated]
-      .filter(a => a.played >= 2)
+      .filter((a) => a.played >= 2)
       .sort((a, b) => a.goalsAgainst - b.goalsAgainst)
       .slice(0, 5);
 

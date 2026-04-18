@@ -1,6 +1,6 @@
 // utils/export-utils.ts
 import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 
@@ -211,13 +211,17 @@ export const ColumnPresets = {
   // Matchs
   matches: [
     { key: 'matchNumber', label: 'Match #', type: 'text', width: 15 },
-    { key: 'participant1.username', label: 'Participant 1', type: 'text', width: 25 },
-    { key: 'participant2.username', label: 'Participant 2', type: 'text', width: 25 },
+    { key: 'matchCode', label: 'Code', type: 'text', width: 20 },
+    { key: 'phase.name', label: 'Phase', type: 'text', width: 25 },
+    { key: 'group.name', label: 'Groupe', type: 'text', width: 20 },
+    { key: 'round', label: 'Round', type: 'number', width: 15 },
+    { key: 'participant1.member.displayName', label: 'Joueur 1', type: 'text', width: 30 },
+    { key: 'participant2.member.displayName', label: 'Joueur 2', type: 'text', width: 30 },
+    { key: 'score1', label: 'Score 1', type: 'number', width: 15 },
+    { key: 'score2', label: 'Score 2', type: 'number', width: 15 },
+    { key: 'winnerId', label: 'Vainqueur', type: 'text', width: 25 },
     { key: 'status', label: 'Statut', type: 'text', width: 20 },
-    { key: 'result.score1', label: 'Score 1', type: 'number', width: 15 },
-    { key: 'result.score2', label: 'Score 2', type: 'number', width: 15 },
-    { key: 'winner.username', label: 'Vainqueur', type: 'text', width: 25 },
-    { key: 'scheduledTime', label: 'Date prévue', type: 'datetime', width: 25 }
+    { key: 'scheduledTime', label: 'Date prévue', type: 'datetime', width: 30 }
   ] as ColumnConfig[],
 
   // Demandes de dépôt
@@ -386,7 +390,7 @@ export const exportToPDF = async (
     ) as string[][]
 
     // Génération du tableau
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [headers],
       body: body,

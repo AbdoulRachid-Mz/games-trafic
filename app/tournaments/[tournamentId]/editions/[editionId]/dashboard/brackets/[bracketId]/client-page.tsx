@@ -43,6 +43,7 @@ import {
   Settings2,
   Users,
   RefreshCw,
+  Plus,
 } from "lucide-react";
 import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
 import { MarkCompleteDialog } from "@/components/pages/tournaments/edition-detail/mark-complete-dialog";
@@ -52,6 +53,9 @@ import { GenerateBracketMatchesButton } from "@/components/pages/tournaments/edi
 import { deleteMatch } from "@/actions/phases";
 import { toast } from "sonner";
 import { BracketNodeWithDetails } from "@/types/api";
+
+import { DynamicActionMenu, MenuItemAction } from "@/components/shared/dynamic-action-menu";
+import { generateBracketMatches } from "@/actions/phases";
 
 interface ClientPageProps {
   tournamentId: string;
@@ -141,8 +145,116 @@ export default function ClientBracketNodeDetailPage({
     }
   };
 
+  const menuActions: MenuItemAction[] = [
+    {
+      id: "create-match",
+      paramKey: "action",
+      paramValue: "create-match",
+      label: "Créer un match",
+      icon: Plus,
+      variant: "default",
+      overlayType: "dialog",
+      renderContent: (
+        <CreateMatchDialog
+          editionId={editionId}
+          phaseId={node?.phaseId || ""}
+          groupId={node?.groupId || null}
+          bracketNodeId={bracketId}
+          participants={groupParticipants.map((p) => {
+            const reg = registrations.find(
+              (r: any) => r.id === p.registrationId,
+            ) as any;
+            return {
+              registrationId: p.registrationId || "",
+              displayName:
+                reg?.member?.displayName ||
+                reg?.member?.user?.username ||
+                reg?.member?.team?.name ||
+                "Joueur",
+              teamName: reg?.member?.team?.name,
+              isQualified: p.qualified || false,
+            };
+          })}
+          currentMatchesCount={matches.length}
+          inheritedConfig={(node?.metadata as any)?.matchConfig}
+          asFormOnly
+        />
+      )
+    },
+    ...(!matches.length && nodeParticipants.length >= 2 ? [{
+      id: "generate-matches",
+      label: "Générer les matchs restants",
+      icon: Swords,
+      variant: "default",
+      onClick: async () => {
+        try {
+          const res = await generateBracketMatches(bracketId, {
+            forceRecreate: true,
+            returnType: "single",
+          });
+          toast.success(`${res.count} match(s) généré(s) avec succès.`);
+          handleRefresh();
+        } catch (error: any) {
+          toast.error(error.message || "Erreur lors de la génération des matchs.");
+        }
+      }
+    }] : [] as any[]),
+    {
+      separatorBefore: true,
+      id: "update-node",
+      paramKey: "action",
+      paramValue: "update-node",
+      label: "Modifier le nœud",
+      icon: Settings2,
+      variant: "outline",
+      overlayType: "dialog",
+      renderContent: node ? (
+        <UpdateBracketNodeDialog
+          node={{
+            id: bracketId,
+            nodeCode: node.nodeCode,
+            round: node.round,
+            matchNumber: node.matchNumber,
+            bracketType: node.bracketType,
+          }}
+          revalidatePath={`${basePath}/brackets/${bracketId}`}
+          asFormOnly
+        />
+      ) : <></>
+    },
+    {
+      id: "organize-mass",
+      paramKey: "action",
+      paramValue: "organize",
+      label: "Organiser en masse",
+      icon: Users,
+      variant: "outline",
+      href: `${basePath}/brackets/${bracketId}/organize`
+    },
+    {
+      separatorBefore: true,
+      id: "mark-complete",
+      paramKey: "action",
+      paramValue: "mark-complete",
+      label: "Marquer comme terminé",
+      icon: CheckCircle,
+      variant: "default",
+      overlayType: "dialog",
+      renderContent: (
+        <MarkCompleteDialog
+          type="BRACKET_NODE"
+          id={bracketId}
+          name={node?.nodeCode || "Nœud"}
+          onComplete={handleRefresh}
+          asFormOnly
+        />
+      )
+    }
+  ];
+
   return (
     <div className="space-y-6">
+      <DynamicActionMenu actions={menuActions} floatingPosition="bottom-8 right-8" />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -157,18 +269,6 @@ export default function ClientBracketNodeDetailPage({
             <Typography variant="h3" weight="bold">
               Nœud {node?.nodeCode || bracketId.slice(0, 6)}
             </Typography>
-            <Button variant="outline" size="sm" className="gap-2 h-8" asChild>
-              <Link href={`${basePath}/brackets/${bracketId}/organize`}>
-                <Settings2 className="h-4 w-4" /> Organiser en masse
-              </Link>
-            </Button>
-            
-            <MarkCompleteDialog
-              type="BRACKET_NODE"
-              id={bracketId}
-              name={node?.nodeCode || "Nœud"}
-              onComplete={handleRefresh}
-            />
 
             <Button variant="ghost" size="sm" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4" />
@@ -203,16 +303,6 @@ export default function ClientBracketNodeDetailPage({
                       {matches.length} match(s) associé(s)
                     </Typography>
                   </div>
-                  <UpdateBracketNodeDialog
-                    node={{
-                      id: bracketId,
-                      nodeCode: node.nodeCode,
-                      round: node.round,
-                      matchNumber: node.matchNumber,
-                      bracketType: node.bracketType,
-                    }}
-                    revalidatePath={`${basePath}/brackets/${bracketId}`}
-                  />
                 </div>
               </CardContent>
             </Card>
@@ -220,43 +310,13 @@ export default function ClientBracketNodeDetailPage({
 
           {/* Matches */}
           <Card>
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4">
+            <CardHeader className="flex flex-row items-center justify-between pb-4">
               <div className="flex items-center gap-2">
                 <Swords className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg">Matchs liés</CardTitle>
                 <Badge variant="secondary" className="text-xs">
                   {matches.length}
                 </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <GenerateBracketMatchesButton 
-                  bracketNodeId={bracketId}
-                  hasMatches={matches.length > 0}
-                  participantsCount={nodeParticipants.length}
-                />
-                <CreateMatchDialog
-                  editionId={editionId}
-                  phaseId={node?.phaseId || ""}
-                  groupId={node?.groupId || null}
-                  bracketNodeId={bracketId}
-                  participants={groupParticipants.map((p) => {
-                    const reg = registrations.find(
-                      (r: any) => r.id === p.registrationId,
-                    ) as any;
-                    return {
-                      registrationId: p.registrationId || "",
-                      displayName:
-                        reg?.member?.displayName ||
-                        reg?.member?.user?.username ||
-                        reg?.member?.team?.name ||
-                        "Joueur",
-                    };
-                  })}
-                  defaultRound={node?.round || 1}
-                  defaultMatchNumber={node?.matchNumber || 1}
-                  maxMatches={10}
-                  currentMatchesCount={matches.length}
-                />
               </div>
             </CardHeader>
             <CardContent>

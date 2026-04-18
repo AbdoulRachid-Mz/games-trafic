@@ -144,6 +144,9 @@ export async function getTournamentMemberById(id: string) {
             with: {
                 user: true,
                 team: true,
+                tournament: {
+                    columns: { id: true, name: true }
+                }
             },
         });
         return member || null;
@@ -326,7 +329,14 @@ export async function getMemberStatsByEdition(memberId: string) {
         const stats = await db.query.editionRegistrations.findMany({
             where: (t, { eq, and }) => and(eq(t.memberId, memberId), eq(t.isDeleted, false)),
             with: {
-                edition: true,
+                edition: {
+                    columns: { id: true, name: true, editionNumber: true, tournamentId: true },
+                    with: {
+                        tournament: {
+                            columns: { id: true, name: true }
+                        }
+                    }
+                },
             },
             orderBy: (t, { desc }) => [desc(t.registeredAt)],
         });

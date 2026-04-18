@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -52,6 +51,7 @@ interface CreateMatchDialogProps {
     pointsPerDraw?: number;
     pointsPerLoss?: number;
   };
+  asFormOnly?: boolean;
 }
 
 export function CreateMatchDialog({
@@ -66,6 +66,7 @@ export function CreateMatchDialog({
   maxMatches = 100,
   currentMatchesCount = 0,
   inheritedConfig,
+  asFormOnly = false,
 }: CreateMatchDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,14 +83,14 @@ export function CreateMatchDialog({
   const remainingSlots = maxMatches - currentMatchesCount;
 
   useEffect(() => {
-    if (open) {
+    if (open || asFormOnly) {
       if (isAtCapacity) {
         setCapacityError(`Limite de matchs atteinte (${currentMatchesCount}/${maxMatches})`);
       } else {
         setCapacityError(null);
       }
     }
-  }, [open, isAtCapacity, currentMatchesCount, maxMatches]);
+  }, [open, asFormOnly, isAtCapacity, currentMatchesCount, maxMatches]);
 
   const getParticipantDisplay = (participant: typeof participants[0]) => {
     return participant.teamName 
@@ -147,7 +148,11 @@ export function CreateMatchDialog({
       }
 
       toast.success(`${matchesToCreate} match(s) créé(s) avec succès`);
-      setOpen(false);
+      if (!asFormOnly) {
+        setOpen(false);
+      } else {
+        router.back();
+      }
       setP1("");
       setP2("");
       router.refresh();
@@ -158,48 +163,8 @@ export function CreateMatchDialog({
     }
   };
 
-  const getMatchCountOptions = () => {
-    if (phaseType === "ELIMINATION") {
-      return [
-        { value: "1", label: "Match unique" },
-        { value: "3", label: "BO3 (meilleur des 3)" },
-        { value: "5", label: "BO5 (meilleur des 5)" },
-      ];
-    }
-    return [
-      { value: "1", label: "Match unique" },
-      { value: "2", label: "Aller-Retour" },
-    ];
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button 
-          size="sm" 
-          className="gap-2" 
-          disabled={isAtCapacity || participants.length < 2}
-        >
-          <Plus className="h-4 w-4" /> 
-          Créer un match
-          {isAtCapacity && (
-            <Badge variant="destructive" className="ml-1 text-[8px] h-4">
-              Limite
-            </Badge>
-          )}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Swords className="h-5 w-5 text-primary" />
-            Nouveau match
-          </DialogTitle>
-          <DialogDescription>
-            Créez une confrontation entre deux participants.
-          </DialogDescription>
-        </DialogHeader>
-
+  const formContent = (
+    <div className="space-y-4">
         {/* Configuration héritée */}
         {inheritedConfig && Object.keys(inheritedConfig).length > 0 && (
           <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
@@ -242,7 +207,7 @@ export function CreateMatchDialog({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className={cn("space-y-4", !asFormOnly && "pt-4")}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="p1">Joueur 1</Label>
@@ -341,12 +306,13 @@ export function CreateMatchDialog({
             </div>
           </div>
 
-          <DialogFooter className="pt-4">
+          <div className="flex gap-2 sm:gap-0 justify-end pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => asFormOnly ? router.back() : setOpen(false)}
               disabled={loading}
+              className="mr-2"
             >
               Annuler
             </Button>
@@ -358,8 +324,44 @@ export function CreateMatchDialog({
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Swords className="h-4 w-4" />}
               Créer le match
             </Button>
-          </DialogFooter>
+          </div>
         </form>
+    </div>
+  );
+
+  if (asFormOnly) {
+    return formContent;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button 
+          size="sm" 
+          className="gap-2" 
+          disabled={isAtCapacity || participants.length < 2}
+        >
+          <Plus className="h-4 w-4" /> 
+          Créer un match
+          {isAtCapacity && (
+            <Badge variant="destructive" className="ml-1 text-[8px] h-4">
+              Limite
+            </Badge>
+          )}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Swords className="h-5 w-5 text-primary" />
+            Nouveau match
+          </DialogTitle>
+          <DialogDescription>
+            Créez une confrontation entre deux participants.
+          </DialogDescription>
+        </DialogHeader>
+
+        {formContent}
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,4 @@
-'use server';
+"use server";
 
 import {
   tournamentPhases,
@@ -18,7 +18,7 @@ import {
   type NewBracketNode,
   type Match,
   type NewMatch,
-} from '@/database/schema';
+} from "@/database/schema";
 import {
   eq,
   and,
@@ -40,7 +40,7 @@ import {
   exists,
   notInArray,
   not,
-} from 'drizzle-orm';
+} from "drizzle-orm";
 import {
   type TournamentPhaseFilters,
   type PhaseGroupFilters,
@@ -50,11 +50,14 @@ import {
   type ListQuery,
   type PaginationResponse,
   type QueryOptions,
-} from '@/types/api';
-import { db } from '@/lib/db';
-import { generateGroupMatches, generateRoundRobinMatches } from '@/lib/tournaments/match.generator';
-import { revalidatePath } from 'next/cache';
-import { shuffle, chunk } from '@/lib/tournaments/utils';
+} from "@/types/api";
+import { db } from "@/lib/db";
+import {
+  generateGroupMatches,
+  generateRoundRobinMatches,
+} from "@/lib/tournaments/match.generator";
+import { revalidatePath } from "next/cache";
+import { shuffle, chunk } from "@/lib/tournaments/utils";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -65,17 +68,19 @@ import { shuffle, chunk } from '@/lib/tournaments/utils';
  */
 export async function getTournamentPhaseById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<TournamentPhase | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.tournamentPhases.findFirst({
         where: (tournamentPhases, { eq }) => eq(tournamentPhases.id, id),
         with: {
-          edition: options.populate.includes('edition') ? true : undefined,
-          groups: options.populate.includes('groups') ? true : undefined,
-          bracketNodes: options.populate.includes('bracketNodes') ? true : undefined,
-          matches: options.populate.includes('matches') ? true : undefined,
+          edition: options.populate.includes("edition") ? true : undefined,
+          groups: options.populate.includes("groups") ? true : undefined,
+          bracketNodes: options.populate.includes("bracketNodes")
+            ? true
+            : undefined,
+          matches: options.populate.includes("matches") ? true : undefined,
         },
       });
       return (await query) ?? null;
@@ -88,8 +93,8 @@ export async function getTournamentPhaseById(
       .limit(1);
     return result[0] || null;
   } catch (error) {
-    console.error('Error getting tournament phase by ID:', error);
-    throw new Error('Failed to fetch tournament phase');
+    console.error("Error getting tournament phase by ID:", error);
+    throw new Error("Failed to fetch tournament phase");
   }
 }
 
@@ -97,10 +102,14 @@ export async function getTournamentPhaseById(
  * Liste les phases d'une édition avec pagination, filtres et options
  */
 export async function getTournamentPhases(
-  query: ListQuery<TournamentPhaseFilters> = {}
+  query: ListQuery<TournamentPhaseFilters> = {},
 ): Promise<PaginationResponse<TournamentPhase>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const {
+      pagination = { page: 1, limit: 50 },
+      filters = {},
+      options = {},
+    } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     // Build where conditions safely
@@ -108,7 +117,7 @@ export async function getTournamentPhases(
     try {
       whereConditions = buildTournamentPhaseWhereConditions(filters, options);
     } catch (buildError) {
-      console.error('Error building where conditions:', buildError);
+      console.error("Error building where conditions:", buildError);
       // Fallback to a safe default condition
       whereConditions = eq(tournamentPhases.isDeleted, false);
     }
@@ -127,7 +136,7 @@ export async function getTournamentPhases(
 
       if (options.sortBy) {
         const sortField = options.sortBy as keyof TournamentPhase;
-        const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+        const sortOrder = options.sortOrder === "desc" ? desc : asc;
         phasesQuery.orderBy(sortOrder(tournamentPhases[sortField]));
       } else {
         phasesQuery.orderBy(asc(tournamentPhases.order));
@@ -139,20 +148,20 @@ export async function getTournamentPhases(
         .where(whereConditions);
 
       const [phasesResult, countResult] = await Promise.all([
-        phasesQuery.execute().catch(err => {
-          console.error('Phases query failed:', err);
+        phasesQuery.execute().catch((err) => {
+          console.error("Phases query failed:", err);
           return [];
         }),
-        countQuery.execute().catch(err => {
-          console.error('Count query failed:', err);
+        countQuery.execute().catch((err) => {
+          console.error("Count query failed:", err);
           return [{ count: 0 }];
-        })
+        }),
       ]);
 
       phasesData = phasesResult;
       total = countResult[0]?.count ?? 0;
     } catch (queryError) {
-      console.error('Database query error:', queryError);
+      console.error("Database query error:", queryError);
       // Return empty result on query failure
       return {
         data: [],
@@ -181,19 +190,24 @@ export async function getTournamentPhases(
       },
     };
   } catch (error) {
-    console.error('Error getting tournament phases:', error);
-    throw new Error('Failed to fetch tournament phases');
+    console.error("Error getting tournament phases:", error);
+    throw new Error("Failed to fetch tournament phases");
   }
 }
 /**
  * Récupère les statistiques des phases de tournoi
  */
-export async function getTournamentPhaseStats(filters?: TournamentPhaseFilters) {
+export async function getTournamentPhaseStats(
+  filters?: TournamentPhaseFilters,
+) {
   try {
     const whereConditions = buildTournamentPhaseWhereConditions(filters || {});
 
     const [totalResult, activeResult, completedResult] = await Promise.all([
-      db.select({ count: count() }).from(tournamentPhases).where(whereConditions),
+      db
+        .select({ count: count() })
+        .from(tournamentPhases)
+        .where(whereConditions),
       db
         .select({ count: count() })
         .from(tournamentPhases)
@@ -210,8 +224,8 @@ export async function getTournamentPhaseStats(filters?: TournamentPhaseFilters) 
       completed: completedResult[0]?.count ?? 0,
     };
   } catch (error) {
-    console.error('Error getting tournament phase stats:', error);
-    throw new Error('Failed to fetch tournament phase statistics');
+    console.error("Error getting tournament phase stats:", error);
+    throw new Error("Failed to fetch tournament phase statistics");
   }
 }
 
@@ -224,16 +238,20 @@ export async function getTournamentPhaseStats(filters?: TournamentPhaseFilters) 
  */
 export async function getPhaseGroupById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<PhaseGroup | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.phaseGroups.findFirst({
         where: (phaseGroups, { eq }) => eq(phaseGroups.id, id),
         with: {
-          phase: options.populate.includes('phase') ? true : undefined,
-          participants: options.populate.includes('participants') ? true : undefined,
-          bracketNodes: options.populate.includes('bracketNodes') ? true : undefined,
+          phase: options.populate.includes("phase") ? true : undefined,
+          participants: options.populate.includes("participants")
+            ? true
+            : undefined,
+          bracketNodes: options.populate.includes("bracketNodes")
+            ? true
+            : undefined,
         },
       });
       return (await query) ?? null;
@@ -246,8 +264,8 @@ export async function getPhaseGroupById(
       .limit(1);
     return result[0] || null;
   } catch (error) {
-    console.error('Error getting phase group by ID:', error);
-    throw new Error('Failed to fetch phase group');
+    console.error("Error getting phase group by ID:", error);
+    throw new Error("Failed to fetch phase group");
   }
 }
 
@@ -255,10 +273,14 @@ export async function getPhaseGroupById(
  * Liste les groupes d'une phase avec pagination et filtres
  */
 export async function getPhaseGroups(
-  query: ListQuery<PhaseGroupFilters> = {}
+  query: ListQuery<PhaseGroupFilters> = {},
 ): Promise<PaginationResponse<PhaseGroup>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const {
+      pagination = { page: 1, limit: 50 },
+      filters = {},
+      options = {},
+    } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildPhaseGroupWhereConditions(filters, options);
@@ -272,7 +294,7 @@ export async function getPhaseGroups(
 
     if (options.sortBy) {
       const sortField = options.sortBy as keyof PhaseGroup;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+      const sortOrder = options.sortOrder === "desc" ? desc : asc;
       groupsQuery.orderBy(sortOrder(phaseGroups[sortField]));
     } else {
       groupsQuery.orderBy(asc(phaseGroups.order));
@@ -283,7 +305,10 @@ export async function getPhaseGroups(
       .from(phaseGroups)
       .where(whereConditions);
 
-    const [groupsData, totalResult] = await Promise.all([groupsQuery, countQuery]);
+    const [groupsData, totalResult] = await Promise.all([
+      groupsQuery,
+      countQuery,
+    ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
@@ -300,8 +325,8 @@ export async function getPhaseGroups(
       },
     };
   } catch (error) {
-    console.error('Error getting phase groups:', error);
-    throw new Error('Failed to fetch phase groups');
+    console.error("Error getting phase groups:", error);
+    throw new Error("Failed to fetch phase groups");
   }
 }
 
@@ -314,20 +339,27 @@ export async function getPhaseGroups(
  */
 export async function getPhaseGroupParticipantById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<PhaseGroupParticipant | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.phaseGroupParticipants.findFirst({
-        where: (phaseGroupParticipants, { eq }) => eq(phaseGroupParticipants.id, id),
+        where: (phaseGroupParticipants, { eq }) =>
+          eq(phaseGroupParticipants.id, id),
         with: {
-          group: options.populate.includes('group') ? true : undefined,
-          registration: options.populate.includes('registration') ? {
-            with: {
-              member: options.populate.includes('member') ? true : undefined,
-              edition: options.populate.includes('edition') ? true : undefined,
-            }
-          } : undefined,
+          group: options.populate.includes("group") ? true : undefined,
+          registration: options.populate.includes("registration")
+            ? {
+                with: {
+                  member: options.populate.includes("member")
+                    ? true
+                    : undefined,
+                  edition: options.populate.includes("edition")
+                    ? true
+                    : undefined,
+                },
+              }
+            : undefined,
         },
       });
       return (await query) ?? null;
@@ -340,8 +372,8 @@ export async function getPhaseGroupParticipantById(
       .limit(1);
     return result[0] || null;
   } catch (error) {
-    console.error('Error getting phase group participant by ID:', error);
-    throw new Error('Failed to fetch phase group participant');
+    console.error("Error getting phase group participant by ID:", error);
+    throw new Error("Failed to fetch phase group participant");
   }
 }
 
@@ -351,14 +383,19 @@ export async function getPhaseGroupParticipantById(
 export async function deletePhaseGroupParticipant(id: string): Promise<void> {
   try {
     const [participant] = await db
-      .select({ id: phaseGroupParticipants.id, groupId: phaseGroupParticipants.groupId })
+      .select({
+        id: phaseGroupParticipants.id,
+        groupId: phaseGroupParticipants.groupId,
+      })
       .from(phaseGroupParticipants)
       .where(eq(phaseGroupParticipants.id, id))
       .limit(1);
 
     if (!participant) return;
 
-    await db.delete(phaseGroupParticipants).where(eq(phaseGroupParticipants.id, id));
+    await db
+      .delete(phaseGroupParticipants)
+      .where(eq(phaseGroupParticipants.id, id));
 
     // Recalculate standings if groupId exists
     if (participant.groupId) {
@@ -366,7 +403,7 @@ export async function deletePhaseGroupParticipant(id: string): Promise<void> {
     }
   } catch (error) {
     console.error("Error deleting phase group participant:", error);
-    throw new Error('Failed to delete phase group participant');
+    throw new Error("Failed to delete phase group participant");
   }
 }
 
@@ -374,7 +411,7 @@ export async function deletePhaseGroupParticipant(id: string): Promise<void> {
  * Supprime plusieurs participants de groupe par leurs IDs
  */
 export async function bulkDeletePhaseGroupParticipants(
-  ids: string[]
+  ids: string[],
 ): Promise<void> {
   try {
     if (ids.length === 0) return;
@@ -383,8 +420,8 @@ export async function bulkDeletePhaseGroupParticipants(
       .delete(phaseGroupParticipants)
       .where(inArray(phaseGroupParticipants.id, ids));
   } catch (error) {
-    console.error('Error bulk deleting phase group participants:', error);
-    throw new Error('Failed to bulk delete phase group participants');
+    console.error("Error bulk deleting phase group participants:", error);
+    throw new Error("Failed to bulk delete phase group participants");
   }
 }
 
@@ -392,13 +429,20 @@ export async function bulkDeletePhaseGroupParticipants(
  * Liste les participants d'un groupe avec pagination et filtres
  */
 export async function getPhaseGroupParticipants(
-  query: ListQuery<PhaseGroupParticipantFilters> = {}
+  query: ListQuery<PhaseGroupParticipantFilters> = {},
 ): Promise<PaginationResponse<PhaseGroupParticipant>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const {
+      pagination = { page: 1, limit: 50 },
+      filters = {},
+      options = {},
+    } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
-    const whereConditions = buildPhaseGroupParticipantWhereConditions(filters, options);
+    const whereConditions = buildPhaseGroupParticipantWhereConditions(
+      filters,
+      options,
+    );
 
     const participantsQuery = db
       .select()
@@ -409,7 +453,7 @@ export async function getPhaseGroupParticipants(
 
     if (options.sortBy) {
       const sortField = options.sortBy as keyof PhaseGroupParticipant;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+      const sortOrder = options.sortOrder === "desc" ? desc : asc;
       participantsQuery.orderBy(sortOrder(phaseGroupParticipants[sortField]));
     } else {
       participantsQuery.orderBy(desc(phaseGroupParticipants.points));
@@ -420,7 +464,10 @@ export async function getPhaseGroupParticipants(
       .from(phaseGroupParticipants)
       .where(whereConditions);
 
-    const [participantsData, totalResult] = await Promise.all([participantsQuery, countQuery]);
+    const [participantsData, totalResult] = await Promise.all([
+      participantsQuery,
+      countQuery,
+    ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
@@ -437,8 +484,8 @@ export async function getPhaseGroupParticipants(
       },
     };
   } catch (error) {
-    console.error('Error getting phase group participants:', error);
-    throw new Error('Failed to fetch phase group participants');
+    console.error("Error getting phase group participants:", error);
+    throw new Error("Failed to fetch phase group participants");
   }
 }
 
@@ -449,35 +496,47 @@ export async function getPhaseGroupParticipants(
 export async function getPhaseStandings(phaseId: string) {
   try {
     const groupsWithParticipants = await db.query.phaseGroups.findMany({
-      where: and(eq(phaseGroups.phaseId, phaseId), eq(phaseGroups.isDeleted, false)),
+      where: and(
+        eq(phaseGroups.phaseId, phaseId),
+        eq(phaseGroups.isDeleted, false),
+      ),
       orderBy: [asc(phaseGroups.order)],
       with: {
         participants: {
-          orderBy: [desc(phaseGroupParticipants.points), asc(phaseGroupParticipants.position)],
+          orderBy: [
+            desc(phaseGroupParticipants.points),
+            asc(phaseGroupParticipants.position),
+          ],
           with: {
             registration: {
               with: {
                 member: {
                   with: {
                     user: {
-                      columns: { id: true, username: true, fullName: true, profileImage: true, image: true }
+                      columns: {
+                        id: true,
+                        username: true,
+                        fullName: true,
+                        profileImage: true,
+                        image: true,
+                      },
                     },
                     team: {
-                      columns: { id: true, name: true, logo: true }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                      columns: { id: true, name: true, logo: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    return groupsWithParticipants.map(group => ({
+    return groupsWithParticipants.map((group) => ({
       groupId: group.id,
       groupName: group.name,
-      rows: (group.participants || []).map(p => ({
+      rows: (group.participants || []).map((p) => ({
         id: p.id,
         registrationId: p.registrationId,
         points: p.points ?? 0,
@@ -490,11 +549,16 @@ export async function getPhaseStandings(phaseId: string) {
         scoreDifference: (p.scoreFor ?? 0) - (p.scoreAgainst ?? 0),
         position: p.position ?? undefined,
         qualified: p.qualified ?? false,
-        displayName: p.registration?.member?.user?.username || p.registration?.member?.user?.fullName || "Anonyme",
-        avatar: p.registration?.member?.user?.profileImage || p.registration?.member?.user?.image,
+        displayName:
+          p.registration?.member?.user?.username ||
+          p.registration?.member?.user?.fullName ||
+          "Anonyme",
+        avatar:
+          p.registration?.member?.user?.profileImage ||
+          p.registration?.member?.user?.image,
         teamName: p.registration?.member?.team?.name,
-        teamLogo: p.registration?.member?.team?.logo
-      }))
+        teamLogo: p.registration?.member?.team?.logo,
+      })),
     }));
   } catch (error) {
     console.error("Error fetching phase standings:", error);
@@ -511,18 +575,22 @@ export async function getPhaseStandings(phaseId: string) {
  */
 export async function getBracketNodeById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<BracketNode | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.bracketNodes.findFirst({
         where: (bracketNodes, { eq }) => eq(bracketNodes.id, id),
         with: {
-          phase: options.populate.includes('phase') ? true : undefined,
-          group: options.populate.includes('group') ? true : undefined,
-          parentNode: options.populate.includes('parentNode') ? true : undefined,
-          childNodes: options.populate.includes('childNodes') ? true : undefined,
-          match: options.populate.includes('match') ? true : undefined,
+          phase: options.populate.includes("phase") ? true : undefined,
+          group: options.populate.includes("group") ? true : undefined,
+          parentNode: options.populate.includes("parentNode")
+            ? true
+            : undefined,
+          childNodes: options.populate.includes("childNodes")
+            ? true
+            : undefined,
+          match: options.populate.includes("match") ? true : undefined,
         },
       });
       return (await query) ?? null;
@@ -535,8 +603,8 @@ export async function getBracketNodeById(
       .limit(1);
     return result[0] || null;
   } catch (error) {
-    console.error('Error getting bracket node by ID:', error);
-    throw new Error('Failed to fetch bracket node');
+    console.error("Error getting bracket node by ID:", error);
+    throw new Error("Failed to fetch bracket node");
   }
 }
 
@@ -544,10 +612,14 @@ export async function getBracketNodeById(
  * Liste les nœuds de bracket d'une phase avec pagination et filtres
  */
 export async function getBracketNodes(
-  query: ListQuery<BracketNodeFilters> = {}
+  query: ListQuery<BracketNodeFilters> = {},
 ): Promise<PaginationResponse<BracketNode>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const {
+      pagination = { page: 1, limit: 50 },
+      filters = {},
+      options = {},
+    } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildBracketNodeWhereConditions(filters, options);
@@ -561,7 +633,7 @@ export async function getBracketNodes(
 
     if (options.sortBy) {
       const sortField = options.sortBy as keyof BracketNode;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+      const sortOrder = options.sortOrder === "desc" ? desc : asc;
       nodesQuery.orderBy(sortOrder(bracketNodes[sortField]));
     } else {
       nodesQuery.orderBy(asc(bracketNodes.order));
@@ -572,7 +644,10 @@ export async function getBracketNodes(
       .from(bracketNodes)
       .where(whereConditions);
 
-    const [nodesData, totalResult] = await Promise.all([nodesQuery, countQuery]);
+    const [nodesData, totalResult] = await Promise.all([
+      nodesQuery,
+      countQuery,
+    ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
@@ -589,8 +664,8 @@ export async function getBracketNodes(
       },
     };
   } catch (error) {
-    console.error('Error getting bracket nodes:', error);
-    throw new Error('Failed to fetch bracket nodes');
+    console.error("Error getting bracket nodes:", error);
+    throw new Error("Failed to fetch bracket nodes");
   }
 }
 
@@ -606,60 +681,110 @@ export async function getBracketNodes(
  */
 export async function getMatchById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<Match | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
       const query = db.query.matches.findFirst({
         where: (matches, { eq }) => eq(matches.id, id),
         with: {
-          edition: options.populate.includes('edition') ? {
-            with: {
-              tournament: {
+          edition: options.populate.includes("edition")
+            ? {
                 with: {
-                  members: {
-                    where: (members, { eq }) => eq(members.isDeleted, false),
-                    columns: { id: true, userId: true, role: true, isCoOrganizer: true }
-                  }
-                }
+                  tournament: {
+                    with: {
+                      members: {
+                        where: (members, { eq }) =>
+                          eq(members.isDeleted, false),
+                        columns: {
+                          id: true,
+                          userId: true,
+                          role: true,
+                          isCoOrganizer: true,
+                        },
+                      },
+                    },
+                  },
+                },
               }
-            }
-          } : undefined,
-          phase: options.populate.includes('phase') ? true : undefined,
-          group: options.populate.includes('group') ? true : undefined,
-          bracketNode: options.populate.includes('bracketNode') ? true : undefined,
-          participant1: options.populate.includes('participant1') ? {
-            with: {
-              member: options.populate.includes('member1') ? {
+            : undefined,
+          phase: options.populate.includes("phase") ? true : undefined,
+          group: options.populate.includes("group") ? true : undefined,
+          bracketNode: options.populate.includes("bracketNode")
+            ? true
+            : undefined,
+          participant1: options.populate.includes("participant1")
+            ? {
                 with: {
-                  user: { columns: { id: true, username: true, fullName: true, profileImage: true, image: true } },
-                  team: { columns: { id: true, name: true, logo: true } }
-                }
-              } : undefined,
-            }
-          } : undefined,
-          participant2: options.populate.includes('participant2') ? {
-            with: {
-              member: options.populate.includes('member2') ? {
+                  member: options.populate.includes("member1")
+                    ? {
+                        with: {
+                          user: {
+                            columns: {
+                              id: true,
+                              username: true,
+                              fullName: true,
+                              profileImage: true,
+                              image: true,
+                            },
+                          },
+                          team: {
+                            columns: { id: true, name: true, logo: true },
+                          },
+                        },
+                      }
+                    : undefined,
+                },
+              }
+            : undefined,
+          participant2: options.populate.includes("participant2")
+            ? {
                 with: {
-                  user: { columns: { id: true, username: true, fullName: true, profileImage: true, image: true } },
-                  team: { columns: { id: true, name: true, logo: true } }
-                }
-              } : undefined,
-            }
-          } : undefined,
-          winner: options.populate.includes('winner') ? {
-            with: {
-              member: options.populate.includes('winnerMember') ? true : undefined,
-            }
-          } : undefined,
-          loser: options.populate.includes('loser') ? {
-            with: {
-              member: options.populate.includes('loserMember') ? true : undefined,
-            }
-          } : undefined,
-          submittedBy: options.populate.includes('submittedBy') ? true : undefined,
-          resolvedBy: options.populate.includes('resolvedBy') ? true : undefined,
+                  member: options.populate.includes("member2")
+                    ? {
+                        with: {
+                          user: {
+                            columns: {
+                              id: true,
+                              username: true,
+                              fullName: true,
+                              profileImage: true,
+                              image: true,
+                            },
+                          },
+                          team: {
+                            columns: { id: true, name: true, logo: true },
+                          },
+                        },
+                      }
+                    : undefined,
+                },
+              }
+            : undefined,
+          winner: options.populate.includes("winner")
+            ? {
+                with: {
+                  member: options.populate.includes("winnerMember")
+                    ? true
+                    : undefined,
+                },
+              }
+            : undefined,
+          loser: options.populate.includes("loser")
+            ? {
+                with: {
+                  member: options.populate.includes("loserMember")
+                    ? true
+                    : undefined,
+                },
+              }
+            : undefined,
+          submittedBy: options.populate.includes("submittedBy")
+            ? true
+            : undefined,
+          resolvedBy: options.populate.includes("resolvedBy")
+            ? true
+            : undefined,
         },
       });
       return (await query) ?? null;
@@ -672,8 +797,8 @@ export async function getMatchById(
       .limit(1);
     return result[0] || null;
   } catch (error) {
-    console.error('Error getting match by ID:', error);
-    throw new Error('Failed to fetch match');
+    console.error("Error getting match by ID:", error);
+    throw new Error("Failed to fetch match");
   }
 }
 
@@ -681,10 +806,14 @@ export async function getMatchById(
  * Liste les matchs avec pagination et filtres
  */
 export async function getMatches(
-  query: ListQuery<MatchFilters> = {}
+  query: ListQuery<MatchFilters> = {},
 ): Promise<PaginationResponse<Match>> {
   try {
-    const { pagination = { page: 1, limit: 50 }, filters = {}, options = {} } = query;
+    const {
+      pagination = { page: 1, limit: 50 },
+      filters = {},
+      options = {},
+    } = query;
     const offset = (pagination.page - 1) * pagination.limit;
 
     const whereConditions = buildMatchWhereConditions(filters, options);
@@ -698,7 +827,7 @@ export async function getMatches(
 
     if (options.sortBy) {
       const sortField = options.sortBy as keyof Match;
-      const sortOrder = options.sortOrder === 'desc' ? desc : asc;
+      const sortOrder = options.sortOrder === "desc" ? desc : asc;
       matchesQuery.orderBy(sortOrder(matches[sortField]));
     } else {
       matchesQuery.orderBy(asc(matches.scheduledTime));
@@ -709,7 +838,10 @@ export async function getMatches(
       .from(matches)
       .where(whereConditions);
 
-    const [matchesData, totalResult] = await Promise.all([matchesQuery, countQuery]);
+    const [matchesData, totalResult] = await Promise.all([
+      matchesQuery,
+      countQuery,
+    ]);
 
     const total = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(total / pagination.limit);
@@ -726,13 +858,15 @@ export async function getMatches(
       },
     };
   } catch (error) {
-    console.error('Error getting matches:', error);
-    throw new Error('Failed to fetch matches');
+    console.error("Error getting matches:", error);
+    throw new Error("Failed to fetch matches");
   }
 }
 
-
-export async function generatePhaseMatches(phaseId: string, config?: { forceRecreate?: boolean; groupId?: string }) {
+export async function generatePhaseMatches(
+  phaseId: string,
+  config?: { forceRecreate?: boolean; groupId?: string },
+) {
   try {
     const phase = await db.query.tournamentPhases.findFirst({
       where: eq(tournamentPhases.id, phaseId),
@@ -741,18 +875,29 @@ export async function generatePhaseMatches(phaseId: string, config?: { forceRecr
           with: {
             participants: true,
             bracketNodes: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!phase) throw new Error("Phase not found");
 
     if (config?.forceRecreate) {
       if (config.groupId) {
-        await db.delete(matches).where(and(eq(matches.groupId, config.groupId), eq(matches.status, "PENDING")));
+        await db
+          .delete(matches)
+          .where(
+            and(
+              eq(matches.groupId, config.groupId),
+              eq(matches.status, "PENDING"),
+            ),
+          );
       } else {
-        await db.delete(matches).where(and(eq(matches.phaseId, phaseId), eq(matches.status, "PENDING")));
+        await db
+          .delete(matches)
+          .where(
+            and(eq(matches.phaseId, phaseId), eq(matches.status, "PENDING")),
+          );
       }
     }
 
@@ -760,74 +905,92 @@ export async function generatePhaseMatches(phaseId: string, config?: { forceRecr
     const createdNodes = [];
 
     if (phase.phaseType === "GROUP_STAGE" && phase.groups) {
-      const groupsToProcess = config?.groupId ? phase.groups.filter((g: any) => g.id === config.groupId) : phase.groups;
-      
+      const groupsToProcess = config?.groupId
+        ? phase.groups.filter((g: any) => g.id === config.groupId)
+        : phase.groups;
+
       for (const group of groupsToProcess) {
         const participants = group.participants || [];
         if (participants.length < 2) continue;
-        
+
         // Ensure bracket nodes exist for the group if none
         let nodes = group.bracketNodes || [];
         if (nodes.length === 0) {
-           // Create a default node for the group
-           const nodeRes = await db.insert(bracketNodes).values({
+          // Create a default node for the group
+          const nodeRes = await db
+            .insert(bracketNodes)
+            .values({
               phaseId,
               groupId: group.id,
-              nodeCode: `${group.name || 'G'}-N1`,
+              nodeCode: `${group.name || "G"}-N1`,
               round: 1,
               matchNumber: 1,
-              metadata: { 
-                 participants: participants.map((p: any) => p.registrationId),
-                 name: "Général",
-                 generateMatches: true,
-                 matchesCount: 1,
-                 format: 'BEST_OF_1'
+              metadata: {
+                participants: participants.map((p: any) => p.registrationId),
+                name: "Général",
+                generateMatches: true,
+                matchesCount: 1,
+                format: "BEST_OF_1",
               },
-           } as any).returning();
-           nodes = [nodeRes[0]];
-           createdNodes.push(nodeRes[0]);
+            } as any)
+            .returning();
+          nodes = [nodeRes[0]];
+          createdNodes.push(nodeRes[0]);
         } else {
-           // Update nodes with participants if they are empty
-           for (const node of nodes) {
-              const metadata = (node.metadata as any) || {};
-              if (!metadata.participants || metadata.participants.length === 0) {
-                 await db.update(bracketNodes).set({
-                    metadata: { 
-                      ...metadata, 
-                      participants: participants.map((p: any) => p.registrationId) 
-                    },
-                 }).where(eq(bracketNodes.id, node.id));
-              }
-           }
+          // Update nodes with participants if they are empty
+          for (const node of nodes) {
+            const metadata = (node.metadata as any) || {};
+            if (!metadata.participants || metadata.participants.length === 0) {
+              await db
+                .update(bracketNodes)
+                .set({
+                  metadata: {
+                    ...metadata,
+                    participants: participants.map(
+                      (p: any) => p.registrationId,
+                    ),
+                  },
+                })
+                .where(eq(bracketNodes.id, node.id));
+            }
+          }
         }
 
         // Generate matches for each node
         for (const node of nodes) {
-           const nodeMetadata = (node.metadata as any) || {};
-           const nodeParticipants = nodeMetadata.participants || participants.map((p: any) => p.registrationId);
-           
-           const generated = generateGroupMatches(nodeParticipants.map((id: string) => ({
-              id
-           })), { returnType: "single" });
-           
-           for (const [index, m] of generated.entries()) {
-                const mData = {
-                  editionId: phase.editionId,
-                  phaseId: phase.id,
-                  groupId: group.id,
-                  bracketNodeId: node.id,
-                  participant1RegistrationId: m.participant1?.id,
-                  participant2RegistrationId: m.participant2?.id,
-                  matchNumber: index + 1,
-                  status: "PENDING" as const,
-                  round: node.round || 1,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                };
-                
-                const res = await db.insert(matches).values(mData as any).returning();
-                createdMatches.push(res[0]);
-           }
+          const nodeMetadata = (node.metadata as any) || {};
+          const nodeParticipants =
+            nodeMetadata.participants ||
+            participants.map((p: any) => p.registrationId);
+
+          const generated = generateGroupMatches(
+            nodeParticipants.map((id: string) => ({
+              id,
+            })),
+            { returnType: "single" },
+          );
+
+          for (const [index, m] of generated.entries()) {
+            const mData = {
+              editionId: phase.editionId,
+              phaseId: phase.id,
+              groupId: group.id,
+              bracketNodeId: node.id,
+              participant1RegistrationId: m.participant1?.id,
+              participant2RegistrationId: m.participant2?.id,
+              matchNumber: index + 1,
+              status: "PENDING" as const,
+              round: node.round || 1,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            const res = await db
+              .insert(matches)
+              .values(mData as any)
+              .returning();
+            createdMatches.push(res[0]);
+          }
         }
       }
     } else if (phase.phaseType === "ELIMINATION") {
@@ -836,7 +999,11 @@ export async function generatePhaseMatches(phaseId: string, config?: { forceRecr
     }
 
     revalidatePath(`/tournaments/editions/${phase.editionId}/dashboard`);
-    return { success: true, count: createdMatches.length, nodesCount: createdNodes.length };
+    return {
+      success: true,
+      count: createdMatches.length,
+      nodesCount: createdNodes.length,
+    };
   } catch (error) {
     console.error("Failed to generate matches", error);
     throw error;
@@ -852,11 +1019,19 @@ export async function generatePhaseMatches(phaseId: string, config?: { forceRecr
  * Résout le problème "À déterminer" dans l'UI
  */
 export async function getMatchesWithParticipants(
-  query: ListQuery<MatchFilters> = {}
+  query: ListQuery<MatchFilters> = {},
 ): Promise<PaginationResponse<any>> {
   try {
-    const { pagination = { page: 1, limit: 20 }, filters = {}, options = {} } = query;
+    const {
+      pagination = { page: 1, limit: 20 },
+      filters = {},
+      options = {},
+    } = query;
     const offset = (pagination.page - 1) * pagination.limit;
+
+    if (!filters?.editionId) {
+      throw new Error("editionId is required");
+    }
 
     const whereConditions = buildMatchWhereConditions(filters, options);
 
@@ -864,35 +1039,52 @@ export async function getMatchesWithParticipants(
       where: whereConditions,
       limit: pagination.limit,
       offset,
-      orderBy: options.sortBy === 'scheduledTime'
-        ? [asc(matches.scheduledTime)]
-        : options.sortBy === 'createdAt'
-        ? [desc(matches.createdAt)]
-        : [asc(matches.scheduledTime)],
+      orderBy:
+        options.sortBy === "scheduledTime"
+          ? [asc(matches.scheduledTime)]
+          : options.sortBy === "createdAt"
+            ? [desc(matches.createdAt)]
+            : [asc(matches.scheduledTime)],
       with: {
         participant1: {
           with: {
             member: {
               with: {
-                user: { columns: { id: true, username: true, fullName: true, profileImage: true, image: true } },
-                team: { columns: { id: true, name: true, logo: true } }
-              }
-            }
-          }
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  },
+                },
+                team: { columns: { id: true, name: true, logo: true } },
+              },
+            },
+          },
         },
         participant2: {
           with: {
             member: {
               with: {
-                user: { columns: { id: true, username: true, fullName: true, profileImage: true, image: true } },
-                team: { columns: { id: true, name: true, logo: true } }
-              }
-            }
-          }
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  },
+                },
+                team: { columns: { id: true, name: true, logo: true } },
+              },
+            },
+          },
         },
         phase: { columns: { id: true, name: true, phaseType: true } },
         group: { columns: { id: true, name: true } },
-      }
+      },
     });
 
     const countResult = await db
@@ -915,8 +1107,8 @@ export async function getMatchesWithParticipants(
       },
     };
   } catch (error) {
-    console.error('Error getting matches with participants:', error);
-    throw new Error('Failed to fetch matches with participants');
+    console.error("Error getting matches with participants:", error);
+    throw new Error("Failed to fetch matches with participants");
   }
 }
 
@@ -931,26 +1123,61 @@ export async function getEditionMatchStats(editionId: string): Promise<{
   disputed: number;
 }> {
   try {
-    const [totalRes, completedRes, inProgressRes, disputedRes] = await Promise.all([
-      db.select({ count: count() }).from(matches)
-        .where(and(eq(matches.editionId, editionId), eq(matches.isDeleted, false))),
-      db.select({ count: count() }).from(matches)
-        .where(and(eq(matches.editionId, editionId), eq(matches.status, 'COMPLETED'), eq(matches.isDeleted, false))),
-      db.select({ count: count() }).from(matches)
-        .where(and(eq(matches.editionId, editionId), eq(matches.status, 'IN_PROGRESS'), eq(matches.isDeleted, false))),
-      db.select({ count: count() }).from(matches)
-        .where(and(eq(matches.editionId, editionId), eq(matches.status, 'DISPUTED'), eq(matches.isDeleted, false))),
-    ]);
+    const [totalRes, completedRes, inProgressRes, disputedRes] =
+      await Promise.all([
+        db
+          .select({ count: count() })
+          .from(matches)
+          .where(
+            and(eq(matches.editionId, editionId), eq(matches.isDeleted, false)),
+          ),
+        db
+          .select({ count: count() })
+          .from(matches)
+          .where(
+            and(
+              eq(matches.editionId, editionId),
+              eq(matches.status, "COMPLETED"),
+              eq(matches.isDeleted, false),
+            ),
+          ),
+        db
+          .select({ count: count() })
+          .from(matches)
+          .where(
+            and(
+              eq(matches.editionId, editionId),
+              eq(matches.status, "IN_PROGRESS"),
+              eq(matches.isDeleted, false),
+            ),
+          ),
+        db
+          .select({ count: count() })
+          .from(matches)
+          .where(
+            and(
+              eq(matches.editionId, editionId),
+              eq(matches.status, "DISPUTED"),
+              eq(matches.isDeleted, false),
+            ),
+          ),
+      ]);
 
     const total = totalRes[0]?.count ?? 0;
     const completed = completedRes[0]?.count ?? 0;
     const inProgress = inProgressRes[0]?.count ?? 0;
     const disputed = disputedRes[0]?.count ?? 0;
 
-    return { total, completed, inProgress, pending: total - completed - inProgress - disputed, disputed };
+    return {
+      total,
+      completed,
+      inProgress,
+      pending: total - completed - inProgress - disputed,
+      disputed,
+    };
   } catch (error) {
-    console.error('Error getting edition match stats:', error);
-    throw new Error('Failed to fetch edition match stats');
+    console.error("Error getting edition match stats:", error);
+    throw new Error("Failed to fetch edition match stats");
   }
 }
 
@@ -967,7 +1194,7 @@ export async function checkGroupCapacity(groupId: string): Promise<{
       where: eq(phaseGroups.id, groupId),
       with: { participants: true },
     });
-    if (!group) throw new Error('Groupe introuvable');
+    if (!group) throw new Error("Groupe introuvable");
 
     const config = (group.config as any) || {};
     const max: number | null = config.maxParticipants ?? null;
@@ -975,7 +1202,7 @@ export async function checkGroupCapacity(groupId: string): Promise<{
 
     return { current, max, isFull: max !== null && current >= max };
   } catch (error) {
-    console.error('Error checking group capacity:', error);
+    console.error("Error checking group capacity:", error);
     throw error;
   }
 }
@@ -985,7 +1212,7 @@ export async function checkGroupCapacity(groupId: string): Promise<{
  */
 export async function generateBracketMatches(
   bracketNodeId: string,
-  config?: { returnType?: 'single' | 'double'; forceRecreate?: boolean }
+  config?: { returnType?: "single" | "double"; forceRecreate?: boolean },
 ): Promise<{ success: boolean; count: number }> {
   try {
     const node = await db.query.bracketNodes.findFirst({
@@ -993,13 +1220,15 @@ export async function generateBracketMatches(
       with: { phase: true, group: true },
     });
 
-    if (!node) throw new Error('Bracket node introuvable');
+    if (!node) throw new Error("Bracket node introuvable");
 
     const nodeMetadata = (node.metadata as any) || {};
     const participantIds: string[] = nodeMetadata.participants || [];
 
     if (participantIds.length < 2) {
-      throw new Error(`Le bracket doit avoir au moins 2 participants (actuellement ${participantIds.length})`);
+      throw new Error(
+        `Le bracket doit avoir au moins 2 participants (actuellement ${participantIds.length})`,
+      );
     }
 
     // Valider que les participants appartiennent bien au groupe parent
@@ -1007,22 +1236,29 @@ export async function generateBracketMatches(
       const groupParticipants = await db.query.phaseGroupParticipants.findMany({
         where: eq(phaseGroupParticipants.groupId, node.groupId),
       });
-      const validIds = new Set(groupParticipants.map(p => p.registrationId));
-      const invalidIds = participantIds.filter(id => !validIds.has(id));
+      const validIds = new Set(groupParticipants.map((p) => p.registrationId));
+      const invalidIds = participantIds.filter((id) => !validIds.has(id));
       if (invalidIds.length > 0) {
-        throw new Error(`Participants invalides (non membres du groupe) : ${invalidIds.join(', ')}`);
+        throw new Error(
+          `Participants invalides (non membres du groupe) : ${invalidIds.join(", ")}`,
+        );
       }
     }
 
     if (config?.forceRecreate) {
-      await db.delete(matches).where(
-        and(eq(matches.bracketNodeId, bracketNodeId), eq(matches.status, 'PENDING'))
-      );
+      await db
+        .delete(matches)
+        .where(
+          and(
+            eq(matches.bracketNodeId, bracketNodeId),
+            eq(matches.status, "PENDING"),
+          ),
+        );
     }
 
     const generated = generateGroupMatches(
-      participantIds.map(id => ({ id })),
-      { returnType: config?.returnType ?? 'single' }
+      participantIds.map((id) => ({ id })),
+      { returnType: config?.returnType ?? "single" },
     );
 
     const createdMatches = [];
@@ -1036,17 +1272,20 @@ export async function generateBracketMatches(
         participant2RegistrationId: m.participant2?.id,
         matchNumber: index + 1,
         round: node.round ?? 1,
-        status: 'PENDING' as const,
+        status: "PENDING" as const,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      const res = await db.insert(matches).values(mData as any).returning();
+      const res = await db
+        .insert(matches)
+        .values(mData as any)
+        .returning();
       createdMatches.push(res[0]);
     }
 
     return { success: true, count: createdMatches.length };
   } catch (error) {
-    console.error('Error generating bracket matches:', error);
+    console.error("Error generating bracket matches:", error);
     throw error;
   }
 }
@@ -1059,11 +1298,15 @@ export async function generateBracketMatches(
  * Crée une nouvelle phase de tournoi
  */
 export async function createTournamentPhase(
-  phaseData: NewTournamentPhase
+  phaseData: NewTournamentPhase,
 ): Promise<TournamentPhase> {
   try {
-    if (!phaseData.editionId || !phaseData.name || phaseData.order === undefined) {
-      throw new Error('editionId, name and order are required');
+    if (
+      !phaseData.editionId ||
+      !phaseData.name ||
+      phaseData.order === undefined
+    ) {
+      throw new Error("editionId, name and order are required");
     }
 
     const result = await db
@@ -1077,11 +1320,11 @@ export async function createTournamentPhase(
 
     return result[0];
   } catch (error) {
-    console.error('Error creating tournament phase:', error);
+    console.error("Error creating tournament phase:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to create tournament phase');
+    throw new Error("Failed to create tournament phase");
   }
 }
 
@@ -1089,11 +1332,11 @@ export async function createTournamentPhase(
  * Crée plusieurs phases de tournoi en une seule transaction
  */
 export async function bulkCreateTournamentPhases(
-  phasesData: NewTournamentPhase[]
+  phasesData: NewTournamentPhase[],
 ): Promise<TournamentPhase[]> {
   try {
     if (phasesData.length === 0) return [];
-    
+
     const result = await db
       .insert(tournamentPhases)
       .values(
@@ -1101,14 +1344,14 @@ export async function bulkCreateTournamentPhases(
           ...p,
           createdAt: new Date(),
           updatedAt: new Date(),
-        }))
+        })),
       )
       .returning();
 
     return result;
   } catch (error) {
-    console.error('Error bulk creating tournament phases:', error);
-    throw new Error('Failed to bulk create tournament phases');
+    console.error("Error bulk creating tournament phases:", error);
+    throw new Error("Failed to bulk create tournament phases");
   }
 }
 
@@ -1117,12 +1360,12 @@ export async function bulkCreateTournamentPhases(
  */
 export async function updateTournamentPhase(
   id: string,
-  phaseData: Partial<NewTournamentPhase>
+  phaseData: Partial<NewTournamentPhase>,
 ): Promise<TournamentPhase> {
   try {
     const existingPhase = await getTournamentPhaseById(id);
     if (!existingPhase) {
-      throw new Error('Tournament phase not found');
+      throw new Error("Tournament phase not found");
     }
 
     const result = await db
@@ -1136,18 +1379,20 @@ export async function updateTournamentPhase(
 
     return result[0];
   } catch (error) {
-    console.error('Error updating tournament phase:', error);
+    console.error("Error updating tournament phase:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to update tournament phase');
+    throw new Error("Failed to update tournament phase");
   }
 }
 
 /**
  * Supprime une phase de tournoi (soft delete)
  */
-export async function deleteTournamentPhase(id: string): Promise<TournamentPhase> {
+export async function deleteTournamentPhase(
+  id: string,
+): Promise<TournamentPhase> {
   try {
     const result = await db
       .update(tournamentPhases)
@@ -1159,25 +1404,31 @@ export async function deleteTournamentPhase(id: string): Promise<TournamentPhase
       .returning();
 
     if (result.length === 0) {
-      throw new Error('Tournament phase not found');
+      throw new Error("Tournament phase not found");
     }
     return result[0];
   } catch (error) {
-    console.error('Error deleting tournament phase:', error);
+    console.error("Error deleting tournament phase:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to delete tournament phase');
+    throw new Error("Failed to delete tournament phase");
   }
 }
 
 /**
  * Crée un nouveau groupe de phase
  */
-export async function createPhaseGroup(groupData: NewPhaseGroup): Promise<PhaseGroup> {
+export async function createPhaseGroup(
+  groupData: NewPhaseGroup,
+): Promise<PhaseGroup> {
   try {
-    if (!groupData.phaseId || !groupData.name || groupData.order === undefined) {
-      throw new Error('phaseId, name and order are required');
+    if (
+      !groupData.phaseId ||
+      !groupData.name ||
+      groupData.order === undefined
+    ) {
+      throw new Error("phaseId, name and order are required");
     }
 
     const result = await db
@@ -1191,11 +1442,11 @@ export async function createPhaseGroup(groupData: NewPhaseGroup): Promise<PhaseG
 
     return result[0];
   } catch (error) {
-    console.error('Error creating phase group:', error);
+    console.error("Error creating phase group:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to create phase group');
+    throw new Error("Failed to create phase group");
   }
 }
 
@@ -1203,7 +1454,7 @@ export async function createPhaseGroup(groupData: NewPhaseGroup): Promise<PhaseG
  * Crée plusieurs groupes de phase en une seule transaction
  */
 export async function bulkCreatePhaseGroups(
-  groupsData: NewPhaseGroup[]
+  groupsData: NewPhaseGroup[],
 ): Promise<PhaseGroup[]> {
   try {
     if (groupsData.length === 0) return [];
@@ -1215,14 +1466,14 @@ export async function bulkCreatePhaseGroups(
           ...g,
           createdAt: new Date(),
           updatedAt: new Date(),
-        }))
+        })),
       )
       .returning();
 
     return result;
   } catch (error) {
-    console.error('Error bulk creating phase groups:', error);
-    throw new Error('Failed to bulk create phase groups');
+    console.error("Error bulk creating phase groups:", error);
+    throw new Error("Failed to bulk create phase groups");
   }
 }
 
@@ -1231,12 +1482,12 @@ export async function bulkCreatePhaseGroups(
  */
 export async function updatePhaseGroup(
   id: string,
-  groupData: Partial<NewPhaseGroup>
+  groupData: Partial<NewPhaseGroup>,
 ): Promise<PhaseGroup> {
   try {
     const existingGroup = await getPhaseGroupById(id);
     if (!existingGroup) {
-      throw new Error('Phase group not found');
+      throw new Error("Phase group not found");
     }
 
     const result = await db
@@ -1250,11 +1501,11 @@ export async function updatePhaseGroup(
 
     return result[0];
   } catch (error) {
-    console.error('Error updating phase group:', error);
+    console.error("Error updating phase group:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to update phase group');
+    throw new Error("Failed to update phase group");
   }
 }
 
@@ -1273,15 +1524,15 @@ export async function deletePhaseGroup(id: string): Promise<PhaseGroup> {
       .returning();
 
     if (result.length === 0) {
-      throw new Error('Phase group not found');
+      throw new Error("Phase group not found");
     }
     return result[0];
   } catch (error) {
-    console.error('Error deleting phase group:', error);
+    console.error("Error deleting phase group:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to delete phase group');
+    throw new Error("Failed to delete phase group");
   }
 }
 
@@ -1289,11 +1540,11 @@ export async function deletePhaseGroup(id: string): Promise<PhaseGroup> {
  * Crée un nouveau participant de groupe
  */
 export async function createPhaseGroupParticipant(
-  participantData: NewPhaseGroupParticipant
+  participantData: NewPhaseGroupParticipant,
 ): Promise<PhaseGroupParticipant> {
   try {
     if (!participantData.groupId || !participantData.registrationId) {
-      throw new Error('groupId and registrationId are required');
+      throw new Error("groupId and registrationId are required");
     }
 
     const result = await db
@@ -1307,11 +1558,11 @@ export async function createPhaseGroupParticipant(
 
     return result[0];
   } catch (error) {
-    console.error('Error creating phase group participant:', error);
+    console.error("Error creating phase group participant:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to create phase group participant');
+    throw new Error("Failed to create phase group participant");
   }
 }
 
@@ -1319,7 +1570,7 @@ export async function createPhaseGroupParticipant(
  * Crée plusieurs participants de groupe en une seule transaction
  */
 export async function bulkCreatePhaseGroupParticipants(
-  participantsData: NewPhaseGroupParticipant[]
+  participantsData: NewPhaseGroupParticipant[],
 ): Promise<PhaseGroupParticipant[]> {
   try {
     if (participantsData.length === 0) return [];
@@ -1331,14 +1582,14 @@ export async function bulkCreatePhaseGroupParticipants(
           ...p,
           createdAt: new Date(),
           updatedAt: new Date(),
-        }))
+        })),
       )
       .returning();
 
     return result;
   } catch (error) {
-    console.error('Error bulk creating phase group participants:', error);
-    throw new Error('Failed to bulk create phase group participants');
+    console.error("Error bulk creating phase group participants:", error);
+    throw new Error("Failed to bulk create phase group participants");
   }
 }
 
@@ -1347,12 +1598,12 @@ export async function bulkCreatePhaseGroupParticipants(
  */
 export async function updatePhaseGroupParticipant(
   id: string,
-  participantData: Partial<NewPhaseGroupParticipant>
+  participantData: Partial<NewPhaseGroupParticipant>,
 ): Promise<PhaseGroupParticipant> {
   try {
     const existingParticipant = await getPhaseGroupParticipantById(id);
     if (!existingParticipant) {
-      throw new Error('Phase group participant not found');
+      throw new Error("Phase group participant not found");
     }
 
     const result = await db
@@ -1366,11 +1617,11 @@ export async function updatePhaseGroupParticipant(
 
     return result[0];
   } catch (error) {
-    console.error('Error updating phase group participant:', error);
+    console.error("Error updating phase group participant:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to update phase group participant');
+    throw new Error("Failed to update phase group participant");
   }
 }
 
@@ -1405,11 +1656,11 @@ export async function updatePhaseGroupParticipant(
  * Crée un nouveau nœud de bracket
  */
 export async function createBracketNode(
-  nodeData: NewBracketNode
+  nodeData: NewBracketNode,
 ): Promise<BracketNode> {
   try {
     if (!nodeData.phaseId || !nodeData.nodeCode) {
-      throw new Error('phaseId and nodeCode are required');
+      throw new Error("phaseId and nodeCode are required");
     }
 
     const result = await db
@@ -1423,11 +1674,11 @@ export async function createBracketNode(
 
     return result[0];
   } catch (error) {
-    console.error('Error creating bracket node:', error);
+    console.error("Error creating bracket node:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to create bracket node');
+    throw new Error("Failed to create bracket node");
   }
 }
 
@@ -1435,7 +1686,7 @@ export async function createBracketNode(
  * Crée plusieurs nœuds de bracket en une seule transaction
  */
 export async function bulkCreateBracketNodes(
-  nodesData: (NewBracketNode & { editionId?: string })[]
+  nodesData: (NewBracketNode & { editionId?: string })[],
 ): Promise<BracketNode[]> {
   try {
     if (nodesData.length === 0) return [];
@@ -1451,7 +1702,7 @@ export async function bulkCreateBracketNodes(
               createdAt: new Date(),
               updatedAt: new Date(),
             };
-          })
+          }),
         )
         .returning();
 
@@ -1462,43 +1713,47 @@ export async function bulkCreateBracketNodes(
         const metadata = (node.metadata as any) || {};
         const participants = metadata.participants || [];
         const generateMatches = metadata.generateMatches !== false;
-        
-        if (participants.length >= 2 && inputData.editionId && generateMatches) {
-           // Generate matches for this node
-           // For now, simple BO1 generation between first two or all pairs if group matches
-           const matchesToCreate = metadata.matchesCount || 1;
-           const format = metadata.format || 'BEST_OF_1';
 
-           const generated = generateGroupMatches(
-              participants.map((id: string) => ({ id })),
-              { returnType: format === 'HOME_AWAY' ? 'double' : 'single' }
-           );
+        if (
+          participants.length >= 2 &&
+          inputData.editionId &&
+          generateMatches
+        ) {
+          // Generate matches for this node
+          // For now, simple BO1 generation between first two or all pairs if group matches
+          const matchesToCreate = metadata.matchesCount || 1;
+          const format = metadata.format || "BEST_OF_1";
 
-           for (const [idx, m] of generated.entries()) {
-              await tx.insert(matches).values({
-                editionId: inputData.editionId,
-                phaseId: node.phaseId,
-                groupId: node.groupId,
-                bracketNodeId: node.id,
-                participant1RegistrationId: m.participant1?.id,
-                participant2RegistrationId: m.participant2?.id,
-                matchCode: `${node.nodeCode || 'BR'}-M${idx + 1}`,
-                status: 'PENDING',
-                round: node.round || 1,
-                matchNumber: idx + 1,
-                metadata: { format },
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              } as any);
-           }
+          const generated = generateGroupMatches(
+            participants.map((id: string) => ({ id })),
+            { returnType: format === "HOME_AWAY" ? "double" : "single" },
+          );
+
+          for (const [idx, m] of generated.entries()) {
+            await tx.insert(matches).values({
+              editionId: inputData.editionId,
+              phaseId: node.phaseId,
+              groupId: node.groupId,
+              bracketNodeId: node.id,
+              participant1RegistrationId: m.participant1?.id,
+              participant2RegistrationId: m.participant2?.id,
+              matchCode: `${node.nodeCode || "BR"}-M${idx + 1}`,
+              status: "PENDING",
+              round: node.round || 1,
+              matchNumber: idx + 1,
+              metadata: { format },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as any);
+          }
         }
       }
 
       return result;
     });
   } catch (error) {
-    console.error('Error bulk creating bracket nodes:', error);
-    throw new Error('Failed to bulk create bracket nodes');
+    console.error("Error bulk creating bracket nodes:", error);
+    throw new Error("Failed to bulk create bracket nodes");
   }
 }
 
@@ -1507,12 +1762,12 @@ export async function bulkCreateBracketNodes(
  */
 export async function updateBracketNode(
   id: string,
-  nodeData: Partial<NewBracketNode>
+  nodeData: Partial<NewBracketNode>,
 ): Promise<BracketNode> {
   try {
     const existingNode = await getBracketNodeById(id);
     if (!existingNode) {
-      throw new Error('Bracket node not found');
+      throw new Error("Bracket node not found");
     }
 
     const result = await db
@@ -1526,11 +1781,11 @@ export async function updateBracketNode(
 
     return result[0];
   } catch (error) {
-    console.error('Error updating bracket node:', error);
+    console.error("Error updating bracket node:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to update bracket node');
+    throw new Error("Failed to update bracket node");
   }
 }
 
@@ -1549,15 +1804,15 @@ export async function deleteBracketNode(id: string): Promise<BracketNode> {
       .returning();
 
     if (result.length === 0) {
-      throw new Error('Bracket node not found');
+      throw new Error("Bracket node not found");
     }
     return result[0];
   } catch (error) {
-    console.error('Error deleting bracket node:', error);
+    console.error("Error deleting bracket node:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to delete bracket node');
+    throw new Error("Failed to delete bracket node");
   }
 }
 
@@ -1567,29 +1822,37 @@ export async function deleteBracketNode(id: string): Promise<BracketNode> {
 export async function createMatch(matchData: NewMatch): Promise<Match> {
   try {
     if (!matchData.editionId || !matchData.phaseId) {
-      throw new Error('editionId and phaseId are required');
+      throw new Error("editionId and phaseId are required");
     }
 
     if (
       matchData.participant1RegistrationId &&
       matchData.participant2RegistrationId &&
-      matchData.participant1RegistrationId === matchData.participant2RegistrationId
+      matchData.participant1RegistrationId ===
+        matchData.participant2RegistrationId
     ) {
       throw new Error("Un participant ne peut pas jouer contre lui-même");
     }
 
     // Duplicate Check
-    if (matchData.participant1RegistrationId && matchData.participant2RegistrationId) {
+    if (
+      matchData.participant1RegistrationId &&
+      matchData.participant2RegistrationId
+    ) {
       const p1 = matchData.participant1RegistrationId;
       const p2 = matchData.participant2RegistrationId;
-      
+
       const filterConditions = [
         eq(matches.editionId, matchData.editionId),
         eq(matches.phaseId, matchData.phaseId),
       ];
-      
-      if (matchData.groupId) filterConditions.push(eq(matches.groupId, matchData.groupId));
-      if (matchData.bracketNodeId) filterConditions.push(eq(matches.bracketNodeId, matchData.bracketNodeId));
+
+      if (matchData.groupId)
+        filterConditions.push(eq(matches.groupId, matchData.groupId));
+      if (matchData.bracketNodeId)
+        filterConditions.push(
+          eq(matches.bracketNodeId, matchData.bracketNodeId),
+        );
 
       const existingMatch = await db.query.matches.findFirst({
         where: and(
@@ -1597,18 +1860,20 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
           or(
             and(
               eq(matches.participant1RegistrationId, p1),
-              eq(matches.participant2RegistrationId, p2)
+              eq(matches.participant2RegistrationId, p2),
             ),
             and(
               eq(matches.participant1RegistrationId, p2),
-              eq(matches.participant2RegistrationId, p1)
-            )
-          )
-        )
+              eq(matches.participant2RegistrationId, p1),
+            ),
+          ),
+        ),
       });
-      
+
       if (existingMatch) {
-         throw new Error("Ce match existe déjà pour ces deux participants dans cette phase/groupe.");
+        throw new Error(
+          "Ce match existe déjà pour ces deux participants dans cette phase/groupe.",
+        );
       }
     }
 
@@ -1623,11 +1888,11 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
 
     return result[0];
   } catch (error) {
-    console.error('Error creating match:', error);
+    console.error("Error creating match:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to create match');
+    throw new Error("Failed to create match");
   }
 }
 
@@ -1635,7 +1900,7 @@ export async function createMatch(matchData: NewMatch): Promise<Match> {
  * Crée plusieurs matchs en une seule transaction
  */
 export async function bulkCreateMatches(
-  matchesData: NewMatch[]
+  matchesData: NewMatch[],
 ): Promise<Match[]> {
   try {
     if (matchesData.length === 0) return [];
@@ -1647,14 +1912,14 @@ export async function bulkCreateMatches(
           ...m,
           createdAt: new Date(),
           updatedAt: new Date(),
-        }))
+        })),
       )
       .returning();
 
     return result;
   } catch (error) {
-    console.error('Error bulk creating matches:', error);
-    throw new Error('Failed to bulk create matches');
+    console.error("Error bulk creating matches:", error);
+    throw new Error("Failed to bulk create matches");
   }
 }
 
@@ -1663,12 +1928,12 @@ export async function bulkCreateMatches(
  */
 export async function updateMatch(
   id: string,
-  matchData: Partial<NewMatch>
+  matchData: Partial<NewMatch>,
 ): Promise<Match> {
   try {
     const existingMatch = await getMatchById(id);
     if (!existingMatch) {
-      throw new Error('Match not found');
+      throw new Error("Match not found");
     }
 
     const result = await db
@@ -1683,24 +1948,24 @@ export async function updateMatch(
     const updatedMatch = result[0];
 
     // Auto-check qualification and trigger standings recalculation
-    if (matchData.status === 'COMPLETED') {
+    if (matchData.status === "COMPLETED") {
       if (updatedMatch.groupId) {
         await recalculateGroupStandings(updatedMatch.groupId);
       }
       // Prochaine étape : Propagation automatique vers le bracket (Node) si applicable
       if (updatedMatch.bracketNodeId) {
-         // Logique de progression vers le parent du bracket
+        // Logique de progression vers le parent du bracket
       }
     }
 
     revalidatePath(`/tournaments/editions/${updatedMatch.editionId}/dashboard`);
     return updatedMatch;
   } catch (error) {
-    console.error('Error updating match:', error);
+    console.error("Error updating match:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to update match');
+    throw new Error("Failed to update match");
   }
 }
 
@@ -1719,15 +1984,15 @@ export async function deleteMatch(id: string): Promise<Match> {
       .returning();
 
     if (result.length === 0) {
-      throw new Error('Match not found');
+      throw new Error("Match not found");
     }
     return result[0];
   } catch (error) {
-    console.error('Error deleting match:', error);
+    console.error("Error deleting match:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Failed to delete match');
+    throw new Error("Failed to delete match");
   }
 }
 
@@ -1740,7 +2005,7 @@ export async function deleteMatch(id: string): Promise<Match> {
  */
 function buildTournamentPhaseWhereConditions(
   filters: TournamentPhaseFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -1757,16 +2022,18 @@ function buildTournamentPhaseWhereConditions(
   if (filters.phaseType && filters.phaseType.length > 0) {
     conditions.push(inArray(tournamentPhases.phaseType, filters.phaseType));
   }
-  if (typeof filters.isActive === 'boolean') {
+  if (typeof filters.isActive === "boolean") {
     conditions.push(eq(tournamentPhases.isActive, filters.isActive));
   }
-  if (typeof filters.isCompleted === 'boolean') {
+  if (typeof filters.isCompleted === "boolean") {
     conditions.push(eq(tournamentPhases.isCompleted, filters.isCompleted));
   }
-  if (typeof filters.isDoubleElimination === 'boolean') {
-    conditions.push(eq(tournamentPhases.isDoubleElimination, filters.isDoubleElimination));
+  if (typeof filters.isDoubleElimination === "boolean") {
+    conditions.push(
+      eq(tournamentPhases.isDoubleElimination, filters.isDoubleElimination),
+    );
   }
-  if (typeof filters.isHidden === 'boolean') {
+  if (typeof filters.isHidden === "boolean") {
     conditions.push(eq(tournamentPhases.isHidden, filters.isHidden));
   }
   if (filters.orderMin !== undefined) {
@@ -1776,16 +2043,27 @@ function buildTournamentPhaseWhereConditions(
     conditions.push(lte(tournamentPhases.order, filters.orderMax));
   }
   if (filters.scheduledStartFrom) {
-    conditions.push(gte(tournamentPhases.scheduledStart, new Date(filters.scheduledStartFrom)));
+    conditions.push(
+      gte(
+        tournamentPhases.scheduledStart,
+        new Date(filters.scheduledStartFrom),
+      ),
+    );
   }
   if (filters.scheduledStartTo) {
-    conditions.push(lte(tournamentPhases.scheduledStart, new Date(filters.scheduledStartTo)));
+    conditions.push(
+      lte(tournamentPhases.scheduledStart, new Date(filters.scheduledStartTo)),
+    );
   }
   if (filters.scheduledEndFrom) {
-    conditions.push(gte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndFrom)));
+    conditions.push(
+      gte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndFrom)),
+    );
   }
   if (filters.scheduledEndTo) {
-    conditions.push(lte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndTo)));
+    conditions.push(
+      lte(tournamentPhases.scheduledEnd, new Date(filters.scheduledEndTo)),
+    );
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
@@ -1796,7 +2074,7 @@ function buildTournamentPhaseWhereConditions(
  */
 function buildPhaseGroupWhereConditions(
   filters: PhaseGroupFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -1817,10 +2095,10 @@ function buildPhaseGroupWhereConditions(
       conditions.push(eq(phaseGroups.groupType, filters.groupType));
     }
   }
-  if (typeof filters.isCompleted === 'boolean') {
+  if (typeof filters.isCompleted === "boolean") {
     conditions.push(eq(phaseGroups.isCompleted, filters.isCompleted));
   }
-  if (typeof filters.isLocked === 'boolean') {
+  if (typeof filters.isLocked === "boolean") {
     conditions.push(eq(phaseGroups.isLocked, filters.isLocked));
   }
   if (filters.orderMin !== undefined) {
@@ -1838,7 +2116,7 @@ function buildPhaseGroupWhereConditions(
  */
 function buildPhaseGroupParticipantWhereConditions(
   filters: PhaseGroupParticipantFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -1857,7 +2135,9 @@ function buildPhaseGroupParticipantWhereConditions(
     conditions.push(inArray(phaseGroupParticipants.groupId, groupIdsForPhase));
   }
   if (filters.registrationId) {
-    conditions.push(eq(phaseGroupParticipants.registrationId, filters.registrationId));
+    conditions.push(
+      eq(phaseGroupParticipants.registrationId, filters.registrationId),
+    );
   }
   if (filters.qualified !== undefined) {
     conditions.push(eq(phaseGroupParticipants.qualified, filters.qualified));
@@ -1875,16 +2155,24 @@ function buildPhaseGroupParticipantWhereConditions(
     conditions.push(lte(phaseGroupParticipants.points, filters.pointsMax));
   }
   if (filters.matchesPlayedMin !== undefined) {
-    conditions.push(gte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMin));
+    conditions.push(
+      gte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMin),
+    );
   }
   if (filters.matchesPlayedMax !== undefined) {
-    conditions.push(lte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMax));
+    conditions.push(
+      lte(phaseGroupParticipants.matchesPlayed, filters.matchesPlayedMax),
+    );
   }
   if (filters.matchesWonMin !== undefined) {
-    conditions.push(gte(phaseGroupParticipants.matchesWon, filters.matchesWonMin));
+    conditions.push(
+      gte(phaseGroupParticipants.matchesWon, filters.matchesWonMin),
+    );
   }
   if (filters.matchesWonMax !== undefined) {
-    conditions.push(lte(phaseGroupParticipants.matchesWon, filters.matchesWonMax));
+    conditions.push(
+      lte(phaseGroupParticipants.matchesWon, filters.matchesWonMax),
+    );
   }
   if (filters.isSeeded !== undefined) {
     conditions.push(eq(phaseGroupParticipants.isSeeded, filters.isSeeded));
@@ -1898,7 +2186,7 @@ function buildPhaseGroupParticipantWhereConditions(
  */
 function buildBracketNodeWhereConditions(
   filters: BracketNodeFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
 
@@ -1957,115 +2245,44 @@ function buildBracketNodeWhereConditions(
 /**
  * Construit les conditions WHERE pour les matchs
  */
-function buildMatchWhereConditions(
-  filters: MatchFilters,
-  options: QueryOptions = {}
-) {
+function buildMatchWhereConditions(filters: MatchFilters = {}, options: any = {}) {
   const conditions = [];
 
-  if (!options.includeDeleted) {
-    conditions.push(eq(matches.isDeleted, false));
+  // 🔒 obligatoire (sécurité backend)
+  if (!filters.editionId) {
+    throw new Error("editionId is required in filters");
   }
 
-  if (filters.editionId) {
-    conditions.push(eq(matches.editionId, filters.editionId));
-  }
-  if (filters.phaseId) {
+  // ✅ Toujours présent
+  conditions.push(eq(matches.editionId, filters.editionId));
+
+  // ✅ Optionnels (SAFE)
+  if (filters.phaseId != null) {
     conditions.push(eq(matches.phaseId, filters.phaseId));
   }
-  if (filters.groupId) {
+
+  if (filters.groupId != null) {
     conditions.push(eq(matches.groupId, filters.groupId));
   }
-  if (filters.bracketNodeId) {
+
+  if (filters.bracketNodeId != null) {
     conditions.push(eq(matches.bracketNodeId, filters.bracketNodeId));
   }
-  if (filters.matchCode) {
-    conditions.push(eq(matches.matchCode, filters.matchCode));
-  }
-  if (filters.matchType) {
-    if (Array.isArray(filters.matchType)) {
-      conditions.push(inArray(matches.matchType, filters.matchType));
-    } else {
-      conditions.push(eq(matches.matchType, filters.matchType));
-    }
-  }
-  if (filters.roundMin !== undefined) {
-    conditions.push(gte(matches.round, filters.roundMin));
-  }
-  if (filters.roundMax !== undefined) {
-    conditions.push(lte(matches.round, filters.roundMax));
-  }
-  if (filters.matchNumberMin !== undefined) {
-    conditions.push(gte(matches.matchNumber, filters.matchNumberMin));
-  }
-  if (filters.matchNumberMax !== undefined) {
-    conditions.push(lte(matches.matchNumber, filters.matchNumberMax));
-  }
-  if (filters.scheduledTimeFrom) {
-    conditions.push(gte(matches.scheduledTime, new Date(filters.scheduledTimeFrom)));
-  }
-  if (filters.scheduledTimeTo) {
-    conditions.push(lte(matches.scheduledTime, new Date(filters.scheduledTimeTo)));
-  }
-  if (filters.participant1RegistrationId) {
-    conditions.push(eq(matches.participant1RegistrationId, filters.participant1RegistrationId));
-  }
-  if (filters.participant2RegistrationId) {
-    conditions.push(eq(matches.participant2RegistrationId, filters.participant2RegistrationId));
-  }
-  if (filters.memberRegistrationId) {
-    conditions.push(
-      or(
-        eq(matches.participant1RegistrationId, filters.memberRegistrationId),
-        eq(matches.participant2RegistrationId, filters.memberRegistrationId)
-      )
-    );
-  }
-  if (filters.score1Min !== undefined) {
-    conditions.push(gte(matches.score1, filters.score1Min));
-  }
-  if (filters.score1Max !== undefined) {
-    conditions.push(lte(matches.score1, filters.score1Max));
-  }
-  if (filters.score2Min !== undefined) {
-    conditions.push(gte(matches.score2, filters.score2Min));
-  }
-  if (filters.score2Max !== undefined) {
-    conditions.push(lte(matches.score2, filters.score2Max));
-  }
-  if (filters.winnerRegistrationId) {
-    conditions.push(eq(matches.winnerRegistrationId, filters.winnerRegistrationId));
-  }
-  if (filters.loserRegistrationId) {
-    conditions.push(eq(matches.loserRegistrationId, filters.loserRegistrationId));
-  }
-  if (filters.statuses && filters.statuses.length > 0) {
+
+  if (Array.isArray(filters.statuses) && filters.statuses.length > 0) {
     conditions.push(inArray(matches.status, filters.statuses));
   }
-  if (filters.submittedByUserId) {
-    conditions.push(eq(matches.submittedByUserId, filters.submittedByUserId));
-  }
-  if (typeof filters.disputed === 'boolean') {
-    conditions.push(eq(matches.disputed, filters.disputed));
-  }
-  if (typeof filters.confirmedByAdmin === 'boolean') {
-    conditions.push(eq(matches.confirmedByAdmin, filters.confirmedByAdmin));
-  }
-  if (typeof filters.confirmedByParticipant1 === 'boolean') {
-    conditions.push(eq(matches.confirmedByParticipant1, filters.confirmedByParticipant1));
-  }
-  if (typeof filters.confirmedByParticipant2 === 'boolean') {
-    conditions.push(eq(matches.confirmedByParticipant2, filters.confirmedByParticipant2));
-  }
 
-  return conditions.length > 0 ? and(...conditions) : undefined;
+  // 🔥 important : jamais undefined
+  return and(...conditions);
 }
-
 
 /**
  * Recalcule les statistiques et le classement pour un groupe spécifique
  */
-export async function recalculateGroupStandings(groupId: string): Promise<void> {
+export async function recalculateGroupStandings(
+  groupId: string,
+): Promise<void> {
   try {
     const group = await db.query.phaseGroups.findFirst({
       where: eq(phaseGroups.id, groupId),
@@ -2080,7 +2297,7 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
       where: and(
         eq(matches.groupId, groupId),
         eq(matches.status, "COMPLETED"),
-        eq(matches.confirmedByAdmin, true)
+        eq(matches.confirmedByAdmin, true),
       ),
     });
 
@@ -2105,7 +2322,8 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
 
     // Accumulate stats from matches
     for (const m of finishedMatches) {
-      if (!m.participant1RegistrationId || !m.participant2RegistrationId) continue;
+      if (!m.participant1RegistrationId || !m.participant2RegistrationId)
+        continue;
 
       const p1 = statsMap.get(m.participant1RegistrationId);
       const p2 = statsMap.get(m.participant2RegistrationId);
@@ -2140,7 +2358,9 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
     // Update database for each participant
     await db.transaction(async (tx) => {
       for (const [regId, stats] of statsMap.entries()) {
-        const participant = group.participants.find((p) => p.registrationId === regId);
+        const participant = group.participants.find(
+          (p) => p.registrationId === regId,
+        );
         if (participant) {
           await tx
             .update(phaseGroupParticipants)
@@ -2152,7 +2372,6 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
         }
       }
     });
-
   } catch (error) {
     console.error("Error recalculating group standings:", error);
     throw error;
@@ -2164,10 +2383,11 @@ export async function recalculateGroupStandings(groupId: string): Promise<void> 
  */
 export async function toggleGroupLock(groupId: string, isLocked: boolean) {
   try {
-    await db.update(phaseGroups)
+    await db
+      .update(phaseGroups)
       .set({ isLocked, updatedAt: new Date() })
       .where(eq(phaseGroups.id, groupId));
-    
+
     revalidatePath(`/tournaments/dashboard`);
     return { success: true };
   } catch (error) {
@@ -2179,14 +2399,20 @@ export async function toggleGroupLock(groupId: string, isLocked: boolean) {
 /**
  * Vérifie les entités non terminées d'une entité parente (Phase, Group, BracketNode)
  */
-export async function checkPendingEntitiesAction(type: 'PHASE' | 'GROUP' | 'BRACKET_NODE', id: string) {
+export async function checkPendingEntitiesAction(
+  type: "PHASE" | "GROUP" | "BRACKET_NODE",
+  id: string,
+) {
   const pendingEntities: string[] = [];
-  
+
   try {
-    if (type === 'PHASE') {
+    if (type === "PHASE") {
       // 1. Check all groups in this phase
       const groups = await db.query.phaseGroups.findMany({
-        where: and(eq(phaseGroups.phaseId, id), eq(phaseGroups.isDeleted, false)),
+        where: and(
+          eq(phaseGroups.phaseId, id),
+          eq(phaseGroups.isDeleted, false),
+        ),
       });
       for (const group of groups) {
         if (!(group as any).isCompleted) {
@@ -2200,67 +2426,93 @@ export async function checkPendingEntitiesAction(type: 'PHASE' | 'GROUP' | 'BRAC
           eq(matches.phaseId, id),
           isNull(matches.groupId),
           eq(matches.isDeleted, false),
-          not(inArray(matches.status, ['CANCELLED', 'COMPLETED']))
+          not(inArray(matches.status, ["CANCELLED", "COMPLETED"])),
         ),
       });
       for (const match of pendingMatches) {
-        pendingEntities.push(`Match: ${match.matchCode || match.id} n'est pas terminé`);
+        pendingEntities.push(
+          `Match: ${match.matchCode || match.id} n'est pas terminé`,
+        );
       }
 
       // 3. Check all bracket nodes directly in this phase
       const nodes = await db.query.bracketNodes.findMany({
-        where: and(eq(bracketNodes.phaseId, id), eq(bracketNodes.isDeleted, false), isNull(bracketNodes.groupId)),
+        where: and(
+          eq(bracketNodes.phaseId, id),
+          eq(bracketNodes.isDeleted, false),
+          isNull(bracketNodes.groupId),
+        ),
       });
       for (const node of nodes) {
         if (!(node as any).isCompleted) {
-           const nodeMatches = await db.query.matches.findMany({
-             where: and(eq(matches.bracketNodeId, node.id), eq(matches.isDeleted, false)),
-           });
-           const hasPending = nodeMatches.some(m => !['CANCELLED', 'COMPLETED'].includes(m.status || ''));
-           if (hasPending) {
-              pendingEntities.push(`Nœud: ${node.nodeCode || node.id} a des matches non terminés`);
-           }
+          const nodeMatches = await db.query.matches.findMany({
+            where: and(
+              eq(matches.bracketNodeId, node.id),
+              eq(matches.isDeleted, false),
+            ),
+          });
+          const hasPending = nodeMatches.some(
+            (m) => !["CANCELLED", "COMPLETED"].includes(m.status || ""),
+          );
+          if (hasPending) {
+            pendingEntities.push(
+              `Nœud: ${node.nodeCode || node.id} a des matches non terminés`,
+            );
+          }
         }
       }
-    } else if (type === 'GROUP') {
+    } else if (type === "GROUP") {
       // 1. Check all matches in this group (direct matches)
       const groupMatches = await db.query.matches.findMany({
         where: and(
           eq(matches.groupId, id),
           eq(matches.isDeleted, false),
-          not(inArray(matches.status, ['CANCELLED', 'COMPLETED']))
+          not(inArray(matches.status, ["CANCELLED", "COMPLETED"])),
         ),
       });
       for (const match of groupMatches) {
-        pendingEntities.push(`Match: ${match.matchCode || match.id} n'est pas terminé`);
+        pendingEntities.push(
+          `Match: ${match.matchCode || match.id} n'est pas terminé`,
+        );
       }
 
       // 2. Check all bracket nodes in this group
       const nodes = await db.query.bracketNodes.findMany({
-        where: and(eq(bracketNodes.groupId, id), eq(bracketNodes.isDeleted, false)),
+        where: and(
+          eq(bracketNodes.groupId, id),
+          eq(bracketNodes.isDeleted, false),
+        ),
       });
 
       for (const node of nodes) {
         if (!(node as any).isCompleted) {
-           const nodeMatches = await db.query.matches.findMany({
-             where: and(eq(matches.bracketNodeId, node.id), eq(matches.isDeleted, false))
-           });
-           
-           const hasPending = nodeMatches.some(m => !['CANCELLED', 'COMPLETED'].includes(m.status || ''));
-           if (hasPending) {
-              pendingEntities.push(`Nœud ${node.nodeCode}: des matches sont en attente`);
-           } else if (nodeMatches.length === 0) {
-              pendingEntities.push(`Nœud: ${node.nodeCode} n'est pas terminé`);
-           }
+          const nodeMatches = await db.query.matches.findMany({
+            where: and(
+              eq(matches.bracketNodeId, node.id),
+              eq(matches.isDeleted, false),
+            ),
+          });
+
+          const hasPending = nodeMatches.some(
+            (m) => !["CANCELLED", "COMPLETED"].includes(m.status || ""),
+          );
+          if (hasPending) {
+            pendingEntities.push(
+              `Nœud ${node.nodeCode}: des matches sont en attente`,
+            );
+          } else if (nodeMatches.length === 0) {
+            pendingEntities.push(`Nœud: ${node.nodeCode} n'est pas terminé`);
+          }
         }
       }
-
-    } else if (type === 'BRACKET_NODE') {
+    } else if (type === "BRACKET_NODE") {
       const nodeMatches = await db.query.matches.findMany({
         where: and(eq(matches.bracketNodeId, id), eq(matches.isDeleted, false)),
       });
 
-      const pendingMatches = nodeMatches.filter(m => !['CANCELLED', 'COMPLETED'].includes(m.status || ''));
+      const pendingMatches = nodeMatches.filter(
+        (m) => !["CANCELLED", "COMPLETED"].includes(m.status || ""),
+      );
       for (const m of pendingMatches) {
         pendingEntities.push(`Match: ${m.matchCode || m.id}`);
       }
@@ -2280,14 +2532,18 @@ export async function markGroupCompleteAction(groupId: string) {
   try {
     const group = await db.query.phaseGroups.findFirst({
       where: eq(phaseGroups.id, groupId),
-      with: { participants: true }
+      with: { participants: true },
     });
     if (!group) throw new Error("Groupe introuvable");
 
     // 1. Vérification des matches non terminés
-    const pending = await checkPendingEntitiesAction('GROUP', groupId);
+    const pending = await checkPendingEntitiesAction("GROUP", groupId);
     if (pending.pendingEntities.length > 0) {
-      return { success: false, error: "Certaines entités ne sont pas encore terminées.", pendingEntities: pending.pendingEntities };
+      return {
+        success: false,
+        error: "Certaines entités ne sont pas encore terminées.",
+        pendingEntities: pending.pendingEntities,
+      };
     }
 
     // 2. Recalculer les classements finaux
@@ -2298,29 +2554,36 @@ export async function markGroupCompleteAction(groupId: string) {
     const advanceCount = config.advanceCount || 2;
 
     const sortedParticipants = [...group.participants].sort((a, b) => {
-       if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
-       return ((b.scoreFor || 0) - (b.scoreAgainst || 0)) - ((a.scoreFor || 0) - (a.scoreAgainst || 0));
+      if ((b.points || 0) !== (a.points || 0))
+        return (b.points || 0) - (a.points || 0);
+      return (
+        (b.scoreFor || 0) -
+        (b.scoreAgainst || 0) -
+        ((a.scoreFor || 0) - (a.scoreAgainst || 0))
+      );
     });
 
     return await db.transaction(async (tx) => {
-       for (let i = 0; i < sortedParticipants.length; i++) {
-          const isQualified = i < advanceCount;
-          await tx.update(phaseGroupParticipants)
-            .set({ 
-               qualified: isQualified, 
-               position: i + 1,
-               updatedAt: new Date()
-            })
-            .where(eq(phaseGroupParticipants.id, sortedParticipants[i].id));
-       }
+      for (let i = 0; i < sortedParticipants.length; i++) {
+        const isQualified = i < advanceCount;
+        await tx
+          .update(phaseGroupParticipants)
+          .set({
+            qualified: isQualified,
+            position: i + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(phaseGroupParticipants.id, sortedParticipants[i].id));
+      }
 
-       // 4. Marquer comme terminé et verrouiller
-       await tx.update(phaseGroups)
-         .set({ isCompleted: true, isLocked: true, updatedAt: new Date() })
-         .where(eq(phaseGroups.id, groupId));
+      // 4. Marquer comme terminé et verrouiller
+      await tx
+        .update(phaseGroups)
+        .set({ isCompleted: true, isLocked: true, updatedAt: new Date() })
+        .where(eq(phaseGroups.id, groupId));
 
-       revalidatePath(`/tournaments/dashboard`);
-       return { success: true, qualifiedCount: advanceCount };
+      revalidatePath(`/tournaments/dashboard`);
+      return { success: true, qualifiedCount: advanceCount };
     });
   } catch (error) {
     console.error("Error marking group complete:", error);
@@ -2339,40 +2602,46 @@ export async function markPhaseCompleteAction(phaseId: string) {
     if (!phase) throw new Error("Phase introuvable");
 
     // 1. Vérification des entités non terminées
-    const pending = await checkPendingEntitiesAction('PHASE', phaseId);
+    const pending = await checkPendingEntitiesAction("PHASE", phaseId);
     if (pending.pendingEntities.length > 0) {
-      return { success: false, error: "Certaines entités ne sont pas encore terminées.", pendingEntities: pending.pendingEntities };
+      return {
+        success: false,
+        error: "Certaines entités ne sont pas encore terminées.",
+        pendingEntities: pending.pendingEntities,
+      };
     }
 
     // 2. Si c'est la dernière phase, on peut marquer le gagnant de l'édition
     const nextPhase = await db.query.tournamentPhases.findFirst({
-       where: and(
-          eq(tournamentPhases.editionId, phase.editionId),
-          gt(tournamentPhases.order, phase.order),
-          eq(tournamentPhases.isDeleted, false)
-       ),
-       orderBy: asc(tournamentPhases.order)
+      where: and(
+        eq(tournamentPhases.editionId, phase.editionId),
+        gt(tournamentPhases.order, phase.order),
+        eq(tournamentPhases.isDeleted, false),
+      ),
+      orderBy: asc(tournamentPhases.order),
     });
 
     return await db.transaction(async (tx) => {
-       // Marquer la phase comme terminée
-       await tx.update(tournamentPhases)
-         .set({ isCompleted: true, isActive: false, updatedAt: new Date() })
-         .where(eq(tournamentPhases.id, phaseId));
+      // Marquer la phase comme terminée
+      await tx
+        .update(tournamentPhases)
+        .set({ isCompleted: true, isActive: false, updatedAt: new Date() })
+        .where(eq(tournamentPhases.id, phaseId));
 
-       // Verrouiller tous les groupes (au cas où ils ne l'étaient pas)
-       await tx.update(phaseGroups)
-         .set({ isLocked: true, isCompleted: true, updatedAt: new Date() })
-         .where(eq(phaseGroups.phaseId, phaseId));
+      // Verrouiller tous les groupes (au cas où ils ne l'étaient pas)
+      await tx
+        .update(phaseGroups)
+        .set({ isLocked: true, isCompleted: true, updatedAt: new Date() })
+        .where(eq(phaseGroups.phaseId, phaseId));
 
-       // Si pas de phase suivante, l'édition est probablement terminée
-       if (!nextPhase) {
-          // Gérer le gagnant de l'édition ici
-          // ... logic to update edition winner if applicable
-       }
+      // Si pas de phase suivante, l'édition est probablement terminée
+      if (!nextPhase) {
+        // Gérer le gagnant de l'édition ici
+        // ... logic to update edition winner if applicable
+      }
 
-       revalidatePath(`/tournaments/dashboard`);
-       return { success: true, isLastPhase: !nextPhase };
+      revalidatePath(`/tournaments/dashboard`);
+      return { success: true, isLastPhase: !nextPhase };
     });
   } catch (error) {
     console.error("Error marking phase complete:", error);
@@ -2387,73 +2656,92 @@ export async function markBracketNodeCompleteAction(nodeId: string) {
   try {
     const node = await db.query.bracketNodes.findFirst({
       where: eq(bracketNodes.id, nodeId),
-      with: { parentNode: true }
+      with: { parentNode: true },
     });
     if (!node) throw new Error("Bracket node introuvable");
 
     // 1. Vérification des matches non terminés
-    const pending = await checkPendingEntitiesAction('BRACKET_NODE', nodeId);
+    const pending = await checkPendingEntitiesAction("BRACKET_NODE", nodeId);
     if (pending.pendingEntities.length > 0) {
-      return { success: false, error: "Certaines entités ne sont pas encore terminées.", pendingEntities: pending.pendingEntities };
+      return {
+        success: false,
+        error: "Certaines entités ne sont pas encore terminées.",
+        pendingEntities: pending.pendingEntities,
+      };
     }
 
     // 2. Déterminer le gagnant du node
     const nodeMatches = await db.query.matches.findMany({
-      where: and(eq(matches.bracketNodeId, nodeId), eq(matches.status, 'COMPLETED'), eq(matches.confirmedByAdmin, true)),
+      where: and(
+        eq(matches.bracketNodeId, nodeId),
+        eq(matches.status, "COMPLETED"),
+        eq(matches.confirmedByAdmin, true),
+      ),
     });
 
     if (nodeMatches.length === 0) {
-       return { success: false, error: "Aucun match terminé trouvé pour ce node." };
+      return {
+        success: false,
+        error: "Aucun match terminé trouvé pour ce node.",
+      };
     }
 
     // Calcul du gagnant global du node (si plusieurs matches, ex: BO3)
     const winCounts = new Map();
     for (const m of nodeMatches) {
-       if (m.winnerRegistrationId) {
-          winCounts.set(m.winnerRegistrationId, (winCounts.get(m.winnerRegistrationId) || 0) + 1);
-       }
+      if (m.winnerRegistrationId) {
+        winCounts.set(
+          m.winnerRegistrationId,
+          (winCounts.get(m.winnerRegistrationId) || 0) + 1,
+        );
+      }
     }
 
     let winnerId = null;
     let maxWins = 0;
     for (const [regId, count] of winCounts.entries()) {
-       if (count > maxWins) {
-          maxWins = count;
-          winnerId = regId;
-       }
+      if (count > maxWins) {
+        maxWins = count;
+        winnerId = regId;
+      }
     }
 
     if (!winnerId) {
-       return { success: false, error: "Impossible de déterminer le gagnant du node." };
+      return {
+        success: false,
+        error: "Impossible de déterminer le gagnant du node.",
+      };
     }
 
     return await db.transaction(async (tx) => {
-       // 3. Faire progresser le gagnant vers le node parent si applicable
-       if (node.parentNodeId) {
-          const parentNode = node.parentNode;
-          const parentMetadata = (parentNode?.metadata || {} as any) || {};
-          const parentParticipants = parentMetadata.participants || [];
-          
-          if (!parentParticipants.includes(winnerId)) {
-             await tx.update(bracketNodes)
-               .set({ 
-                  metadata: { 
-                    ...parentMetadata, 
-                    participants: [...parentParticipants, winnerId] 
-                  },
-                  updatedAt: new Date()
-               })
-               .where(eq(bracketNodes.id, node.parentNodeId));
-          }
-       }
+      // 3. Faire progresser le gagnant vers le node parent si applicable
+      if (node.parentNodeId) {
+        const parentNode = node.parentNode;
+        const parentMetadata = parentNode?.metadata || ({} as any) || {};
+        const parentParticipants = parentMetadata.participants || [];
 
-       // 4. Marquer le node comme terminé
-       await tx.update(bracketNodes)
-         .set({ isCompleted: true, updatedAt: new Date() })
-         .where(eq(bracketNodes.id, nodeId));
+        if (!parentParticipants.includes(winnerId)) {
+          await tx
+            .update(bracketNodes)
+            .set({
+              metadata: {
+                ...parentMetadata,
+                participants: [...parentParticipants, winnerId],
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(bracketNodes.id, node.parentNodeId));
+        }
+      }
 
-       revalidatePath(`/tournaments/dashboard`);
-       return { success: true, winnerId };
+      // 4. Marquer le node comme terminé
+      await tx
+        .update(bracketNodes)
+        .set({ isCompleted: true, updatedAt: new Date() })
+        .where(eq(bracketNodes.id, nodeId));
+
+      revalidatePath(`/tournaments/dashboard`);
+      return { success: true, winnerId };
     });
   } catch (error) {
     console.error("Error marking bracket node complete:", error);
@@ -2462,294 +2750,24 @@ export async function markBracketNodeCompleteAction(nodeId: string) {
 }
 
 /**
- * Auto-génère la structure d'une phase (groupes, nodes, matches)
- * CORRIGÉ : Supporte la création de multiples nœuds par groupe (journées pour ROUND_ROBIN)
+ * Récupère un aperçu de la structure du tournoi sans persistance
  */
-export async function autoGeneratePhaseStructureAction(phaseId: string, config: {
-  groupsCount?: number;
-  participantsPerGroup?: number;
-  seedingMethod: 'RANDOM' | 'SEQUENTIAL' | 'SNAKE';
-  generateGroups: boolean;
-  generateNodes: boolean;
-  generateMatches: boolean;
-  groupPrefix?: string;
-  nodePrefix?: string;  // Nouveau: préfixe pour les nœuds (ex: "Journée", "Round")
-  participantIds?: string[];
-  isHomeAway?: boolean;
-}) {
+export async function getStructurePreviewAction(
+  editionId: string,
+  phasesData: any[],
+  participantRegIds: string[]
+) {
   try {
-    const phase = await db.query.tournamentPhases.findFirst({
-      where: eq(tournamentPhases.id, phaseId),
-      with: { edition: true }
+    const result = await createStructureEngine({
+      editionId,
+      phases: phasesData,
+      participantRegIds,
+      options: { dryRun: true }
     });
-    if (!phase) throw new Error("Phase introuvable");
-
-    // 1. Récupérer les participants source
-    let participants: string[] = config.participantIds || [];
-
-    if (participants.length === 0) {
-      const phaseConfig = (phase.config as any) || {};
-      const source = phaseConfig.participantSource || 'EDITION';
-
-      if (source.startsWith('PHASE_')) {
-        const sourcePhaseId = source.replace('PHASE_', '');
-        const sourceParticipants = await db.query.phaseGroupParticipants.findMany({
-          where: and(
-            exists(
-              db.select().from(phaseGroups)
-                .where(and(
-                  eq(phaseGroups.id, phaseGroupParticipants.groupId),
-                  eq(phaseGroups.phaseId, sourcePhaseId)
-                ))
-            ),
-            eq(phaseGroupParticipants.qualified, true)
-          )
-        });
-        participants = sourceParticipants.map(p => p.registrationId);
-      } else {
-        const regs = await db.query.editionRegistrations.findMany({
-          where: and(
-            eq(editionRegistrations.editionId, phase.editionId),
-            eq(editionRegistrations.status, 'REGISTERED')
-          )
-        });
-        participants = regs.map(r => r.id);
-      }
-    }
-
-    if (participants.length === 0) {
-       throw new Error("Aucun participant trouvé pour cette phase.");
-    }
-
-    // 2. Seeding
-    let workingParticipants = [...participants];
-    if (config.seedingMethod === 'RANDOM') {
-       workingParticipants = shuffle(workingParticipants);
-    } else if (config.seedingMethod === 'SEQUENTIAL') {
-       // Garder l'ordre original
-       workingParticipants = [...participants];
-    } else if (config.seedingMethod === 'SNAKE') {
-       // Seed en serpentin
-       const half = Math.ceil(workingParticipants.length / 2);
-       const firstHalf = workingParticipants.slice(0, half);
-       const secondHalf = workingParticipants.slice(half).reverse();
-       workingParticipants = [];
-       for (let i = 0; i < Math.max(firstHalf.length, secondHalf.length); i++) {
-         if (firstHalf[i]) workingParticipants.push(firstHalf[i]);
-         if (secondHalf[i]) workingParticipants.push(secondHalf[i]);
-       }
-    }
-
-    const participantsPerGroup = config.participantsPerGroup || 4;
-    const groupsCount = config.groupsCount || Math.ceil(workingParticipants.length / participantsPerGroup);
-    const nodePrefix = config.nodePrefix || (phase.phaseType === 'ROUND_ROBIN' ? 'Journée' : 'Round');
-
-    return await db.transaction(async (tx) => {
-       // Si on ne génère pas de groupes, on traite la phase comme un bloc unique
-       if (!config.generateGroups) {
-          if (phase.phaseType === 'ELIMINATION' || phase.phaseType === 'KNOCKOUT') {
-             // Logique d'élimination directe sans groupes
-             const participantsCount = workingParticipants.length;
-             const totalRounds = Math.ceil(Math.log2(participantsCount));
-             let matchCounter = 1;
-             let currentRoundParticipants = [...workingParticipants];
-             
-             for (let round = 1; round <= totalRounds; round++) {
-               const matchesCount = Math.floor(currentRoundParticipants.length / 2);
-               for (let m = 0; m < matchesCount; m++) {
-                 const p1 = currentRoundParticipants[m * 2];
-                 const p2 = currentRoundParticipants[m * 2 + 1];
-                 
-                 const [node] = await tx.insert(bracketNodes).values({
-                   phaseId,
-                   nodeCode: `${nodePrefix}${round}-M${m + 1}`,
-                   round,
-                   matchNumber: matchCounter++,
-                   bracketType: 'UPPER',
-                   order: matchCounter,
-                   metadata: {
-                     participants: [p1, p2].filter(Boolean),
-                     name: `${nodePrefix} ${round}`,
-                     generateMatches: config.generateMatches,
-                     matchesCount: 1,
-                     format: 'BEST_OF_1'
-                   },
-                   createdAt: new Date(),
-                   updatedAt: new Date(),
-                 }).returning();
-
-                 if (config.generateMatches && p1 && p2) {
-                   await tx.insert(matches).values({
-                     editionId: phase.editionId,
-                     phaseId,
-                     bracketNodeId: node.id,
-                     participant1RegistrationId: p1,
-                     participant2RegistrationId: p2,
-                     matchCode: `${node.nodeCode}`,
-                     status: 'PENDING',
-                     round,
-                     matchNumber: m + 1,
-                     createdAt: new Date(),
-                     updatedAt: new Date(),
-                   } as any);
-                 }
-               }
-               // Préparer les gagnants pour le round suivant (TBD)
-               currentRoundParticipants = Array(matchesCount).fill(null).map((_, i) => `winner_${round}_${i + 1}`);
-             }
-          }
-          return { success: true, message: "Phase initialisée sans groupes" };
-       }
-
-       // 3. Répartir en groupes
-       const groups = chunk(workingParticipants, participantsPerGroup);
-       let prefix = config.groupPrefix || "Groupe";
-       
-       for (let i = 0; i < Math.min(groups.length, groupsCount); i++) {
-          const groupRegs = groups[i];
-          
-          let groupName = `${prefix} ${String.fromCharCode(65 + i)}`;
-          if (phase.phaseType === 'ROUND_ROBIN') {
-             groupName = groups.length === 1 ? "Classement" : `Ligue ${i + 1}`;
-          } else if (phase.phaseType === 'SWISS') {
-             groupName = "Système Suisse";
-          }
-
-          const [newGroup] = await tx.insert(phaseGroups).values({
-             phaseId,
-             name: groupName,
-             order: i + 1,
-             participantCount: groupRegs.length,
-             groupType: phase.phaseType === 'ROUND_ROBIN' ? 'ROUND_ROBIN' : (phase.phaseType || 'STANDARD'),
-             config: {
-                isHomeAway: config.isHomeAway || false,
-                generateMatches: config.generateMatches
-             },
-             createdAt: new Date(),
-             updatedAt: new Date(),
-          }).returning();
-
-          // Ajouter les participants au groupe
-          for (let j = 0; j < groupRegs.length; j++) {
-             await tx.insert(phaseGroupParticipants).values({
-                groupId: newGroup.id,
-                registrationId: groupRegs[j],
-                position: j + 1,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-             });
-          }
-
-          if (config.generateNodes) {
-            // Calculer le nombre de rounds/nœuds nécessaires
-            const participantCount = groupRegs.length;
-            let roundsCount = 0;
-            let nodesPerRound: number[] = [];
-            
-            if (phase.phaseType === 'ROUND_ROBIN') {
-              // Pour ROUND_ROBIN, on crée un nœud par journée
-              roundsCount = participantCount - 1;
-              const matchesPerRound = Math.floor(participantCount / 2);
-              nodesPerRound = Array(roundsCount).fill(matchesPerRound);
-            } else if (phase.phaseType === 'SWISS') {
-              // Pour SWISS, on utilise le nombre de rounds configuré
-              roundsCount = (phase.config as any)?.roundsCount || 5;
-              const matchesPerRound = Math.floor(participantCount / 2);
-              nodesPerRound = Array(roundsCount).fill(matchesPerRound);
-            } else {
-              // Pour GROUP_STAGE, un seul nœud pour tous les matchs du groupe
-              roundsCount = 1;
-              const totalMatches = (participantCount * (participantCount - 1)) / 2;
-              nodesPerRound = [totalMatches];
-            }
-            
-            // Créer les nœuds (un par round/journée)
-            const createdNodes = [];
-            for (let round = 1; round <= roundsCount; round++) {
-              const matchesCount = nodesPerRound[round - 1];
-              const nodeCode = `${newGroup.name.slice(0, 3).toUpperCase()}-${nodePrefix}${round}`;
-              
-              const [node] = await tx.insert(bracketNodes).values({
-                 phaseId,
-                 groupId: newGroup.id,
-                 nodeCode,
-                 round,
-                 matchNumber: round,
-                 order: round,
-                 metadata: {
-                   participants: groupRegs,
-                   name: `${nodePrefix} ${round}`,
-                   generateMatches: config.generateMatches,
-                   matchesCount,
-                   format: 'BEST_OF_1',
-                   nodeType: phase.phaseType === 'ROUND_ROBIN' ? 'ROUND_ROBIN' : 'STANDARD'
-                 }
-              } as any).returning();
-              createdNodes.push(node);
-            }
-
-            // Générer les matches pour chaque nœud si demandé
-            if (config.generateMatches) {
-              const returnType = config.isHomeAway ? 'double' : 'single';
-              let allMatches: any[] = [];
-              
-              if (phase.phaseType === 'ROUND_ROBIN') {
-                // Générer tous les matchs du round robin
-                const generated = generateGroupMatches(groupRegs.map(id => ({ id })), { returnType });
-                // Répartir les matchs par round
-                const matchesPerRoundValue = Math.floor(groupRegs.length / 2);
-                for (let round = 1; round <= roundsCount; round++) {
-                  const roundMatches = generated.slice((round - 1) * matchesPerRoundValue, round * matchesPerRoundValue);
-                  const node = createdNodes[round - 1];
-                  for (const [idx, m] of roundMatches.entries()) {
-                    await tx.insert(matches).values({
-                       editionId: phase.editionId,
-                       phaseId,
-                       groupId: newGroup.id,
-                       bracketNodeId: node.id,
-                       participant1RegistrationId: m.participant1?.id,
-                       participant2RegistrationId: m.participant2?.id,
-                       matchCode: `${node.nodeCode}-M${idx + 1}`,
-                       status: 'PENDING',
-                       round: m.round || round,
-                       matchNumber: idx + 1,
-                       scheduledTime: new Date(Date.now() + (round - 1) * 24 * 60 * 60 * 1000), // +1 jour par round
-                       createdAt: new Date(),
-                       updatedAt: new Date(),
-                    } as any);
-                  }
-                }
-              } else {
-                // Pour GROUP_STAGE, tous les matchs dans le premier nœud
-                const generated = generateGroupMatches(groupRegs.map(id => ({ id })), { returnType });
-                const node = createdNodes[0];
-                for (const [idx, m] of generated.entries()) {
-                  await tx.insert(matches).values({
-                     editionId: phase.editionId,
-                     phaseId,
-                     groupId: newGroup.id,
-                     bracketNodeId: node.id,
-                     participant1RegistrationId: m.participant1?.id,
-                     participant2RegistrationId: m.participant2?.id,
-                     matchCode: `${node.nodeCode}-M${idx + 1}`,
-                     status: 'PENDING',
-                     round: m.round || 1,
-                     matchNumber: idx + 1,
-                     createdAt: new Date(),
-                     updatedAt: new Date(),
-                  } as any);
-                }
-              }
-            }
-          }
-       }
-
-       revalidatePath(`/tournaments/editions/${phase.editionId}/dashboard`);
-       return { success: true, groupsCount: Math.min(groups.length, groupsCount) };
-    });
-  } catch (error) {
-    console.error("Error auto generating phase structure:", error);
-    throw error;
+    return result;
+  } catch (error: any) {
+    console.error("Error getting structure preview:", error);
+    throw new Error(error.message || "Échec du calcul de l'aperçu");
   }
 }
 
@@ -2757,6 +2775,10 @@ export async function autoGeneratePhaseStructureAction(phaseId: string, config: 
  * Organise la structure complète d'une édition
  * CORRIGÉ : Supporte la création de multiples nœuds par groupe (journées pour ROUND_ROBIN)
  */
+import { createStructureEngine } from "@/lib/tournaments/structure-engine";
+import { generateMatchesEngine } from "@/lib/tournaments/match-generation-engine";
+import { propagatePhaseResults } from "@/lib/tournaments/propagation-service";
+
 export async function organizeEditionStructure(
   editionId: string,
   phasesData: any[],
@@ -2765,294 +2787,48 @@ export async function organizeEditionStructure(
     autoInitializeFirstPhase?: boolean;
     groupsSize?: number;
     randomizeDistribution?: boolean;
-    generateGroups?: boolean;
-    generateNodes?: boolean;
-    generateMatches?: boolean;
-    isHomeAway?: boolean;
-  } = {}
+    clearExisting?: boolean;
+  } = {},
 ) {
   try {
-    const edition = await db.query.tournamentEditions.findFirst({
-      where: eq(tournamentEditions.id, editionId),
-    });
-
-    if (!edition) throw new Error("Édition introuvable");
-
-    if (edition.maxParticipants && participantRegIds.length > edition.maxParticipants) {
-      throw new Error(`Limite de participants atteinte (${participantRegIds.length}/${edition.maxParticipants})`);
-    }
-
-    return await db.transaction(async (tx) => {
-      // 1. Création des phases
-      const createdPhases = await tx
-        .insert(tournamentPhases)
-        .values(
-          phasesData.map((p, idx) => ({
-            ...p,
-            editionId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }))
-        )
-        .returning();
-
-      const firstPhase = createdPhases[0];
-      
-      // 2. Initialisation automatique de la Phase 1 si demandée
-      if (options.autoInitializeFirstPhase && firstPhase && participantRegIds.length > 0) {
-        const workingRegIds = options.randomizeDistribution !== false 
-          ? shuffle([...participantRegIds]) 
-          : [...participantRegIds];
-
-        const generateGroups = options.generateGroups !== false;
-        const generateNodes = options.generateNodes !== false;
-        const generateMatches = options.generateMatches !== false;
-        
-        // Récupérer la configuration de la phase
-        const phaseConfig = phasesData[0]?.config || {};
-        const nodePrefix = phaseConfig.nodePrefix || (firstPhase.phaseType === 'ROUND_ROBIN' ? 'Journée' : 'Round');
-
-        if (firstPhase.phaseType === 'GROUP_STAGE' || firstPhase.phaseType === 'ROUND_ROBIN' || firstPhase.phaseType === 'SWISS') {
-          if (generateGroups) {
-            const groupSize = phaseConfig.groupsSize || options.groupsSize || 4;
-            let groupsChunks = chunk(workingRegIds, groupSize);
-            
-            // Pour ROUND_ROBIN, on force un seul groupe
-            if (firstPhase.phaseType === 'ROUND_ROBIN') {
-              groupsChunks = [workingRegIds];
-            }
-            
-            const groupsCount = phaseConfig.groupsCount || groupsChunks.length;
-
-            for (let i = 0; i < Math.min(groupsChunks.length, groupsCount); i++) {
-              const players = groupsChunks[i];
-              
-              // Créer le groupe
-              let groupName = `Groupe ${String.fromCharCode(65 + i)}`;
-              if (firstPhase.phaseType === 'ROUND_ROBIN') {
-                groupName = groupsChunks.length === 1 ? "Classement" : `Ligue ${i + 1}`;
-              } else if (firstPhase.phaseType === 'SWISS') {
-                groupName = "Système Suisse";
-              }
-
-              const [group] = await tx
-                .insert(phaseGroups)
-                .values({
-                  phaseId: firstPhase.id,
-                  name: groupName,
-                  order: i,
-                  participantCount: players.length,
-                  groupType: firstPhase.phaseType === 'ROUND_ROBIN' ? 'ROUND_ROBIN' : 'STANDARD',
-                  config: {
-                    isHomeAway: options.isHomeAway || false,
-                    generateMatches: generateMatches,
-                    nodePrefix: nodePrefix,
-                  },
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                })
-                .returning();
-
-              // Assigner les participants au groupe
-              for (const regId of players) {
-                await tx.insert(phaseGroupParticipants).values({
-                  groupId: group.id,
-                  registrationId: regId,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                });
-              }
-
-              if (generateNodes) {
-                const participantCount = players.length;
-                
-                // Calculer la structure des nœuds
-                if (firstPhase.phaseType === 'ROUND_ROBIN') {
-                  // Pour ROUND_ROBIN: un nœud par journée
-                  const roundsCount = participantCount - 1;
-                  const matchesPerRound = Math.floor(participantCount / 2);
-                  
-                  // Générer tous les matchs du round robin
-                  const returnType = options.isHomeAway ? 'double' : 'single';
-                  const allMatches = generateGroupMatches(players.map(id => ({ id })), { returnType });
-                  
-                  // Créer un nœud par journée et répartir les matchs
-                  for (let round = 1; round <= roundsCount; round++) {
-                    const startIdx = (round - 1) * matchesPerRound;
-                    const roundMatches = allMatches.slice(startIdx, startIdx + matchesPerRound);
-                    
-                    const [node] = await tx.insert(bracketNodes).values({
-                      phaseId: firstPhase.id,
-                      groupId: group.id,
-                      nodeCode: `${group.name.slice(0, 3).toUpperCase()}-${nodePrefix}${round}`,
-                      round,
-                      matchNumber: round,
-                      order: round,
-                      metadata: {
-                        participants: players,
-                        name: `${nodePrefix} ${round}`,
-                        generateMatches: generateMatches,
-                        matchesCount: roundMatches.length,
-                        format: 'BEST_OF_1',
-                        nodeType: 'ROUND_ROBIN'
-                      },
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    }).returning();
-                    
-                    if (generateMatches) {
-                      for (const [idx, m] of roundMatches.entries()) {
-                        await tx.insert(matches).values({
-                          editionId,
-                          phaseId: firstPhase.id,
-                          groupId: group.id,
-                          bracketNodeId: node.id,
-                          participant1RegistrationId: m.participant1?.id,
-                          participant2RegistrationId: m.participant2?.id,
-                          matchCode: `${node.nodeCode}-M${idx + 1}`,
-                          status: 'PENDING',
-                          round,
-                          matchNumber: idx + 1,
-                          scheduledTime: new Date(Date.now() + (round - 1) * 24 * 60 * 60 * 1000), // +1 jour par round
-                          createdAt: new Date(),
-                          updatedAt: new Date(),
-                        } as any);
-                      }
-                    }
-                  }
-                } 
-                else if (firstPhase.phaseType === 'GROUP_STAGE') {
-                  // Pour GROUP_STAGE: un seul nœud contenant tous les matchs du groupe
-                  const totalMatches = (participantCount * (participantCount - 1)) / 2;
-                  
-                  const [node] = await tx.insert(bracketNodes).values({
-                    phaseId: firstPhase.id,
-                    groupId: group.id,
-                    nodeCode: `${group.name.slice(0, 3).toUpperCase()}-Poule`,
-                    round: 1,
-                    matchNumber: 1,
-                    order: 0,
-                    metadata: {
-                      participants: players,
-                      name: group.name,
-                      generateMatches: generateMatches,
-                      matchesCount: totalMatches,
-                      format: 'BEST_OF_1',
-                      nodeType: 'GROUP_STAGE'
-                    },
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  }).returning();
-                  
-                  if (generateMatches) {
-                    const returnType = options.isHomeAway ? 'double' : 'single';
-                    const generated = generateGroupMatches(players.map(id => ({ id })), { returnType });
-                    
-                    for (const [idx, m] of generated.entries()) {
-                      await tx.insert(matches).values({
-                        editionId,
-                        phaseId: firstPhase.id,
-                        groupId: group.id,
-                        bracketNodeId: node.id,
-                        participant1RegistrationId: m.participant1?.id,
-                        participant2RegistrationId: m.participant2?.id,
-                        matchCode: `${node.nodeCode}-M${idx + 1}`,
-                        status: 'PENDING',
-                        round: m.round || 1,
-                        matchNumber: idx + 1,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                      } as any);
-                    }
-                  }
-                }
-                else if (firstPhase.phaseType === 'SWISS') {
-                  // Pour SWISS: un nœud par round
-                  const roundsCount = phaseConfig.roundsCount || 5;
-                  
-                  for (let round = 1; round <= roundsCount; round++) {
-                    const [node] = await tx.insert(bracketNodes).values({
-                      phaseId: firstPhase.id,
-                      groupId: group.id,
-                      nodeCode: `${nodePrefix}${round}`,
-                      round,
-                      matchNumber: round,
-                      order: round,
-                      metadata: {
-                        participants: players,
-                        name: `${nodePrefix} ${round}`,
-                        generateMatches: generateMatches,
-                        matchesCount: Math.floor(players.length / 2),
-                        format: 'BEST_OF_1',
-                        nodeType: 'SWISS'
-                      },
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    }).returning();
-                  }
-                }
-              }
-            }
-          }
-        } 
-        else if (firstPhase.phaseType === 'ELIMINATION' || firstPhase.phaseType === 'KNOCKOUT') {
-          // Logique pour élimination directe
-          const pairCount = Math.floor(workingRegIds.length / 2);
-          const totalRounds = Math.ceil(Math.log2(workingRegIds.length));
-          let matchCounter = 1;
-          
-          for (let round = 1; round <= totalRounds; round++) {
-            const matchesThisRound = round === 1 ? pairCount : Math.pow(2, totalRounds - round);
-            for (let i = 0; i < matchesThisRound && matchCounter <= workingRegIds.length - 1; i++) {
-              const p1 = round === 1 ? workingRegIds[i * 2] : null;
-              const p2 = round === 1 ? workingRegIds[i * 2 + 1] : null;
-              
-              if (generateNodes) {
-                const [node] = await tx.insert(bracketNodes).values({
-                  phaseId: firstPhase.id,
-                  nodeCode: `${nodePrefix}${round}-M${i + 1}`,
-                  round,
-                  matchNumber: matchCounter++,
-                  bracketType: 'UPPER',
-                  order: matchCounter,
-                  metadata: {
-                    participants: [p1, p2].filter(Boolean),
-                    requiresMatch: true,
-                    generateMatches: generateMatches,
-                    matchesCount: 1,
-                    format: 'BEST_OF_1'
-                  },
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                }).returning();
-
-                if (generateMatches && p1 && p2) {
-                  await tx.insert(matches).values({
-                    editionId,
-                    phaseId: firstPhase.id,
-                    bracketNodeId: node.id,
-                    participant1RegistrationId: p1,
-                    participant2RegistrationId: p2,
-                    matchCode: `${node.nodeCode}`,
-                    status: 'PENDING',
-                    round,
-                    matchNumber: i + 1,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  } as any);
-                }
-              }
-            }
-          }
-        }
+    const result = await createStructureEngine({
+      editionId,
+      phases: phasesData,
+      participantRegIds,
+      options: {
+        autoInitializeFirstPhase: options.autoInitializeFirstPhase,
+        clearExisting: options.clearExisting ?? true,
       }
-
-      revalidatePath(`/tournaments/editions/${editionId}/dashboard`);
-      return { success: true, phaseCount: createdPhases.length };
     });
+
+    revalidatePath(`/tournaments/editions/${editionId}/dashboard`);
+    return result;
   } catch (error: any) {
     console.error("Error organizing edition structure:", error);
     throw new Error(error.message || "Échec de l'organisation structurelle");
   }
 }
 
+/**
+ * Action pour déclencher la génération de matchs via le moteur centralisé
+ */
+export async function generateMatchesAction(
+  type: "PHASE" | "GROUP" | "NODE",
+  id: string,
+  options: any = {}
+) {
+  try {
+    const result = await generateMatchesEngine({ type, id, options });
+    
+    // Si c'est une phase et qu'elle est terminée, on peut tenter une propagation
+    if (type === "PHASE" && options.propagate) {
+      await propagatePhaseResults(id);
+    }
+
+    revalidatePath(`/tournaments/dashboard`);
+    return { success: true, result };
+  } catch (error: any) {
+    console.error("Error in generateMatchesAction:", error);
+    return { success: false, error: error.message };
+  }
+}

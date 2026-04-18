@@ -140,7 +140,10 @@ export default function MemberDetailPage() {
           // Get matches for all registrations
           const matchesPromises = stats.map((s) =>
             getMatchesWithParticipants({
-              filters: { memberRegistrationId: s.id },
+              filters: { 
+                memberRegistrationId: s.id,
+                editionId: s.editionId
+              },
               pagination: { page: 1, limit: 10 },
             }),
           );

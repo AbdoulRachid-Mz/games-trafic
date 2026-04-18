@@ -109,9 +109,18 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
       {/* Navigation */}
       <div className="flex flex-col gap-4">
         <Button variant="ghost" size="sm" className="w-fit gap-2 -ml-2 text-muted-foreground" asChild>
-          <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}>
-            <ChevronLeft className="h-4 w-4" /> Retour aux matchs
-          </Link>
+          {/* on fait un back */}
+        {
+          isOrganizer ? (
+            <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`}>
+              <ChevronLeft className="h-4 w-4" /> Retour aux matchs
+            </Link>
+          ) : (
+            <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}>
+              <ChevronLeft className="h-4 w-4" /> Retour aux matchs
+            </Link>
+          )
+        }
         </Button>
         
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -423,7 +432,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
 
 function ParticipantLargeAvatar({ participant, isWinner }: { participant: any; isWinner?: boolean }) {
   const name = participant?.member?.displayName || "?";
-  const image = participant?.member?.avatar || participant?.member?.user?.profileImage || participant?.member?.user?.image;
+  const image = participant?.member?.avatar || participant?.member?.user?.profileImage || participant?.member?.user?.image || "icons/avatar.png";
   
   return (
     <div className={cn(

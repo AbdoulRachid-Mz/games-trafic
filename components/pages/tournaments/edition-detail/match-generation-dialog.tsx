@@ -25,15 +25,16 @@ export function MatchGenerationDialog({
   onSuccess?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { generatePhaseMatches } = useMatchManager(phaseId);
+  const { generateMatches } = useMatchManager(phaseId);
   const [forceRecreate, setForceRecreate] = useState(false);
   const [createNodes, setCreateNodes] = useState(true);
 
   const handleGenerate = async () => {
     try {
-      await generatePhaseMatches.mutateAsync({ 
-        phaseId, 
-        config: { forceRecreate, groupId, createNodes } as any
+      await generateMatches.mutateAsync({ 
+        type: "PHASE",
+        id: phaseId, 
+        options: { forceRecreate, groupId, createNodes }
       });
       setOpen(false);
       onSuccess?.();
@@ -45,7 +46,7 @@ export function MatchGenerationDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="default" disabled={disabled || generatePhaseMatches.isPending} className="gap-2 font-bold shadow-md">
+        <Button size="sm" variant="default" disabled={disabled || generateMatches.isPending} className="gap-2 font-bold shadow-md">
           <Play className="h-4 w-4" />
           Générer Tout
         </Button>
@@ -91,10 +92,10 @@ export function MatchGenerationDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-           <Button variant="ghost" onClick={() => setOpen(false)} disabled={generatePhaseMatches.isPending}>Annuler</Button>
-           <Button onClick={handleGenerate} disabled={generatePhaseMatches.isPending} className="gap-2">
-             {generatePhaseMatches.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-             {generatePhaseMatches.isPending ? "Génération..." : "Lancer la génération"}
+           <Button variant="ghost" onClick={() => setOpen(false)} disabled={generateMatches.isPending}>Annuler</Button>
+           <Button onClick={handleGenerate} disabled={generateMatches.isPending} className="gap-2">
+             {generateMatches.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+             {generateMatches.isPending ? "Génération..." : "Lancer la génération"}
            </Button>
         </DialogFooter>
       </DialogContent>
