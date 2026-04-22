@@ -2,23 +2,23 @@
 
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { 
-  Search, 
-  LayoutGrid, 
-  List, 
-  Download, 
-  FileText, 
-  FileDown, 
-  FileJson 
+import {
+  Search,
+  LayoutGrid,
+  List,
+  Download,
+  FileText,
+  FileDown,
+  FileJson,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { MemberCard } from "@/components/cards/member-card";
 import { useEditionManager } from "@/hooks/use-edition-manager";
@@ -59,10 +59,14 @@ export function EditionParticipantsList({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
           <h3 className="text-xl font-bold flex items-center gap-2">
-            Participants 
-            <Badge variant="secondary" className="rounded-full px-2.5">{participants.length}</Badge>
+            Participants
+            <Badge variant="secondary" className="rounded-full px-2.5">
+              {participants.length}
+            </Badge>
           </h3>
-          <p className="text-sm text-muted-foreground">Liste des membres et équipes inscrits officiellement.</p>
+          <p className="text-sm text-muted-foreground">
+            Liste des membres et équipes inscrits officiellement.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -75,7 +79,7 @@ export function EditionParticipantsList({
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          
+
           <div className="flex gap-1 border rounded-lg p-1 bg-card">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -97,7 +101,7 @@ export function EditionParticipantsList({
             </Button>
           </div>
 
-          <EditionBestPlayersStats 
+          {/* <EditionBestPlayersStats 
             editionId={editionId}
             trigger={
               <Button variant="outline" size="sm" className="h-10 px-4 whitespace-nowrap gap-2 bg-card hover:bg-muted border-dashed border-primary/30">
@@ -106,10 +110,10 @@ export function EditionParticipantsList({
                 <span className="sm:hidden text-xs">Stats</span>
               </Button>
             }
-          />
+          /> */}
 
           <Select onValueChange={(val: string) => handleExport(val as any)}>
-            <SelectTrigger className="h-10 px-4 w-full sm:w-[160px] bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-sm">
+            <SelectTrigger className="h-10 px-4 w-full sm:w-[160px] bg-primary text-white hover:bg-primary/90 border-none shadow-sm">
               <div className="flex items-center">
                 <Download className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Exporter" />
@@ -154,11 +158,7 @@ export function EditionParticipantsList({
           }
         >
           {filtered.map((reg) => (
-            <MemberCard
-              key={reg.id}
-              member={reg.member}
-              viewMode={viewMode}
-            />
+            <MemberCard key={reg.id} member={reg.member} viewMode={viewMode} />
           ))}
         </div>
       )}

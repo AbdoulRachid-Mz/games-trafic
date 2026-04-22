@@ -1,6 +1,7 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/[phaseId]/page.tsx
 import { getTournamentPhases } from "@/actions/phases";
 import { getPhaseGroups } from "@/actions/phases";
+import { getTournamentEditionById } from "@/actions/editions";
 import { PhaseDetailClient } from "./phase-detail-client";
 
 interface PageProps {
@@ -25,10 +26,14 @@ const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: s
 export default async function PhaseDetailPage({ params }: PageProps) {
   const { tournamentId, editionId, phaseId } = await params;
 
-  const allPhasesRes = await getTournamentPhases({
-    filters: { editionId },
-    options: { sortBy: "order", sortOrder: "asc" },
-  });
+  const [allPhasesRes, edition] = await Promise.all([
+    getTournamentPhases({
+      filters: { editionId },
+      options: { sortBy: "order", sortOrder: "asc" },
+    }),
+    getTournamentEditionById(editionId)
+  ]);
+
   const allPhases = allPhasesRes.data;
   const phase = allPhases.find((p) => p.id === phaseId);
 
@@ -51,6 +56,7 @@ export default async function PhaseDetailPage({ params }: PageProps) {
       allPhases={allPhases}
       basePath={basePath}
       typeConf={typeConf}
+      editionConfig={(edition?.editionConfig as any) || {}}
     />
   );
 }

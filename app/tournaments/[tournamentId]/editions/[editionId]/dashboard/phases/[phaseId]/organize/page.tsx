@@ -1,10 +1,11 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/[phaseId]/organize/page.tsx
 import { db } from "@/lib/db";
 import { eq, and, exists } from "drizzle-orm";
-import { tournamentPhases, phaseGroups, phaseGroupParticipants, editionRegistrations } from "@/database/schema";
+import { tournamentPhases, phaseGroups, phaseGroupParticipants, editionRegistrations, tournamentEditions } from "@/database/schema";
 import { PhaseOrganizeClient } from "@/components/pages/tournaments/edition-detail/phase-organize-client";
 import { Typography } from "@/components/ui/typography";
 import { notFound } from "next/navigation";
+import { getTournamentEditionById } from "@/actions/editions";
 
 interface PageProps {
   params: Promise<{
@@ -73,10 +74,13 @@ export default async function PhaseOrganizePage({ params }: PageProps) {
   }
 
   // 3. Fetch Existing Structure
-  const existingGroups = await db.query.phaseGroups.findMany({
-    where: and(eq(phaseGroups.phaseId, phaseId), eq(phaseGroups.isDeleted, false)),
-    orderBy: (groups, { asc }) => [asc(groups.order)],
-  });
+  const [existingGroups, edition] = await Promise.all([
+    db.query.phaseGroups.findMany({
+      where: and(eq(phaseGroups.phaseId, phaseId), eq(phaseGroups.isDeleted, false)),
+      orderBy: (groups, { asc }) => [asc(groups.order)],
+    }),
+    getTournamentEditionById(editionId)
+  ]);
 
   return (
     <div className="space-y-6">
@@ -98,6 +102,7 @@ export default async function PhaseOrganizePage({ params }: PageProps) {
         phaseConfig={phaseConfig}
         sourceParticipants={sourceParticipants}
         existingGroups={existingGroups}
+        editionConfig={(edition?.editionConfig as any) || {}}
       />
     </div>
   );

@@ -57,6 +57,11 @@ import { BracketNodeWithDetails } from "@/types/api";
 import { DynamicActionMenu, MenuItemAction } from "@/components/shared/dynamic-action-menu";
 import { generateBracketMatches } from "@/actions/phases";
 
+import { useState, useTransition } from "react";
+import { updateTournamentEditionModeAction } from "@/actions/editions";
+import { useRouter } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
+
 interface ClientPageProps {
   tournamentId: string;
   editionId: string;
@@ -66,6 +71,11 @@ interface ClientPageProps {
   registrations: EditionRegistration[];
   groupParticipants: PhaseGroupParticipant[];
   matches: Match[];
+  editionConfig: {
+    competitionType?: string;
+    competitionMode?: "AUTO" | "MANUAL";
+    [key: string]: any;
+  };
 }
 
 function getMatchStatusBadge(m: Match) {
@@ -110,7 +120,27 @@ export default function ClientBracketNodeDetailPage({
   registrations,
   groupParticipants,
   matches,
+  editionConfig,
 }: ClientPageProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const isAutoMode = editionConfig.competitionMode === "AUTO";
+
+  const handleSwitchToManual = () => {
+    startTransition(async () => {
+      try {
+        const res = await updateTournamentEditionModeAction(editionId, "MANUAL");
+        if (res.success) {
+          toast.success("Mode manuel activé avec succès.");
+          router.refresh();
+        } else {
+          toast.error(res.error || "Erreur lors du changement de mode.");
+        }
+      } catch (error) {
+        toast.error("Une erreur est survenue.");
+      }
+    });
+  };
   // Fonction utilitaire côté client
   const getName = (id: string | null | undefined) => {
     if (!id) return "À déterminer";
@@ -155,30 +185,38 @@ export default function ClientBracketNodeDetailPage({
       variant: "default",
       overlayType: "dialog",
       renderContent: (
-        <CreateMatchDialog
-          editionId={editionId}
-          phaseId={node?.phaseId || ""}
-          groupId={node?.groupId || null}
-          bracketNodeId={bracketId}
-          participants={groupParticipants.map((p) => {
-            const reg = registrations.find(
-              (r: any) => r.id === p.registrationId,
-            ) as any;
-            return {
-              registrationId: p.registrationId || "",
-              displayName:
-                reg?.member?.displayName ||
-                reg?.member?.user?.username ||
-                reg?.member?.team?.name ||
-                "Joueur",
-              teamName: reg?.member?.team?.name,
-              isQualified: p.qualified || false,
-            };
-          })}
-          currentMatchesCount={matches.length}
-          inheritedConfig={(node?.metadata as any)?.matchConfig}
-          asFormOnly
-        />
+        <>
+          {isAutoMode && (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4 text-amber-700 text-xs flex gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <p>Créer un match manuellement peut perturber l'Assistant.</p>
+            </div>
+          )}
+          <CreateMatchDialog
+            editionId={editionId}
+            phaseId={node?.phaseId || ""}
+            groupId={node?.groupId || null}
+            bracketNodeId={bracketId}
+            participants={groupParticipants.map((p) => {
+              const reg = registrations.find(
+                (r: any) => r.id === p.registrationId,
+              ) as any;
+              return {
+                registrationId: p.registrationId || "",
+                displayName:
+                  reg?.member?.displayName ||
+                  reg?.member?.user?.username ||
+                  reg?.member?.team?.name ||
+                  "Joueur",
+                teamName: reg?.member?.team?.name,
+                isQualified: p.qualified || false,
+              };
+            })}
+            currentMatchesCount={matches.length}
+            inheritedConfig={(node?.metadata as any)?.matchConfig}
+            asFormOnly
+          />
+        </>
       )
     },
     ...(!matches.length && nodeParticipants.length >= 2 ? [{
@@ -186,18 +224,31 @@ export default function ClientBracketNodeDetailPage({
       label: "Générer les matchs restants",
       icon: Swords,
       variant: "default",
-      onClick: async () => {
-        try {
-          const res = await generateBracketMatches(bracketId, {
-            forceRecreate: true,
-            returnType: "single",
-          });
-          toast.success(`${res.count} match(s) généré(s) avec succès.`);
-          handleRefresh();
-        } catch (error: any) {
-          toast.error(error.message || "Erreur lors de la génération des matchs.");
+      ...(isAutoMode ? {
+        overlayType: "dialog",
+        renderContent: (
+          <div className="space-y-4 p-4 text-center">
+            <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto" />
+            <Typography variant="body-base" weight="bold">Action Déconseillée</Typography>
+            <p className="text-sm text-muted-foreground">La génération manuelle est réservée au mode Manuel.</p>
+            <Button variant="outline" size="sm" onClick={async () => {
+              try {
+                const res = await generateBracketMatches(bracketId, { forceRecreate: true, returnType: "single" });
+                toast.success(`${res.count} match(s) généré(s).`);
+                handleRefresh();
+              } catch (e: any) { toast.error(e.message); }
+            }}>Générer quand même</Button>
+          </div>
+        )
+      } : {
+        onClick: async () => {
+          try {
+            const res = await generateBracketMatches(bracketId, { forceRecreate: true, returnType: "single" });
+            toast.success(`${res.count} match(s) généré(s).`);
+            handleRefresh();
+          } catch (e: any) { toast.error(e.message); }
         }
-      }
+      })
     }] : [] as any[]),
     {
       separatorBefore: true,
@@ -208,19 +259,29 @@ export default function ClientBracketNodeDetailPage({
       icon: Settings2,
       variant: "outline",
       overlayType: "dialog",
-      renderContent: node ? (
-        <UpdateBracketNodeDialog
-          node={{
-            id: bracketId,
-            nodeCode: node.nodeCode,
-            round: node.round,
-            matchNumber: node.matchNumber,
-            bracketType: node.bracketType,
-          }}
-          revalidatePath={`${basePath}/brackets/${bracketId}`}
-          asFormOnly
-        />
-      ) : <></>
+      renderContent: (
+        <>
+          {isAutoMode && (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-2 text-amber-700 text-xs flex gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <p>Modifier la structure du nœud peut casser l'arbre de compétition de l'Assistant.</p>
+            </div>
+          )}
+          {node ? (
+            <UpdateBracketNodeDialog
+              node={{
+                id: bracketId,
+                nodeCode: node.nodeCode,
+                round: node.round,
+                matchNumber: node.matchNumber,
+                bracketType: node.bracketType,
+              }}
+              revalidatePath={`${basePath}/brackets/${bracketId}`}
+              asFormOnly
+            />
+          ) : <></>}
+        </>
+      )
     },
     {
       id: "organize-mass",
@@ -229,7 +290,22 @@ export default function ClientBracketNodeDetailPage({
       label: "Organiser en masse",
       icon: Users,
       variant: "outline",
-      href: `${basePath}/brackets/${bracketId}/organize`
+      ...(isAutoMode ? {
+        overlayType: "dialog",
+        renderContent: (
+          <div className="p-4 space-y-4">
+             <div className="flex items-center gap-2 text-amber-600 font-bold">
+               <AlertTriangle className="h-5 w-5" /> Attention
+             </div>
+             <p className="text-sm text-muted-foreground">L'organisation manuelle des participants est déconseillée en mode Auto.</p>
+             <div className="flex justify-end">
+               <Button variant="outline" size="sm" onClick={() => router.push(`${basePath}/brackets/${bracketId}/organize`)}>Continuer</Button>
+             </div>
+          </div>
+        )
+      } : {
+        href: `${basePath}/brackets/${bracketId}/organize`
+      })
     },
     {
       separatorBefore: true,
@@ -265,10 +341,52 @@ export default function ClientBracketNodeDetailPage({
               </Link>
             </Button>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Typography variant="h3" weight="bold">
               Nœud {node?.nodeCode || bracketId.slice(0, 6)}
             </Typography>
+
+            <div className="flex items-center gap-2">
+              {isAutoMode ? (
+                <Badge className="bg-blue-600/10 text-blue-600 border-blue-600/20 shadow-sm text-[10px] px-2 py-0.5 flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  Assistant
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 shadow-sm text-[10px] px-2 py-0.5">
+                  Manuel
+                </Badge>
+              )}
+
+              {isAutoMode && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[9px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 uppercase font-black tracking-tighter">
+                      Passer en manuel
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+                        <AlertTriangle className="h-5 w-5" /> Basculer en mode Manuel ?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        L'Assistant ne gérera plus automatiquement ce nœud de bracket. Cette action est irréversible.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleSwitchToManual}
+                        className="bg-amber-600 hover:bg-amber-700"
+                      >
+                        Confirmer
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
 
             <Button variant="ghost" size="sm" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4" />

@@ -395,20 +395,33 @@ export async function getTournamentEditions(
       options,
     );
 
-    const editionsQuery = db
-      .select()
-      .from(tournamentEditions)
-      .where(whereConditions)
-      .limit(pagination.limit)
-      .offset(offset);
-
-    if (options.sortBy) {
-      const sortField = options.sortBy as keyof TournamentEdition;
-      const sortOrder = options.sortOrder === "desc" ? desc : asc;
-      editionsQuery.orderBy(sortOrder(tournamentEditions[sortField]));
-    } else {
-      editionsQuery.orderBy(desc(tournamentEditions.createdAt));
-    }
+    const editionsQuery = db.query.tournamentEditions.findMany({
+      where: whereConditions,
+      limit: pagination.limit,
+      offset: offset,
+      orderBy: (editions, { desc: _desc, asc: _asc }) => {
+        const order = options.sortOrder === "desc" ? _desc : _asc;
+        const sortableColumns: Record<string, any> = {
+          createdAt: editions.createdAt,
+          updatedAt: editions.updatedAt,
+          startDate: editions.startDate,
+          endDate: editions.endDate,
+          name: editions.name,
+          status: editions.status,
+          currentParticipants: editions.currentParticipants,
+          maxParticipants: editions.maxParticipants,
+        };
+        const col = options.sortBy && sortableColumns[options.sortBy]
+          ? sortableColumns[options.sortBy]
+          : editions.createdAt;
+        return [order(col)];
+      },
+      with: {
+        tournament: {
+          columns: TOURNAMENT_CARD_COLUMNS,
+        }
+      } as any,
+    });
 
     const countQuery = db
       .select({ count: count() })
@@ -424,7 +437,7 @@ export async function getTournamentEditions(
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: editionsData,
+      data: editionsData as any,
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -1883,6 +1896,11 @@ export async function submitMatchResult(
       proofUrl,
       updatedAt: new Date(),
     };
+    
+    // pas de score negatif
+    if (score1 < 0 || score2 < 0) {
+      throw new Error("Le score ne peut pas être négatif");
+    }
 
     // Determine status and confirmations
     const isParticipant1 =

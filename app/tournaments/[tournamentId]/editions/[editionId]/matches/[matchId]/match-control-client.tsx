@@ -39,6 +39,7 @@ import { deleteMatch } from "@/actions/phases";
 import { AdvancedUpload } from "@/components/ui/advanced-upload";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { Badge } from "@/components/ui/badge";
+import { MatchSuccessDialog } from "@/components/pages/tournaments/matches/match-success-dialog";
 
 interface MatchControlClientProps {
   match: any;
@@ -65,6 +66,16 @@ export function MatchControlClient({
     score2: match.score2 ?? 0,
     proofUrl: match.proofUrl || "",
     disputeReason: match.disputeReason || ""
+  });
+
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [shouldShowConfetti, setShouldShowConfetti] = useState(false);
+  const [celebrationData, setCelebrationData] = useState({
+    p1Name: match.participant1?.member?.displayName || "Participant 1",
+    p2Name: match.participant2?.member?.displayName || "Participant 2",
+    score1: match.score1 ?? 0,
+    score2: match.score2 ?? 0,
+    winnerName: ""
   });
 
   // Déterminer les rôles
@@ -150,6 +161,15 @@ export function MatchControlClient({
       try {
         const result = await adminConfirmMatchResult(match.id, formData.score1, formData.score2);
         toast.success("Match confirmé et clôturé !");
+        setCelebrationData({
+          p1Name: match.participant1?.member?.displayName || "Participant 1",
+          p2Name: match.participant2?.member?.displayName || "Participant 2",
+          score1: formData.score1,
+          score2: formData.score2,
+          winnerName: result.winnerName || (formData.score1 > formData.score2 ? match.participant1?.member?.displayName : match.participant2?.member?.displayName)
+        });
+        setShouldShowConfetti(!!result.needsProgression);
+        setShowCelebration(true);
         if (result.needsProgression) {
           toast.info(`${result.winnerName || "Le vainqueur"} est qualifié pour la phase suivante !`);
         }
@@ -258,6 +278,7 @@ export function MatchControlClient({
               </Label>
               <Input
                 type="number"
+                min={0}
                 value={formData.score1}
                 disabled={!canEditScore}
                 onChange={(e) => handleScoreChange("score1", e.target.value)}
@@ -278,6 +299,7 @@ export function MatchControlClient({
               <Input
                 type="number"
                 value={formData.score2}
+                min={0}
                 disabled={!canEditScore}
                 onChange={(e) => handleScoreChange("score2", e.target.value)}
                 className={cn(
@@ -442,6 +464,13 @@ export function MatchControlClient({
           </div>
         </div>
       </div>
+
+      <MatchSuccessDialog
+        open={showCelebration}
+        onOpenChange={setShowCelebration}
+        matchData={celebrationData}
+        showConfetti={shouldShowConfetti}
+      />
     </div>
   );
 }

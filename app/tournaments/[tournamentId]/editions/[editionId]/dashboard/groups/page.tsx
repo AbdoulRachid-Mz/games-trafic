@@ -175,7 +175,7 @@ export default async function GroupsDashboardPage({
         <div className={cn(
           "grid gap-4",
           viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : 
-          viewMode === "compact" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : 
+          viewMode === "compact" ? "grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : 
           "grid-cols-1"
         )}>
           {allGroups.map((group: any) => (

@@ -1,0 +1,2 @@
+ALTER TABLE "bracket_nodes" ADD COLUMN "winner_registration_id" text;--> statement-breakpoint
+ALTER TABLE "bracket_nodes" ADD CONSTRAINT "bracket_nodes_winner_registration_id_edition_registrations_id_fk" FOREIGN KEY ("winner_registration_id") REFERENCES "public"."edition_registrations"("id") ON DELETE set null ON UPDATE no action;

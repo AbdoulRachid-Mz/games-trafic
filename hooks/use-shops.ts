@@ -86,7 +86,7 @@ export function useShopById(
   return useQuery({
     queryKey: shopKeys.detail(id, options?.populate),
     queryFn: () => (id ? getShopById(id, options) : null),
-    enabled: !!id,
+    enabled: !!id && id !== "" && id !== "undefined",
     staleTime: 10 * 60 * 1000, // 10 minutes
     ...queryOpts,
   });
@@ -226,7 +226,7 @@ export function useShopStatsById(
   return useQuery({
     queryKey: shopKeys.statsById(shopId),
     queryFn: () => (shopId ? getShopStatsById(shopId) : null),
-    enabled: !!shopId,
+    enabled: !!shopId && shopId !== "" && shopId !== "undefined",
     staleTime: 10 * 60 * 1000,
     ...queryOpts,
   });

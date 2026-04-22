@@ -16,8 +16,8 @@ import { EditionParticipantsList } from "./edition-participants-list";
 import { EditionPhasesView } from "./edition-phases-view";
 import { EditionJoinDialog } from "./edition-join-dialog";
 import { EditionPaymentDialog } from "./edition-payment-dialog";
-import { EditionStandingsTab } from "./edition-standings-tab";
 import { EditionMatchesTab } from "./edition-matches-tab";
+import { EditionBestParticipantsTab } from "./edition-best-participants-tab";
 import { ResponsiveTabs, type ResponsiveTab } from "@/components/ui/responsive-tabs";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,11 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
-import { Users, Target, Trophy, Calendar, Wallet, Info, LayoutGrid, Swords, Shield } from "lucide-react";
+import { Users, Target, Trophy, Calendar, Wallet, Info, LayoutGrid, Swords, Shield, Star } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { EditionStandingsTab } from "./edition-standings-tab";
 
 interface EditionPageContentProps {
   tournament: Tournament;
@@ -40,6 +41,7 @@ interface EditionPageContentProps {
   currentUserMember?: TournamentMember & { team?: Team };
   currentUserRegistration?: EditionRegistrationWithRelations;
   isOrganizer?: boolean;
+  recentMatches?: any[];
 }
 
 export function EditionPageContent({
@@ -50,6 +52,7 @@ export function EditionPageContent({
   currentUserMember,
   currentUserRegistration,
   isOrganizer = false,
+  recentMatches = [],
 }: EditionPageContentProps) {
   const { user } = useAuthContext();
   const { isMobile } = useScreenSize();
@@ -140,6 +143,14 @@ export function EditionPageContent({
           isAdmin={isOrganizer}
           phases={phases}
         />
+      ),
+    },
+    {
+      value: "best_participants",
+      label: "Meilleurs Participants",
+      icon: <Star className="h-4 w-4" />,
+      content: (
+        <EditionBestParticipantsTab editionId={edition.id} />
       ),
     },
     {
@@ -270,6 +281,7 @@ export function EditionPageContent({
         onCancelPayment={() => setShowPaymentDialog(false)}
         onConfirmPayment={handleConfirmJoin}
         isRegistered={isRegistered}
+        recentMatches={recentMatches}
       />
 
       <div className="container mx-auto px-4 py-6 space-y-8">
@@ -331,9 +343,11 @@ export function EditionPageContent({
             <ResponsiveTabs 
               tabs={tabs} 
               defaultValue="standings"
-              className="w-full"
+              className="w-full flex-1 min-w-0"
               mobileCount={2}
               tabletCount={3}
+              swipeable
+              showNavButtons
             />
           </div>
 

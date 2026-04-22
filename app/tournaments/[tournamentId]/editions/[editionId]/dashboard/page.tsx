@@ -40,6 +40,12 @@ export const metadata: Metadata = {
   title: "Dashboard Édition - Vue d'ensemble",
 };
 
+interface EditionConfig {
+  competitionType?: "CHAMPIONSHIP" | "CUP" | "LDC" | "SWISS";
+  competitionMode?: "AUTO" | "MANUAL";
+  [key: string]: any;
+}
+
 export default async function DashboardOverviewPage({ params }: PageProps) {
   const { tournamentId, editionId } = await params;
 
@@ -99,6 +105,8 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
     },
   ];
 
+  const editionConfig = (edition.editionConfig as EditionConfig) || {};
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -116,21 +124,39 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
             {edition.name || `#${edition.editionNumber}`}
           </Typography>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Competition Config Badges */}
+          <div className="flex items-center gap-1.5 mr-2">
+            <Badge className="bg-primary/10 text-primary border-primary/20 shadow-sm text-[10px] font-bold px-2 py-0.5">
+              {editionConfig.competitionType === "CHAMPIONSHIP" ? "CHAMPIONNAT" : 
+               editionConfig.competitionType === "CUP" ? "COUPE" :
+               editionConfig.competitionType === "SWISS" ? "SUISSE" : "LDC"}
+            </Badge>
+            <Badge className={cn(
+              "shadow-sm text-[10px] font-bold px-2 py-0.5",
+              editionConfig.competitionMode === "AUTO" 
+                ? "bg-blue-500/10 text-blue-600 border-blue-200" 
+                : "bg-amber-500/10 text-amber-600 border-amber-200"
+            )}>
+              {editionConfig.competitionMode === "AUTO" ? "ASST. AUTO" : "MODE MANUEL"}
+            </Badge>
+          </div>
+
           <Badge
             variant="outline"
             className="px-3 py-1 font-medium bg-background"
           >
             {edition.status}
           </Badge>
-          <Button size="sm" asChild>
+          <Button size="sm" asChild variant="ghost" className="h-8">
             <Link href={`/tournaments/${tournamentId}/editions/${editionId}`}>
-              Voir la page publique
+              Vue publique
             </Link>
           </Button>
+          
           {/* link to organisation page */}
-          {edition.phases && edition.phases.length < 1 && (
-            <Button size="sm" variant="default" asChild>
+          {(phasesResponse.data.length < 1) && (
+            <Button size="sm" variant="default" asChild className="h-8 shadow-md">
               <Link
                 href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/organize`}
               >

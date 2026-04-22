@@ -1,0 +1,7 @@
+- [x] Fix bugs and implement Single Source of Truth
+  - [x] Fix TS errors in `mark-complete-dialog.tsx`
+  - [x] Implement `isAutoMode` logic in `mark-complete-dialog.tsx` (Use edition defaults)
+  - [x] Update `PhaseOrganizeClient.tsx` to restrict/warn in auto mode
+  - [x] Update `GroupNodesOrganizeClient.tsx` to restrict/warn in auto mode
+  - [x] Refactor `organizeNextPhaseAction` to prioritize DB config in auto mode
+  - [x] Fix TS error in `brackets/page.tsx` (BracketExportButton props)

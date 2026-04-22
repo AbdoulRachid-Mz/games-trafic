@@ -3,6 +3,7 @@
 import ClientBracketNodeDetailPage from "./client-page";
 import { getBracketNodeById, getPhaseGroupParticipants } from "@/actions/phases";
 import { getEditionRegistrations, getMatches } from "@/actions/tournaments";
+import { getTournamentEditionById } from "@/actions/editions";
 import type { BracketNodeWithDetails } from "@/types/api";
 
 interface PageProps {
@@ -22,11 +23,19 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
     populate: ["phase", "group"],
   })) as BracketNodeWithDetails | null;
   
-  const regsRes = await getEditionRegistrations({
-    filters: { editionId },
-    options: { populate: ["member", "member.user", "member.team"] },
-    pagination: { page: 1, limit: 500 },
-  });
+  const [regsRes, matchesRes, edition] = await Promise.all([
+    getEditionRegistrations({
+      filters: { editionId },
+      options: { populate: ["member", "member.user", "member.team"] },
+      pagination: { page: 1, limit: 500 },
+    }),
+    getMatches({
+      filters: { editionId, bracketNodeId: bracketId },
+      options: { sortBy: "round", sortOrder: "asc" },
+      pagination: { page: 1, limit: 100 },
+    }),
+    getTournamentEditionById(editionId)
+  ]);
   
   const groupParticipantsRes = node?.groupId
     ? await getPhaseGroupParticipants({
@@ -36,12 +45,6 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
       })
     : { data: [] };
   
-  const matchesRes = await getMatches({
-    filters: { editionId, bracketNodeId: bracketId },
-    options: { sortBy: "round", sortOrder: "asc" },
-    pagination: { page: 1, limit: 100 },
-  });
-
   // Passer toutes les données sérialisables au composant client
   return (
     <ClientBracketNodeDetailPage
@@ -53,6 +56,7 @@ export default async function BracketNodeDetailPage({ params }: PageProps) {
       registrations={JSON.parse(JSON.stringify(regsRes.data))}
       groupParticipants={JSON.parse(JSON.stringify(groupParticipantsRes.data))}
       matches={JSON.parse(JSON.stringify(matchesRes.data))}
+      editionConfig={(edition?.editionConfig as any) || {}}
     />
   );
 }

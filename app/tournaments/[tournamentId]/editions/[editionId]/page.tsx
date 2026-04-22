@@ -91,6 +91,10 @@ export default async function EditionPage({ params }: PageProps) {
   const hasPaid = currentUserRegistration?.feePaid ?? false;
   const showQR = !isFree && isRegistered && !hasPaid;
 
+  // 4. Récupérer les matchs récents pour le carrousel du header
+  const { getEditionRecentMatches } = await import("@/actions/phases");
+  const recentMatches = await getEditionRecentMatches(editionId);
+
   return (
     <div className="space-y-8">
       <EditionPageContent
@@ -101,6 +105,7 @@ export default async function EditionPage({ params }: PageProps) {
         currentUserMember={currentUserMember}
         currentUserRegistration={currentUserRegistration}
         isOrganizer={isOrganizer}
+        recentMatches={recentMatches}
       />
 
       {/* Free badge */}

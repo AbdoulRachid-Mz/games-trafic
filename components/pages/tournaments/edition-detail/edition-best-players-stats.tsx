@@ -99,7 +99,7 @@ export function EditionBestPlayersStats({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-y-auto border-none shadow-2xl">
         <div className="bg-primary p-6 text-primary-foreground relative">
           <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
              <Trophy className="h-32 w-32 rotate-12" />

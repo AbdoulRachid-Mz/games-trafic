@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -31,16 +31,24 @@ import { Controller } from "react-hook-form";
 import { createInsertSchema } from "drizzle-zod";
 import { tournamentEditions } from "@/database/schema";
 
-const formSchema = createInsertSchema(tournamentEditions).pick({
-  name: true,
-  editionNumber: true,
-  startDate: true,
-  maxParticipants: true,
-  prizePool: true,
-  prizeCurrency: true,
-  locationType: true,
-  location: true,
-  description: true,
+const formSchema = z.object({
+  name: z.string().min(1, "Le nom est requis"),
+  editionNumber: z.number().int().min(1),
+  startDate: z.date(),
+  maxParticipants: z.number().int().min(1).nullable().optional(),
+  prizePool: z.string().nullable().optional(),
+  prizeCurrency: z.string().min(1),
+  locationType: z.string().min(1),
+  location: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  editionConfig: z.object({
+    competitionType: z.enum(["CHAMPIONSHIP", "CUP", "LDC", "SWISS"]),
+    competitionMode: z.enum(["AUTO", "MANUAL"]),
+    checkinRequired: z.boolean(),
+    autoStart: z.boolean(),
+    seedMethod: z.string(),
+    tiebreakerRules: z.record(z.string(), z.any()),
+  }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -74,17 +82,25 @@ export function CreateEditionForm({
       locationType: "ONLINE",
       location: "En ligne",
       description: "",
+      editionConfig: {
+        competitionType: "LDC",
+        competitionMode: "AUTO",
+        checkinRequired: false,
+        autoStart: true,
+        seedMethod: "RANDOM",
+        tiebreakerRules: {},
+      },
     },
   });
 
-  async function onSubmit(values: FormValues) {
+  const onSubmit: SubmitHandler<FormValues> = async (values) => {
     setLoading(true);
     try {
       await createTournamentEdition({
         ...values,
         tournamentId,
         status: "UPCOMING",
-        startDate: new Date(values.startDate),
+        startDate: values.startDate,
       } as any);
 
       toast.success("Édition créée avec succès");
@@ -96,7 +112,7 @@ export function CreateEditionForm({
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <Card>
@@ -188,6 +204,56 @@ export function CreateEditionForm({
                   />
                   {errors.locationType && <FieldError errors={[errors.locationType]} />}
                 </FieldContent>
+              </Field>
+
+              <Field>
+                <FieldLabel>Type de compétition</FieldLabel>
+                <FieldContent>
+                  <Controller
+                    control={control}
+                    name="editionConfig.competitionType"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value ?? "LDC"}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir le type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CHAMPIONSHIP">Championnat (Ligue)</SelectItem>
+                          <SelectItem value="CUP">Coupe (Élimination directe)</SelectItem>
+                          <SelectItem value="LDC">Ligue des Champions (Groupes + Élimination)</SelectItem>
+                          <SelectItem value="SWISS">Système Suisse</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </FieldContent>
+                <FieldDescription>
+                   Définit la structure de base du tournoi.
+                </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel>Mode de gestion</FieldLabel>
+                <FieldContent>
+                  <Controller
+                    control={control}
+                    name="editionConfig.competitionMode"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value ?? "AUTO"}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir le mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AUTO">Assistant (Automatisé)</SelectItem>
+                          <SelectItem value="MANUAL">Manuel (Contrôle total)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </FieldContent>
+                <FieldDescription>
+                  L'Assistant gère les qualifications et bracket nodes automatiquement en mode Auto.
+                </FieldDescription>
               </Field>
             </div>
 

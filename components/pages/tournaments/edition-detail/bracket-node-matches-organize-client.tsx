@@ -29,7 +29,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { bulkCreateMatches, deleteMatch, generateBracketMatches, updateMatch } from "@/actions/phases";
+import {
+  bulkCreateMatches,
+  deleteMatch,
+  generateBracketMatches,
+  updateMatch,
+} from "@/actions/phases";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -48,6 +53,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface BracketNodeMatchesOrganizeClientProps {
   node: any;
@@ -56,6 +72,11 @@ interface BracketNodeMatchesOrganizeClientProps {
   allRegistrations: any[];
   groupParticipants: any[];
   existingMatches: any[];
+  editionConfig: {
+    competitionType?: string;
+    competitionMode?: "AUTO" | "MANUAL";
+    [key: string]: any;
+  };
 }
 
 type MatchFormat = "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5" | "HOME_AWAY";
@@ -71,7 +92,8 @@ type DraftMatch = {
   scheduledTime?: Date;
 };
 
-const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateTempId = () =>
+  `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 export function BracketNodeMatchesOrganizeClient({
   node,
@@ -80,19 +102,21 @@ export function BracketNodeMatchesOrganizeClient({
   allRegistrations,
   groupParticipants,
   existingMatches,
+  editionConfig,
 }: BracketNodeMatchesOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const isAutoMode = editionConfig.competitionMode === "AUTO";
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"draft" | "existing">("draft");
 
   // Récupération de la configuration héritée
-  const nodeMetadata = node.metadata as any || {};
+  const nodeMetadata = (node.metadata as any) || {};
   const inheritedFormat = nodeMetadata.format || "BEST_OF_1";
   const inheritedParticipants = nodeMetadata.participants || [];
-  
+
   const [draftMatches, setDraftMatches] = useState<DraftMatch[]>([]);
-  
+
   // État pour le formulaire d'ajout
   const [p1, setP1] = useState<string>(inheritedParticipants[0] || "");
   const [p2, setP2] = useState<string>(inheritedParticipants[1] || "");
@@ -118,7 +142,9 @@ export function BracketNodeMatchesOrganizeClient({
   const getParticipantStatus = (id: string) => {
     if (inheritedParticipants.includes(id)) return "bracket";
     const hasMatches = existingMatches.some(
-      m => m.participant1RegistrationId === id || m.participant2RegistrationId === id
+      (m) =>
+        m.participant1RegistrationId === id ||
+        m.participant2RegistrationId === id,
     );
     if (hasMatches) return "scheduled";
     return "available";
@@ -146,7 +172,7 @@ export function BracketNodeMatchesOrganizeClient({
 
     const count = parseInt(matchCount);
     const startMatchNumber = existingMatches.length + draftMatches.length + 1;
-    
+
     const newDrafts: DraftMatch[] = [];
     for (let i = 0; i < count; i++) {
       newDrafts.push({
@@ -166,19 +192,25 @@ export function BracketNodeMatchesOrganizeClient({
 
   const handleGenerateAllMatches = () => {
     if (inheritedParticipants.length < 2) {
-      toast.error("Ce bracket n'a pas assez de participants pour générer des matchs.");
+      toast.error(
+        "Ce bracket n'a pas assez de participants pour générer des matchs.",
+      );
       return;
     }
 
     startTransition(async () => {
       try {
-        const result = await generateBracketMatches(node.id, { forceRecreate: false });
+        const result = await generateBracketMatches(node.id, {
+          forceRecreate: false,
+        });
         if (result.success) {
           toast.success(`${result.count} match(s) généré(s) automatiquement.`);
           router.refresh();
         }
       } catch (error: any) {
-        toast.error(error.message || "Erreur lors de la génération des matchs.");
+        toast.error(
+          error.message || "Erreur lors de la génération des matchs.",
+        );
       }
     });
   };
@@ -189,20 +221,23 @@ export function BracketNodeMatchesOrganizeClient({
     startTransition(async () => {
       try {
         await bulkCreateMatches(
-          draftMatches.map((m, idx) => ({
-            editionId,
-            phaseId: node.phaseId,
-            groupId: node.groupId,
-            bracketNodeId: node.id,
-            round: m.round,
-            matchNumber: m.matchNumber,
-            participant1RegistrationId: m.participant1RegistrationId,
-            participant2RegistrationId: m.participant2RegistrationId,
-            matchCode: `${node.nodeCode || "BR"}-M${existingMatches.length + idx + 1}`,
-            status: "PENDING",
-            scheduledTime: m.scheduledTime,
-            metadata: { format: m.format, leg: m.leg },
-          }) as any),
+          draftMatches.map(
+            (m, idx) =>
+              ({
+                editionId,
+                phaseId: node.phaseId,
+                groupId: node.groupId,
+                bracketNodeId: node.id,
+                round: m.round,
+                matchNumber: m.matchNumber,
+                participant1RegistrationId: m.participant1RegistrationId,
+                participant2RegistrationId: m.participant2RegistrationId,
+                matchCode: `${node.nodeCode || "BR"}-M${existingMatches.length + idx + 1}`,
+                status: "PENDING",
+                scheduledTime: m.scheduledTime,
+                metadata: { format: m.format, leg: m.leg },
+              }) as any,
+          ),
         );
         toast.success(`${draftMatches.length} matchs sauvegardés.`);
         setDraftMatches([]);
@@ -214,11 +249,13 @@ export function BracketNodeMatchesOrganizeClient({
   };
 
   const handleRemoveDraft = (id: string) => {
-    setDraftMatches(draftMatches.filter(m => m.id !== id));
+    setDraftMatches(draftMatches.filter((m) => m.id !== id));
   };
 
   const handleUpdateDraft = (id: string, updates: Partial<DraftMatch>) => {
-    setDraftMatches(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    setDraftMatches((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    );
   };
 
   const handleDeleteExisting = async (id: string) => {
@@ -231,13 +268,18 @@ export function BracketNodeMatchesOrganizeClient({
     }
   };
 
-  const handleUpdateScore = async (matchId: string, score1: number, score2: number) => {
+  const handleUpdateScore = async (
+    matchId: string,
+    score1: number,
+    score2: number,
+  ) => {
     startTransition(async () => {
       try {
-        const winnerId = score1 > score2 ? 
-          (await getMatchParticipants(matchId)).participant1 : 
-          (await getMatchParticipants(matchId)).participant2;
-        
+        const winnerId =
+          score1 > score2
+            ? (await getMatchParticipants(matchId)).participant1
+            : (await getMatchParticipants(matchId)).participant2;
+
         await updateMatch(matchId, {
           score1,
           score2,
@@ -254,7 +296,7 @@ export function BracketNodeMatchesOrganizeClient({
   };
 
   const getMatchParticipants = async (matchId: string) => {
-    const match = existingMatches.find(m => m.id === matchId);
+    const match = existingMatches.find((m) => m.id === matchId);
     return {
       participant1: match?.participant1RegistrationId,
       participant2: match?.participant2RegistrationId,
@@ -263,39 +305,74 @@ export function BracketNodeMatchesOrganizeClient({
 
   // Calcul des statistiques
   const stats = useMemo(() => {
-    const completed = existingMatches.filter(m => m.status === "COMPLETED").length;
-    const pending = existingMatches.filter(m => m.status === "PENDING").length;
-    const inProgress = existingMatches.filter(m => m.status === "IN_PROGRESS").length;
+    const completed = existingMatches.filter(
+      (m) => m.status === "COMPLETED",
+    ).length;
+    const pending = existingMatches.filter(
+      (m) => m.status === "PENDING",
+    ).length;
+    const inProgress = existingMatches.filter(
+      (m) => m.status === "IN_PROGRESS",
+    ).length;
     return { completed, pending, inProgress, total: existingMatches.length };
   }, [existingMatches]);
 
   return (
     <div className="space-y-6">
+      {/* Mode Auto Warning */}
+      {isAutoMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-4 items-start shadow-sm mb-6">
+          <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <AlertCircle className="h-6 w-6 text-amber-600" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-bold text-amber-900 text-sm">
+              Mode Assistant Actif
+            </h4>
+            <p className="text-amber-800 text-xs leading-relaxed">
+              Cette édition est en mode Auto. La création ou suppression
+              manuelle de matches peut interférer avec la progression
+              automatique de la phase. Pensez à basculer en{" "}
+              <strong>Mode Manuel</strong> pour une gestion structurale libre.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Bandeau de configuration héritée */}
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
         <div className="flex items-center gap-2 mb-2">
           <Info className="h-4 w-4 text-primary" />
-          <span className="text-xs font-bold uppercase tracking-wider text-primary">Configuration du bracket</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-primary">
+            Configuration du bracket
+          </span>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <Badge variant="secondary">Format: {inheritedFormat}</Badge>
-          <Badge variant="secondary">{inheritedParticipants.length} participant(s)</Badge>
-          {nodeMetadata.generateMatches !== false && <Badge variant="secondary">Génération auto ✓</Badge>}
+          <Badge variant="secondary">
+            {inheritedParticipants.length} participant(s)
+          </Badge>
+          {nodeMetadata.generateMatches !== false && (
+            <Badge variant="secondary">Génération auto ✓</Badge>
+          )}
         </div>
       </div>
 
       {/* Alertes */}
       {hasNodeParticipants ? (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex max-md:flex-col items-center gap-4 animate-in fade-in slide-in-from-top-4">
           <div className="flex-1">
-            <p className="text-sm font-bold text-emerald-700">Participants Assignés</p>
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            <p className="text-sm font-bold text-emerald-700">
+              Participants Assignés
+            </p>
             <p className="text-xs text-emerald-600/80">
-              Ce bracket a déjà {inheritedParticipants.length} participants assignés.
-              Vous pouvez générer automatiquement tous les matchs ou les créer manuellement.
+              Ce bracket a déjà {inheritedParticipants.length} participants
+              assignés. Vous pouvez générer automatiquement tous les matchs ou
+              les créer manuellement.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-sm:flex-wrap">
             <Button
               size="sm"
               variant="outline"
@@ -304,23 +381,68 @@ export function BracketNodeMatchesOrganizeClient({
             >
               <RefreshCw className="h-3 w-3" /> Auto-remplir
             </Button>
-            <Button
-              size="sm"
-              variant="default"
-              className="h-8 gap-2 bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleGenerateAllMatches}
-              disabled={isPending}
-            >
-              {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Swords className="h-3 w-3" />}
-              Générer tous les matchs
-            </Button>
+            {isAutoMode ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-8 gap-2 bg-amber-600 hover:bg-amber-700"
+                    disabled={isPending}
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Swords className="h-3 w-3" />
+                    )}
+                    Générer tous les matchs
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-500" /> Action
+                      Déconseillée
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      L'Assistant gère la planification des matchs en mode Auto.
+                      La génération forcée peut créer des doublons ou perturber
+                      l'arbre de compétition.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleGenerateAllMatches}>
+                      Continuer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-8 gap-2 bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleGenerateAllMatches}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Swords className="h-3 w-3" />
+                )}
+                Générer tous les matchs
+              </Button>
+            )}
           </div>
         </div>
       ) : (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center gap-4">
           <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-bold text-amber-700">Aucun participant assigné</p>
+            <p className="text-sm font-bold text-amber-700">
+              Aucun participant assigné
+            </p>
             <p className="text-xs text-amber-600/80">
               Aucun participant n'est assigné à ce bracket. Vous devez les
               sélectionner manuellement parmi les participants du groupe.
@@ -331,10 +453,11 @@ export function BracketNodeMatchesOrganizeClient({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Colonne de configuration */}
-        <Card className="lg:col-span-1 border-primary/10 shadow-lg h-fit sticky top-6">
+        <Card className="lg:col-span-1 border-primary/10 shadow-lg h-fit sticky max-md:relative md:top-6">
           <CardHeader className="bg-primary/5 pb-4 rounded-t-xl">
             <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-primary" /> Configurateur de Matchs
+              <Settings2 className="h-5 w-5 text-primary" /> Configurateur de
+              Matchs
             </CardTitle>
             <CardDescription className="text-xs">
               Sélectionnez les duellistes et configurez la série
@@ -355,16 +478,25 @@ export function BracketNodeMatchesOrganizeClient({
                     {groupParticipants.map((pg: any) => {
                       const status = getParticipantStatus(pg.registrationId);
                       return (
-                        <SelectItem key={pg.registrationId} value={pg.registrationId}>
+                        <SelectItem
+                          key={pg.registrationId}
+                          value={pg.registrationId}
+                        >
                           <div className="flex items-center gap-2">
                             {getName(pg.registrationId)}
                             {status === "bracket" && (
-                              <Badge variant="secondary" className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none">
+                              <Badge
+                                variant="secondary"
+                                className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none"
+                              >
                                 Bracket
                               </Badge>
                             )}
                             {status === "scheduled" && (
-                              <Badge variant="outline" className="h-3.5 text-[8px]">
+                              <Badge
+                                variant="outline"
+                                className="h-3.5 text-[8px]"
+                              >
                                 Programmé
                               </Badge>
                             )}
@@ -394,11 +526,17 @@ export function BracketNodeMatchesOrganizeClient({
                     {groupParticipants.map((pg: any) => {
                       const status = getParticipantStatus(pg.registrationId);
                       return (
-                        <SelectItem key={pg.registrationId} value={pg.registrationId}>
+                        <SelectItem
+                          key={pg.registrationId}
+                          value={pg.registrationId}
+                        >
                           <div className="flex items-center gap-2">
                             {getName(pg.registrationId)}
                             {status === "bracket" && (
-                              <Badge variant="secondary" className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none">
+                              <Badge
+                                variant="secondary"
+                                className="h-3.5 text-[8px] bg-emerald-500/10 text-emerald-600 border-none"
+                              >
                                 Bracket
                               </Badge>
                             )}
@@ -434,14 +572,21 @@ export function BracketNodeMatchesOrganizeClient({
                 <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Format
                 </Label>
-                <Select value={format} onValueChange={(v: MatchFormat) => setFormat(v)}>
+                <Select
+                  value={format}
+                  onValueChange={(v: MatchFormat) => setFormat(v)}
+                >
                   <SelectTrigger className="h-10 text-xs rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="BEST_OF_1">Standard (BO1)</SelectItem>
-                    <SelectItem value="BEST_OF_3">Meilleur des 3 (BO3)</SelectItem>
-                    <SelectItem value="BEST_OF_5">Meilleur des 5 (BO5)</SelectItem>
+                    <SelectItem value="BEST_OF_3">
+                      Meilleur des 3 (BO3)
+                    </SelectItem>
+                    <SelectItem value="BEST_OF_5">
+                      Meilleur des 5 (BO5)
+                    </SelectItem>
                     <SelectItem value="HOME_AWAY">Aller-Retour</SelectItem>
                   </SelectContent>
                 </Select>
@@ -485,20 +630,60 @@ export function BracketNodeMatchesOrganizeClient({
             </Button>
           </CardContent>
           <CardFooter className="pt-4 border-t bg-muted/30 rounded-b-xl flex flex-col gap-2">
-            <Button
-              className="w-full gap-2 font-bold h-12 shadow-md shadow-primary/20"
-              onClick={handleSaveDrafts}
-              disabled={isPending || draftMatches.length === 0}
-            >
-              {isPending ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <CheckCircle2 className="h-5 w-5" />
-              )}
-              {isPending
-                ? "Sauvegarde..."
-                : `Sauvegarder ${draftMatches.length} Matchs`}
-            </Button>
+            {isAutoMode ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="w-full gap-2 font-bold h-12 shadow-md shadow-primary/20"
+                    disabled={isPending || draftMatches.length === 0}
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5" />
+                    )}
+                    {isPending
+                      ? "Sauvegarde..."
+                      : `Sauvegarder ${draftMatches.length} Matchs`}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-500" />{" "}
+                      Sauvegarde Manuelle
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Ajouter manuellement des matchs en mode Auto peut
+                      interférer avec la planification automatique de
+                      l'Assistant. Il est conseillé de laisser l'Assistant gérer
+                      ou de basculer en mode Manuel.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSaveDrafts}>
+                      Sauvegarder quand même
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button
+                className="w-full gap-2 font-bold h-12 shadow-md shadow-primary/20"
+                onClick={handleSaveDrafts}
+                disabled={isPending || draftMatches.length === 0}
+              >
+                {isPending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5" />
+                )}
+                {isPending
+                  ? "Sauvegarde..."
+                  : `Sauvegarder ${draftMatches.length} Matchs`}
+              </Button>
+            )}
             {stats.total > 0 && (
               <div className="flex justify-between w-full text-[10px] text-muted-foreground pt-2">
                 <span>✓ {stats.completed} terminés</span>
@@ -511,7 +696,11 @@ export function BracketNodeMatchesOrganizeClient({
 
         {/* Colonne de liste */}
         <Card className="lg:col-span-2 border-none shadow-xl flex flex-col overflow-hidden">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full flex flex-col h-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as any)}
+            className="w-full flex flex-col h-full"
+          >
             <CardHeader className="border-b pb-0 shrink-0">
               <div className="flex items-center justify-between mb-2">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -548,7 +737,9 @@ export function BracketNodeMatchesOrganizeClient({
                   <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-40">
                     <Plus className="h-12 w-12 mb-3" />
                     <p className="text-sm font-medium">Le draft est vide</p>
-                    <p className="text-xs">Ajoutez des matchs depuis le configurateur</p>
+                    <p className="text-xs">
+                      Ajoutez des matchs depuis le configurateur
+                    </p>
                   </div>
                 ) : (
                   <div className="divide-y max-h-[600px] overflow-y-auto">
@@ -558,7 +749,9 @@ export function BracketNodeMatchesOrganizeClient({
                         match={m}
                         index={idx}
                         getName={getName}
-                        onUpdate={(updates: any) => handleUpdateDraft(m.id, updates)}
+                        onUpdate={(updates: any) =>
+                          handleUpdateDraft(m.id, updates)
+                        }
                         onRemove={() => handleRemoveDraft(m.id)}
                         participants={groupParticipants}
                       />
@@ -566,12 +759,17 @@ export function BracketNodeMatchesOrganizeClient({
                   </div>
                 )}
               </TabsContent>
-              <TabsContent value="existing" className="m-0 focus-visible:ring-0">
+              <TabsContent
+                value="existing"
+                className="m-0 focus-visible:ring-0"
+              >
                 {existingMatches.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-40">
                     <Swords className="h-12 w-12 mb-3" />
                     <p className="text-sm font-medium">Aucun match existant</p>
-                    <p className="text-xs">Générez des matchs ou ajoutez-en manuellement</p>
+                    <p className="text-xs">
+                      Générez des matchs ou ajoutez-en manuellement
+                    </p>
                   </div>
                 ) : (
                   <div className="divide-y max-h-[600px] overflow-y-auto">
@@ -581,7 +779,9 @@ export function BracketNodeMatchesOrganizeClient({
                         match={match}
                         getName={getName}
                         onDelete={() => handleDeleteExisting(match.id)}
-                        onUpdateScore={(score1: number, score2: number) => handleUpdateScore(match.id, score1, score2)}
+                        onUpdateScore={(score1: number, score2: number) =>
+                          handleUpdateScore(match.id, score1, score2)
+                        }
                         isPending={isPending}
                       />
                     ))}
@@ -597,15 +797,24 @@ export function BracketNodeMatchesOrganizeClient({
 }
 
 // Composant pour une carte de match en draft
-function DraftMatchCard({ match, index, getName, onUpdate, onRemove, participants }: any) {
+function DraftMatchCard({
+  match,
+  index,
+  getName,
+  onUpdate,
+  onRemove,
+  participants,
+}: any) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <div className={cn(
-        "p-4 hover:bg-primary/5 transition-colors",
-        isExpanded && "bg-primary/5"
-      )}>
+      <div
+        className={cn(
+          "p-4 hover:bg-primary/5 transition-colors",
+          isExpanded && "bg-primary/5",
+        )}
+      >
         <CollapsibleTrigger asChild>
           <div className="flex items-center justify-between cursor-pointer">
             <div className="flex items-center gap-3">
@@ -614,14 +823,24 @@ function DraftMatchCard({ match, index, getName, onUpdate, onRemove, participant
               </div>
               <div>
                 <div className="font-medium text-sm">
-                  {getName(match.participant1RegistrationId)} vs {getName(match.participant2RegistrationId)}
+                  {getName(match.participant1RegistrationId)} vs{" "}
+                  {getName(match.participant2RegistrationId)}
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                  <span>Leg {match.leg}/{match.format === "BEST_OF_5" ? 5 : match.format === "BEST_OF_3" ? 3 : 1}</span>
+                  <span>
+                    Leg {match.leg}/
+                    {match.format === "BEST_OF_5"
+                      ? 5
+                      : match.format === "BEST_OF_3"
+                        ? 3
+                        : 1}
+                  </span>
                   <span>•</span>
                   <span>Round {match.round}</span>
                   <span>•</span>
-                  <Badge variant="outline" className="text-[8px]">{match.format}</Badge>
+                  <Badge variant="outline" className="text-[8px]">
+                    {match.format}
+                  </Badge>
                 </div>
               </div>
             </div>
@@ -630,11 +849,18 @@ function DraftMatchCard({ match, index, getName, onUpdate, onRemove, participant
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
               >
                 <X className="h-3.5 w-3.5" />
               </Button>
-              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
             </div>
           </div>
         </CollapsibleTrigger>
@@ -642,27 +868,40 @@ function DraftMatchCard({ match, index, getName, onUpdate, onRemove, participant
           <div className="pt-4 pl-11 space-y-3 border-t mt-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-[10px] text-muted-foreground">Round</Label>
+                <Label className="text-[10px] text-muted-foreground">
+                  Round
+                </Label>
                 <Input
                   type="number"
                   className="h-8 text-xs"
                   value={match.round}
-                  onChange={(e) => onUpdate({ round: parseInt(e.target.value) || 1 })}
+                  onChange={(e) =>
+                    onUpdate({ round: parseInt(e.target.value) || 1 })
+                  }
                 />
               </div>
               <div>
-                <Label className="text-[10px] text-muted-foreground">Match #</Label>
+                <Label className="text-[10px] text-muted-foreground">
+                  Match #
+                </Label>
                 <Input
                   type="number"
                   className="h-8 text-xs"
                   value={match.matchNumber}
-                  onChange={(e) => onUpdate({ matchNumber: parseInt(e.target.value) || 1 })}
+                  onChange={(e) =>
+                    onUpdate({ matchNumber: parseInt(e.target.value) || 1 })
+                  }
                 />
               </div>
             </div>
             <div>
-              <Label className="text-[10px] text-muted-foreground">Format</Label>
-              <Select value={match.format} onValueChange={(v: any) => onUpdate({ format: v })}>
+              <Label className="text-[10px] text-muted-foreground">
+                Format
+              </Label>
+              <Select
+                value={match.format}
+                onValueChange={(v: any) => onUpdate({ format: v })}
+              >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -682,7 +921,13 @@ function DraftMatchCard({ match, index, getName, onUpdate, onRemove, participant
 }
 
 // Composant pour une carte de match existant
-function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending }: any) {
+function ExistingMatchCard({
+  match,
+  getName,
+  onDelete,
+  onUpdateScore,
+  isPending,
+}: any) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [score1, setScore1] = useState(match.score1 || "");
   const [score2, setScore2] = useState(match.score2 || "");
@@ -690,11 +935,23 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
   const getStatusBadge = () => {
     switch (match.status) {
       case "COMPLETED":
-        return <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Terminé</Badge>;
+        return (
+          <Badge className="bg-emerald-500/10 text-emerald-600 border-none">
+            Terminé
+          </Badge>
+        );
       case "IN_PROGRESS":
-        return <Badge className="bg-blue-500/10 text-blue-600 border-none">En cours</Badge>;
+        return (
+          <Badge className="bg-blue-500/10 text-blue-600 border-none">
+            En cours
+          </Badge>
+        );
       case "PENDING_REVIEW":
-        return <Badge className="bg-amber-500/10 text-amber-600 border-none">En attente</Badge>;
+        return (
+          <Badge className="bg-amber-500/10 text-amber-600 border-none">
+            En attente
+          </Badge>
+        );
       default:
         return <Badge variant="outline">Programmé</Badge>;
     }
@@ -702,10 +959,12 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <div className={cn(
-        "p-4 hover:bg-muted/30 transition-colors",
-        isExpanded && "bg-muted/30"
-      )}>
+      <div
+        className={cn(
+          "p-4 hover:bg-muted/30 transition-colors",
+          isExpanded && "bg-muted/30",
+        )}
+      >
         <CollapsibleTrigger asChild>
           <div className="flex items-center justify-between cursor-pointer">
             <div className="flex items-center gap-4">
@@ -714,17 +973,22 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
               </div>
               <div>
                 <div className="font-bold text-sm flex items-center gap-2">
-                  {getName(match.participant1RegistrationId)} vs {getName(match.participant2RegistrationId)}
+                  {getName(match.participant1RegistrationId)} vs{" "}
+                  {getName(match.participant2RegistrationId)}
                   {getStatusBadge()}
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   {match.score1 !== null && match.score2 !== null ? (
-                    <span className="font-mono font-bold">Score: {match.score1} - {match.score2}</span>
+                    <span className="font-mono font-bold">
+                      Score: {match.score1} - {match.score2}
+                    </span>
                   ) : (
                     <span>Non joué</span>
                   )}
                   {match.winnerRegistrationId && (
-                    <span>• Vainqueur: {getName(match.winnerRegistrationId)}</span>
+                    <span>
+                      • Vainqueur: {getName(match.winnerRegistrationId)}
+                    </span>
                   )}
                 </div>
               </div>
@@ -734,12 +998,19 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
                 disabled={isPending}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
             </div>
           </div>
         </CollapsibleTrigger>
@@ -747,7 +1018,9 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
           <div className="pt-4 pl-14 space-y-3 border-t mt-3">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Score Joueur 1</Label>
+                <Label className="text-[10px] text-muted-foreground">
+                  Score Joueur 1
+                </Label>
                 <Input
                   type="number"
                   min={0}
@@ -758,7 +1031,9 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Score Joueur 2</Label>
+                <Label className="text-[10px] text-muted-foreground">
+                  Score Joueur 2
+                </Label>
                 <Input
                   type="number"
                   min={0}
@@ -774,10 +1049,16 @@ function ExistingMatchCard({ match, getName, onDelete, onUpdateScore, isPending 
                 size="sm"
                 variant="outline"
                 className="flex-1"
-                onClick={() => onUpdateScore(parseInt(score1) || 0, parseInt(score2) || 0)}
+                onClick={() =>
+                  onUpdateScore(parseInt(score1) || 0, parseInt(score2) || 0)
+                }
                 disabled={isPending}
               >
-                {isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                {isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                )}
                 Valider le score
               </Button>
             </div>

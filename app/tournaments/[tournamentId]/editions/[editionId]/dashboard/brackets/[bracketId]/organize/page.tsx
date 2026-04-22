@@ -7,6 +7,7 @@ import {
   getTournamentPhaseById,
 } from "@/actions/phases";
 import { getEditionRegistrations } from "@/actions/tournaments";
+import { getTournamentEditionById } from "@/actions/editions";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Swords, Settings } from "lucide-react";
 import Link from "next/link";
@@ -37,23 +38,24 @@ export default async function BracketNodeOrganizePage({
   const phase = node.phaseId ? await getTournamentPhaseById(node.phaseId) : null;
   const phaseConfig = (phase?.config as any) || {};
 
-  const regsRes = await getEditionRegistrations({
-    filters: { editionId },
-    options: { populate: ["member", "member.user", "member.team"] },
-    pagination: { page: 1, limit: 1000 },
-  });
-
-  const participantsRes = node.groupId
-    ? await getPhaseGroupParticipants({
-        filters: { groupId: node.groupId },
-        pagination: { limit: 1000, page: 1 },
-      })
-    : { data: [] };
-
-  const matchesRes = await getMatchesWithParticipants({
-    filters: { editionId, bracketNodeId: bracketId },
-    pagination: { page: 1, limit: 1000 },
-  });
+  const [regsRes, participantsRes, matchesRes, edition] = await Promise.all([
+    getEditionRegistrations({
+      filters: { editionId },
+      options: { populate: ["member", "member.user", "member.team"] },
+      pagination: { page: 1, limit: 1000 },
+    }),
+    node.groupId
+      ? getPhaseGroupParticipants({
+          filters: { groupId: node.groupId },
+          pagination: { limit: 1000, page: 1 },
+        })
+      : { data: [] },
+    getMatchesWithParticipants({
+      filters: { editionId, bracketNodeId: bracketId },
+      pagination: { page: 1, limit: 1000 },
+    }),
+    getTournamentEditionById(editionId)
+  ]);
 
   return (
     <div className="space-y-6">
@@ -84,6 +86,7 @@ export default async function BracketNodeOrganizePage({
         allRegistrations={regsRes.data as any[]}
         groupParticipants={participantsRes.data as any[]}
         existingMatches={matchesRes.data as any[]}
+        editionConfig={(edition?.editionConfig as any) || {}}
       />
     </div>
   );

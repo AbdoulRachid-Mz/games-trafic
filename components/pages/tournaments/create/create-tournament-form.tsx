@@ -72,12 +72,20 @@ interface TournamentFormData {
   contactPhone: string;
   discordServer: string;
   whatsappGroup: string;
+
+  // Édition
+  addFirstEdition: boolean;
+  editionName: string;
+  competitionType: string;
+  competitionMode: string;
+  seedMethod: string;
+  entryFee: number;
 }
 
 const steps = [
-  { id: 1, title: "Images", icon: ImageIcon, description: "Profil & Cover" },
-  { id: 2, title: "Identité", icon: Gamepad2, description: "Nom & Jeu" },
-  { id: 3, title: "Accès", icon: Shield, description: "Visibilité & Contact" },
+  { id: 1, title: "Identité", icon: Gamepad2, description: "Nom, Jeu & Images" },
+  { id: 2, title: "Accès", icon: Shield, description: "Visibilité & Contact" },
+  { id: 3, title: "Édition", icon: Calendar, description: "Format & Config" },
   { id: 4, title: "Aperçu", icon: CheckCircle2, description: "Vérification" },
 ];
 
@@ -105,6 +113,12 @@ export function CreateTournamentForm() {
     contactPhone: (user?.countryCode ?? "") + (user?.phoneNumber ?? "") || "",
     discordServer: "",
     whatsappGroup: "",
+    addFirstEdition: true,
+    editionName: "",
+    competitionType: "LDC",
+    competitionMode: "AUTO",
+    seedMethod: "RANDOM",
+    entryFee: 0,
   });
 
   const updateField = <K extends keyof TournamentFormData>(
@@ -180,14 +194,23 @@ export function CreateTournamentForm() {
         visibility: tournamentData.visibility ?? "PUBLIC",
       });
 
-      // 1ère édition — sans prizePool (sera configuré dans l'édition)
-      const editionData: NewTournamentEdition = {
+      // 1ère édition
+      const editionData: any = {
         tournamentId: tournament.id,
         editionNumber: 1,
-        name: `${tournament.name} - Édition 1`,
+        name: formData.editionName || `${tournament.name} - Édition 1`,
         startDate: new Date(formData.startDate),
         maxParticipants: formData.maxParticipants,
         status: "UPCOMING",
+        entryFee: formData.entryFee.toString(),
+        editionConfig: {
+          checkinRequired: false,
+          autoStart: true,
+          seedMethod: formData.seedMethod,
+          competitionType: formData.competitionType,
+          competitionMode: formData.competitionMode,
+          tiebreakerRules: {}
+        }
       };
 
       await createTournamentEdition(editionData);
@@ -265,12 +288,11 @@ export function CreateTournamentForm() {
               transition={{ duration: 0.3 }}
               className="h-full"
             >
-              {/* ── Step 1: Images ── */}
+              {/* ── Step 1: Identité & Images ── */}
               {step === 1 && (
-                <div className="space-y-6">
-                  {/* Wrapper for stacked uploads */}
-                  <div className="relative">
-                    {/* Cover upload */}
+                <div className="space-y-8">
+                  {/* Images Section */}
+                  <div className="relative mb-12">
                     <div className="space-y-2">
                       <Label>Image de couverture</Label>
                       <AdvancedUpload
@@ -278,34 +300,17 @@ export function CreateTournamentForm() {
                         onChange={(url) => updateField("coverImage", url)}
                         uploadPath="tournaments/cover"
                         uploadPreset="games_trafics"
-                        // className="max-h-[300px]"
-                        emptyPreview={
-                          <div className="text-center">
-                            <Typography variant="caption2" theme="muted">
-                              Uploadez une image de couverture
-                            </Typography>
-                          </div>
-                        }
                         previewClassName="min-h-[180px]"
                         showInternalSelection
                         internalImagesFolder="images/tournaments/cover"
                       />
                     </div>
-
-                    {/* Profile upload overlay */}
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
                       <AdvancedUpload
                         value={formData.profileImage}
                         onChange={(url) => updateField("profileImage", url)}
                         uploadPath="tournaments/profile"
                         uploadPreset="games_trafics"
-                        emptyPreview={
-                          <div className="text-center">
-                            <Typography variant="caption2" theme="muted">
-                              Uploadez une image de profil
-                            </Typography>
-                          </div>
-                        }
                         isRounded
                         previewClassName="w-32 h-32"
                         showInternalSelection
@@ -313,178 +318,113 @@ export function CreateTournamentForm() {
                       />
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* ── Step 2: Identité & Jeu ── */}
-              {step === 2 && (
-                <div className="space-y-6">
-                  {/* Nom */}
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nom du tournoi *</Label>
-                    <Input
-                      id="name"
-                      placeholder="Ex: Tournoi Clash Royale - Édition Hiver"
-                      value={formData.name}
-                      onChange={(e) => updateField("name", e.target.value)}
-                      className="text-lg"
-                    />
-                  </div>
+                  <div className="pt-8 space-y-6">
+                    {/* Nom */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nom du tournoi *</Label>
+                      <Input
+                        id="name"
+                        placeholder="Ex: Tournoi Clash Royale - Édition Hiver"
+                        value={formData.name}
+                        onChange={(e) => updateField("name", e.target.value)}
+                        className="text-lg"
+                      />
+                    </div>
 
-                  {/* Jeu & Plateforme */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Jeu *</Label>
-                      <Select
-                        value={formData.game}
-                        onValueChange={(val) => updateField("game", val)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choisir un jeu" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="EFOOTBALL PES">
-                            EA Football PES
-                          </SelectItem>
-                          <SelectItem value="FIFA 24">EA FIFA</SelectItem>
-                          <SelectItem value="COD">Call of Duty</SelectItem>
-                          <SelectItem value="LOL">League of Legends</SelectItem>
-                          <SelectItem value="CR">Clash Royale</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Plateforme</Label>
-                      <Select
-                        value={formData.platform}
-                        onValueChange={(val) =>
-                          updateField(
-                            "platform",
-                            val as (typeof platformEnum.enumValues)[number],
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choisir une plateforme" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PC">PC</SelectItem>
-                          <SelectItem value="PLAYSTATION">
-                            PlayStation
-                          </SelectItem>
-                          <SelectItem value="XBOX">Xbox</SelectItem>
-                          <SelectItem value="NINTENDO_SWITCH">
-                            Nintendo Switch
-                          </SelectItem>
-                          <SelectItem value="MOBILE">Mobile</SelectItem>
-                          <SelectItem value="VR">VR</SelectItem>
-                          <SelectItem value="OTHER">Autre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Mode, Participants, Date */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Mode de jeu</Label>
-                      <Select
-                        value={formData.gameMode}
-                        onValueChange={(val) => updateField("gameMode", val)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1v1">1 vs 1</SelectItem>
-                          <SelectItem value="2v2">2 vs 2</SelectItem>
-                          <SelectItem value="3v3">3 vs 3</SelectItem>
-                          <SelectItem value="5v5">5 vs 5</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Participants max</Label>
-                      <Select
-                        value={formData.maxParticipants.toString()}
-                        onValueChange={(val) =>
-                          updateField("maxParticipants", parseInt(val))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Participants" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="8">8 joueurs</SelectItem>
-                          <SelectItem value="16">16 joueurs</SelectItem>
-                          <SelectItem value="32">32 joueurs</SelectItem>
-                          <SelectItem value="64">64 joueurs</SelectItem>
-                          <SelectItem value="128">128 joueurs</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Date de début *</Label>
-                      <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="datetime-local"
-                          className="pl-9"
-                          value={formData.startDate}
-                          onChange={(e) =>
-                            updateField("startDate", e.target.value)
+                    {/* Jeu & Plateforme */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Jeu *</Label>
+                        <Select
+                          value={formData.game}
+                          onValueChange={(val) => updateField("game", val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choisir un jeu" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="EFOOTBALL PES">EA Football PES</SelectItem>
+                            <SelectItem value="FIFA 24">EA FIFA</SelectItem>
+                            <SelectItem value="COD">Call of Duty</SelectItem>
+                            <SelectItem value="LOL">League of Legends</SelectItem>
+                            <SelectItem value="CR">Clash Royale</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Plateforme</Label>
+                        <Select
+                          value={formData.platform}
+                          onValueChange={(val) =>
+                            updateField("platform", val as any)
                           }
-                        />
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choisir une plateforme" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PC">PC</SelectItem>
+                            <SelectItem value="PLAYSTATION">PlayStation</SelectItem>
+                            <SelectItem value="XBOX">Xbox</SelectItem>
+                            <SelectItem value="NINTENDO_SWITCH">Nintendo Switch</SelectItem>
+                            <SelectItem value="MOBILE">Mobile</SelectItem>
+                            <SelectItem value="VR">VR</SelectItem>
+                            <SelectItem value="OTHER">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="desc">Description</Label>
-                    <Textarea
-                      id="desc"
-                      placeholder="Décrivez votre tournoi, les règles spécifiques, etc."
-                      className="min-h-[100px]"
-                      value={formData.description}
-                      onChange={(e) =>
-                        updateField("description", e.target.value)
-                      }
-                    />
-                    {!formData.description.trim() && formData.name.trim() && (
-                      <div className="mt-2 p-3 rounded-lg border border-border/50 bg-secondary/20">
-                        <div className="flex items-center justify-between gap-3">
-                          <Typography variant="caption1" theme="muted">
-                            Suggestion automatique
-                          </Typography>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              updateField(
-                                "description",
-                                generateTournamentDescription({
-                                  name: formData.name,
-                                  game: formData.game,
-                                  platform: formData.platform,
-                                  maxParticipants: formData.maxParticipants,
-                                  startDate: formData.startDate,
-                                  cashprize: 0,
-                                }),
-                              )
-                            }
-                          >
-                            Utiliser
-                          </Button>
+                    {/* Mode & Date */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Mode de jeu</Label>
+                        <Select
+                          value={formData.gameMode}
+                          onValueChange={(val) => updateField("gameMode", val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1v1">1 vs 1</SelectItem>
+                            <SelectItem value="2v2">2 vs 2</SelectItem>
+                            <SelectItem value="3v3">3 vs 3</SelectItem>
+                            <SelectItem value="5v5">5 vs 5</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Date de début *</Label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="datetime-local"
+                            className="pl-9"
+                            value={formData.startDate}
+                            onChange={(e) => updateField("startDate", e.target.value)}
+                          />
                         </div>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="desc">Description</Label>
+                      <Textarea
+                        id="desc"
+                        placeholder="Décrivez votre tournoi..."
+                        className="min-h-[100px]"
+                        value={formData.description}
+                        onChange={(e) => updateField("description", e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* ── Step 3: Visibilité & Contact ── */}
-              {step === 3 && (
+              {/* ── Step 2: Visibilité & Contact ── */}
+              {step === 2 && (
                 <div className="space-y-6">
                   <div>
                     <Typography variant="h3" weight="bold" className="mb-1">
@@ -620,6 +560,100 @@ export function CreateTournamentForm() {
                     </div>
                   </div>
                 </div>
+              //  </div>
+              )}
+
+              {/* ── Step 3: Édition ── */}
+              {step === 3 && (
+                <div className="space-y-6">
+                  <div>
+                    <Typography variant="h3" weight="bold" className="mb-1">
+                      Configuration de l'Édition
+                    </Typography>
+                    <Typography variant="body-sm" theme="muted">
+                      Paramètres de la première édition du tournoi
+                    </Typography>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editionName">Nom de l'édition</Label>
+                      <Input
+                        id="editionName"
+                        placeholder={`${formData.name} - Édition 1`}
+                        value={formData.editionName}
+                        onChange={(e) => updateField("editionName", e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Type de compétition</Label>
+                        <Select
+                          value={formData.competitionType}
+                          onValueChange={(val) => updateField("competitionType", val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="LDC">Champions League (LDC)</SelectItem>
+                            <SelectItem value="CHAMPIONSHIP">Championnat (Ligue)</SelectItem>
+                            <SelectItem value="CUP">Coupe (Élimination directe)</SelectItem>
+                            <SelectItem value="SWISS">Rondes Suisses</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Mode d'organisation</Label>
+                        <Select
+                          value={formData.competitionMode}
+                          onValueChange={(val) => updateField("competitionMode", val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AUTO">Automatique (Wizard)</SelectItem>
+                            <SelectItem value="MANUAL">Manuel (Expert)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Méthode de Tirage (Seed)</Label>
+                        <Select
+                          value={formData.seedMethod}
+                          onValueChange={(val) => updateField("seedMethod", val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Tirage" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="RANDOM">Aléatoire</SelectItem>
+                            <SelectItem value="MANUAL">Manuel</SelectItem>
+                            <SelectItem value="RANKED">Par Rang / Elo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {!formData.isPublic && (
+                        <div className="space-y-2">
+                          <Label htmlFor="entryFee">Prix d'entrée (GTC)</Label>
+                          <Input
+                            id="entryFee"
+                            type="number"
+                            min="0"
+                            value={formData.entryFee}
+                            onChange={(e) => updateField("entryFee", parseInt(e.target.value) || 0)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* ── Step 4: Aperçu ── */}
@@ -665,7 +699,7 @@ export function CreateTournamentForm() {
                     </div>
                     <div className="pt-12 p-6">
                       <Typography variant="h3" weight="bold" className="mb-2">
-                        {getTournamentPreviewData(formData).title}
+                        {formData.editionName || getTournamentPreviewData(formData).title}
                       </Typography>
                       {(formData.description.trim() ||
                         formData.name.trim()) && (

@@ -975,6 +975,8 @@ export const tournamentEditions = pgTable('tournament_editions', {
     checkinRequired: false,
     autoStart: true,
     seedMethod: 'RANDOM',
+    competitionType: 'LDC', // 'CHAMPIONSHIP', 'CUP', 'LDC', 'SWISS'
+    competitionMode: 'AUTO', // 'AUTO', 'MANUAL'
     tiebreakerRules: {}
   }),
 
@@ -996,6 +998,10 @@ export const tournamentEditions = pgTable('tournament_editions', {
   // Gestion
   notificationsEnabled: boolean('notifications_enabled').default(true),
   autoAdvance: boolean('auto_advance').default(true),
+  
+  // Winner (Final result)
+  winnerId: text('winner_id').references(() => tournamentMembers.id), // Official global winner
+  winnerMetadata: jsonb('winner_metadata').default({}), // Cached info: { username: string, avatar: string, teamName: string, etc. }
 
   isActive: boolean('is_active').default(true),
   isDeleted: boolean('is_deleted').default(false),
@@ -1367,6 +1373,7 @@ export const bracketNodes = pgTable('bracket_nodes', {
 
   isDeleted: boolean('is_deleted').default(false),
   isCompleted: boolean('is_completed').default(false),
+  winnerRegistrationId: text('winner_registration_id').references(() => editionRegistrations.id, { onDelete: 'set null' }),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -2520,7 +2527,7 @@ export const bracketNodesRelations = relations(bracketNodes, ({ one, many }) => 
     relationName: 'bracket_parent'
   }),
   childNodes: many(bracketNodes, { relationName: 'bracket_parent' }),
-  match: one(matches),
+  matches: many(matches),
 }));
 
 export const matchesRelations = relations(matches, ({ one }) => ({

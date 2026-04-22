@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BracketNodeCard } from "@/components/cards/bracket-node-card";
 import { PhaseFilter } from "../groups/phase-filter";
+import { BracketExportButton } from "@/components/pages/tournaments/edition-detail/bracket-export-button";
 
 export const metadata: Metadata = {
   title: "Gestion des Brackets - Dashboard",
@@ -52,6 +53,18 @@ function getRoundLabel(roundIndex: number, totalRounds: number) {
   // For others: 1/8, 1/16, 1/32...
   const pow = Math.pow(2, distanceToFinal + 1);
   return `1/${pow} finale`;
+}
+
+function phaseTypeLabel(type: string | null | undefined): string {
+  switch (type) {
+    case "ELIMINATION": return "Élimination directe";
+    case "ROUND_ROBIN": return "Round Robin";
+    case "GROUP_STAGE": return "Phase de poules";
+    case "SWISS": return "Système suisse";
+    case "KNOCKOUT": return "Knockout";
+    case "CUSTOM": return "Personnalisé";
+    default: return "Inconnu";
+  }
 }
 
 export default async function BracketsDashboardPage({
@@ -105,7 +118,7 @@ export default async function BracketsDashboardPage({
       // Get matches for each node to count them
       const nodesWithStats = await Promise.all(nodes.map(async (node) => {
         const matchesRes = await getMatchesWithParticipants({
-          filters: { bracketNodeId: node.id },
+          filters: { bracketNodeId: node.id, editionId },
           pagination: { page: 1, limit: 1 } // Just need total
         });
         return {
@@ -148,10 +161,10 @@ export default async function BracketsDashboardPage({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <Typography variant="h3" weight="bold">
-            Gestion des Brackets
+            Gestion des Brackets/rencontres
           </Typography>
           <Typography variant="body-sm" theme="muted">
             Gestion des rounds et des rencontres par bracket
@@ -223,9 +236,9 @@ export default async function BracketsDashboardPage({
                     <Trophy className="h-6 w-6" />
                   </div>
                   <div>
-                    <Typography variant="h5" weight="bold">
+                    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phase.id}`} className="text-lg font-semibold hover:underline hover:text-primary transition-colors" >
                       {phase.name}
-                    </Typography>
+                    </Link>
                     <div className="flex items-center gap-3 mt-1">
                       <Typography variant="caption1" theme="muted">
                         {nodes.length} bracket(s) • {phase.matchesCount} match(s)
@@ -244,14 +257,18 @@ export default async function BracketsDashboardPage({
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <Badge variant="secondary" className="text-[10px] uppercase">
-                    {phase.phaseType}
+                    {phaseTypeLabel(phase.phaseType)}
                   </Badge>
+                  <BracketExportButton 
+                    phase={phase} 
+                    nodes={nodes} 
+                  />
                   <Button size="sm" variant="outline" asChild>
                     <Link
                       href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases/${phase.id}`}
-                    >
+                    > 
                       Éditer la phase
                     </Link>
                   </Button>
@@ -260,8 +277,8 @@ export default async function BracketsDashboardPage({
 
               <div className={cn(
                 "grid gap-4",
-                viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : 
-                viewMode === "compact" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : 
+                viewMode === "grid" ? "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3" : 
+                viewMode === "compact" ? "grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : 
                 "grid-cols-1"
               )}>
                 {nodes.map((node: any) => (

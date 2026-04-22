@@ -12,9 +12,19 @@ import {
 import { Typography } from "@/components/ui/typography";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Sword, ChevronUp, ChevronDown, Minus } from "lucide-react";
+import { Trophy, Sword, ChevronUp, ChevronDown, Minus, Download, FileSpreadsheet, FileJson, FileText, File, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useScreenSize } from "@/hooks/use-screen";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { exportData, createExportData, type ExportFormat } from "@/utils/export-utils";
 
 // ============================================================================
 // TYPES
@@ -174,6 +184,51 @@ export function StandingsTable({
       "Joueur";
     const image = (row as StandingRow | BracketStandingRow)?.participantImage || member?.avatar || user?.profileImage;
     return { name, image };
+  };
+
+  const handleExport = async (format: ExportFormat) => {
+    let exportRows: any[] = [];
+    let fileName = "classement";
+
+    if (mode === "group" && activeGroup) {
+      exportRows = sortedGroupRows.map((row, idx) => ({
+        ...row,
+        position: row.position || idx + 1,
+        participantName: getParticipantInfo(row.registrationId, row).name,
+        status: row.qualified ? "Qualifié" : row.eliminated ? "Éliminé" : "En cours",
+      }));
+      fileName = `classement_${activeGroup.groupName.replace(/\s+/g, "_")}`;
+    } else if (mode === "edition") {
+      exportRows = editionRows.map((row, idx) => ({
+        ...row,
+        position: row.position || idx + 1,
+        participantName: getParticipantInfo(row.registrationId, row).name,
+        status: row.qualified ? "Qualifié" : "En cours",
+      }));
+      fileName = "classement_general";
+    } else if (mode === "bracket") {
+       exportRows = sortedBracketRows.map((row, idx) => ({
+        position: row.position || idx + 1,
+        participantName: getParticipantInfo(row.registrationId, row).name,
+        round: row.round,
+        roundLabel: row.roundLabel,
+        status: row.won ? "Qualifié" : row.eliminated ? "Éliminé" : "En cours",
+      }));
+      fileName = "classement_phases_finales";
+    }
+
+    const config = {
+      filename: fileName,
+      title: title || "Classement du Tournoi",
+      subtitle: mode === "group" ? `Groupe: ${activeGroup?.groupName}` : mode === "edition" ? "Classement Général" : "Phases Finales",
+      header: {
+        title: "Game Trafics",
+        subtitle: "Export du classement automatique",
+      }
+    };
+
+    const tableData = createExportData(exportRows, "standings");
+    await exportData(format, tableData, config);
   };
 
   const renderEmpty = () => (
@@ -387,55 +442,84 @@ export function StandingsTable({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         {title && (
           <Typography variant="h4" weight="bold">
             {title}
           </Typography>
         )}
-        {showFilter && groups.length > 1 && (
+        
+        {showFilter && mode === "group" && groups.length > 1 && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Groupe :</span>
-            <Select
-              value={selectedGroupId}
-              onValueChange={setSelectedGroupId}
-            >
+            <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Choisir un groupe" />
               </SelectTrigger>
               <SelectContent>
-                {groups.map((group) => (
-                  <SelectItem key={group.groupId} value={group.groupId}>
-                    {group.groupName}
+                {groups.map((g) => (
+                  <SelectItem key={g.groupId} value={g.groupId}>
+                    {g.groupName}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="h-4 w-4" />
+              {isMobile ? "" : "Exporter"}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Format d'export</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleExport("excel")}>
+              <FileSpreadsheet className="h-4 w-4 mr-2 text-green-600" />
+              Excel (XLSX)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv")}>
+              <FileText className="h-4 w-4 mr-2 text-blue-600" />
+              CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("json")}>
+              <FileJson className="h-4 w-4 mr-2 text-orange-500" />
+              JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("pdf")}>
+              <File className="h-4 w-4 mr-2 text-red-500" />
+              PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <Card className="overflow-hidden border-none shadow-sm">
-        <div className="overflow-x-auto">
+      <Card className="overflow-hidden border-border/50 shadow-2xl relative">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+           <Trophy className="h-64 w-64 rotate-12" />
+        </div>
+        <div className="overflow-x-auto relative z-10">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+            <thead className="bg-muted/40 border-b border-white/5">
               <tr className="text-muted-foreground">
-                <th className="text-left p-4 w-12 font-medium">#</th>
-                <th className="text-left p-4 font-medium">Participant</th>
-                <th className="text-center p-4 font-bold text-foreground">Pts</th>
+                <th className="text-left p-4 w-12 font-black uppercase tracking-tighter italic">#</th>
+                <th className="text-left p-4 font-black uppercase tracking-tighter italic">Guerrier</th>
+                <th className="text-center p-4 font-black text-foreground uppercase tracking-widest bg-primary/5">Pts</th>
                 {!isMobile && (
                   <>
-                    <th className="text-center p-4 font-medium">J</th>
-                    <th className="text-center p-4 font-medium">V</th>
-                    <th className="text-center p-4 font-medium">N</th>
-                    <th className="text-center p-4 font-medium">D</th>
-                    <th className="text-center p-4 font-medium">+/-</th>
-                    <th className="text-center p-4 font-medium">Diff.</th>
+                    <th className="text-center p-4 font-medium uppercase text-[10px] tracking-[0.2em]">J</th>
+                    <th className="text-center p-4 font-medium uppercase text-[10px] tracking-[0.2em]">V</th>
+                    <th className="text-center p-4 font-medium uppercase text-[10px] tracking-[0.2em]">N</th>
+                    <th className="text-center p-4 font-medium uppercase text-[10px] tracking-[0.2em]">D</th>
+                    <th className="text-center p-4 font-medium uppercase text-[10px] tracking-[0.2em]">Buts</th>
+                    <th className="text-center p-4 font-medium uppercase text-[10px] tracking-[0.2em]">Diff</th>
                   </>
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-white/5 bg-background/50 backdrop-blur-sm">
               {sortedGroupRows.map((row, idx) => {
                 const { name, image } = getParticipantInfo(
                   row.registrationId,
@@ -445,62 +529,83 @@ export function StandingsTable({
                   <tr
                     key={row.registrationId}
                     className={cn(
-                      "hover:bg-accent/5 transition-colors",
-                      row.qualified && "bg-green-500/5",
+                      "hover:bg-primary/[0.03] transition-all group",
+                      row.qualified && "bg-green-500/[0.02]",
                       currentRegistrationId === row.registrationId && "bg-primary/10 hover:bg-primary/15"
                     )}
                   >
-                    <td className="p-4 font-bold text-muted-foreground whitespace-nowrap">
+                    <td className="p-4 font-black italic text-muted-foreground/50 whitespace-nowrap group-hover:text-primary transition-colors">
                       {row.position || idx + 1}
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 border-2 border-background ring-2 ring-border">
-                          <AvatarImage src={image} />
-                          <AvatarFallback className="text-[10px] bg-muted">
-                            {name.substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                           <Avatar className="h-11 w-11 border-2 border-background ring-4 ring-muted transition-all group-hover:ring-primary/20">
+                             <AvatarImage src={image} />
+                             <AvatarFallback className="text-[10px] font-black bg-muted">
+                               {name.substring(0, 2).toUpperCase()}
+                             </AvatarFallback>
+                           </Avatar>
+                           {idx === 0 && (
+                             <div className="absolute -top-2 -left-2 bg-yellow-500 rounded-full p-1 shadow-lg ring-2 ring-background animate-bounce">
+                               <Trophy className="h-3 w-3 text-black" />
+                             </div>
+                           )}
+                        </div>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm whitespace-nowrap">
+                            <span className="font-black text-base uppercase tracking-tighter italic group-hover:text-primary transition-colors">
                               {name}
                             </span>
                             {currentRegistrationId === row.registrationId && (
-                              <Badge variant="default" className="text-[10px] h-5 px-1.5 leading-none">Moi</Badge>
+                              <Badge className="bg-primary/20 text-primary border-primary/20 text-[10px] h-5 px-2 font-black uppercase italic">Moi</Badge>
                             )}
                           </div>
-                          {row.qualified && (
-                            <span className="text-[10px] text-green-600 font-medium leading-none">
-                              Qualifié
-                            </span>
-                          )}
-                          {row.eliminated && (
-                            <span className="text-[10px] text-destructive font-medium leading-none">
-                              Éliminé
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            {row.qualified && (
+                              <span className="text-[10px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest border border-green-500/20">
+                                Qualifié
+                              </span>
+                            )}
+                            {row.eliminated && (
+                              <span className="text-[10px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest border border-red-500/20">
+                                Éliminé
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="p-4 text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-black">
+                    <td className="p-4 text-center bg-primary/[0.02]">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-primary text-white font-black italic text-lg shadow-lg shadow-primary/30 transform group-hover:scale-110 transition-transform">
                         {row.points}
                       </span>
                     </td>
                     {!isMobile && (
                       <>
-                        <td className="p-4 text-center font-medium">{row.matchesPlayed}</td>
-                        <td className="p-4 text-center text-green-600">{row.matchesWon}</td>
-                        <td className="p-4 text-center text-amber-600">{row.matchesDrawn}</td>
-                        <td className="p-4 text-center text-destructive">{row.matchesLost}</td>
-                        <td className="p-4 text-center text-muted-foreground tabular-nums">
-                          {row.scoreFor}/{row.scoreAgainst}
+                        <td className="p-4 text-center font-bold text-muted-foreground">{row.matchesPlayed}</td>
+                        <td className="p-4 text-center">
+                           <Badge variant="outline" className="bg-green-500/5 text-green-500 border-green-500/20 font-black">{row.matchesWon}</Badge>
                         </td>
-                        <td className="p-4 text-center font-bold">
-                          {row.scoreDifference > 0
-                            ? `+${row.scoreDifference}`
-                            : row.scoreDifference}
+                        <td className="p-4 text-center">
+                           <Badge variant="outline" className="bg-amber-500/5 text-amber-500 border-amber-500/20 font-black">{row.matchesDrawn}</Badge>
+                        </td>
+                        <td className="p-4 text-center">
+                           <Badge variant="outline" className="bg-red-500/5 text-red-500 border-red-500/20 font-black">{row.matchesLost}</Badge>
+                        </td>
+                        <td className="p-4 text-center font-bold text-muted-foreground tabular-nums">
+                          <span className="text-green-500">{row.scoreFor}</span>
+                          <span className="opacity-30 mx-1">/</span>
+                          <span className="text-red-400">{row.scoreAgainst}</span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={cn(
+                            "font-black italic px-2 py-1 rounded-lg text-sm",
+                            row.scoreDifference > 0 ? "bg-green-500/10 text-green-500" : 
+                            row.scoreDifference < 0 ? "bg-red-500/10 text-red-500" : "bg-muted text-muted-foreground"
+                          )}>
+                            {row.scoreDifference > 0 ? `+${row.scoreDifference}` : row.scoreDifference}
+                          </span>
                         </td>
                       </>
                     )}

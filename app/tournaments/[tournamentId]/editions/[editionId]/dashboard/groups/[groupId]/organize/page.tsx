@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { getPhaseGroupById, getBracketNodes } from "@/actions/phases";
 import { getEditionRegistrations } from "@/actions/tournaments";
+import { getTournamentEditionById } from "@/actions/editions";
 import { notFound } from "next/navigation";
 import { ChevronLeft, LayoutGrid, Settings } from "lucide-react";
 import Link from "next/link";
@@ -20,17 +21,19 @@ export default async function GroupNodesOrganizePage({
   const group = (await getPhaseGroupById(groupId, { populate: ["phase"] })) as any;
   if (!group) notFound();
 
-  const nodesRes = await getBracketNodes({
-    filters: { groupId },
-    options: { sortBy: "order", sortOrder: "asc" },
-    pagination: { limit: 100, page: 1 },
-  });
-
-  const regsRes = await getEditionRegistrations({
-    filters: { editionId },
-    options: { populate: ["member", "member.user", "member.team"] },
-    pagination: { page: 1, limit: 1000 },
-  });
+  const [nodesRes, regsRes, edition] = await Promise.all([
+    getBracketNodes({
+      filters: { groupId },
+      options: { sortBy: "order", sortOrder: "asc" },
+      pagination: { limit: 100, page: 1 },
+    }),
+    getEditionRegistrations({
+      filters: { editionId },
+      options: { populate: ["member", "member.user", "member.team"] },
+      pagination: { page: 1, limit: 1000 },
+    }),
+    getTournamentEditionById(editionId)
+  ]);
 
   const groupParticipantsRes = (await getPhaseGroupById(groupId, { populate: ["participants"] })) as any;
   const participants = groupParticipantsRes?.participants || [];
@@ -67,6 +70,7 @@ export default async function GroupNodesOrganizePage({
         phaseConfig={(group.phase as any)?.config || {}}
         tournamentId={tournamentId}
         editionId={editionId}
+        editionConfig={(edition?.editionConfig as any) || {}}
       />
     </div>
   );

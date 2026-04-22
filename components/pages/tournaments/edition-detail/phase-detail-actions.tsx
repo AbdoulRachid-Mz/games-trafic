@@ -13,12 +13,16 @@ interface PhaseDetailActionsProps {
     phaseId: string;
     isActive: boolean;
     isCompleted: boolean;
+    phaseType?: string;
+    editionType?: string;
 }
 
 export function PhaseDetailActions({
     phaseId,
     isActive,
     isCompleted,
+    phaseType,
+    editionType,
 }: PhaseDetailActionsProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
@@ -76,6 +80,8 @@ export function PhaseDetailActions({
                     type="PHASE"
                     id={phaseId}
                     name="Phase"
+                    phaseType={phaseType}
+                    editionType={editionType}
                     onComplete={() => router.refresh()}
                 />
             )}

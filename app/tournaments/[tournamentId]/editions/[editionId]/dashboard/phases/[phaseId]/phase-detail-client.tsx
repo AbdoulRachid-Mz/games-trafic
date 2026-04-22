@@ -6,13 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Settings2, Users, Swords, ChevronLeft, PlusCircle, RefreshCcw } from "lucide-react";
+import { Settings2, Users, Swords, ChevronLeft, PlusCircle, RefreshCcw, AlertTriangle } from "lucide-react";
 import type { TournamentPhase, PhaseGroup } from "@/database/schema";
 import { PhaseDetailActions } from "@/components/pages/tournaments/edition-detail/phase-detail-actions";
 import { GroupItemActions } from "@/components/pages/tournaments/edition-detail/group-item-actions";
 import { CreateGroupDialog } from "@/components/pages/tournaments/edition-detail/create-group-dialog";
 import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/edition-detail/generate-group-matches-dialog";
 import { DynamicActionMenu } from "@/components/shared/dynamic-action-menu";
+import { useState, useTransition } from "react";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
+import { updateTournamentEditionModeAction } from "@/actions/editions";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 interface PhaseDetailClientProps {
   tournamentId: string;
@@ -23,6 +38,11 @@ interface PhaseDetailClientProps {
   allPhases: TournamentPhase[];
   basePath: string;
   typeConf: { label: string; color: string; bgColor: string };
+  editionConfig: {
+    competitionType?: string;
+    competitionMode?: "AUTO" | "MANUAL";
+    [key: string]: any;
+  };
 }
 
 const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -44,8 +64,30 @@ export function PhaseDetailClient({
   groups, 
   allPhases, 
   basePath, 
-  typeConf 
+  typeConf,
+  editionConfig 
 }: PhaseDetailClientProps) {
+
+  const isAutoMode = editionConfig.competitionMode === "AUTO";
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleSwitchToManual = () => {
+    startTransition(async () => {
+      try {
+        await updateTournamentEditionModeAction(editionId, "MANUAL");
+        toast.success("Mode basculé en Manuel", {
+          description: "Vous avez maintenant le contrôle total de l'édition.",
+        });
+        router.refresh();
+      } catch (error) {
+        toast.error("Erreur lors du basculement", {
+          description: "Impossible de basculer en mode Manuel.",
+        });
+      }
+    });
+  };
+  
   return (
     <div className="space-y-3 animate-in fade-in duration-500">
       {/* Header */}
@@ -73,11 +115,18 @@ export function PhaseDetailClient({
                   <Badge className={`${typeConf.bgColor} ${typeConf.color} border shadow-sm text-xs font-bold px-3 py-0.5`}>
                     {typeConf.label}
                   </Badge>
+                  {isAutoMode ? (
+                    <Badge className="bg-blue-600/10 text-blue-600 border-blue-600/20 shadow-sm text-xs px-3 py-0.5 flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Mode Auto (Assistant)
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 shadow-sm text-xs px-3 py-0.5">
+                      Mode Manuel
+                    </Badge>
+                  )}
                   {phase.isActive && (
                     <Badge className="bg-green-600/10 text-green-600 border-green-600/20 shadow-sm text-xs px-3 py-0.5">Active</Badge>
-                  )}
-                  {!phase.isActive && (
-                    <Badge variant="outline" className="text-muted-foreground text-xs px-3 py-0.5">Inactive</Badge>
                   )}
                   {phase.isCompleted && (
                     <Badge variant="secondary" className="text-xs px-3 py-0.5">Terminée</Badge>
@@ -98,11 +147,54 @@ export function PhaseDetailClient({
                 </div>
               </div>
 
-              <PhaseDetailActions
-                phaseId={phaseId}
-                isActive={phase.isActive ?? false}
-                isCompleted={phase.isCompleted ?? false}
-              />
+              <div className="flex items-center gap-2">
+                {isAutoMode && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 border-amber-500/30 text-amber-600 hover:bg-amber-500/5 text-[10px] font-black uppercase tracking-wider">
+                        Passer en manuel
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+                          <AlertTriangle className="h-5 w-5" /> Basculer en mode Manuel ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-3">
+                          <p>
+                            En basculant en mode **Manuel**, vous prenez le contrôle total de la structure de l'édition.
+                          </p>
+                          <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20 text-amber-700 text-xs space-y-2">
+                             <p className="font-bold">Risques identifiés :</p>
+                             <ul className="list-disc pl-4 space-y-1">
+                               <li>L'Assistant (Wizard) ne pourra plus générer ou réorganiser automatiquement les phases.</li>
+                               <li>Les calculs automatiques de qualification pourraient être perturbés si la structure change.</li>
+                               <li>**Cette action est irréversible** pour cette édition.</li>
+                             </ul>
+                          </div>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={handleSwitchToManual}
+                          className="bg-amber-600 hover:bg-amber-700"
+                        >
+                          Confirmer la bascule
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+
+                <PhaseDetailActions
+                  phaseId={phaseId}
+                  isActive={phase.isActive ?? false}
+                  isCompleted={phase.isCompleted ?? false}
+                  phaseType={phase.phaseType as string | undefined}
+                  editionType={editionConfig.competitionType}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -123,12 +215,41 @@ export function PhaseDetailClient({
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <Button variant="outline" asChild size="sm">
-               <Link href={`./phases/${phaseId}/organize`}>
-                  <RefreshCcw className="h-4 w-4 mr-2" />
-                  Organiser Phase
-               </Link>
-             </Button>
+            {isAutoMode ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Organiser Phase
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                   <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-amber-500" /> Action Déconseillée en Mode Auto
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Cette phase est gérée par l'Assistant. La modification manuelle de la structure (groupes, participants) peut perturber le calcul automatique des qualifications.
+                        <br /><br />
+                        Il est recommandé de laisser l'Assistant gérer la structure ou de basculer en **Mode Manuel** au préalable.
+                      </AlertDialogDescription>
+                   </AlertDialogHeader>
+                   <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction asChild>
+                        <Link href={`./phases/${phaseId}/organize`}>Continuer quand même</Link>
+                      </AlertDialogAction>
+                   </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Button variant="outline" asChild size="sm">
+                <Link href={`./phases/${phaseId}/organize`}>
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Organiser Phase
+                </Link>
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-3">
@@ -191,11 +312,23 @@ export function PhaseDetailClient({
             paramValue: "createGroup",
             overlayType: "dialog",
             renderContent: (
-              <CreateGroupDialog 
-                phaseId={phaseId} 
-                nextOrder={groups.length + 1} 
-                previousPhases={allPhases.filter(p => (p.order || 0) < (phase?.order || 0)).map(p => ({ id: p.id, name: p.name || `Phase ${p.order}` }))}
-              />
+              <>
+                {isAutoMode && (
+                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4 text-amber-700 text-xs flex gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <p>
+                      <strong>Attention :</strong> Cette édition est en mode Auto. 
+                      Créer manuellement un groupe peut briser la logique de l'Assistant.
+                    </p>
+                  </div>
+                )}
+                <CreateGroupDialog 
+                  phaseId={phaseId} 
+                  nextOrder={groups.length + 1} 
+                  previousPhases={allPhases.filter(p => (p.order || 0) < (phase?.order || 0)).map(p => ({ id: p.id, name: p.name || `Phase ${p.order}` }))}
+                  asFormOnly
+                />
+              </>
             )
           },
           {
@@ -203,7 +336,24 @@ export function PhaseDetailClient({
              label: "Générer Structure",
              icon: RefreshCcw,
              href: `./phases/${phaseId}/organize`,
-             separatorBefore: true
+             separatorBefore: true,
+             ...(isAutoMode ? {
+               overlayType: "dialog",
+               renderContent: (
+                 <div className="space-y-4 p-4">
+                   <div className="flex items-center gap-2 text-amber-600 font-bold">
+                     <AlertTriangle className="h-5 w-5" /> Action Déconseillée
+                   </div>
+                   <p className="text-sm text-muted-foreground">
+                     La génération manuelle de structure en mode Auto peut perturber l'Assistant. 
+                     Il est préférable de laisser l'Assistant gérer ou de basculer en mode Manuel.
+                   </p>
+                   <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => router.push(`./phases/${phaseId}/organize`)}>Continuer quand même</Button>
+                   </div>
+                 </div>
+               )
+             } : {})
           }
         ]}
       />

@@ -47,7 +47,15 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { organizeEditionStructure, getStructurePreviewAction } from "@/actions/phases";
+import {
+  organizeEditionStructure,
+  getStructurePreviewAction,
+  resetEditionStructure,
+} from "@/actions/phases";
+import {
+  updateEdition,
+  updateTournamentEditionModeAction,
+} from "@/actions/editions";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -79,6 +87,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { useScreenSize } from "@/hooks/use-screen";
 
 // ============================================================================
 // TYPES
@@ -126,7 +135,29 @@ type DraftPhase = {
 
     // For all
     seedingMethod?: "RANDOM" | "SEQUENTIAL" | "SNAKE" | "MANUAL";
+    // For ELIMINATION / KNOCKOUT
+    knockoutStrategy?: "BARRAGE" | "DIRECT";
   };
+};
+
+interface DepthControls {
+  groups: boolean;
+  brackets: boolean;
+  matches: boolean;
+}
+
+type AutoConfig = {
+  preset: "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM";
+  groupsCount: number;
+  groupsQualifiedCount: number;
+  knockoutStrategy: "BARRAGE" | "DIRECT";
+  roundsCount?: number;
+  isHomeAwayGroups: boolean;
+  isHomeAwayElimination: boolean;
+  nodePrefix: string;
+
+  // New granular gen for AUTO mode
+  depth: DepthControls;
 };
 
 type StructurePreview = {
@@ -369,9 +400,13 @@ export function OrganizeWizardClient({
 }: OrganizeWizardClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [mode, setMode] = useState<"AUTO" | "MANUAL">("AUTO");
+  const [mode, setMode] = useState<"AUTO" | "MANUAL">(
+    edition?.editionConfig?.competitionMode ?? "AUTO",
+  );
   const [showPreview, setShowPreview] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const [draftPhases, setDraftPhases] = useState<DraftPhase[]>([
     {
@@ -388,13 +423,116 @@ export function OrganizeWizardClient({
     },
   ]);
 
-  const [autoConfig, setAutoConfig] = useState({
-    preset: "LEAGUE" as "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM",
-    isHomeAway: false,
-    groupsQualifiedCount: 2,
-    groupsCount: 4,
-    nodePrefix: "Journée",
+  const [autoConfig, setAutoConfig] = useState<AutoConfig>({
+    preset: (() => {
+      const type = edition?.editionConfig?.competitionType;
+      if (type === "CHAMPIONSHIP") return "LEAGUE";
+      if (type === "LDC") return "CHAMPIONS";
+      if (type === "SWISS") return "SWISS";
+      return "CHAMPIONS"; // Default to CHAMPIONS for CUP or others
+    })() as "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM",
+    isHomeAwayGroups: edition?.editionConfig?.isHomeAwayGroups ?? edition?.editionConfig?.isHomeAway ?? false,
+    isHomeAwayElimination: edition?.editionConfig?.isHomeAwayElimination ?? false,
+    groupsQualifiedCount: edition?.editionConfig?.advanceCount || 2,
+    groupsCount: edition?.editionConfig?.groupsCount || 4,
+    nodePrefix: edition?.editionConfig?.nodePrefix || "Journée",
+    knockoutStrategy:
+      (edition?.editionConfig?.knockoutStrategy as any) || "BARRAGE",
+    depth: {
+      groups: edition?.editionConfig?.generateGroups !== false,
+      brackets: edition?.editionConfig?.generateNodes !== false,
+      matches: edition?.editionConfig?.generateMatches !== false,
+    },
   });
+
+  const [hasPendingConfigChange, setHasPendingConfigChange] = useState(false);
+  const [showConfigConfirm, setShowConfigConfirm] = useState(false);
+  const [pendingConfig, setPendingConfig] = useState<AutoConfig | null>(null);
+
+  // Sync mode if editionConfig changes after mount (e.g. router refresh)
+  useEffect(() => {
+    if (edition?.editionConfig?.competitionMode) {
+      setMode(edition.editionConfig.competitionMode);
+    }
+  }, [edition?.editionConfig?.competitionMode]);
+
+  // Charger la config existante de l'édition si elle change
+  useEffect(() => {
+    if (edition?.editionConfig) {
+      const config = edition.editionConfig;
+      let preset: "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM" = "CHAMPIONS";
+      if (config.competitionType === "CHAMPIONSHIP") preset = "LEAGUE";
+      else if (config.competitionType === "SWISS") preset = "SWISS";
+
+      setAutoConfig((prev) => ({
+        ...prev,
+        preset,
+        isHomeAwayGroups: config.isHomeAwayGroups ?? config.isHomeAway ?? false,
+        isHomeAwayElimination: config.isHomeAwayElimination ?? false,
+        groupsQualifiedCount: config.advanceCount || 2,
+        groupsCount: config.groupsCount || 4,
+        nodePrefix: config.nodePrefix || "Journée",
+        knockoutStrategy: (config.knockoutStrategy as any) || "BARRAGE",
+        depth: {
+          groups: config.generateGroups !== false,
+          brackets: config.generateNodes !== false,
+          matches: config.generateMatches !== false,
+        },
+      }));
+    }
+  }, [edition?.editionConfig]);
+
+  const saveEditionConfig = useCallback(
+    async (newConfig: AutoConfig) => {
+      try {
+        await updateTournamentEditionModeAction(editionId, "AUTO");
+        await updateEdition(editionId, {
+          editionConfig: {
+            ...edition?.editionConfig,
+            competitionType:
+              newConfig.preset === "LEAGUE"
+                ? "CHAMPIONSHIP"
+                : newConfig.preset === "SWISS"
+                  ? "SWISS"
+                  : "LDC",
+            competitionMode: "AUTO",
+            isHomeAwayGroups: newConfig.isHomeAwayGroups,
+            isHomeAwayElimination: newConfig.isHomeAwayElimination,
+            advanceCount: newConfig.groupsQualifiedCount,
+            groupsCount: newConfig.groupsCount,
+            nodePrefix: newConfig.nodePrefix,
+            knockoutStrategy: newConfig.knockoutStrategy,
+            generateGroups: newConfig.depth.groups,
+            generateNodes: newConfig.depth.brackets,
+            generateMatches: newConfig.depth.matches,
+          },
+        } as any);
+
+        toast.success("Configuration de l'édition mise à jour");
+        setHasPendingConfigChange(false);
+        router.refresh();
+      } catch (error) {
+        toast.error("Erreur lors de la sauvegarde de la configuration");
+      }
+    },
+    [editionId, edition?.editionConfig, router],
+  );
+
+  const existingPhasesCount = edition?.phases?.length || 0;
+  const hasExistingPhases = existingPhasesCount > 0;
+
+  const handleAutoConfigChange = useCallback(
+    (newConfig: AutoConfig) => {
+      if (hasExistingPhases) {
+        setPendingConfig(newConfig);
+        setShowConfigConfirm(true);
+      } else {
+        setAutoConfig(newConfig);
+        setHasPendingConfigChange(true);
+      }
+    },
+    [hasExistingPhases],
+  );
 
   const [participantStrategy, setParticipantStrategy] = useState<
     "ALL" | "SELECTED"
@@ -412,72 +550,95 @@ export function OrganizeWizardClient({
   const currentParticipantsCount = selectedRegIds.length;
   const isOverLimit =
     maxParticipants > 0 && currentParticipantsCount > maxParticipants;
-  const existingPhasesCount = edition?.phases?.length || 0;
-  const hasExistingPhases = existingPhasesCount > 0;
+
+  // Helper for power of 2
+  const isPowerOfTwo = (n: number) => (n & (n - 1)) === 0 && n !== 0;
+  const getNearestLowerPowerOfTwo = (n: number) =>
+    Math.pow(2, Math.floor(Math.log2(n)));
 
   // Auto-build phases selon le preset
   const buildAutoPhases = useCallback((): DraftPhase[] => {
     const phases: DraftPhase[] = [];
-    const { preset, isHomeAway, groupsQualifiedCount, nodePrefix } = autoConfig;
+    const {
+      preset,
+      isHomeAwayGroups,
+      isHomeAwayElimination,
+      groupsQualifiedCount,
+      nodePrefix,
+      groupsCount,
+      knockoutStrategy,
+      depth = { groups: true, brackets: true, matches: true },
+    } = autoConfig;
+
+    const getDepthOptions = (isGroupPhase: boolean) => ({
+      generateGroups: isGroupPhase ? true : false,
+      generateNodes: depth.brackets,
+      generateMatches: depth.brackets && depth.matches,
+    });
 
     if (preset === "LEAGUE") {
+      const options = getDepthOptions(true);
       phases.push({
         id: generateTempId(),
-        name: isHomeAway ? "Championnat (Aller-Retour)" : "Championnat",
+        name: isHomeAwayGroups ? "Championnat (A/R)" : "Championnat",
         phaseType: "ROUND_ROBIN",
         order: 0,
         participantSource: "EDITION",
         qualifiedCount: groupsQualifiedCount,
-        generateGroups: true,
-        generateNodes: true,
-        generateMatches: true,
+        ...options,
         config: {
           ...DEFAULT_PHASE_CONFIGS.ROUND_ROBIN,
           groupsCount: 1,
-          isHomeAway,
+          isHomeAway: isHomeAwayGroups,
           advanceCount: groupsQualifiedCount,
           nodePrefix,
         },
       });
     } else if (preset === "CHAMPIONS") {
-      // Phase de groupes
+      // 1. Phase de groupes
+      const groupPhaseOptions = getDepthOptions(true);
+      const groupPhaseId = generateTempId();
+      const qualifiedTotal = (groupsCount || 4) * groupsQualifiedCount;
+
       phases.push({
-        id: generateTempId(),
-        name: autoConfig.isHomeAway ? "Phase de groupes (A/R)" : "Phase de groupes",
+        id: groupPhaseId,
+        name: isHomeAwayGroups ? "Phase de groupes (A/R)" : "Phase de groupes",
         phaseType: "GROUP_STAGE",
         order: 0,
         participantSource: "EDITION",
-        qualifiedCount: groupsQualifiedCount * autoConfig.groupsCount,
-        generateGroups: true,
-        generateNodes: true,
-        generateMatches: true,
+        qualifiedCount: qualifiedTotal,
+        ...groupPhaseOptions,
         config: {
           ...DEFAULT_PHASE_CONFIGS.GROUP_STAGE,
-          groupsCount: autoConfig.groupsCount,
+          groupsCount: groupsCount,
           advanceCount: groupsQualifiedCount,
-          isHomeAway: autoConfig.isHomeAway,
+          isHomeAway: isHomeAwayGroups,
           nodePrefix: "Groupe",
         },
       });
-      // Phase d'élimination
+
+      // 2. Éliminations Directes (UNE SEULE PHASE)
+      const koOptions = getDepthOptions(false);
+      
       phases.push({
         id: generateTempId(),
-        name: autoConfig.isHomeAway ? "Phases finales (A/R)" : "Phases finales",
+        name: isHomeAwayElimination ? "Phase Finale (A/R)" : "Phase Finale",
         phaseType: "ELIMINATION",
         order: 1,
         participantSource: "PHASE_QUALIFIED",
-        sourcePhaseId: phases[0].id,
-        qualifiedCount: 1, // Winner
-        generateGroups: false,
-        generateNodes: true,
-        generateMatches: true,
+        sourcePhaseId: groupPhaseId,
+        qualifiedCount: qualifiedTotal,
+        ...koOptions,
         config: {
           ...DEFAULT_PHASE_CONFIGS.ELIMINATION,
-          isHomeAway: autoConfig.isHomeAway,
-          nodePrefix: "Round",
+          isHomeAway: isHomeAwayElimination,
+          nodePrefix: "Match",
+          knockoutStrategy, // Pour transmission éventuelle
         },
       });
+
     } else if (preset === "SWISS") {
+      const options = getDepthOptions(true);
       phases.push({
         id: generateTempId(),
         name: "Système Suisse",
@@ -485,9 +646,7 @@ export function OrganizeWizardClient({
         order: 0,
         participantSource: "EDITION",
         qualifiedCount: groupsQualifiedCount,
-        generateGroups: true,
-        generateNodes: true,
-        generateMatches: true,
+        ...options,
         config: {
           ...DEFAULT_PHASE_CONFIGS.SWISS,
           advanceCount: groupsQualifiedCount,
@@ -497,24 +656,25 @@ export function OrganizeWizardClient({
     }
 
     return phases;
-  }, [autoConfig]);
+  }, [autoConfig, isPowerOfTwo, getNearestLowerPowerOfTwo]);
 
   // Mettre à jour le preview via le serveur
   useEffect(() => {
     const updatePreview = async () => {
       if (selectedRegIds.length < 2) return;
-      
+
       setIsPreviewLoading(true);
       try {
-        const phasesToPreview = mode === "AUTO" ? buildAutoPhases() : draftPhases;
-        
+        const phasesToPreview =
+          mode === "AUTO" ? buildAutoPhases() : draftPhases;
+
         // Formatter pour l'API StructureEngine
         const phasesForApi = buildPhasesForPreview(phasesToPreview);
-        
+
         const preview = await getStructurePreviewAction(
           editionId,
           phasesForApi,
-          selectedRegIds
+          selectedRegIds,
         );
         setServerPreview(preview);
       } catch (error) {
@@ -526,7 +686,14 @@ export function OrganizeWizardClient({
 
     const timer = setTimeout(updatePreview, 500); // Debounce
     return () => clearTimeout(timer);
-  }, [mode, draftPhases, autoConfig, selectedRegIds, editionId, buildAutoPhases]);
+  }, [
+    mode,
+    draftPhases,
+    autoConfig,
+    selectedRegIds,
+    editionId,
+    buildAutoPhases,
+  ]);
 
   /**
    * Formate les phases draft pour l'API de preview
@@ -536,7 +703,7 @@ export function OrganizeWizardClient({
       name: p.name,
       phaseType: p.phaseType,
       order: idx,
-      config: p.config
+      config: p.config,
     }));
   }
 
@@ -729,6 +896,22 @@ export function OrganizeWizardClient({
     router,
   ]);
 
+  const handleResetStructure = useCallback(async () => {
+    setIsResetting(true);
+    try {
+      const result = await resetEditionStructure(editionId);
+      if (result.success) {
+        toast.success("Structure réinitialisée avec succès");
+        setShowResetConfirm(false);
+        router.refresh();
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Erreur lors de la réinitialisation");
+    } finally {
+      setIsResetting(false);
+    }
+  }, [editionId, router]);
+
   const getName = (reg: any) =>
     reg.member?.displayName || reg.member?.user?.username || "Joueur";
 
@@ -786,11 +969,18 @@ export function OrganizeWizardClient({
               <p className="text-muted-foreground text-sm mb-4">
                 Cette édition contient déjà {existingPhasesCount} phase(s).
               </p>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap justify-center gap-3">
                 <Button variant="outline" onClick={() => setShowPreview(true)}>
                   <Eye className="h-4 w-4 mr-2" /> Voir la structure
                 </Button>
-                <Button variant="default" onClick={() => setMode("MANUAL")}>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowResetConfirm(true)}
+                  disabled={isResetting}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Réinitialiser
+                </Button>
+                <Button variant="secondary" onClick={() => setMode("MANUAL")}>
                   <Settings2 className="h-4 w-4 mr-2" /> Mode Expert
                 </Button>
               </div>
@@ -812,8 +1002,10 @@ export function OrganizeWizardClient({
             {mode === "AUTO" ? (
               <AutoModeConfig
                 autoConfig={autoConfig}
-                setAutoConfig={setAutoConfig}
+                onConfigChange={handleAutoConfigChange}
                 currentParticipantsCount={currentParticipantsCount}
+                hasPendingChanges={hasPendingConfigChange}
+                onSave={() => saveEditionConfig(autoConfig)}
               />
             ) : (
               <ManualModeConfig
@@ -894,6 +1086,96 @@ export function OrganizeWizardClient({
         onConfirm={confirmDeploy}
         isPending={isPending}
       />
+
+      {/* Reset confirm dialog */}
+      <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Réinitialiser la structure ?
+            </DialogTitle>
+            <DialogDescription>
+              Cette action est{" "}
+              <span className="font-bold text-destructive">irréversible</span>.
+              Toutes les phases, tous les groupes, tous les nœuds de bracket et
+              TOUS les matchs de cette édition seront définitivement supprimés.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowResetConfirm(false)}
+              disabled={isResetting}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleResetStructure}
+              className="gap-2"
+              disabled={isResetting}
+            >
+              {isResetting ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Confirmer la suppression totale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Config Change Confirm Dialog */}
+      <Dialog open={showConfigConfirm} onOpenChange={setShowConfigConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Changement de configuration
+            </DialogTitle>
+            <DialogDescription className="space-y-3">
+              <p>
+                Vous avez déjà des phases existantes dans cette édition. Changer
+                le format ou la structure pourrait rendre la structure actuelle
+                incohérente.
+              </p>
+              <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-md text-xs text-amber-700">
+                <strong>Attention:</strong> Il est fortement recommandé de{" "}
+                <span className="font-bold">réinitialiser la structure</span>{" "}
+                avant d'appliquer un nouveau format automatique si des matchs
+                ont déjà été générés.
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowConfigConfirm(false);
+                setPendingConfig(null);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="default"
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={() => {
+                if (pendingConfig) {
+                  setAutoConfig(pendingConfig);
+                  setHasPendingConfigChange(true);
+                }
+                setShowConfigConfirm(false);
+                setPendingConfig(null);
+              }}
+            >
+              Appliquer quand même
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -904,15 +1186,50 @@ export function OrganizeWizardClient({
 
 function AutoModeConfig({
   autoConfig,
-  setAutoConfig,
+  onConfigChange,
   currentParticipantsCount,
+  hasPendingChanges,
+  onSave,
 }: {
-  autoConfig: any;
-  setAutoConfig: any;
+  autoConfig: AutoConfig;
+  onConfigChange: (config: AutoConfig) => void;
   currentParticipantsCount: number;
+  hasPendingChanges?: boolean;
+  onSave?: () => void;
 }) {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!onSave) return;
+    setIsSaving(true);
+    await onSave();
+    setIsSaving(false);
+  };
+
   return (
     <div className="space-y-6">
+      {hasPendingChanges && (
+        <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 text-amber-600 text-xs font-medium">
+            <AlertCircle className="h-4 w-4" />
+            <span>Modifications non enregistrées</span>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="h-7 text-[10px] bg-amber-600 hover:bg-amber-700"
+          >
+            {isSaving ? (
+              <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+            )}
+            Enregistrer la config
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-4">
         <Label className="font-bold text-xs uppercase tracking-wider text-primary">
           Format du tournoi
@@ -940,7 +1257,9 @@ function AutoModeConfig({
           ].map((p) => (
             <button
               key={p.id}
-              onClick={() => setAutoConfig({ ...autoConfig, preset: p.id })}
+              onClick={() =>
+                onConfigChange({ ...autoConfig, preset: p.id as any })
+              }
               className={cn(
                 "p-4 rounded-xl border-2 text-left transition-all",
                 autoConfig.preset === p.id
@@ -970,9 +1289,9 @@ function AutoModeConfig({
           <div className="flex items-center justify-between">
             <Label className="text-sm font-bold">Aller-Retour</Label>
             <Checkbox
-              checked={autoConfig.isHomeAway}
+              checked={autoConfig.isHomeAwayGroups}
               onCheckedChange={(v) =>
-                setAutoConfig({ ...autoConfig, isHomeAway: !!v })
+                onConfigChange({ ...autoConfig, isHomeAwayGroups: !!v })
               }
             />
           </div>
@@ -983,7 +1302,7 @@ function AutoModeConfig({
               className="h-8 text-sm"
               value={autoConfig.nodePrefix}
               onChange={(e) =>
-                setAutoConfig({ ...autoConfig, nodePrefix: e.target.value })
+                onConfigChange({ ...autoConfig, nodePrefix: e.target.value })
               }
               placeholder="Journée, Round, Match..."
             />
@@ -997,7 +1316,7 @@ function AutoModeConfig({
               <Slider
                 value={[autoConfig.groupsQualifiedCount]}
                 onValueChange={(v) =>
-                  setAutoConfig({ ...autoConfig, groupsQualifiedCount: v[0] })
+                  onConfigChange({ ...autoConfig, groupsQualifiedCount: v[0] })
                 }
                 min={1}
                 max={Math.min(
@@ -1021,12 +1340,26 @@ function AutoModeConfig({
       {autoConfig.preset === "CHAMPIONS" && (
         <>
           <div className="space-y-4 p-4 rounded-xl bg-muted/30">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-bold">Aller-Retour en groupes</Label>
+            <div className="flex items-center justify-between border-b pb-3 border-primary/10">
+              <Label className="text-sm font-bold">
+                Aller-Retour (Groupes)
+              </Label>
               <Checkbox
-                checked={autoConfig.isHomeAway}
+                checked={autoConfig.isHomeAwayGroups}
                 onCheckedChange={(v) =>
-                  setAutoConfig({ ...autoConfig, isHomeAway: !!v })
+                  onConfigChange({ ...autoConfig, isHomeAwayGroups: !!v })
+                }
+              />
+            </div>
+            
+            <div className="flex items-center justify-between border-b pb-3 border-primary/10">
+              <Label className="text-sm font-bold">
+                Aller-Retour (Éliminations)
+              </Label>
+              <Checkbox
+                checked={autoConfig.isHomeAwayElimination}
+                onCheckedChange={(v) =>
+                  onConfigChange({ ...autoConfig, isHomeAwayElimination: !!v })
                 }
               />
             </div>
@@ -1037,7 +1370,7 @@ function AutoModeConfig({
                 <Slider
                   value={[autoConfig.groupsCount || 1]}
                   onValueChange={(v) =>
-                    setAutoConfig({ ...autoConfig, groupsCount: v[0] })
+                    onConfigChange({ ...autoConfig, groupsCount: v[0] })
                   }
                   min={1}
                   max={16}
@@ -1051,12 +1384,17 @@ function AutoModeConfig({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-medium">Qualifiés par groupe</Label>
+              <Label className="text-xs font-medium">
+                Qualifiés par groupe
+              </Label>
               <div className="flex items-center gap-3">
                 <Slider
                   value={[autoConfig.groupsQualifiedCount]}
                   onValueChange={(v) =>
-                    setAutoConfig({ ...autoConfig, groupsQualifiedCount: v[0] })
+                    onConfigChange({
+                      ...autoConfig,
+                      groupsQualifiedCount: v[0],
+                    })
                   }
                   min={1}
                   max={4}
@@ -1068,38 +1406,115 @@ function AutoModeConfig({
                 </span>
               </div>
             </div>
+
+            {/* Knockout Strategy choice */}
+            {(() => {
+              const qualifiedTotal =
+                (autoConfig.groupsCount || 4) * autoConfig.groupsQualifiedCount;
+              const isPowerOfTwo = (n: number) =>
+                (n & (n - 1)) === 0 && n !== 0;
+
+              if (qualifiedTotal > 0 && !isPowerOfTwo(qualifiedTotal)) {
+                return (
+                  <div className="space-y-3 pt-2 border-t border-primary/10">
+                    <Label className="text-xs font-bold text-primary">
+                      Gestion du tableau ({qualifiedTotal} qualifiés)
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant={
+                          autoConfig.knockoutStrategy === "BARRAGE"
+                            ? "default"
+                            : "outline"
+                        }
+                        onClick={() =>
+                          onConfigChange({
+                            ...autoConfig,
+                            knockoutStrategy: "BARRAGE",
+                          })
+                        }
+                        className="text-[10px] h-7"
+                      >
+                        Tour de Barrage
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={
+                          autoConfig.knockoutStrategy === "DIRECT"
+                            ? "default"
+                            : "outline"
+                        }
+                        onClick={() =>
+                          onConfigChange({
+                            ...autoConfig,
+                            knockoutStrategy: "DIRECT",
+                          })
+                        }
+                        className="text-[10px] h-7"
+                      >
+                        Direct (avec BYEs)
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Dynamic Knockout Preview Box inside CHAMPIONS config */}
           {(() => {
-            const qualifiedTotal = (autoConfig.groupsCount || 4) * autoConfig.groupsQualifiedCount;
+            const qualifiedTotal =
+              (autoConfig.groupsCount || 4) * autoConfig.groupsQualifiedCount;
             const rounds = Math.ceil(Math.log2(qualifiedTotal));
             const stages = [];
-            
+
             if (rounds >= 1 && qualifiedTotal >= 2) stages.unshift("Finale");
-            if (rounds >= 2 && qualifiedTotal >= 4) stages.unshift("Demi-finale");
-            if (rounds >= 3 && qualifiedTotal >= 8) stages.unshift("Quart de finale");
-            if (rounds >= 4 && qualifiedTotal >= 16) stages.unshift("Huitièmes");
-            if (rounds >= 5 && qualifiedTotal >= 32) stages.unshift("Seizièmes");
+            if (rounds >= 2 && qualifiedTotal >= 4)
+              stages.unshift("Demi-finale");
+            if (rounds >= 3 && qualifiedTotal >= 8)
+              stages.unshift("Quart de finale");
+            if (rounds >= 4 && qualifiedTotal >= 16)
+              stages.unshift("Huitièmes");
+            if (rounds >= 5 && qualifiedTotal >= 32)
+              stages.unshift("Seizièmes");
+            if (rounds >= 6 && qualifiedTotal >= 64)
+              stages.unshift("Trente-deuxièmes");
+            if (rounds >= 7 && qualifiedTotal >= 128)
+              stages.unshift("Soixante-quatrièmes");
 
             return (
               <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 mt-2">
-                 <Label className="text-xs font-bold text-primary flex items-center gap-2 mb-3">
-                   <ShieldCheck className="h-4 w-4" />
-                   Structure Phase Finale générée ({qualifiedTotal} qualifiés)
-                 </Label>
-                 <div className="flex items-center flex-wrap gap-2 text-sm">
-                   {stages.map((stage, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-muted-foreground font-medium">
-                        <div className="px-2 py-1 bg-background border rounded text-xs shadow-sm">{stage}</div>
-                        {idx < stages.length - 1 && <ArrowRight className="h-3 w-3" />}
+                <Label className="text-xs font-bold text-primary flex items-center gap-2 mb-3">
+                  <ShieldCheck className="h-4 w-4" />
+                  Structure Phase Finale générée ({qualifiedTotal} qualifiés)
+                </Label>
+                <div className="flex items-center flex-wrap gap-2 text-sm">
+                  {stages.map((stage, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 text-muted-foreground font-medium"
+                    >
+                      <div className="px-2 py-1 bg-background border rounded text-xs shadow-sm">
+                        {stage}
                       </div>
-                   ))}
-                   {stages.length === 0 && <span className="text-xs text-destructive">Il faut au moins 2 qualifiés au total.</span>}
-                 </div>
-                 <p className="text-[10px] text-muted-foreground mt-3 leading-tight">
-                   Les phases finales débuteront automatiquement selon le nombre de qualifiés calculé ({autoConfig.groupsQualifiedCount} par groupe × {autoConfig.groupsCount} groupes).
-                 </p>
+                      {idx < stages.length - 1 && (
+                        <ArrowRight className="h-3 w-3" />
+                      )}
+                    </div>
+                  ))}
+                  {stages.length === 0 && (
+                    <span className="text-xs text-destructive">
+                      Il faut au moins 2 qualifiés au total.
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-3 leading-tight">
+                  Les phases finales débuteront automatiquement selon le nombre
+                  de qualifiés calculé ({autoConfig.groupsQualifiedCount} par
+                  groupe × {autoConfig.groupsCount} groupes).
+                </p>
               </div>
             );
           })()}
@@ -1113,7 +1528,7 @@ function AutoModeConfig({
             <Slider
               value={[5]}
               onValueChange={(v) =>
-                setAutoConfig({ ...autoConfig, roundsCount: v[0] })
+                onConfigChange({ ...autoConfig, roundsCount: v[0] })
               }
               min={3}
               max={11}
@@ -1128,6 +1543,89 @@ function AutoModeConfig({
       <div className="text-xs text-muted-foreground bg-primary/5 p-3 rounded-lg">
         <Info className="h-3 w-3 inline mr-1" />
         Basé sur {currentParticipantsCount} participant(s) inscrit(s)
+      </div>
+
+      {/* Contrôles de profondeur de structure */}
+      <div className="space-y-3 mt-4 pt-4 border-t">
+        <Label className="font-bold text-xs uppercase tracking-wider text-primary">
+          Niveaux de génération
+        </Label>
+
+        <div className="space-y-3">
+          {/* Niveau 1: Groupes - Toujours actif pour GROUP_STAGE/ROUND_ROBIN */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="depth-groups"
+              checked={autoConfig.depth?.groups !== false}
+              onCheckedChange={(v) =>
+                onConfigChange({
+                  ...autoConfig,
+                  depth: { ...autoConfig.depth, groups: !!v },
+                })
+              }
+              disabled={
+                autoConfig.preset !== "LEAGUE" &&
+                autoConfig.preset !== "CHAMPIONS"
+              }
+            />
+            <Label
+              htmlFor="depth-groups"
+              className="text-sm cursor-pointer flex items-center gap-2"
+            >
+              Groupes / Poules
+              {(autoConfig.preset === "LEAGUE" ||
+                autoConfig.preset === "CHAMPIONS") && (
+                <span className="text-[10px] text-muted-foreground">
+                  (Obligatoire)
+                </span>
+              )}
+            </Label>
+          </div>
+
+          {/* Niveau 2: Brackets / Journées - Désactivé si groupes non cochés */}
+          <div className="flex items-center gap-2 pl-6 border-l-2 border-muted">
+            <Checkbox
+              id="depth-brackets"
+              checked={autoConfig.depth?.brackets !== false}
+              onCheckedChange={(v) =>
+                onConfigChange({
+                  ...autoConfig,
+                  depth: { ...autoConfig.depth, brackets: !!v },
+                })
+              }
+              disabled={autoConfig.depth?.groups === false}
+            />
+            <Label htmlFor="depth-brackets" className="text-sm cursor-pointer">
+              Brackets / Journées / Nœuds
+            </Label>
+          </div>
+
+          {/* Niveau 3: Matchs - Désactivé si brackets non cochés */}
+          <div className="flex items-center gap-2 pl-12 border-l-2 border-muted">
+            <Checkbox
+              id="depth-matches"
+              checked={autoConfig.depth?.matches !== false}
+              onCheckedChange={(v) =>
+                onConfigChange({
+                  ...autoConfig,
+                  depth: { ...autoConfig.depth, matches: !!v },
+                })
+              }
+              disabled={autoConfig.depth?.brackets === false}
+            />
+            <Label htmlFor="depth-matches" className="text-sm cursor-pointer">
+              Générer les Matchs
+            </Label>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground mt-2">
+          {!autoConfig.depth?.brackets
+            ? "La structure s'arrêtera à la création des groupes."
+            : !autoConfig.depth?.matches
+              ? "Les brackets seront créés, mais les matchs devront être générés manuellement."
+              : "Structure complète (Groupes > Brackets > Matchs)."}
+        </p>
       </div>
     </div>
   );
@@ -1393,35 +1891,93 @@ function PhaseConfigCard({
 
             <div className="space-y-3 pt-2 border-t">
               <Label className="text-[10px] font-bold uppercase text-primary">
-                Génération automatique
+                Niveaux de génération
               </Label>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col gap-3">
+                {/* Level 1: Groups (Mandatory for group stages) */}
                 <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={phase.generateGroups}
-                    onCheckedChange={(v) => onUpdate({ generateGroups: !!v })}
-                    disabled={
-                      phase.phaseType === "ELIMINATION" ||
-                      phase.phaseType === "KNOCKOUT"
-                    }
-                  />
-                  <span className="text-xs">Groupes / Poules</span>
+                  <div className="relative flex items-center">
+                    <Checkbox
+                      id={`gen-groups-${phase.id}`}
+                      checked={
+                        phase.generateGroups ||
+                        phase.phaseType === "GROUP_STAGE" ||
+                        phase.phaseType === "ROUND_ROBIN"
+                      }
+                      onCheckedChange={(v) => onUpdate({ generateGroups: !!v })}
+                      disabled={
+                        phase.phaseType === "GROUP_STAGE" ||
+                        phase.phaseType === "ROUND_ROBIN" ||
+                        phase.phaseType === "ELIMINATION" ||
+                        phase.phaseType === "KNOCKOUT"
+                      }
+                    />
+                  </div>
+                  <Label
+                    htmlFor={`gen-groups-${phase.id}`}
+                    className="text-xs flex items-center gap-2 cursor-pointer"
+                  >
+                    Groupes / Poules
+                    {(phase.phaseType === "GROUP_STAGE" ||
+                      phase.phaseType === "ROUND_ROBIN") && (
+                      <span className="text-[9px] text-muted-foreground italic">
+                        (Obligatoire)
+                      </span>
+                    )}
+                  </Label>
                 </div>
-                <div className="flex items-center gap-2">
+
+                {/* Level 2: Brackets / Nodes */}
+                <div className="flex items-center gap-2 pl-4 border-l-2 border-muted">
                   <Checkbox
+                    id={`gen-nodes-${phase.id}`}
                     checked={phase.generateNodes}
-                    onCheckedChange={(v) => onUpdate({ generateNodes: !!v })}
+                    onCheckedChange={(v) => {
+                      const enabled = !!v;
+                      onUpdate({
+                        generateNodes: enabled,
+                        generateMatches: enabled
+                          ? phase.generateMatches
+                          : false,
+                      });
+                    }}
                   />
-                  <span className="text-xs">Nœuds / Journées</span>
+                  <Label
+                    htmlFor={`gen-nodes-${phase.id}`}
+                    className="text-xs cursor-pointer"
+                  >
+                    Brackets / Journées
+                  </Label>
                 </div>
-                <div className="flex items-center gap-2">
+
+                {/* Level 3: Matches */}
+                <div
+                  className={cn(
+                    "flex items-center gap-2 pl-8 border-l-2 border-muted transition-opacity",
+                    !phase.generateNodes && "opacity-50",
+                  )}
+                >
                   <Checkbox
+                    id={`gen-matches-${phase.id}`}
                     checked={phase.generateMatches}
+                    disabled={!phase.generateNodes}
                     onCheckedChange={(v) => onUpdate({ generateMatches: !!v })}
                   />
-                  <span className="text-xs">Matchs</span>
+                  <Label
+                    htmlFor={`gen-matches-${phase.id}`}
+                    className="text-xs cursor-pointer"
+                  >
+                    Générer les Matchs
+                  </Label>
                 </div>
               </div>
+              <p className="text-[9px] text-muted-foreground mt-1">
+                {!phase.generateNodes
+                  ? "La structure de la phase s'arrêtera à la création des groupes."
+                  : !phase.generateMatches
+                    ? "Les brackets seront créés, mais les matchs devront être générés manuellement."
+                    : "Structure complète (Groupes > Brackets > Matchs)."}
+              </p>
             </div>
 
             <div>
@@ -1917,11 +2473,17 @@ function FloatingDeployButton({
   isLoading,
 }: any) {
   if (currentParticipantsCount < 2) return null;
+  const { isMobile } = useScreenSize();
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
+    <div
+      className={cn(
+        "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4",
+        isMobile ? "bottom-2" : "",
+      )}
+    >
       <Button
-        size="lg"
+        size={isMobile ? "sm" : "lg"}
         className={cn(
           "h-14 w-full rounded-full shadow-2xl gap-3 font-bold text-base transition-all duration-300",
           isOverLimit
@@ -1965,9 +2527,15 @@ function PreviewDialog({
   onConfirm,
   isPending,
 }: any) {
+  const { isMobile } = useScreenSize();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent
+        className={cn(
+          "max-w-6xl max-h-[85vh] overflow-y-auto flex flex-col",
+          isMobile ? "w-[95%]" : "",
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5 text-primary" />
@@ -1995,20 +2563,19 @@ function PreviewDialog({
                 <div className="text-[10px] text-muted-foreground">Phases</div>
               </div>
               <div className="bg-primary/5 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold">{preview?.totalMatches || 0}</div>
+                <div className="text-2xl font-bold">
+                  {preview?.totalMatches || 0}
+                </div>
                 <div className="text-[10px] text-muted-foreground">Matchs</div>
               </div>
               <div className="bg-primary/5 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">
                   {preview?.phases?.reduce(
-                    (acc: number, p: any) =>
-                      acc + (p.groups?.length || 0),
+                    (acc: number, p: any) => acc + (p.groups?.length || 0),
                     0,
                   ) || 0}
                 </div>
-                <div className="text-[10px] text-muted-foreground">
-                  Groupes
-                </div>
+                <div className="text-[10px] text-muted-foreground">Groupes</div>
               </div>
             </div>
 
@@ -2029,7 +2596,10 @@ function PreviewDialog({
                     <span className="text-xs text-muted-foreground">
                       {phase.participantCount} participants
                     </span>
-                    <Badge variant="default" className="text-[9px] bg-primary/20 text-primary border-none">
+                    <Badge
+                      variant="default"
+                      className="text-[9px] bg-primary/20 text-primary border-none"
+                    >
                       {phase.matchesCount} matchs
                     </Badge>
                   </div>
@@ -2042,29 +2612,35 @@ function PreviewDialog({
                       className="border rounded-lg p-3 bg-card/50"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold">
-                          {group.name}
-                        </span>
+                        <span className="text-sm font-bold">{group.name}</span>
                         <span className="text-[10px] text-muted-foreground font-medium">
                           {group.participantCount} part.
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                         <div className="text-[10px] text-muted-foreground">
-                          {group.rounds ? `${group.rounds} rounds` : 'Poule unique'}
+                        <div className="text-[10px] text-muted-foreground">
+                          {group.rounds
+                            ? `${group.rounds} rounds`
+                            : "Poule unique"}
                         </div>
-                        <Badge variant={group.matchesCount > 0 ? "secondary" : "outline"} className="text-[9px] h-4">
-                          {group.matchesCount} match{group.matchesCount > 1 ? 's' : ''}
+                        <Badge
+                          variant={
+                            group.matchesCount > 0 ? "secondary" : "outline"
+                          }
+                          className="text-[9px] h-4"
+                        >
+                          {group.matchesCount} match
+                          {group.matchesCount > 1 ? "s" : ""}
                         </Badge>
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="px-3 pb-3">
-                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                     <Zap className="h-2.5 w-2.5 text-primary" />
-                     {phase.seedingNote}
-                   </p>
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Zap className="h-2.5 w-2.5 text-primary" />
+                    {phase.seedingNote}
+                  </p>
                 </div>
               </div>
             ))}

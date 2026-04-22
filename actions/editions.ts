@@ -17,6 +17,7 @@ import { getMatchesWithParticipants } from "./phases";
 import { Parser } from "@json2csv/plainjs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 // Type for Edition with Relations
 // export type TournamentEditionWithRelations = TournamentEdition & {
@@ -821,5 +822,114 @@ export async function getEditionBestPlayersStats(editionId: string) {
   } catch (error) {
     console.error("Error getting best players stats:", error);
     return null;
+  }
+}
+
+/**
+ * Export des classements (Standings)
+ */
+export async function exportStandingsAction(
+  data: any[],
+  format: "pdf" | "csv" | "json" | "excel",
+  fileName: string
+): Promise<{ success: boolean; data?: string; filename: string; error?: string }> {
+  try {
+    let resultData: string = "";
+    const timestamp = Date.now();
+    const fullFileName = `${fileName}_${timestamp}`;
+
+    if (format === "json") {
+      resultData = JSON.stringify(data, null, 2);
+      return { success: true, data: resultData, filename: `${fullFileName}.json` };
+    }
+
+    if (format === "csv") {
+      const parser = new Parser();
+      resultData = parser.parse(data);
+      return { success: true, data: resultData, filename: `${fullFileName}.csv` };
+    }
+
+    if (format === "excel") {
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Classement");
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "base64" });
+      return { success: true, data: excelBuffer, filename: `${fullFileName}.xlsx` };
+    }
+
+    if (format === "pdf") {
+      // For PDF, we return JSON and handle it on client or a basic string
+      return { success: true, data: JSON.stringify(data), filename: `${fullFileName}.pdf` };
+    }
+
+    return { success: false, filename: fullFileName, error: "Format non supporté" };
+  } catch (error: any) {
+    console.error("Export standings failed:", error);
+    return { success: false, filename: fileName, error: error.message };
+  }
+}
+
+/**
+ * Met à jour le mode de compétition d'une édition (AUTO vs MANUAL)
+ */
+export async function updateTournamentEditionModeAction(
+  editionId: string,
+  mode: "AUTO" | "MANUAL"
+) {
+  try {
+    const edition = await db.query.tournamentEditions.findFirst({
+      where: eq(tournamentEditions.id, editionId),
+    });
+
+    if (!edition) throw new Error("Édition introuvable");
+
+    const currentConfig = (edition.editionConfig as any) || {};
+    const newConfig = {
+      ...currentConfig,
+      competitionMode: mode,
+    };
+
+    await db
+      .update(tournamentEditions)
+      .set({ editionConfig: newConfig })
+      .where(eq(tournamentEditions.id, editionId));
+
+    revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}/dashboard`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update edition mode:", error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * Désigne officiellement le vainqueur d'une édition
+ */
+export async function designateEditionWinnerAction(
+  editionId: string,
+  winnerId: string, // memberId
+  winnerMetadata: any
+) {
+  try {
+    await db
+      .update(tournamentEditions)
+      .set({
+        winnerId,
+        winnerMetadata,
+        status: "COMPLETED",
+        updatedAt: new Date(),
+      })
+      .where(eq(tournamentEditions.id, editionId));
+
+    const edition = await getTournamentEditionById(editionId);
+    if (edition) {
+      revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}`);
+      revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}/dashboard`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to designate winner:", error);
+    return { success: false, error: String(error) };
   }
 }

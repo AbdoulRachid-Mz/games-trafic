@@ -1,4 +1,4 @@
-import { getTournamentsWithEditions } from "@/actions/tournaments";
+import { getTournamentEditions } from "@/actions/tournaments";
 import { TournamentsList } from "@/components/pages/tournaments/tournaments-list";
 import { Suspense } from "react";
 
@@ -9,11 +9,13 @@ export const metadata = {
 };
 
 export default async function TournamentsPage() {
-  const tournaments = await getTournamentsWithEditions(100, "createdAt", "desc");
+  const response = await getTournamentEditions({
+    pagination: { page: 1, limit: 100 },
+  });
 
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-screen">Chargement des tournois...</div>}>
-      <TournamentsList initialTournaments={tournaments} />
+      <TournamentsList initialTournaments={response.data} />
     </Suspense>
   );
 }

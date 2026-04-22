@@ -83,7 +83,7 @@ export function useTournamentById(
     return useQuery({
         queryKey: tournamentKeys.detail(id, populate),
         queryFn: () => getTournamentById(id, { populate }),
-        enabled: !!id && enabled,
+        enabled: !!id && id !== "" && enabled,
         staleTime: 1000 * 60,
     });
 }
@@ -99,7 +99,7 @@ export function useTournamentEditionById(
     return useQuery({
         queryKey: tournamentKeys.edition(id, populate),
         queryFn: () => getTournamentEditionById(id, { populate }),
-        enabled: !!id && enabled,
+        enabled: !!id && id !== "" && enabled,
         staleTime: 1000 * 60,
     });
 }

@@ -23,7 +23,9 @@ export interface PhaseBlueprint {
 export interface StructureEngineOptions {
   dryRun?: boolean;
   clearExisting?: boolean;
+  clearExistingInPhase?: boolean; // If true, clears structure only for targetPhaseId
   autoInitializeFirstPhase?: boolean;
+  targetPhaseId?: string; // If provided, populates this specific phase instead of creating new ones
 }
 
 /**
@@ -51,20 +53,44 @@ export async function createStructureEngine({
     if (clearExisting) {
       // Deleting phases cascades to groups, nodes, and matches
       await tx.delete(tournamentPhases).where(eq(tournamentPhases.editionId, editionId));
+    } else if (options.clearExistingInPhase && options.targetPhaseId) {
+      // Localized clearing for a specific phase
+      const pId = options.targetPhaseId;
+      await tx.delete(matches).where(eq(matches.phaseId, pId));
+      await tx.delete(bracketNodes).where(eq(bracketNodes.phaseId, pId));
+      await tx.delete(phaseGroups).where(eq(phaseGroups.phaseId, pId));
     }
 
-    // 2. Insert Phases
-    const createdPhases = await tx
-      .insert(tournamentPhases)
-      .values(
-        phases.map((p) => ({
-          ...p,
-          editionId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }))
-      )
-      .returning();
+    // 2. Insert or Retrieve Phases
+    let createdPhases: any[] = [];
+    
+    if (options.targetPhaseId) {
+      const existingPhase = await tx.query.tournamentPhases.findFirst({
+        where: eq(tournamentPhases.id, options.targetPhaseId)
+      });
+      if (!existingPhase) throw new Error("Phase cible introuvable");
+      
+      // Optionnel: Mettre à jour le type de phase si nécessaire
+      if (existingPhase.phaseType !== phases[0].phaseType) {
+        await tx.update(tournamentPhases)
+          .set({ phaseType: phases[0].phaseType, updatedAt: new Date() })
+          .where(eq(tournamentPhases.id, options.targetPhaseId));
+      }
+      
+      createdPhases = [existingPhase];
+    } else {
+      createdPhases = await tx
+        .insert(tournamentPhases)
+        .values(
+          phases.map((p) => ({
+            ...p,
+            editionId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }))
+        )
+        .returning();
+    }
 
     if (!autoInitializeFirstPhase || !participantRegIds || participantRegIds.length === 0) {
       return { success: true, phaseCount: createdPhases.length };
@@ -101,7 +127,7 @@ export async function createStructureEngine({
 
         // Look-ahead for knockout propagation
         const advanceCount = phaseConfig.advanceCount || 2;
-        const totalQualifiers = groups.length * advanceCount;
+        const totalQualifiers = (groups?.length || 0) * advanceCount;
         currentPhaseParticipants = Array.from({ length: totalQualifiers }, (_, idx) => `QUALIFIER_${idx + 1}`);
       } else if (phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT") {
         await setupBracketPhase(tx, editionId, phase, currentPhaseParticipants, genOptions);

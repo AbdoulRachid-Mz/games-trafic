@@ -46,6 +46,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface GroupNodesOrganizeClientProps {
   tournamentId: string;
@@ -58,6 +59,11 @@ interface GroupNodesOrganizeClientProps {
   allRegistrations: any[];
   groupConfig?: any;
   phaseConfig?: any;
+  editionConfig: {
+    competitionType?: string;
+    competitionMode?: "AUTO" | "MANUAL";
+    [key: string]: any;
+  };
 }
 
 type MatchFormat = "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5";
@@ -94,9 +100,11 @@ export function GroupNodesOrganizeClient({
   allRegistrations,
   groupConfig,
   phaseConfig,
+  editionConfig,
 }: GroupNodesOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const isAutoMode = editionConfig.competitionMode === "AUTO";
   const [draftNodes, setDraftNodes] = useState<DraftNode[]>([]);
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"draft" | "existing">("draft");
@@ -413,6 +421,22 @@ export function GroupNodesOrganizeClient({
 
   return (
     <div className="space-y-6">
+      {/* Mode Auto Warning */}
+      {isAutoMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-4 items-start shadow-sm">
+          <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <AlertCircle className="h-6 w-6 text-amber-600" />
+          </div>
+          <div className="space-y-1">
+             <h4 className="font-bold text-amber-900 text-sm">Mode Assistant Actif</h4>
+             <p className="text-amber-800 text-xs leading-relaxed">
+               L'édition est en mode Auto. La modification manuelle des nœuds de bracket peut briser la logique de qualification automatique. 
+               Il est recommandé de basculer en <strong>Mode Manuel</strong> si vous souhaitez organiser ce groupe différemment de ce qui a été prévu par l'Assistant.
+             </p>
+          </div>
+        </div>
+      )}
+
       {/* Bandeau de configuration héritée */}
       {(groupConfig?.nodesType || phaseConfig?.nodesType) && (
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
@@ -442,81 +466,133 @@ export function GroupNodesOrganizeClient({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
-              {/* Type de nœuds */}
-              <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Type d'organisation
-                </Label>
-                <Select value={nodeType} onValueChange={(v: any) => setNodeType(v)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ROUND_ROBIN">Round Robin (Journées)</SelectItem>
-                    <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
-                    <SelectItem value="SWISS">Système Suisse</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Format des matchs */}
-              <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Format des matchs
-                </Label>
-                <Select value={matchFormat} onValueChange={(v: any) => setMatchFormat(v)}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BEST_OF_1">BO1 (un match)</SelectItem>
-                    <SelectItem value="BEST_OF_3">BO3 (au meilleur des 3)</SelectItem>
-                    <SelectItem value="BEST_OF_5">BO5 (au meilleur des 5)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Rounds pour Swiss */}
-              {nodeType === "SWISS" && (
-                <div className="space-y-2">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Nombre de rounds
-                  </Label>
-                  <div className="flex items-center gap-3">
-                    <Slider
-                      value={[roundsCount]}
-                      onValueChange={(v) => setRoundsCount(v[0])}
-                      min={3}
-                      max={11}
-                      step={2}
-                      className="flex-1"
-                    />
-                    <span className="w-12 text-center font-bold text-sm">{roundsCount}</span>
+              {isAutoMode ? (
+                 <div className="space-y-4">
+                  <div className="bg-primary/5 p-3 rounded-lg border border-primary/20 space-y-2">
+                    <p className="text-xs font-bold text-primary flex items-center gap-1.5">
+                      <Trophy className="h-3.5 w-3.5" /> Configuration Automatique
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Ce groupe est géré par l'Assistant. Les paramètres (Format, Nœuds) sont prédéfinis.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5 opacity-70 cursor-not-allowed">
+                     <Label className="text-[10px] font-bold uppercase text-muted-foreground">Type de nœuds</Label>
+                     <Badge variant="outline" className="text-[10px] w-full justify-start">{nodeType}</Badge>
+                  </div>
+                  <div className="space-y-1.5 opacity-70 cursor-not-allowed">
+                     <Label className="text-[10px] font-bold uppercase text-muted-foreground">Format Match</Label>
+                     <Badge variant="outline" className="text-[10px] w-full justify-start">{matchFormat}</Badge>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* Type de nœuds */}
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Type d'organisation
+                    </Label>
+                    <Select value={nodeType} onValueChange={(v: any) => setNodeType(v)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ROUND_ROBIN">Round Robin (Journées)</SelectItem>
+                        <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
+                        <SelectItem value="SWISS">Système Suisse</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {/* Options */}
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="gen-matches"
-                  checked={generateMatches}
-                  onCheckedChange={(v) => setGenerateMatches(!!v)}
-                />
-                <Label htmlFor="gen-matches" className="text-xs font-medium cursor-pointer">
-                  Générer les matches immédiatement
-                </Label>
-              </div>
+                  {/* Format des matchs */}
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Format des matchs
+                    </Label>
+                    <Select value={matchFormat} onValueChange={(v: any) => setMatchFormat(v)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BEST_OF_1">BO1 (un match)</SelectItem>
+                        <SelectItem value="BEST_OF_3">BO3 (au meilleur des 3)</SelectItem>
+                        <SelectItem value="BEST_OF_5">BO5 (au meilleur des 5)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Rounds pour Swiss */}
+                  {nodeType === "SWISS" && (
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Nombre de rounds
+                      </Label>
+                      <div className="flex items-center gap-3">
+                        <Slider
+                          value={[roundsCount]}
+                          onValueChange={(v) => setRoundsCount(v[0])}
+                          min={3}
+                          max={11}
+                          step={2}
+                          className="flex-1"
+                        />
+                        <span className="w-12 text-center font-bold text-sm">{roundsCount}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Options */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="gen-matches"
+                      checked={generateMatches}
+                      onCheckedChange={(v) => setGenerateMatches(!!v)}
+                    />
+                    <Label htmlFor="gen-matches" className="text-xs font-medium cursor-pointer">
+                      Générer les matches immédiatement
+                    </Label>
+                  </div>
+                </>
+              )}
             </CardContent>
             <CardFooter className="pt-4 border-t bg-muted/30 flex flex-col gap-2">
-              <Button
-                className="w-full gap-2 font-bold"
-                onClick={handleAutoGenerateNodes}
-                disabled={isPending || groupParticipants.length === 0}
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                Générer la structure
-              </Button>
+              {isAutoMode ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      className="w-full gap-2 font-bold"
+                      disabled={isPending || groupParticipants.length === 0}
+                    >
+                      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                      Générer la structure
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-amber-500" /> Action Déconseillée
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        D'après le mode Auto, l'Assistant gère déjà la structure optimale. 
+                        Toute régénération manuelle pourrait altérer les données de qualification.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleAutoGenerateNodes}>Continuer</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button
+                  className="w-full gap-2 font-bold"
+                  onClick={handleAutoGenerateNodes}
+                  disabled={isPending || groupParticipants.length === 0}
+                >
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                  Générer la structure
+                </Button>
+              )}
               <div className="grid grid-cols-2 gap-2 w-full">
                 <Button
                   variant="outline"
@@ -697,15 +773,46 @@ export function GroupNodesOrganizeClient({
           {/* Bouton flottant de sauvegarde */}
           {draftNodes.length > 0 && (
             <div className="fixed bottom-6 right-6 z-50">
-              <Button
-                size="lg"
-                className="h-12 px-6 rounded-full shadow-2xl gap-2 font-bold"
-                onClick={handleSaveNodes}
-                disabled={isPending}
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Sauvegarder {draftNodes.length} nœud(s)
-              </Button>
+              {isAutoMode ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="lg"
+                      className="h-12 px-6 rounded-full shadow-2xl gap-2 font-bold"
+                      disabled={isPending}
+                    >
+                      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Sauvegarder {draftNodes.length} nœud(s)
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-amber-500" /> Sauvegarde Manuelle Déconseillée
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        L'Assistant gère actuellement cette édition. Ajouter manuellement ces nœuds peut impacter les résultats automatiques.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleSaveNodes}>
+                        Confirmer la sauvegarde
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button
+                  size="lg"
+                  className="h-12 px-6 rounded-full shadow-2xl gap-2 font-bold"
+                  onClick={handleSaveNodes}
+                  disabled={isPending}
+                >
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Sauvegarder {draftNodes.length} nœud(s)
+                </Button>
+              )}
             </div>
           )}
         </div>

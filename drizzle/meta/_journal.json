@@ -99,6 +99,20 @@
       "when": 1776199206349,
       "tag": "0013_rich_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1776871267481,
+      "tag": "0014_lonely_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1776880658974,
+      "tag": "0015_known_deadpool",
+      "breakpoints": true
     }
   ]
 }

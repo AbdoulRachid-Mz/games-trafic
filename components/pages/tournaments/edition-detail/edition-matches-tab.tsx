@@ -35,6 +35,7 @@ import {
   Users,
   Calendar,
   X,
+  Swords,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
@@ -64,7 +65,9 @@ export function EditionMatchesTab({
   phases = [],
 }: EditionMatchesTabProps) {
   // États
-  const [activePhaseId, setActivePhaseId] = useState(initialPhaseId || phases[0]?.id || "");
+  const [activePhaseId, setActivePhaseId] = useState(
+    initialPhaseId || phases[0]?.id || "",
+  );
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
   const [allMatchesPage, setAllMatchesPage] = useState(1);
@@ -131,8 +134,9 @@ export function EditionMatchesTab({
     async (format: "csv" | "json" | "pdf" | "excel", scope: "all" | "my") => {
       setIsExporting(true);
       try {
-        const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
-        
+        const { exportData: exportToFormat, createExportData } =
+          await import("@/utils/export-utils");
+
         const filters: any = { editionId };
         if (activePhaseId) filters.phaseId = activePhaseId;
         if (statusFilter !== "ALL") filters.statuses = [statusFilter];
@@ -140,7 +144,7 @@ export function EditionMatchesTab({
           filters.memberRegistrationId = userReg.id;
 
         const result = await exportMatchesToFormat(editionId, format, filters);
-        
+
         if (result.success && result.data) {
           const rawData = JSON.parse(result.data);
           const config = {
@@ -215,287 +219,254 @@ export function EditionMatchesTab({
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Stats */}
-      <StatsCarousel
-        data={matchStats.map((s) => ({
-          label: s.label,
-          value: s.value,
-          icon: s.icon,
-          className: cn("border-none bg-muted/30", s.color),
-        }))}
-        className="p-4"
-        itemsPerView={{ mobile: 2, md: 4, lg: 4 }}
-      />
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+      {/* Premium Header/Stats Section */}
+      <div className="relative overflow-hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 p-6 md:p-8">
+        <div className="absolute -top-24 -right-24 h-64 w-64 bg-primary/10 blur-[100px]" />
+        <div className="absolute -bottom-24 -left-24 h-64 w-64 bg-primary/10 blur-[100px]" />
 
-      {/* Phase Selector (Horizontal Scroll/Tabs) */}
-      {phases.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy className="h-4 w-4 text-primary" />
-            <Typography variant="body-sm" weight="bold" theme="muted" className="uppercase tracking-wider">
-              Phases du tournoi
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <Typography
+              variant="h3"
+              weight="bold"
+              className="italic uppercase tracking-tighter flex items-center gap-3"
+            >
+              <Swords className="h-8 w-8 text-primary" />
+              Arène des Combats
+            </Typography>
+            <Typography variant="body-sm" theme="muted" className="max-w-md">
+              Suivez l'intensité de chaque affrontement en temps réel. Les
+              statistiques et résultats sont mis à jour officiellement.
             </Typography>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
-            {phases.map((phase) => (
-              <Button
-                key={phase.id}
-                variant={activePhaseId === phase.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setActivePhaseId(phase.id);
-                  setAllMatchesPage(1);
-                  setMyMatchesPage(1);
-                }}
-                className={cn(
-                  "flex-shrink-0 h-9 px-4 rounded-full transition-all",
-                  activePhaseId === phase.id ? "shadow-md scale-105" : "hover:bg-primary/5"
-                )}
+
+          <div className="flex flex-wrap gap-4">
+            {matchStats.map((s, i) => (
+              <div
+                key={i}
+                className="flex flex-col items-center px-6 py-3 rounded-2xl bg-background/50 border border-white/5 backdrop-blur-sm min-w-[100px]"
               >
-                {phase.name}
-              </Button>
-            ))}
-          </div>
-          <Separator className="opacity-50" />
-        </div>
-      )}
-
-      {/* Mes matchs */}
-      {userReg?.id && myPagination.total > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🔥</span>
-              <Typography variant="h5" weight="bold">
-                Mes matchs
-              </Typography>
-              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs rounded-full">
-                {myPagination.total}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1"
-                    disabled={isExporting}
-                  >
-                    {isExporting ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Download className="h-3.5 w-3.5" />
-                    )}
-                    <span className="text-xs hidden sm:inline">Exporter</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Mes matchs</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleExport("excel", "my")}>
-                    Excel
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("csv", "my")}>
-                    CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("json", "my")}>
-                    JSON
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("pdf", "my")}>
-                    PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {myMatches.map((match: any) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-                onUpdate={() => {
-                  refetchAll();
-                  refetchMy();
-                }}
-              />
-            ))}
-          </div>
-
-          {myPagination.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!myPagination.hasPrev}
-                onClick={() => setMyMatchesPage((p) => Math.max(1, p - 1))}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, myPagination.totalPages) }).map((_, i) => {
-                  const pageNum = i + 1;
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={myMatchesPage === pageNum ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setMyMatchesPage(pageNum)}
-                      className="h-8 w-8 p-0 text-xs"
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-                {myPagination.totalPages > 5 && <span className="text-muted-foreground text-xs">...</span>}
+                <div className={cn("mb-1", s.color)}>{s.icon}</div>
+                <div className="text-xl font-black italic">{s.value}</div>
+                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
+                  {s.label}
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!myPagination.hasNext}
-                onClick={() =>
-                  setMyMatchesPage((p) =>
-                    Math.min(myPagination.totalPages, p + 1),
-                  )
-                }
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          
-          <Separator className="my-8 opacity-50" />
-        </div>
-      )}
-
-      {/* Tous les matchs (Aperçu) */}
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            <Typography variant="h5" weight="bold">
-              Tous les matchs
-            </Typography>
-            <Badge variant="outline" className="text-xs rounded-full">
-              {allPagination.total}
-            </Badge>
+            ))}
           </div>
+        </div>
+      </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={statusFilter}
-              onValueChange={(val) => {
-                setStatusFilter(val);
+      {/* Modern Filter Bar */}
+      <div className="sticky top-2 z-20 bg-background/80 backdrop-blur-md border rounded-2xl p-2 shadow-xl shadow-primary/5 flex flex-col lg:flex-row items-stretch lg:items-center gap-2">
+        <div className="flex-1 flex overflow-x-auto scroller-hide gap-1 p-1">
+          {phases.map((phase) => (
+            <button
+              key={phase.id}
+              onClick={() => {
+                setActivePhaseId(phase.id);
                 setAllMatchesPage(1);
               }}
+              className={cn(
+                "px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-tighter transition-all whitespace-nowrap",
+                activePhaseId === phase.id
+                  ? "bg-primary text-white shadow-lg shadow-primary/30 scale-105"
+                  : "hover:bg-muted text-muted-foreground",
+              )}
             >
-              <SelectTrigger className="h-9 w-[130px] text-xs bg-card">
-                <Filter className="h-3 w-3 mr-2" />
-                <SelectValue placeholder="État" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tous les états</SelectItem>
-                <SelectItem value="PENDING">Programmé</SelectItem>
-                <SelectItem value="IN_PROGRESS">En cours</SelectItem>
-                <SelectItem value="COMPLETED">Terminé</SelectItem>
-                <SelectItem value="DISPUTED">Litige</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1"
-                  disabled={isExporting}
-                >
-                  {isExporting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Download className="h-3.5 w-3.5" />
-                  )}
-                  <span className="text-xs hidden sm:inline">Exporter</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Tous les matchs</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleExport("excel", "all")}>
-                  Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("csv", "all")}>
-                  CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("json", "all")}>
-                  JSON
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("pdf", "all")}>
-                  PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+              {phase.name}
+            </button>
+          ))}
         </div>
 
-        {allMatches.length === 0 ? (
-          <Card className="border-dashed py-12 bg-muted/5">
-            <CardContent className="text-center">
-              <div className="bg-muted p-4 rounded-full w-fit mx-auto mb-4">
-                <Calendar className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-              <Typography variant="body-base" theme="muted">
-                Aucun match trouvé pour cette phase ou ce filtre.
+        <Separator
+          orientation="vertical"
+          className="hidden lg:block h-8 mx-2"
+        />
+
+        <div className="flex items-center gap-2 p-1">
+          <Select
+            value={statusFilter}
+            onValueChange={(val) => {
+              setStatusFilter(val);
+              setAllMatchesPage(1);
+            }}
+          >
+            <SelectTrigger className="h-10 w-[150px] border-none bg-muted/50 font-bold text-[11px] uppercase tracking-wider rounded-xl">
+              <Filter className="h-3 w-3 mr-2 text-primary" />
+              <SelectValue placeholder="État" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous les états</SelectItem>
+              <SelectItem value="PENDING">À venir</SelectItem>
+              <SelectItem value="IN_PROGRESS">Live NOW</SelectItem>
+              <SelectItem value="COMPLETED">Terminés</SelectItem>
+              <SelectItem value="DISPUTED">Litiges</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 border-none bg-muted/50 rounded-xl px-4 gap-2"
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 text-primary" />
+                )}
+                <span className="text-[11px] font-black uppercase tracking-wider">
+                  Export
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl p-2 w-48">
+              <DropdownMenuLabel className="text-[10px] uppercase font-black text-muted-foreground">
+                Format d'export
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleExport("excel", "all")}
+                className="rounded-lg gap-2 cursor-pointer font-bold"
+              >
+                <div className="h-2 w-2 rounded-full bg-green-500" /> Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleExport("pdf", "all")}
+                className="rounded-lg gap-2 cursor-pointer font-bold"
+              >
+                <div className="h-2 w-2 rounded-full bg-red-500" /> PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleExport("csv", "all")}
+                className="rounded-lg gap-2 cursor-pointer font-bold"
+              >
+                <div className="h-2 w-2 rounded-full bg-blue-500" /> CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Mes Matchs (Spécial Highlight) */}
+        {userReg?.id && myMatches.length > 0 && (
+          <div className="col-span-full space-y-4">
+            <div className="flex items-center gap-3 px-2">
+              <div className="h-3 w-3 rounded-full bg-primary animate-ping" />
+              <Typography
+                variant="h5"
+                weight="bold"
+                className="italic uppercase tracking-tighter"
+              >
+                Mes Prochains Chocs
               </Typography>
-              {statusFilter !== "ALL" && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="mt-2 text-primary"
-                  onClick={() => setStatusFilter("ALL")}
-                >
-                  Voir tous les matchs de cette phase
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {allMatches.map((match: any) => (
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myMatches.map((match: any) => (
                 <MatchCard
                   key={match.id}
                   match={match}
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
-                  onUpdate={() => refetchAll()}
+                  onUpdate={() => {
+                    refetchAll();
+                    refetchMy();
+                  }}
+                  className="bg-primary/5 border-primary/20 hover:bg-primary/10 transition-colors shadow-lg shadow-primary/5"
                 />
               ))}
             </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-4 bg-muted/20 rounded-xl border border-dashed">
-              <div className="text-sm text-muted-foreground">
-                <Typography variant="body-sm">
-                  Affichage des <strong>{allMatches.length}</strong> derniers matchs sur <strong>{allPagination.total}</strong>.
-                </Typography>
-              </div>
-              {tournamentId && (
-                <Button variant="default" size="sm" asChild className="gap-2 shadow-lg shadow-primary/20">
-                  <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}>
-                    Voir tout le calendrier
-                    <ChevronRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
-            </div>
+            <Separator className="my-8" />
           </div>
         )}
+
+        {/* Tous les matchs */}
+        <div className="col-span-full space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <Typography
+              variant="body-sm"
+              weight="bold"
+              theme="muted"
+              className="uppercase tracking-[0.2em] font-bold"
+            >
+              Calendrier des rencontres
+            </Typography>
+            <Badge variant="outline" className="font-mono text-xs">
+              {allPagination.total} Matchs
+            </Badge>
+          </div>
+
+          {allMatches.length === 0 ? (
+            <div className="py-20 text-center border-2 border-dashed rounded-3xl bg-muted/5 flex flex-col items-center justify-center gap-4">
+              <div className="p-4 rounded-full bg-muted/20">
+                <Calendar className="h-10 w-10 text-muted-foreground/30" />
+              </div>
+              <Typography variant="body-base" theme="muted" weight="medium">
+                Aucune rencontre disponible avec ces filtres.
+              </Typography>
+              <Button
+                variant="link"
+                onClick={() => {
+                  setStatusFilter("ALL");
+                  setActivePhaseId(phases[0]?.id || "");
+                }}
+              >
+                Réinitialiser les filtres
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {allMatches.map((match: any) => (
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
+                    onUpdate={() => refetchAll()}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination Premium */}
+              {allPagination.totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 py-8">
+                  <Button
+                    variant="outline"
+                    disabled={!allPagination.hasPrev}
+                    onClick={() => setAllMatchesPage((p) => Math.max(1, p - 1))}
+                    className="rounded-full h-12 w-12 border-primary/10 hover:bg-primary/5"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+
+                  <div className="flex items-center gap-2 px-6 py-2 bg-muted/30 rounded-full border border-white/5 font-black italic text-sm">
+                    <span className="text-primary">{allMatchesPage}</span>
+                    <span className="opacity-30">/</span>
+                    <span>{allPagination.totalPages}</span>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    disabled={!allPagination.hasNext}
+                    onClick={() =>
+                      setAllMatchesPage((p) =>
+                        Math.min(allPagination.totalPages, p + 1),
+                      )
+                    }
+                    className="rounded-full h-12 w-12 border-primary/10 hover:bg-primary/5"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,17 +1,13 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { MoreHorizontal } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./dropdown-menu";
+import { Button } from "./button";
 
 export interface ResponsiveTab {
     value: string;
@@ -29,6 +25,8 @@ interface ResponsiveTabsProps {
     mobileCount?: number; // Default: 2 tabs
     className?: string;
     children?: (tab: ResponsiveTab) => React.ReactNode;
+    swipeable?: boolean;
+    showNavButtons?: boolean;
 }
 
 export function ResponsiveTabs({
@@ -40,6 +38,8 @@ export function ResponsiveTabs({
     mobileCount = 2,
     className,
     children,
+    swipeable = false,
+    showNavButtons = false,
 }: ResponsiveTabsProps) {
     const { screenSize } = useScreenSize();
     const [activeTab, setActiveTab] = useState(defaultValue || tabs[0]?.value);
@@ -66,6 +66,44 @@ export function ResponsiveTabs({
         setActiveTab(value);
         onValueChange?.(value);
     };
+
+    // Embla Carousel Integration
+    const initialIndex = tabs.findIndex(t => t.value === activeTab);
+    const [emblaRef, emblaApi] = useEmblaCarousel({
+        startIndex: initialIndex !== -1 ? initialIndex : 0,
+        loop: false,
+        active: swipeable,
+        watchDrag: swipeable,
+    });
+
+    const onSelect = useCallback(() => {
+        if (!emblaApi) return;
+        const selectedIndex = emblaApi.selectedScrollSnap();
+        const selectedTab = tabs[selectedIndex];
+        if (selectedTab && selectedTab.value !== activeTab) {
+            handleValueChange(selectedTab.value);
+        }
+    }, [emblaApi, tabs, activeTab]);
+
+    useEffect(() => {
+        if (!emblaApi) return;
+        emblaApi.on("select", onSelect);
+        return () => {
+            emblaApi.off("select", onSelect);
+        };
+    }, [emblaApi, onSelect]);
+
+    useEffect(() => {
+        if (emblaApi && swipeable) {
+            const index = tabs.findIndex(t => t.value === activeTab);
+            if (index !== -1 && index !== emblaApi.selectedScrollSnap()) {
+                emblaApi.scrollTo(index);
+            }
+        }
+    }, [activeTab, emblaApi, swipeable, tabs]);
+
+    const scrollPrev = useCallback(() => emblaApi && emblaApi.scrollPrev(), [emblaApi]);
+    const scrollNext = useCallback(() => emblaApi && emblaApi.scrollNext(), [emblaApi]);
 
     // Vérifier si le tab actif est dans le dropdown
     const activeTabInDropdown = dropdownTabs.some((tab) => tab.value === activeTab);
@@ -122,21 +160,58 @@ export function ResponsiveTabs({
                 )}
             </div>
 
-            {/* Tab Contents */}
-            {children
-                ? tabs.map((tab) => (
-                    <TabsContent key={tab.value} value={tab.value}>
-                        {children(tab)}
-                    </TabsContent>
-                ))
-                : tabs.map(
-                    (tab) =>
-                        tab.content && (
+            {/* Tab Contents with Swiping support */}
+            <div className="relative mt-4">
+                {showNavButtons && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden md:flex rounded-full bg-background/50 hover:bg-background shadow-md"
+                            onClick={scrollPrev}
+                        >
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden md:flex rounded-full bg-background/50 hover:bg-background shadow-md"
+                            onClick={scrollNext}
+                        >
+                            <ChevronRight className="h-5 w-5" />
+                        </Button>
+                    </>
+                )}
+
+                {swipeable ? (
+                    <div className="overflow-hidden" ref={emblaRef}>
+                        <div className="flex">
+                            {tabs.map((tab) => (
+                                <div key={tab.value} className="flex-[0_0_100%] min-w-0">
+                                    <div className={cn("w-full transition-opacity duration-300", activeTab === tab.value ? "opacity-100" : "opacity-0 pointer-events-none")}>
+                                        {children ? children(tab) : tab.content}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    children
+                        ? tabs.map((tab) => (
                             <TabsContent key={tab.value} value={tab.value}>
-                                {tab.content}
+                                {children(tab)}
                             </TabsContent>
+                        ))
+                        : tabs.map(
+                            (tab) =>
+                                tab.content && (
+                                    <TabsContent key={tab.value} value={tab.value}>
+                                        {tab.content}
+                                    </TabsContent>
+                                )
                         )
                 )}
+            </div>
         </Tabs>
     );
 }

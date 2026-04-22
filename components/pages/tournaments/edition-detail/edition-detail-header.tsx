@@ -22,7 +22,8 @@ import {
 import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import useEmblaCarousel from "embla-carousel-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,10 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import {
-  Tournament,
-  TournamentEditionWithRelations,
-} from "@/database/schema";
+import { Tournament, TournamentEditionWithRelations } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
 import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
@@ -53,6 +51,7 @@ interface EditionDetailHeaderProps {
   onCancelPayment?: () => void;
   onConfirmPayment?: () => void;
   isRegistered?: boolean;
+  recentMatches?: any[];
 }
 
 export function EditionDetailHeader({
@@ -67,8 +66,19 @@ export function EditionDetailHeader({
   onCancelPayment,
   onConfirmPayment,
   isRegistered,
+  recentMatches = [],
 }: EditionDetailHeaderProps) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
   const { isMobile } = useScreenSize();
+
+  // Autoplay functionality: 15 seconds
+  React.useEffect(() => {
+    if (!emblaApi) return;
+    const intervalId = setInterval(() => {
+      emblaApi.scrollNext();
+    }, 15000);
+    return () => clearInterval(intervalId);
+  }, [emblaApi]);
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
 
@@ -77,7 +87,9 @@ export function EditionDetailHeader({
       label: "Tableau de bord",
       icon: null,
       onClick: () =>
-        router.push(`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`),
+        router.push(
+          `/tournaments/${tournament.id}/editions/${edition.id}/dashboard`,
+        ),
       disabled: false,
       requireOrganizer: true,
     },
@@ -85,7 +97,9 @@ export function EditionDetailHeader({
       label: "Matchs",
       icon: null,
       onClick: () =>
-        router.push(`/tournaments/${tournament.id}/editions/${edition.id}/matches`),
+        router.push(
+          `/tournaments/${tournament.id}/editions/${edition.id}/matches`,
+        ),
       disabled: false,
       requireOrganizer: true,
     },
@@ -93,7 +107,9 @@ export function EditionDetailHeader({
       label: "Calendrier",
       icon: Calendar,
       onClick: () =>
-        router.push(`/tournaments/${tournament.id}/editions/${edition.id}/calendar`),
+        router.push(
+          `/tournaments/${tournament.id}/editions/${edition.id}/calendar`,
+        ),
       disabled: false,
       requireOrganizer: true,
     },
@@ -166,44 +182,199 @@ export function EditionDetailHeader({
     }
   };
   const visibleActions = dropdownData.filter(
-    (item) => !item.requireOrganizer || isOrganizer
+    (item) => !item.requireOrganizer || isOrganizer,
   );
   const primaryActions = visibleActions.slice(0, 2);
   const secondaryActions = visibleActions.slice(2);
 
   return (
     <div className="relative border-b bg-gradient-to-b from-background via-background to-muted/10">
-      {/* Bannière */}
-      <div className="relative h-48 md:h-64 overflow-hidden">
-        {tournament.coverImage ? (
-          <Image
-            src={tournament.coverImage}
-            alt={tournament.name}
-            fill
-            className="object-cover opacity-20"
-            priority
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-purple-500/20" />
-        )}
+      {/* Bannière Carousel */}
+      <div
+        className="relative h-64 md:h-80 overflow-hidden bg-muted/20"
+        ref={emblaRef}
+      >
+        <div className="flex h-full">
+          {/* Slide 1: Cover Image */}
+          <div className="flex-[0_0_100%] min-w-0 relative h-full group">
+            {tournament.coverImage ? (
+              <Image
+                src={tournament.coverImage}
+                alt={tournament.name}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
+                priority
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 md:left-24 md:translate-x-0 hidden md:block">
+              <Badge className="bg-primary/80 backdrop-blur-md border-primary/20 text-white px-4 py-1.5 uppercase tracking-[0.2em] text-[10px] font-black italic">
+                Official Cover
+              </Badge>
+            </div>
+          </div>
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/90 to-transparent" />
+          {/* Matches Slides */}
+          {recentMatches.map((match, idx) => (
+            <Link
+              key={match.id}
+              href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
+              className="flex-[0_0_100%] lg:flex-[0_0_50%] xl:flex-[0_0_33.333%] min-w-0 relative h-full px-2 py-4"
+            >
+              <div className="absolute inset-0 pointer-events-none">
+                {tournament.coverImage && (
+                  <Image
+                    src={tournament.coverImage}
+                    alt="match"
+                    fill
+                    className="object-cover opacity-10 blur-sm scale-110"
+                  />
+                )}
+              </div>
 
-        {/* Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-            }}
-          />
+              <div className="h-full w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden group/card hover:border-primary/30 transition-colors">
+                {/* Decorative background circle */}
+                <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover/card:bg-primary/20 transition-colors" />
+
+                <div className="flex items-center justify-between mb-4">
+                  <Badge
+                    variant="outline"
+                    className="bg-background/20 backdrop-blur-sm border-white/10 text-[10px] uppercase font-bold tracking-widest text-white/70"
+                  >
+                    {match.phase?.name || "Match"}
+                  </Badge>
+                  <div className="flex items-center gap-1.5 text-[10px] text-white/50 font-medium italic">
+                    <Clock className="h-3 w-3" />
+                    {match.status === "COMPLETED"
+                      ? "Terminé"
+                      : format(
+                          new Date(match.scheduledTime || match.createdAt),
+                          "HH:mm",
+                          { locale: fr },
+                        )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-6 md:gap-8 flex-1">
+                  {/* Participant 1 */}
+                  <div className="flex flex-col items-center gap-3 flex-1 text-center">
+                    <div className="relative">
+                      <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-muted/20 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform relative">
+                        {match.participant1?.member?.team?.logo ||
+                        match.participant1?.member?.user?.profileImage ? (
+                          <Image
+                            src={
+                              match.participant1?.member?.team?.logo ||
+                              match.participant1?.member?.user?.profileImage ||
+                              match.participant1?.member?.user?.image ||
+                              "/icons/avatar-500.png"
+                            }
+                            alt="participant1"
+                            fill
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-white/20 font-black">?</div>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs md:text-sm font-bold text-white line-clamp-1 truncate w-full uppercase tracking-tighter">
+                      {match.participant1?.member?.team?.name ||
+                        match.participant1?.member?.user?.username ||
+                        "À déterminer"}
+                    </span>
+                  </div>
+
+                  {/* Score / VS */}
+                  <div className="flex flex-col items-center gap-1">
+                    {match.status === "COMPLETED" ? (
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "text-2xl md:text-3xl font-black italic",
+                            (match.score1 ?? 0) > (match.score2 ?? 0)
+                              ? "text-primary shadow-primary/20"
+                              : "text-white/90",
+                          )}
+                        >
+                          {match.score1 ?? 0}
+                        </span>
+                        <span className="text-white/20 font-black">-</span>
+                        <span
+                          className={cn(
+                            "text-2xl md:text-3xl font-black italic",
+                            (match.score2 ?? 0) > (match.score1 ?? 0)
+                              ? "text-primary shadow-primary/20"
+                              : "text-white/90",
+                          )}
+                        >
+                          {match.score2 ?? 0}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="h-8 w-12 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
+                        <span className="text-xs font-black italic text-primary">
+                          VS
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Participant 2 */}
+                  <div className="flex flex-col items-center gap-3 flex-1 text-center">
+                    <div className="relative">
+                      <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-muted/20 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform relative">
+                        {match.participant2?.member?.team?.logo ||
+                        match.participant2?.member?.user?.profileImage ? (
+                          <Image
+                            src={
+                              match.participant2?.member?.team?.logo ||
+                              match.participant2?.member?.user?.profileImage ||
+                              match.participant2?.member?.user?.image ||
+                              "/icons/avatar-500.png"
+                            }
+                            alt=""
+                            fill
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-white/20 font-black">?</div>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs md:text-sm font-bold text-white line-clamp-1 truncate w-full uppercase tracking-tighter">
+                      {match.participant2?.member?.team?.name ||
+                        match.participant2?.member?.user?.username ||
+                        "À déterminer"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-white/5 flex justify-center">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-[10px] text-white/30 hover:text-primary h-auto p-0 uppercase font-black"
+                    asChild
+                  >
+                    <Link
+                      href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
+                    >
+                      Voir les détails <ChevronRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
 
       {/* Informations */}
-      <div className="container mx-auto px-4 relative -mt-16">
-        <div className="flex flex-col md:flex-row items-start md:items-end gap-6">
+      <div className="container mx-auto px-2 relative -mt-16">
+        <div className="flex flex-col lg:flex-row items-start lg:items-end gap-4">
           {/* Logo/Badge */}
           <motion.div
             initial={{ scale: 0 }}
@@ -211,8 +382,17 @@ export function EditionDetailHeader({
             className="relative"
           >
             <div className="relative">
-              <div className="w-24 h-24 md:w-28 md:h-28 rounded-xl border-4 border-background bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-2xl">
-                <Trophy className="h-12 w-12 md:h-14 md:w-14 text-primary" />
+              <div className="w-24 relative h-24 md:w-28 md:h-28 rounded-xl border-4 border-background bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-2xl">
+                <Image
+                  src={
+                    edition.tournament?.profileImage ??
+                    "/icons/tournament-500.png"
+                  }
+                  alt={edition.name || "edition image profile"}
+                  fill
+                  className="h-full w-full object-cover"
+                />
+                {/* <Trophy className="h-12 w-12 md:h-14 md:w-14 text-primary" /> */}
               </div>
 
               {/* Statut */}
@@ -237,8 +417,12 @@ export function EditionDetailHeader({
 
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline" className="gap-1">
-                  <span className="text-lg">{getLocationIcon(edition.locationType || "ONLINE")}</span>
-                  {edition.locationType === "ONLINE" ? "En ligne" : "Présentiel"}
+                  <span className="text-lg">
+                    {getLocationIcon(edition.locationType || "ONLINE")}
+                  </span>
+                  {edition.locationType === "ONLINE"
+                    ? "En ligne"
+                    : "Présentiel"}
                 </Badge>
 
                 {edition.entryFee && Number(edition.entryFee) > 0 && (
@@ -271,8 +455,8 @@ export function EditionDetailHeader({
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-primary" />
                 <span>
-                  {edition.registrations?.length || 0} / {edition.maxParticipants}{" "}
-                  participants
+                  {edition.registrations?.length || 0} /{" "}
+                  {edition.maxParticipants} participants
                 </span>
               </div>
             </div>
@@ -308,12 +492,10 @@ export function EditionDetailHeader({
                       onClick={action.onClick}
                       disabled={action.disabled}
                       className={cn(
-                        action.variant === "destructive" && "text-destructive"
+                        action.variant === "destructive" && "text-destructive",
                       )}
                     >
-                      {action.icon && (
-                        <action.icon className="h-4 w-4 mr-2" />
-                      )}
+                      {action.icon && <action.icon className="h-4 w-4 mr-2" />}
                       {action.label}
                     </DropdownMenuItem>
                   ))}
@@ -321,7 +503,6 @@ export function EditionDetailHeader({
               </DropdownMenu>
             )}
           </div>
-
         </div>
       </div>
     </div>

@@ -5,8 +5,10 @@ import {
   getBracketNodes,
   recalculateGroupStandings,
   getTournamentPhases,
+  getMatchesWithParticipants,
 } from "@/actions/phases";
 import { getEditionRegistrations } from "@/actions/tournaments";
+import { getTournamentEditionById } from "@/actions/editions";
 import { GroupDetailClient } from "./group-detail-client";
 
 interface PageProps {
@@ -84,13 +86,22 @@ export default async function GroupDetailPage({ params }: PageProps) {
   const phaseConfig = (group?.phase as any)?.config || {};
   const participantSource = phaseConfig.participantSource || "EDITION";
 
-  // Fetch Bracket Nodes
-  const nodesRes = await getBracketNodes({
-    filters: { groupId },
-    options: { sortBy: "order", sortOrder: "asc" },
-    pagination: { page: 1, limit: 200 },
-  });
+  const [nodesRes, matchesRes, edition] = await Promise.all([
+    getBracketNodes({
+      filters: { groupId },
+      options: { sortBy: "order", sortOrder: "asc" },
+      pagination: { page: 1, limit: 200 },
+    }),
+    getMatchesWithParticipants({
+      filters: { groupId, editionId },
+      pagination: { page: 1, limit: 500 },
+      options: { sortBy: "matchNumber", sortOrder: "asc" },
+    }),
+    getTournamentEditionById(editionId)
+  ]);
+  
   const nodes = nodesRes.data;
+  const matches = matchesRes.data;
 
   // Global stats
   const totalMatches =
@@ -112,8 +123,10 @@ export default async function GroupDetailPage({ params }: PageProps) {
           nodeCode: node.nodeCode ?? "",
         })) as BracketNode[]
       }
+      matches={matches}
       basePath={basePath}
       totalMatches={totalMatches}
+      editionConfig={(edition?.editionConfig as any) || {}}
     />
   );
 }

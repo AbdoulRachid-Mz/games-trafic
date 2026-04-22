@@ -275,6 +275,21 @@ export const ColumnPresets = {
     { key: 'captain.username', label: 'Capitaine', type: 'text', width: 25 },
     { key: 'createdAt', label: 'Date de création', type: 'date', width: 20 },
     { key: '_count.members', label: 'Membres', type: 'number', width: 15 }
+  ] as ColumnConfig[],
+
+  // Classements (Standings)
+  standings: [
+    { key: 'position', label: 'Pos.', type: 'number', width: 10 },
+    { key: 'participantName', label: 'Participant', type: 'text', width: 30 },
+    { key: 'points', label: 'Points', type: 'number', width: 15 },
+    { key: 'matchesPlayed', label: 'MJ', type: 'number', width: 10 },
+    { key: 'matchesWon', label: 'V', type: 'number', width: 10 },
+    { key: 'matchesDrawn', label: 'N', type: 'number', width: 10 },
+    { key: 'matchesLost', label: 'D', type: 'number', width: 10 },
+    { key: 'scoreFor', label: 'BP', type: 'number', width: 10 },
+    { key: 'scoreAgainst', label: 'BC', type: 'number', width: 10 },
+    { key: 'scoreDifference', label: 'Diff', type: 'number', width: 15 },
+    { key: 'status', label: 'Statut', type: 'text', width: 20 }
   ] as ColumnConfig[]
 }
 
