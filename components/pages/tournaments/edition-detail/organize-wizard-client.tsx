@@ -88,6 +88,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { useScreenSize } from "@/hooks/use-screen";
+// Dans les imports, ajouter :
+import { getEliminationRoundName } from "@/lib/tournaments/get-name";
 
 // ============================================================================
 // TYPES
@@ -353,33 +355,37 @@ const DEFAULT_PHASE_CONFIGS: Record<
 
 const PHASE_TYPE_LABELS: Record<
   PhaseType,
-  { label: string; description: string; icon: typeof Zap }
+  { label: string; description: string; icon: typeof Zap; defaultGroupName?: string }
 > = {
   ROUND_ROBIN: {
     label: "Championnat (Ligue)",
-    description:
-      "Tous les participants s'affrontent en aller simple ou aller-retour",
+    description: "Tous les participants s'affrontent en aller simple ou aller-retour",
     icon: GraduationCap,
+    defaultGroupName: "Classement",
   },
   GROUP_STAGE: {
     label: "Phase de groupes",
     description: "Répartition en groupes, puis qualification",
     icon: Users,
+    defaultGroupName: "Groupe",
   },
   ELIMINATION: {
     label: "Élimination directe",
     description: "Tableau à élimination directe",
     icon: Zap,
+    defaultGroupName: "Round",
   },
   SWISS: {
     label: "Système Suisse",
     description: "Participants affrontés selon leur classement",
     icon: Layers,
+    defaultGroupName: "Round",
   },
   KNOCKOUT: {
     label: "Matchs à élimination",
     description: "Séries de matchs (BO3/BO5)",
     icon: ShieldCheck,
+    defaultGroupName: "Match",
   },
 };
 
@@ -1205,6 +1211,11 @@ function AutoModeConfig({
     await onSave();
     setIsSaving(false);
   };
+
+  function getRoundDisplayName(roundNumber: number, totalQualified: number): string {
+  const matchCount = totalQualified / Math.pow(2, roundNumber);
+  return getEliminationRoundName(matchCount * 2);
+}
 
   return (
     <div className="space-y-6">

@@ -58,7 +58,25 @@ import {
   generateRoundRobinMatches,
 } from "@/lib/tournaments/match.generator";
 import { revalidatePath } from "next/cache";
-import { shuffle, chunk } from "@/lib/tournaments/utils";
+import {
+  shuffle,
+  chunk,
+  getDefaultScheduledTime,
+} from "@/lib/tournaments/utils";
+
+/**
+ * Organise la structure complète d'une édition
+ * CORRIGÉ : Supporte la création de multiples nœuds par groupe (journées pour ROUND_ROBIN)
+ */
+import { createStructureEngine } from "@/lib/tournaments/structure-engine";
+import { generateMatchesEngine } from "@/lib/tournaments/match-generation-engine";
+import { propagatePhaseResults } from "@/lib/tournaments/propagation-service";
+import {
+  computeWinner,
+  getRequiredWins,
+  resolveSlotIndex,
+  computeAggregatedWinner,
+} from "@/lib/tournaments/bracket-engine";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -1118,7 +1136,7 @@ export async function getEditionRecentMatches(editionId: string) {
     const matchesData = await db.query.matches.findMany({
       where: and(
         eq(matches.editionId, editionId),
-        eq(matches.isDeleted, false)
+        eq(matches.isDeleted, false),
       ),
       limit: 10,
       orderBy: [desc(matches.scheduledTime), desc(matches.createdAt)],
@@ -2451,6 +2469,33 @@ export async function toggleGroupLock(groupId: string, isLocked: boolean) {
   }
 }
 
+const FINAL_STATUSES = new Set(["COMPLETED", "CANCELLED"]);
+
+function isMatchPending(status?: string | null) {
+  return !status || !FINAL_STATUSES.has(status);
+}
+
+function groupMatchesBy<T extends { [key: string]: any }>(
+  matches: T[],
+  key: keyof T,
+) {
+  const map = new Map<string, T[]>();
+
+  for (const m of matches) {
+    const k = m[key];
+    if (!k) continue;
+
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(m);
+  }
+
+  return map;
+}
+
+function hasPending(matches: { status?: string | null }[]) {
+  return matches.some((m) => isMatchPending(m.status));
+}
+
 /**
  * Vérifie les entités non terminées d'une entité parente (Phase, Group, BracketNode)
  * CORRIGÉ : Élimine les N+1 queries et utilise les matchs comme source de vérité
@@ -2458,143 +2503,48 @@ export async function toggleGroupLock(groupId: string, isLocked: boolean) {
 export async function checkPendingEntitiesAction(
   type: "PHASE" | "GROUP" | "BRACKET_NODE",
   id: string,
-): Promise<{
-  success: boolean;
-  pendingEntities: Array<{
-    type: "MATCH" | "GROUP" | "NODE" | "PHASE";
-    id: string;
-    label: string;
-    reason: string;
-  }>;
-}> {
+) {
   const pendingEntities: Array<{
-    type: "MATCH" | "GROUP" | "NODE" | "PHASE";
+    type: "MATCH" | "GROUP" | "NODE";
     id: string;
     label: string;
     reason: string;
   }> = [];
 
   try {
+    // 🔥 FETCH GLOBAL MATCHES (1 seule source)
+    let matchesList: Array<
+      typeof db.query.matches.findMany extends (
+        ...args: any[]
+      ) => Promise<infer R>
+        ? R extends (infer M)[]
+          ? M
+          : never
+        : never
+    > = [];
+
     if (type === "PHASE") {
-      // 1. Récupérer tous les groupes de la phase en une seule requête
-      const groups = await db.query.phaseGroups.findMany({
-        where: and(
-          eq(phaseGroups.phaseId, id),
-          eq(phaseGroups.isDeleted, false),
-        ),
+      matchesList = await db.query.matches.findMany({
+        where: and(eq(matches.phaseId, id), eq(matches.isDeleted, false)),
       });
+    }
 
-      // Vérifier les groupes non terminés (basé sur les matchs, pas sur le flag)
-      const groupIds = groups.map((g) => g.id);
-      if (groupIds.length > 0) {
-        // Récupérer tous les matchs des groupes en une seule requête
-        const allGroupMatches = await db.query.matches.findMany({
-          where: and(
-            inArray(matches.groupId, groupIds),
-            eq(matches.isDeleted, false),
-          ),
-        });
-
-        // Grouper les matchs par groupId
-        const matchesByGroup = new Map<string, typeof allGroupMatches>();
-        for (const match of allGroupMatches) {
-          if (!matchesByGroup.has(match.groupId!)) {
-            matchesByGroup.set(match.groupId!, []);
-          }
-          matchesByGroup.get(match.groupId!)!.push(match);
-        }
-
-        // Vérifier chaque groupe
-        for (const group of groups) {
-          const groupMatches = matchesByGroup.get(group.id) || [];
-          const hasPendingMatches = groupMatches.some(
-            (m) => !["CANCELLED", "COMPLETED"].includes(m.status || ""),
-          );
-
-          if (hasPendingMatches) {
-            pendingEntities.push({
-              type: "GROUP",
-              id: group.id,
-              label: group.name || `Groupe ${group.order}`,
-              reason: "Des matchs non terminés",
-            });
-          }
-        }
-      }
-
-      // 2. Récupérer tous les nœuds de bracket directs de la phase
-      const nodes = await db.query.bracketNodes.findMany({
-        where: and(
-          eq(bracketNodes.phaseId, id),
-          eq(bracketNodes.isDeleted, false),
-          isNull(bracketNodes.groupId),
-        ),
-      });
-
-      if (nodes.length > 0) {
-        const nodeIds = nodes.map((n) => n.id);
-
-        // Récupérer tous les matchs des nœuds en une seule requête
-        const allNodeMatches = await db.query.matches.findMany({
-          where: and(
-            inArray(matches.bracketNodeId, nodeIds),
-            eq(matches.isDeleted, false),
-          ),
-        });
-
-        const matchesByNode = new Map<string, typeof allNodeMatches>();
-        for (const match of allNodeMatches) {
-          if (!matchesByNode.has(match.bracketNodeId!)) {
-            matchesByNode.set(match.bracketNodeId!, []);
-          }
-          matchesByNode.get(match.bracketNodeId!)!.push(match);
-        }
-
-        // Vérifier chaque nœud (basé sur les matchs, pas sur le flag isCompleted)
-        for (const node of nodes) {
-          const nodeMatches = matchesByNode.get(node.id) || [];
-          const hasPendingMatches = nodeMatches.some(
-            (m) => !["CANCELLED", "COMPLETED"].includes(m.status || ""),
-          );
-
-          if (hasPendingMatches) {
-            pendingEntities.push({
-              type: "NODE",
-              id: node.id,
-              label: node.nodeCode || `Nœud ${node.id.slice(0, 8)}`,
-              reason: "Matchs non terminés",
-            });
-          }
-        }
-      }
-
-      // 3. Récupérer les matchs directs de la phase (sans groupe)
-      const directMatches = await db.query.matches.findMany({
-        where: and(
-          eq(matches.phaseId, id),
-          isNull(matches.groupId),
-          eq(matches.isDeleted, false),
-        ),
-      });
-
-      for (const match of directMatches) {
-        if (!["CANCELLED", "COMPLETED"].includes(match.status || "")) {
-          pendingEntities.push({
-            type: "MATCH",
-            id: match.id,
-            label: match.matchCode || `Match ${match.id.slice(0, 8)}`,
-            reason: `Statut: ${match.status}`,
-          });
-        }
-      }
-    } else if (type === "GROUP") {
-      // 1. Récupérer tous les matchs du groupe en une seule requête
-      const groupMatches = await db.query.matches.findMany({
+    if (type === "GROUP") {
+      matchesList = await db.query.matches.findMany({
         where: and(eq(matches.groupId, id), eq(matches.isDeleted, false)),
       });
+    }
 
-      for (const match of groupMatches) {
-        if (!["CANCELLED", "COMPLETED"].includes(match.status || "")) {
+    if (type === "BRACKET_NODE") {
+      matchesList = await db.query.matches.findMany({
+        where: and(eq(matches.bracketNodeId, id), eq(matches.isDeleted, false)),
+      });
+    }
+
+    // 🔥 CAS SIMPLE : BRACKET NODE
+    if (type === "BRACKET_NODE") {
+      for (const match of matchesList) {
+        if (isMatchPending(match.status)) {
           pendingEntities.push({
             type: "MATCH",
             id: match.id,
@@ -2604,7 +2554,11 @@ export async function checkPendingEntitiesAction(
         }
       }
 
-      // 2. Récupérer tous les nœuds de bracket du groupe
+      return { success: true, pendingEntities };
+    }
+
+    // 🔥 GROUP LOGIC
+    if (type === "GROUP") {
       const nodes = await db.query.bracketNodes.findMany({
         where: and(
           eq(bracketNodes.groupId, id),
@@ -2612,77 +2566,138 @@ export async function checkPendingEntitiesAction(
         ),
       });
 
-      if (nodes.length > 0) {
-        const nodeIds = nodes.map((n) => n.id);
-
-        // Récupérer tous les matchs des nœuds en une seule requête
-        const allNodeMatches = await db.query.matches.findMany({
-          where: and(
-            inArray(matches.bracketNodeId, nodeIds),
-            eq(matches.isDeleted, false),
-          ),
-        });
-
-        const matchesByNode = new Map<string, typeof allNodeMatches>();
-        for (const match of allNodeMatches) {
-          if (!matchesByNode.has(match.bracketNodeId!)) {
-            matchesByNode.set(match.bracketNodeId!, []);
-          }
-          matchesByNode.get(match.bracketNodeId!)!.push(match);
-        }
-
-        for (const node of nodes) {
-          const nodeMatches = matchesByNode.get(node.id) || [];
-          const hasPendingMatches = nodeMatches.some(
-            (m) => !["CANCELLED", "COMPLETED"].includes(m.status || ""),
-          );
-
-          if (hasPendingMatches) {
-            pendingEntities.push({
-              type: "NODE",
-              id: node.id,
-              label: node.nodeCode || `Nœud ${node.id.slice(0, 8)}`,
-              reason: "Matchs non terminés",
-            });
-          } else if (nodeMatches.length === 0) {
-            pendingEntities.push({
-              type: "NODE",
-              id: node.id,
-              label: node.nodeCode || `Nœud ${node.id.slice(0, 8)}`,
-              reason: "Aucun match généré",
-            });
-          }
-        }
-      }
-    } else if (type === "BRACKET_NODE") {
       const nodeMatches = await db.query.matches.findMany({
-        where: and(eq(matches.bracketNodeId, id), eq(matches.isDeleted, false)),
+        where: and(
+          inArray(
+            matches.bracketNodeId,
+            nodes.map((n) => n.id),
+          ),
+          eq(matches.isDeleted, false),
+        ),
       });
 
-      for (const match of nodeMatches) {
-        if (!["CANCELLED", "COMPLETED"].includes(match.status || "")) {
+      const matchesByNode = groupMatchesBy(nodeMatches, "bracketNodeId");
+
+      for (const node of nodes) {
+        const m = matchesByNode.get(node.id) || [];
+
+        if (m.length === 0) {
+          pendingEntities.push({
+            type: "NODE",
+            id: node.id,
+            label: node.nodeCode || node.id,
+            reason: "Aucun match généré",
+          });
+          continue;
+        }
+
+        if (hasPending(m)) {
+          pendingEntities.push({
+            type: "NODE",
+            id: node.id,
+            label: node.nodeCode || node.id,
+            reason: "Matchs non terminés",
+          });
+        }
+      }
+
+      // matchs directs du groupe
+      for (const match of matchesList) {
+        if (isMatchPending(match.status)) {
           pendingEntities.push({
             type: "MATCH",
             id: match.id,
-            label: match.matchCode || `Match ${match.id.slice(0, 8)}`,
+            label: match.matchCode || match.id,
             reason: `Statut: ${match.status}`,
           });
+        }
+      }
+
+      return { success: true, pendingEntities };
+    }
+
+    // 🔥 PHASE LOGIC (ULTRA OPTI)
+    if (type === "PHASE") {
+      const groups = await db.query.phaseGroups.findMany({
+        where: and(
+          eq(phaseGroups.phaseId, id),
+          eq(phaseGroups.isDeleted, false),
+        ),
+      });
+
+      const groupMatches = matchesList.filter((m) => m.groupId);
+      const matchesByGroup = groupMatches.reduce((map, m) => {
+        if (!m.groupId) return map;
+        if (!map.has(m.groupId)) map.set(m.groupId, []);
+        map.get(m.groupId)!.push(m);
+        return map;
+      }, new Map<string, typeof groupMatches>());
+
+      for (const group of groups) {
+        const gm = matchesByGroup.get(group.id) || [];
+
+        if (gm.length === 0 || hasPending(gm)) {
+          pendingEntities.push({
+            type: "GROUP",
+            id: group.id,
+            label: group.name || `Groupe ${group.order}`,
+            reason:
+              gm.length === 0 ? "Aucun match généré" : "Matchs non terminés",
+          });
+        }
+      }
+
+      // 🔥 BRACKET DIRECT (nodes rattachés à la phase sans group - legacy)
+      const nodeMatches = matchesList.filter((m) => m.bracketNodeId);
+      const matchesByNode = groupMatchesBy(nodeMatches, "bracketNodeId");
+
+      const nodes = await db.query.bracketNodes.findMany({
+        where: and(
+          eq(bracketNodes.phaseId, id),
+          isNull(bracketNodes.groupId), // ⚠️ On garde pour compatibilité legacy
+          eq(bracketNodes.isDeleted, false),
+        ),
+      });
+
+      // Pour chaque node legacy, on vérifie ses matchs
+      for (const node of nodes) {
+        const nm = matchesByNode.get(node.id) || [];
+        if (nm.length === 0 || hasPending(nm)) {
+          pendingEntities.push({
+            type: "NODE",
+            id: node.id,
+            label: node.nodeCode || node.id,
+            reason:
+              nm.length === 0 ? "Aucun match généré" : "Matchs non terminés",
+          });
+        }
+      }
+
+      // matchs directs
+      for (const match of matchesList) {
+        if (!match.groupId && !match.bracketNodeId) {
+          if (isMatchPending(match.status)) {
+            pendingEntities.push({
+              type: "MATCH",
+              id: match.id,
+              label: match.matchCode || match.id,
+              reason: `Statut: ${match.status}`,
+            });
+          }
         }
       }
     }
 
     return { success: true, pendingEntities };
   } catch (error) {
-    console.error("Error checking pending entities:", error);
+    console.error("checkPendingEntitiesAction error:", error);
     return { success: false, pendingEntities: [] };
   }
 }
 
-// phases.ts
-
 /**
  * Marque un groupe comme terminé avec qualification des participants
- * CORRIGÉ : Utilise un moteur de classement dédié
+ * CORRIGÉ : Gère les groupes d'élimination (brackets) correctement
  */
 export async function markGroupCompleteAction(groupId: string) {
   try {
@@ -2691,13 +2706,13 @@ export async function markGroupCompleteAction(groupId: string) {
       with: {
         participants: true,
         phase: {
-          with: { edition: true }
+          with: { edition: true },
         },
       },
     });
     if (!group) throw new Error("Groupe introuvable");
 
-    // 1. Vérification des matches non terminés (basé sur les matchs réels)
+    // 1. Vérification des matches non terminés
     const pending = await checkPendingEntitiesAction("GROUP", groupId);
     if (pending.pendingEntities.length > 0) {
       return {
@@ -2707,38 +2722,94 @@ export async function markGroupCompleteAction(groupId: string) {
       };
     }
 
-    // 2. Recalculer les classements finaux avec le moteur dédié
-    const standings = await calculateGroupStandings(groupId);
-
-    // 3. Appliquer les qualifications selon la config
+    // 2. Récupérer la configuration
     const config = (group.config as any) || {};
     const advanceCount = config.advanceCount || 2;
-    const tiebreakerRules = config.tiebreakerRules || [
-      "POINTS",
-      "GOAL_DIFF",
-      "GOALS_FOR",
-    ];
+    const groupType = group.groupType;
+    const phaseType = group.phase?.phaseType;
 
-    // Trier avec les règles de départage
-    const sortedParticipants = rankParticipants(standings, tiebreakerRules);
+    let qualifiedRegistrationIds: string[] = [];
+
+    // 🔵 CAS 1: Phase de groupes classique (ROUND_ROBIN ou STANDARD avec points)
+    if (
+      phaseType === "GROUP_STAGE" ||
+      phaseType === "ROUND_ROBIN" ||
+      groupType === "ROUND_ROBIN"
+    ) {
+      const standings = await calculateGroupStandings(groupId);
+      const tiebreakerRules = config.tiebreakerRules || [
+        "POINTS",
+        "GOAL_DIFF",
+        "GOALS_FOR",
+      ];
+      const sortedParticipants = rankParticipants(standings, tiebreakerRules);
+      qualifiedRegistrationIds = sortedParticipants
+        .slice(0, advanceCount)
+        .map((p) => p.registrationId);
+    }
+    // 🔴 CAS 2: Phase élimination (chaque bracket du groupe produit des qualifiés)
+    else if (phaseType === "ELIMINATION" || phaseType === "KNOCKOUT") {
+      // Récupérer tous les brackets du groupe
+      const nodes = await db.query.bracketNodes.findMany({
+        where: and(
+          eq(bracketNodes.groupId, groupId),
+          eq(bracketNodes.isDeleted, false),
+          eq(bracketNodes.isCompleted, true),
+        ),
+        orderBy: [asc(bracketNodes.matchNumber)],
+      });
+
+      // Collecter les winners de chaque bracket
+      const winners = nodes
+        .filter((node) => node.winnerRegistrationId)
+        .map((node) => node.winnerRegistrationId);
+
+      // Si besoin de plus de qualifiés que de brackets (ex: 4 qualifiés pour 2 brackets)
+      // On prend les winners + les deuxièmes (runners-up)
+      if (winners.length < advanceCount && nodes.length > 0) {
+        // Pour l'instant, on prend les deuxièmes comme les participants non-winners
+        // Une meilleure approche serait de stocker runnerUpId dans le bracket
+        const allParticipants = group.participants.map((p) => p.registrationId);
+        const available = allParticipants.filter(
+          (id) => id && !winners.includes(id),
+        );
+        qualifiedRegistrationIds = [
+          ...winners,
+          ...available.slice(0, advanceCount - winners.length),
+        ] as string[];
+      } else {
+        qualifiedRegistrationIds = winners.slice(0, advanceCount) as string[];
+      }
+    }
+    // 🟡 CAS 3: Fallback (classement standard)
+    else {
+      const standings = await calculateGroupStandings(groupId);
+      const sortedParticipants = rankParticipants(standings, ["POINTS"]);
+      qualifiedRegistrationIds = sortedParticipants
+        .slice(0, advanceCount)
+        .map((p) => p.registrationId);
+    }
 
     return await db.transaction(async (tx) => {
-      // Marquer les qualifiés
-      for (let i = 0; i < sortedParticipants.length; i++) {
-        const participant = sortedParticipants[i];
-        const isQualified = i < advanceCount;
+      // Marquer les qualifiés dans le groupe
+      for (const participant of group.participants) {
+        const isQualified = qualifiedRegistrationIds.includes(
+          participant.registrationId,
+        );
+        const position =
+          qualifiedRegistrationIds.indexOf(participant.registrationId) + 1;
 
         await tx
           .update(phaseGroupParticipants)
           .set({
             qualified: isQualified,
-            position: i + 1,
+            position: position > 0 ? position : null,
             updatedAt: new Date(),
           })
           .where(eq(phaseGroupParticipants.id, participant.id));
       }
 
-      // 4. Marquer comme terminé et verrouiller
+      // Marquer le groupe comme terminé et verrouillé
       await tx
         .update(phaseGroups)
         .set({
@@ -2748,11 +2819,147 @@ export async function markGroupCompleteAction(groupId: string) {
         })
         .where(eq(phaseGroups.id, groupId));
 
-      // 5. Mettre à jour les résultats de l'édition
+      // 🧠 PROPAGATION vers le groupe suivant (pour élimination)
+      if (phaseType === "ELIMINATION" && qualifiedRegistrationIds.length > 0) {
+        const nextGroup = await tx.query.phaseGroups.findFirst({
+          where: and(
+            eq(phaseGroups.phaseId, group.phaseId),
+            eq(phaseGroups.order, group.order + 1),
+            eq(phaseGroups.isDeleted, false),
+          ),
+        });
+
+        if (nextGroup) {
+          // 1. Ajouter les qualifiés comme participants du groupe suivant
+          for (const regId of qualifiedRegistrationIds) {
+            const existing = await tx.query.phaseGroupParticipants.findFirst({
+              where: and(
+                eq(phaseGroupParticipants.groupId, nextGroup.id),
+                eq(phaseGroupParticipants.registrationId, regId),
+              ),
+            });
+            if (!existing) {
+              await tx.insert(phaseGroupParticipants).values({
+                groupId: nextGroup.id,
+                registrationId: regId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+            }
+          }
+
+          // 2. Récupérer la configuration du groupe suivant
+          const nextGroupConfig = (nextGroup.config as any) || {};
+          const isHomeAway = nextGroupConfig.isHomeAway || false;
+          const matchFormat = nextGroupConfig.matchFormat || "BEST_OF_1";
+
+          // 3. Vérifier si le groupe suivant a déjà des brackets
+          const existingNodes = await tx.query.bracketNodes.findMany({
+            where: and(
+              eq(bracketNodes.groupId, nextGroup.id),
+              eq(bracketNodes.isDeleted, false),
+            ),
+          });
+
+          // 4. Supprimer les anciens brackets et matchs si on force (ou si on veut recréer)
+          if (existingNodes.length > 0) {
+            // Optionnel: on peut les garder et ne créer que ce qui manque
+            // Pour l'instant, on ne fait rien - l'utilisateur pourra régénérer manuellement
+          } else {
+            // 5. Créer la structure pour le groupe suivant
+            const participantsList = qualifiedRegistrationIds;
+            const participantCount = participantsList.length;
+
+            if (participantCount >= 2) {
+              // Mélanger si demandé
+              let shuffledParticipants = [...participantsList];
+              if (nextGroupConfig.seedMethod === "RANDOM") {
+                shuffledParticipants = shuffle(shuffledParticipants);
+              }
+
+              // Nombre de matchs pour ce round
+              const matchesThisRound = Math.floor(participantCount / 2);
+
+              // Créer les bracket nodes et les matchs
+              for (let matchIdx = 0; matchIdx < matchesThisRound; matchIdx++) {
+                const p1 = shuffledParticipants[matchIdx * 2];
+                const p2 = shuffledParticipants[matchIdx * 2 + 1];
+
+                if (!p1 || !p2) continue;
+
+                // Créer le bracket node
+                const [node] = await tx
+                  .insert(bracketNodes)
+                  .values({
+                    phaseId: group.phaseId,
+                    groupId: nextGroup.id,
+                    nodeCode: `${nextGroup.order + 1}-${matchIdx + 1}`,
+                    round: nextGroup.order + 1,
+                    matchNumber: matchIdx + 1,
+                    bracketType: "UPPER",
+                    order: matchIdx,
+                    metadata: {
+                      requiresMatch: true,
+                      matchFormat: matchFormat,
+                      isHomeAway: isHomeAway,
+                      format: isHomeAway ? "HOME_AWAY" : matchFormat,
+                      participants: [p1, p2], // Pour l'affichage UI
+                    },
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  })
+                  .returning();
+
+                // Générer les matchs
+                const matchesToCreate = isHomeAway ? 2 : 1;
+                for (let mIdx = 0; mIdx < matchesToCreate; mIdx++) {
+                  await tx.insert(matches).values({
+                    editionId: group.phase?.editionId,
+                    phaseId: group.phaseId,
+                    groupId: nextGroup.id,
+                    bracketNodeId: node.id,
+                    participant1RegistrationId: mIdx === 0 ? p1 : p2,
+                    participant2RegistrationId: mIdx === 0 ? p2 : p1,
+                    matchCode:
+                      matchesToCreate > 1
+                        ? `${node.nodeCode}-L${mIdx + 1}`
+                        : node.nodeCode,
+                    status: "PENDING",
+                    round: nextGroup.order + 1,
+                    matchNumber: matchIdx + 1,
+                    metadata: {
+                      format: isHomeAway ? "HOME_AWAY" : matchFormat,
+                      leg: mIdx + 1,
+                    },
+                    scheduledTime: getDefaultScheduledTime(
+                      nextGroup.order + 1,
+                      matchIdx + 1,
+                    ),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  });
+                }
+              }
+
+              // Mettre à jour le participantCount et matchCount du groupe
+              await tx
+                .update(phaseGroups)
+                .set({
+                  participantCount: participantsList.length,
+                  matchCount: matchesThisRound,
+                  updatedAt: new Date(),
+                })
+                .where(eq(phaseGroups.id, nextGroup.id));
+            }
+          }
+        }
+      }
+
+      // Mettre à jour les résultats de l'édition
       await updateEditionResultsFromGroup(tx, groupId);
 
       revalidatePath(`/tournaments/dashboard`);
-      return { success: true, qualifiedCount: advanceCount };
+      return { success: true, qualifiedCount: qualifiedRegistrationIds.length };
     });
   } catch (error) {
     console.error("Error marking group complete:", error);
@@ -2780,7 +2987,10 @@ async function calculateGroupStandings(
     where: eq(phaseGroupParticipants.groupId, groupId),
   });
 
-  const statsMap = new Map<string, ParticipantStats & { participantId: string }>();
+  const statsMap = new Map<
+    string,
+    ParticipantStats & { participantId: string }
+  >();
 
   // Initialiser les stats
   for (const p of participants) {
@@ -2899,12 +3109,11 @@ function rankParticipants(
   });
 }
 
-
 export async function markPhaseCompleteAction(phaseId: string) {
   try {
     const phase = await db.query.tournamentPhases.findFirst({
       where: eq(tournamentPhases.id, phaseId),
-      with: { edition: true }
+      with: { edition: true },
     });
     if (!phase) throw new Error("Phase introuvable");
 
@@ -2952,9 +3161,13 @@ export async function markPhaseCompleteAction(phaseId: string) {
         .set({ isLocked: true, isCompleted: true, updatedAt: new Date() })
         .where(eq(phaseGroups.phaseId, phaseId));
 
-      revalidatePath(`/tournaments/${phase.edition.tournamentId}/editions/${phase.editionId}/dashboard`);
-      revalidatePath(`/tournaments/${phase.edition.tournamentId}/editions/${phase.editionId}`);
-      
+      revalidatePath(
+        `/tournaments/${phase.edition.tournamentId}/editions/${phase.editionId}/dashboard`,
+      );
+      revalidatePath(
+        `/tournaments/${phase.edition.tournamentId}/editions/${phase.editionId}`,
+      );
+
       if (nextPhase) {
         await tx
           .update(tournamentPhases)
@@ -2981,148 +3194,160 @@ export async function markPhaseCompleteAction(phaseId: string) {
 
 /**
  * Marque un bracket node comme terminé et fait progresser le gagnant
- * CORRIGÉ : Gère correctement les BO3/BO5 et utilise childPosition
+ * CORRIGÉ : Gère correctement les BO3/BO5 et Aller-Retour (score agrégé)
  */
 export async function markBracketNodeCompleteAction(nodeId: string) {
   try {
     const node = await db.query.bracketNodes.findFirst({
       where: eq(bracketNodes.id, nodeId),
-      with: { 
-        parentNode: true,
-        phase: {
-          with: { edition: true }
-        }
+      with: {
+        phase: { with: { edition: true } },
+        group: true,
       },
     });
+
     if (!node) throw new Error("Bracket node introuvable");
 
-    // 1. Vérification des matches non terminés (basé sur les matchs réels)
-    const pending = await checkPendingEntitiesAction("BRACKET_NODE", nodeId);
-    if (pending.pendingEntities.length > 0) {
+    // 🔒 GUARD
+    if (node.isCompleted && node.winnerRegistrationId) {
       return {
-        success: false,
-        error: "Certaines entités ne sont pas encore terminées.",
-        pendingEntities: pending.pendingEntities,
+        success: true,
+        winnerId: node.winnerRegistrationId,
+        alreadyCompleted: true,
       };
     }
 
-    // 2. Déterminer le gagnant du node (supporte BO3/BO5)
-    const nodeMatches = await db.query.matches.findMany({
+    // 🔍 Vérifier les matchs
+    const matchesList = await db.query.matches.findMany({
       where: and(
         eq(matches.bracketNodeId, nodeId),
-        eq(matches.status, "COMPLETED"),
-        eq(matches.confirmedByAdmin, true),
+        eq(matches.isDeleted, false),
       ),
-      orderBy: [asc(matches.matchNumber)],
     });
 
-    if (nodeMatches.length === 0) {
+    if (matchesList.length === 0) {
+      return { success: false, error: "Aucun match généré pour ce node." };
+    }
+
+    const hasPending = matchesList.some(
+      (m) => !FINAL_STATUSES.has(m.status || ""),
+    );
+    if (hasPending) {
       return {
         success: false,
-        error: "Aucun match terminé trouvé pour ce node.",
+        error: "Des matchs ne sont pas encore terminés.",
       };
     }
 
-    // Calcul du format du match (BO1, BO3, BO5)
+    // 🎯 Déterminer le vainqueur selon le format
+    const completedMatches = matchesList.filter(
+      (m) => m.status === "COMPLETED" && m.confirmedByAdmin,
+    );
     const metadata = (node.metadata as any) || {};
-    const matchFormat = metadata.format || "BEST_OF_1";
+    const format = metadata.format || "BEST_OF_1";
+    const isHomeAway = format === "HOME_AWAY" || metadata.isHomeAway === true;
 
-    // Nombre de victoires nécessaires pour gagner la série
-    const requiredWins =
-      matchFormat === "BEST_OF_5" ? 3 : matchFormat === "BEST_OF_3" ? 2 : 1;
-
-    // Compter les victoires par participant
-    const winCounts = new Map<string, number>();
-    for (const m of nodeMatches) {
-      if (m.winnerRegistrationId) {
-        winCounts.set(
-          m.winnerRegistrationId,
-          (winCounts.get(m.winnerRegistrationId) || 0) + 1,
-        );
-      }
-    }
-
-    // Trouver le gagnant avec suffisamment de victoires
     let winnerId: string | null = null;
-    for (const [regId, wins] of winCounts.entries()) {
-      if (wins >= requiredWins) {
-        winnerId = regId;
-        break;
-      }
+    let aggregateScore1 = 0;
+    let aggregateScore2 = 0;
+
+    if (isHomeAway) {
+      // 🟢 Mode aller-retour: score agrégé
+      const result = computeAggregatedWinner(completedMatches);
+      winnerId = result.winnerId;
+      aggregateScore1 = result.aggregateScore1;
+      aggregateScore2 = result.aggregateScore2;
+    } else {
+      // 🔵 Mode BO1/BO3/BO5: nombre de wins
+      const requiredWins = getRequiredWins(format);
+      const result = computeWinner(completedMatches, requiredWins);
+      winnerId = result.winnerId;
     }
 
     if (!winnerId) {
+      const errorMsg = isHomeAway
+        ? `Match aller-retour non décisif (score agrégé: ${aggregateScore1}-${aggregateScore2})`
+        : `Match non décisif (${getRequiredWins(format)} wins requis)`;
       return {
         success: false,
-        error: `Match non décisif. ${requiredWins} victoires requises. Victoires actuelles: ${Array.from(
-          winCounts.entries(),
-        )
-          .map(([id, w]) => `${id}: ${w}`)
-          .join(", ")}`,
+        error: errorMsg,
       };
     }
 
     return await db.transaction(async (tx) => {
-      // 3. Faire progresser le gagnant vers le node parent avec childPosition
-      if (node.parentNodeId) {
-        const parentNode = await tx.query.bracketNodes.findFirst({
-          where: eq(bracketNodes.id, node.parentNodeId),
-        });
-
-        if (parentNode) {
-          const parentMetadata = (parentNode.metadata as any) || {};
-          let parentParticipants = parentMetadata.participants || [];
-
-          // Utiliser childPosition pour déterminer le slot (0 = UPPER/WINNER, 1 = LOWER/LOSER)
-          let slotIndex = parentParticipants.length;
-          if (node.childPosition === "UPPER" || node.childPosition === "WINNER") {
-            slotIndex = 0;
-          } else if (node.childPosition === "LOWER" || node.childPosition === "LOSER") {
-            slotIndex = 1;
-          }
-
-          // S'assurer que le tableau a la bonne taille
-          if (slotIndex >= parentParticipants.length) {
-            parentParticipants = [
-              ...parentParticipants,
-              ...Array(slotIndex + 1 - parentParticipants.length).fill(null),
-            ];
-          }
-
-          parentParticipants[slotIndex] = winnerId;
-
-          await tx
-            .update(bracketNodes)
-            .set({
-              metadata: {
-                ...parentMetadata,
-                participants: parentParticipants,
-              },
-              updatedAt: new Date(),
-            })
-            .where(eq(bracketNodes.id, node.parentNodeId));
-        }
-      }
-
-      // 4. Marquer le node comme terminé
+      // ✅ Marquer le node comme terminé
       await tx
         .update(bracketNodes)
-        .set({ 
-          isCompleted: true, 
-          winnerRegistrationId: winnerId, 
-          updatedAt: new Date() 
+        .set({
+          isCompleted: true,
+          winnerRegistrationId: winnerId,
+          metadata: isHomeAway
+            ? {
+                ...metadata,
+                aggregateScore1,
+                aggregateScore2,
+              }
+            : metadata,
+          updatedAt: new Date(),
         })
         .where(eq(bracketNodes.id, nodeId));
 
-      // 5. Mettre à jour les résultats de l'édition
-      await updateEditionResultsFromBracketNode(tx, nodeId);
+      // 📊 Upsert dans editionResults
+      const editionId = node.phase?.editionId;
+      if (editionId) {
+        await tx
+          .insert(editionResults)
+          .values({
+            editionId,
+            registrationId: winnerId,
+            position: 1,
+            matchesPlayed: 0,
+            matchesWon: 0,
+            matchesLost: 0,
+            matchesDrawn: 0,
+            prizeCurrency: "GTC",
+            statistics: {},
+            metadata: {},
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [editionResults.editionId, editionResults.registrationId],
+            set: { updatedAt: new Date() },
+          });
+      }
 
-      revalidatePath(`/tournaments/${node.phase?.edition?.tournamentId}/editions/${node.phase?.editionId}/dashboard`);
-      revalidatePath(`/tournaments/${node.phase?.edition?.tournamentId}/editions/${node.phase?.editionId}`);
+      // 🧠 PROPAGATION VERS LE GROUPE SUIVANT (élimination)
+      if (node.groupId) {
+        const groupParticipants =
+          await tx.query.phaseGroupParticipants.findMany({
+            where: eq(phaseGroupParticipants.groupId, node.groupId),
+          });
+
+        // ✅ Mettre à jour metadata.participants pour l'affichage UI
+        const currentMetadata = (node.metadata as any) || {};
+        await tx
+          .update(bracketNodes)
+          .set({
+            metadata: {
+              ...currentMetadata,
+              participants: groupParticipants.map((p) => p.registrationId),
+              winners: node.winnerRegistrationId
+                ? [node.winnerRegistrationId]
+                : [],
+            },
+          })
+          .where(eq(bracketNodes.id, nodeId));
+      }
+
+      revalidatePath(
+        `/tournaments/${node.phase?.edition?.tournamentId}/editions/${node.phase?.editionId}/dashboard`,
+      );
+
       return { success: true, winnerId };
     });
   } catch (error) {
-    console.error("Error marking bracket node complete:", error);
+    console.error("markBracketNodeCompleteAction error:", error);
     throw error;
   }
 }
@@ -3149,14 +3374,6 @@ export async function getStructurePreviewAction(
   }
 }
 
-/**
- * Organise la structure complète d'une édition
- * CORRIGÉ : Supporte la création de multiples nœuds par groupe (journées pour ROUND_ROBIN)
- */
-import { createStructureEngine } from "@/lib/tournaments/structure-engine";
-import { generateMatchesEngine } from "@/lib/tournaments/match-generation-engine";
-import { propagatePhaseResults } from "@/lib/tournaments/propagation-service";
-
 export async function organizeEditionStructure(
   editionId: string,
   phasesData: any[],
@@ -3166,6 +3383,7 @@ export async function organizeEditionStructure(
     groupsSize?: number;
     randomizeDistribution?: boolean;
     clearExisting?: boolean;
+    targetPhaseId?: string;
   } = {},
 ) {
   try {
@@ -3176,6 +3394,7 @@ export async function organizeEditionStructure(
       options: {
         autoInitializeFirstPhase: options.autoInitializeFirstPhase,
         clearExisting: options.clearExisting ?? true,
+        targetPhaseId: options.targetPhaseId,
       },
     });
 
@@ -3279,95 +3498,101 @@ export async function getQualifiedParticipantsPreviewAction(phaseId: string) {
   try {
     const phase = await db.query.tournamentPhases.findFirst({
       where: eq(tournamentPhases.id, phaseId),
-      with: { 
-        groups: true,
-        bracketNodes: {
-          where: eq(bracketNodes.isDeleted, false),
+      with: {
+        groups: {
+          where: eq(phaseGroups.isDeleted, false),
+          orderBy: [asc(phaseGroups.order)],
           with: {
-            matches: {
-              where: and(
-                eq(matches.status, "COMPLETED"),
-                eq(matches.confirmedByAdmin, true)
-              )
-            }
-          }
-        }
+            participants: {
+              where: eq(phaseGroupParticipants.qualified, true),
+              with: {
+                registration: {
+                  with: {
+                    member: {
+                      with: { user: true, team: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
+
     if (!phase) return { success: false, error: "Phase introuvable" };
 
-    let results: any[] = [];
+    const results: any[] = [];
 
-    // --- CASE 1: GROUPS ---
-    if (phase.groups.length > 0) {
-      const groupIds = phase.groups.map(g => g.id);
-      const qualifiedParticipants = await db.query.phaseGroupParticipants.findMany({
-        where: and(
-          inArray(phaseGroupParticipants.groupId, groupIds),
-          eq(phaseGroupParticipants.qualified, true),
-          eq(phaseGroupParticipants.isDeleted, false)
-        ),
-        with: {
-          registration: {
-            with: {
-              member: {
-                with: { user: true, team: true }
-              }
-            }
-          }
-        }
-      });
-      
-      results = qualifiedParticipants.map(qp => ({
-        id: qp.registrationId,
-        participantId: qp.id,
-        registrationId: qp.registrationId,
-        name: qp.registration.member?.displayName || qp.registration.member?.team?.name || qp.registration.member?.user?.fullName || "Participant",
-        image: qp.registration.member?.avatar || qp.registration.member?.user?.profileImage || qp.registration.member?.user?.image,
-        email: qp.registration.member?.contactEmail || qp.registration.member?.user?.email,
-        phone: qp.registration.member?.contactPhone || qp.registration.member?.user?.phoneNumber,
-        groupId: qp.groupId,
-        position: qp.position
-      }));
-    } 
-    // --- CASE 2: BRACKETS (no groups) ---
-    else if (phase.bracketNodes && phase.bracketNodes.length > 0) {
-      // Find final nodes (those that have no parentNodeId)
-      const finalNodes = phase.bracketNodes.filter(n => !n.parentNodeId);
-      
-      for (const node of finalNodes) {
-         // Determine winner of this node (from matches)
-         const winnerId = node.winnerRegistrationId;
-         if (winnerId) {
-            const reg = await db.query.editionRegistrations.findFirst({
-              where: eq(editionRegistrations.id, winnerId),
-              with: {
-                member: {
-                  with: { user: true, team: true }
-                }
-              }
-            });
-
-            if (reg) {
-              results.push({
-                id: reg.id,
-                participantId: node.id, // In brackets, we use node as ref
-                registrationId: reg.id,
-                name: reg.member?.displayName || reg.member?.team?.name || reg.member?.user?.fullName || "Participant",
-                image: reg.member?.avatar || reg.member?.user?.profileImage || reg.member?.user?.image,
-                email: reg.member?.contactEmail || reg.member?.user?.email,
-                phone: reg.member?.contactPhone || reg.member?.user?.phoneNumber,
-                nodeId: node.id,
-                position: 1
-              });
-            }
-         }
+    // Uniquement via les groups
+    for (const group of phase.groups) {
+      for (const participant of group.participants) {
+        results.push({
+          id: participant.registrationId,
+          participantId: participant.id,
+          registrationId: participant.registrationId,
+          name:
+            participant.registration.member?.displayName ||
+            participant.registration.member?.team?.name ||
+            participant.registration.member?.user?.fullName ||
+            "Participant",
+          image:
+            participant.registration.member?.avatar ||
+            participant.registration.member?.user?.profileImage ||
+            participant.registration.member?.user?.image,
+          email:
+            participant.registration.member?.contactEmail ||
+            participant.registration.member?.user?.email,
+          phone:
+            participant.registration.member?.contactPhone ||
+            participant.registration.member?.user?.phoneNumber,
+          groupId: group.id,
+          position: participant.position,
+        });
       }
     }
 
-    return { 
-      success: true, 
-      qualified: results.sort((a, b) => (a.position || 99) - (b.position || 99))
+    // 🔥 BRACKET DIRECT (nodes rattachés à la phase sans group - legacy)
+    const nodes = await db.query.bracketNodes.findMany({
+      where: and(
+        eq(bracketNodes.phaseId, phaseId),
+        isNull(bracketNodes.groupId), // ⚠️ On garde pour compatibilité legacy
+        eq(bracketNodes.isDeleted, false),
+      ),
+    });
+
+    // Pour chaque node legacy, on vérifie ses matchs
+    for (const node of nodes) {
+      const nodeMatches = await db.query.matches.findMany({
+        where: and(
+          eq(matches.bracketNodeId, node.id),
+          eq(matches.isDeleted, false),
+        ),
+      });
+
+      if (
+        nodeMatches.length === 0 ||
+        nodeMatches.some((m) => !FINAL_STATUSES.has(m.status || ""))
+      ) {
+        results.push({
+          id: node.id,
+          participantId: node.id,
+          registrationId: node.winnerRegistrationId,
+          name: node.nodeCode || node.id,
+          image: null,
+          email: null,
+          phone: null,
+          nodeId: node.id,
+          position: 1,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      qualified: results.sort(
+        (a, b) => (a.position || 99) - (b.position || 99),
+      ),
     };
   } catch (error: any) {
     console.error("Error getting qualified participants:", error);
@@ -3415,15 +3640,17 @@ export async function organizeNextPhaseAction(
 
     if (isAutoMode) {
       // En mode Auto, on prend les réglages de l'édition
-      const isElim = phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT";
-      const isGroups = phase.phaseType === "GROUP_STAGE" || phase.phaseType === "ROUND_ROBIN";
-      
+      const isElim =
+        phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT";
+      const isGroups =
+        phase.phaseType === "GROUP_STAGE" || phase.phaseType === "ROUND_ROBIN";
+
       if (isElim) {
         isHomeAway = edConfig.isHomeAwayElimination ?? isHomeAway;
       } else if (isGroups) {
         isHomeAway = edConfig.isHomeAwayGroups ?? isHomeAway;
       }
-      
+
       // On s'assure que les nœuds et matchs sont générés par défaut en auto
       if (options.generateNodes === undefined) generateNodes = true;
       if (options.generateMatches === undefined) generateMatches = true;
@@ -3450,17 +3677,18 @@ export async function organizeNextPhaseAction(
       });
 
       if (previousGroups.length > 0) {
-        const qualifiedParticipants = await db.query.phaseGroupParticipants.findMany({
-          where: and(
-            inArray(
-              phaseGroupParticipants.groupId,
-              previousGroups.map(g => g.id),
+        const qualifiedParticipants =
+          await db.query.phaseGroupParticipants.findMany({
+            where: and(
+              inArray(
+                phaseGroupParticipants.groupId,
+                previousGroups.map((g) => g.id),
+              ),
+              eq(phaseGroupParticipants.qualified, true),
+              eq(phaseGroupParticipants.isDeleted, false),
             ),
-            eq(phaseGroupParticipants.qualified, true),
-            eq(phaseGroupParticipants.isDeleted, false),
-          ),
-        });
-        participantRegIds = qualifiedParticipants.map(p => p.registrationId);
+          });
+        participantRegIds = qualifiedParticipants.map((p) => p.registrationId);
       }
 
       if (participantRegIds.length === 0) {
@@ -3471,7 +3699,7 @@ export async function organizeNextPhaseAction(
         const advanceCount = (phase.config as any)?.advanceCount || 2;
         participantRegIds = editionResultsList
           .slice(0, advanceCount * (previousGroups.length || 1))
-          .map(r => r.registrationId);
+          .map((r) => r.registrationId);
       }
     }
 
@@ -3480,13 +3708,15 @@ export async function organizeNextPhaseAction(
         where: eq(editionRegistrations.editionId, phase.editionId),
         orderBy: asc(editionRegistrations.createdAt),
       });
-      participantRegIds = registrations.map(r => r.id);
+      participantRegIds = registrations.map((r) => r.id);
     }
 
     if (options.customQualifiedIds && options.customQualifiedIds.length > 0) {
       participantRegIds = options.customQualifiedIds;
     } else if (participantRegIds.length < 2) {
-      throw new Error(`Pas assez de participants qualifiés (${participantRegIds.length}). Minimum 2 requis.`);
+      throw new Error(
+        `Pas assez de participants qualifiés (${participantRegIds.length}). Minimum 2 requis.`,
+      );
     }
 
     let participants = [...participantRegIds];
@@ -3507,7 +3737,10 @@ export async function organizeNextPhaseAction(
       // =========================
       // 🟢 CAS 1: PHASE DE GROUPES (GROUP_STAGE / ROUND_ROBIN)
       // =========================
-      if (phase.phaseType === "GROUP_STAGE" || phase.phaseType === "ROUND_ROBIN") {
+      if (
+        phase.phaseType === "GROUP_STAGE" ||
+        phase.phaseType === "ROUND_ROBIN"
+      ) {
         const groupsCount = (phase.config as any)?.groupsCount ?? 1;
         const perGroup = Math.ceil(participants.length / groupsCount);
         const createdGroups: any[] = [];
@@ -3517,7 +3750,10 @@ export async function organizeNextPhaseAction(
           const chunk = participants.slice(start, start + perGroup);
           if (chunk.length === 0) continue;
 
-          const groupName = groupsCount === 1 ? "Classement" : `Groupe ${String.fromCharCode(65 + i)}`;
+          const groupName =
+            groupsCount === 1
+              ? "Classement"
+              : `Groupe ${String.fromCharCode(65 + i)}`;
 
           const [group] = await tx
             .insert(phaseGroups)
@@ -3526,7 +3762,8 @@ export async function organizeNextPhaseAction(
               name: groupName,
               order: i,
               participantCount: chunk.length,
-              groupType: phase.phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "STANDARD",
+              groupType:
+                phase.phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "STANDARD",
               config: {
                 isHomeAway: isHomeAway,
                 advanceCount: (phase.config as any)?.advanceCount || 2,
@@ -3575,7 +3812,11 @@ export async function organizeNextPhaseAction(
                   .returning();
 
                 if (generateMatches) {
-                  const roundMatches = generateRoundRobinMatchesForRound(g.participants, round, g.participants.length);
+                  const roundMatches = generateRoundRobinMatchesForRound(
+                    g.participants,
+                    round,
+                    g.participants.length,
+                  );
                   for (let idx = 0; idx < roundMatches.length; idx++) {
                     const m = roundMatches[idx];
                     await tx.insert(matches).values({
@@ -3596,7 +3837,8 @@ export async function organizeNextPhaseAction(
                 }
               }
             } else {
-              const totalMatches = (g.participants.length * (g.participants.length - 1)) / 2;
+              const totalMatches =
+                (g.participants.length * (g.participants.length - 1)) / 2;
               const [node] = await tx
                 .insert(bracketNodes)
                 .values({
@@ -3647,13 +3889,18 @@ export async function organizeNextPhaseAction(
       // =========================
       // 🟡 CAS 2: PHASE À ÉLIMINATION DIRECTE - ARBRE COMPLET
       // =========================
-      else if (phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT") {
-        const { setupBracketPhase } = await import("@/lib/tournaments/generators");
-        await setupBracketPhase(tx, phase.editionId, phase, participants, {
-          generateNodes: generateNodes,
-          generateMatches: generateMatches,
-          isHomeAway: isHomeAway,
-          nodePrefix: (phase.config as any)?.nodePrefix || "Match",
+      else if (
+        phase.phaseType === "ELIMINATION" ||
+        phase.phaseType === "KNOCKOUT"
+      ) {
+        // Remplacer par :
+        await setupEliminationGroups(tx, phase.editionId, phase, participants, {
+          generateNodes,
+          generateMatches,
+          isHomeAway,
+          matchFormat,
+          seedMethod: options.seedMethod,
+          nodePrefix: (phase.config as any)?.nodePrefix,
         });
       }
 
@@ -3662,7 +3909,7 @@ export async function organizeNextPhaseAction(
       // =========================
       else if (phase.phaseType === "SWISS") {
         const roundsCount = (phase.config as any)?.roundsCount || 5;
-        
+
         for (let round = 1; round <= roundsCount; round++) {
           const [node] = await tx
             .insert(bracketNodes)
@@ -3683,16 +3930,19 @@ export async function organizeNextPhaseAction(
               updatedAt: new Date(),
             })
             .returning();
-          
+
           if (round === 1 && generateMatches) {
-            const shuffled = options.seedMethod === "RANDOM" ? shuffle([...participants]) : [...participants];
+            const shuffled =
+              options.seedMethod === "RANDOM"
+                ? shuffle([...participants])
+                : [...participants];
             const matchPairs = [];
             for (let i = 0; i < shuffled.length; i += 2) {
               if (i + 1 < shuffled.length) {
                 matchPairs.push([shuffled[i], shuffled[i + 1]]);
               }
             }
-            
+
             for (let idx = 0; idx < matchPairs.length; idx++) {
               const [p1, p2] = matchPairs[idx];
               await tx.insert(matches).values({
@@ -3716,7 +3966,6 @@ export async function organizeNextPhaseAction(
 
     revalidatePath(`/tournaments/editions/${phase.editionId}/dashboard`);
     return { success: true };
-    
   } catch (err: any) {
     console.error("Error in organizeNextPhaseAction:", err);
     return { success: false, error: err.message };
@@ -3726,9 +3975,7 @@ export async function organizeNextPhaseAction(
 /**
  * Génère tous les matchs round-robin pour un groupe
  */
-function generateAllRoundRobinMatches(
-  participants: string[],
-): {
+function generateAllRoundRobinMatches(participants: string[]): {
   participant1: { id: string };
   participant2: { id: string };
   round: number;
@@ -3937,5 +4184,236 @@ async function updateEditionResultsFromBracketNode(tx: any, nodeId: string) {
           updatedAt: new Date(),
         },
       });
+  }
+}
+
+/**
+ * Retourne le contexte d'une phase pour le dialogue de clôture
+ * Utilisé par MarkCompleteDialog
+ */
+export async function getPhaseContextAction(phaseId: string): Promise<{
+  isFinalPhase: boolean;
+  nextPhaseId: string | null;
+  nextPhaseName: string | null;
+  phaseType: string;
+  groupsCount: number;
+  qualifiedCount: number;
+  hasPendingEntities: boolean;
+}> {
+  const phase = await db.query.tournamentPhases.findFirst({
+    where: eq(tournamentPhases.id, phaseId),
+    with: {
+      groups: {
+        where: eq(phaseGroups.isDeleted, false),
+      },
+    },
+  });
+
+  if (!phase) {
+    throw new Error("Phase introuvable");
+  }
+
+  // Trouver la phase suivante
+  const nextPhase = await db.query.tournamentPhases.findFirst({
+    where: and(
+      eq(tournamentPhases.editionId, phase.editionId),
+      gt(tournamentPhases.order, phase.order),
+      eq(tournamentPhases.isDeleted, false),
+    ),
+    orderBy: asc(tournamentPhases.order),
+  });
+
+  // Compter les qualifiés
+  let qualifiedCount = 0;
+  for (const group of phase.groups) {
+    const qualified = await db.query.phaseGroupParticipants.findMany({
+      where: and(
+        eq(phaseGroupParticipants.groupId, group.id),
+        eq(phaseGroupParticipants.qualified, true),
+      ),
+    });
+    qualifiedCount += qualified.length;
+  }
+
+  // Vérifier les entités en attente
+  const pending = await checkPendingEntitiesAction("PHASE", phaseId);
+
+  return {
+    isFinalPhase: !nextPhase,
+    nextPhaseId: nextPhase?.id || null,
+    nextPhaseName: nextPhase?.name || null,
+    phaseType: phase.phaseType || "UNKNOWN",
+    groupsCount: phase.groups.length,
+    qualifiedCount,
+    hasPendingEntities: pending.pendingEntities.length > 0,
+  };
+}
+
+/**
+ * Setup d'une phase élimination avec groups par round
+ * Utilise phaseGroupParticipants comme source unique
+ */
+export async function setupEliminationGroups(
+  tx: any,
+  editionId: string,
+  phase: any,
+  participantRegIds: string[],
+  options: {
+    generateNodes?: boolean;
+    generateMatches?: boolean;
+    isHomeAway?: boolean;
+    matchFormat?: "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5";
+    seedMethod?: "RANDOM" | "ORDERED";
+    nodePrefix?: string;
+  } = {},
+) {
+  const participantCount = participantRegIds.length;
+  const totalRounds = Math.ceil(Math.log2(participantCount));
+  const createdGroups = [];
+  let currentParticipants = [...participantRegIds];
+
+  // Mélange si demandé
+  if (options.seedMethod === "RANDOM") {
+    currentParticipants = shuffle(currentParticipants);
+  }
+
+  for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
+    const matchesThisRound = Math.pow(2, totalRounds - roundIndex - 1);
+    const groupName = getEliminationRoundName(matchesThisRound * 2);
+
+    // ✅ advanceCount = nombre de qualifiés pour ce round (vers le round suivant)
+    // Pour le dernier round (finale), advanceCount = 1 (un seul vainqueur)
+    // Pour les rounds intermédiaires, advanceCount = matchesThisRound (un gagnant par match)
+    const advanceCountForRound =
+      roundIndex === totalRounds - 1 ? 1 : matchesThisRound;
+
+    // Créer le group pour ce round
+    const [group] = await tx
+      .insert(phaseGroups)
+      .values({
+        phaseId: phase.id,
+        name: groupName,
+        order: roundIndex,
+        participantCount:
+          roundIndex === 0 ? participantCount : matchesThisRound * 2,
+        groupType: "STANDARD",
+        config: {
+          round: roundIndex + 1,
+          advanceCount: advanceCountForRound, // ✅ Stocker le nombre de qualifiés
+          isHomeAway: options.isHomeAway || false,
+          matchFormat: options.matchFormat || "BEST_OF_1",
+          nodePrefix: options.nodePrefix || "Match",
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    createdGroups.push(group);
+
+    // Assigner les participants UNIQUEMENT au premier round
+    if (roundIndex === 0 && currentParticipants.length > 0) {
+      for (const regId of currentParticipants) {
+        await tx.insert(phaseGroupParticipants).values({
+          groupId: group.id,
+          registrationId: regId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
+
+    // Créer les bracketNodes (un par match) si demandé
+    if (options.generateNodes !== false) {
+      for (let matchIdx = 0; matchIdx < matchesThisRound; matchIdx++) {
+        const p1 = roundIndex === 0 ? currentParticipants[matchIdx * 2] : null;
+        const p2 =
+          roundIndex === 0 ? currentParticipants[matchIdx * 2 + 1] : null;
+
+        const [node] = await tx
+          .insert(bracketNodes)
+          .values({
+            phaseId: phase.id,
+            groupId: group.id,
+            nodeCode: `${roundIndex + 1}-${matchIdx + 1}`,
+            round: roundIndex + 1,
+            matchNumber: matchIdx + 1,
+            bracketType: "UPPER",
+            order: matchIdx,
+            metadata: {
+              requiresMatch: roundIndex === 0,
+              matchFormat: options.matchFormat || "BEST_OF_1",
+              isHomeAway: options.isHomeAway || false,
+              format: options.isHomeAway
+                ? "HOME_AWAY"
+                : options.matchFormat || "BEST_OF_1",
+            },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+
+        // Générer les matchs pour le premier round si demandé
+        if (roundIndex === 0 && p1 && p2 && options.generateMatches !== false) {
+          const matchesToCreate = options.isHomeAway ? 2 : 1;
+          for (let mIdx = 0; mIdx < matchesToCreate; mIdx++) {
+            await tx.insert(matches).values({
+              editionId,
+              phaseId: phase.id,
+              groupId: group.id,
+              bracketNodeId: node.id,
+              participant1RegistrationId: mIdx === 0 ? p1 : p2,
+              participant2RegistrationId: mIdx === 0 ? p2 : p1,
+              matchCode:
+                matchesToCreate > 1
+                  ? `${node.nodeCode}-L${mIdx + 1}`
+                  : node.nodeCode,
+              status: "PENDING",
+              round: roundIndex + 1,
+              matchNumber: matchIdx + 1,
+              metadata: {
+                format: options.isHomeAway
+                  ? "HOME_AWAY"
+                  : options.matchFormat || "BEST_OF_1",
+                leg: mIdx + 1,
+              },
+              scheduledTime: getDefaultScheduledTime(
+                roundIndex + 1,
+                matchIdx + 1,
+              ),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+        }
+      }
+    }
+
+    // Préparer les participants pour le round suivant (null = à déterminer)
+    currentParticipants = Array(matchesThisRound).fill(null);
+  }
+
+  return createdGroups;
+}
+
+/**
+ * Retourne le nom d'un round d'élimination basé sur le nombre de participants
+ */
+function getEliminationRoundName(participantCount: number): string {
+  switch (participantCount) {
+    case 2:
+      return "Finale";
+    case 4:
+      return "Demi-finale";
+    case 8:
+      return "Quart de finale";
+    case 16:
+      return "Huitième de finale";
+    case 32:
+      return "Seizième de finale";
+    case 64:
+      return "Trente-deuxième de finale";
+    default:
+      return `Top ${participantCount}`;
   }
 }

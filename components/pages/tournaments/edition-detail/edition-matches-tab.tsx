@@ -36,6 +36,9 @@ import {
   Calendar,
   X,
   Swords,
+  Grid,
+  List,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
@@ -46,6 +49,8 @@ import { exportMatchesToFormat } from "@/actions/editions";
 import { useMatchList, useEditionMatchStats } from "@/hooks/use-match-manager";
 import { useUserRegistration } from "@/hooks/use-editions";
 import { MatchCard } from "@/components/cards/match-card";
+import { useRouter } from "next/navigation";
+import { ButtonGroup } from "@/components/ui/button-group";
 
 interface EditionMatchesTabProps {
   editionId: string;
@@ -73,6 +78,9 @@ export function EditionMatchesTab({
   const [allMatchesPage, setAllMatchesPage] = useState(1);
   const [myMatchesPage, setMyMatchesPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  // viewmode
+  const [matchViewMode, setMatchViewMode] = useState<"list" | "grid" | "compact">("list");
+  const router = useRouter();
 
   const limit = 20;
 
@@ -348,6 +356,48 @@ export function EditionMatchesTab({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* View Mode toggle button */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 border-none bg-muted/50 rounded-xl px-4 gap-2"
+              >
+                {matchViewMode === "list" && <List className="h-4 w-4 text-primary" />}
+                {matchViewMode === "grid" && <Grid className="h-4 w-4 text-primary" />}
+                {matchViewMode === "compact" && (
+                  <span className="text-[11px] font-black uppercase tracking-wider">comp</span>
+                )}
+                <span className="text-[11px] font-black uppercase tracking-wider">Vue</span>
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl p-2 w-40">
+              <DropdownMenuLabel className="text-[10px] uppercase font-black text-muted-foreground">
+                Mode d'affichage
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setMatchViewMode("list")}
+                className="rounded-lg gap-2 cursor-pointer font-bold"
+              >
+                <List className="h-4 w-4" /> Liste
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setMatchViewMode("grid")}
+                className="rounded-lg gap-2 cursor-pointer font-bold"
+              >
+                <Grid className="h-4 w-4" /> Grille
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setMatchViewMode("compact")}
+                className="rounded-lg gap-2 cursor-pointer font-bold"
+              >
+                <span className="text-xs">comp</span> Compact
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -369,7 +419,18 @@ export function EditionMatchesTab({
               {myMatches.map((match: any) => (
                 <MatchCard
                   key={match.id}
+                  viewMode={matchViewMode}
                   match={match}
+                  onViewP1={() =>
+                    router.push(
+                      `/tournaments/members/${match.participant1?.member?.userId || match.participant1?.member?.id}`,
+                    )
+                  }
+                  onViewP2={() =>
+                    router.push(
+                      `/tournaments/members/${match.participant2?.member?.userId || match.participant2?.member?.id}`,
+                    )
+                  }
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
                   onUpdate={() => {
@@ -423,6 +484,7 @@ export function EditionMatchesTab({
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {allMatches.map((match: any) => (
                   <MatchCard
+                    viewMode={matchViewMode}
                     key={match.id}
                     match={match}
                     currentUserId={currentUserId}

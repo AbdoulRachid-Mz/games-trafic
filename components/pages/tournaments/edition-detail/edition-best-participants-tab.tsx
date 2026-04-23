@@ -90,7 +90,7 @@ export function EditionBestParticipantsTab({
     const team = member?.team;
     
     // Rank 0 = 1st, 1 = 2nd, 2 = 3rd
-    const sizes = ["h-32 w-32", "h-24 w-24", "h-24 w-24"];
+    const sizes = ["h-24 sm:h-20 md:h-32 w-24 sm:w-20 md:w-32", "h-20 sm:h-16 md:h-24 w-20 sm:w-16 md:w-24", "h-20 sm:h-16 md:h-24 w-20 sm:w-16 md:w-24"];
     const colors = ["from-yellow-400 to-amber-600", "from-slate-300 to-slate-500", "from-orange-400 to-orange-700"];
     const trophyColors = ["text-yellow-400", "text-slate-300", "text-orange-400"];
 
@@ -101,7 +101,7 @@ export function EditionBestParticipantsTab({
             <UserAvatar 
               user={{
                 username: user?.username || member?.displayName,
-                profileImage: user?.profileImage || user?.image,
+                profileImage: user?.profileImage || user?.image || "/icons/avatar-500.png",
               }} 
               className={cn("border-4 border-background", sizes[rank])}
             />

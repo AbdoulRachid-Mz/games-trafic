@@ -12,7 +12,7 @@ import {
   generateRoundRobinMatches, 
   generateEliminationMatches 
 } from "./match.generator";
-import { shuffle } from "./utils";
+import { getDefaultScheduledTime, shuffle } from "./utils";
 
 export interface MatchGenerationOptions {
   dryRun?: boolean;
@@ -21,18 +21,11 @@ export interface MatchGenerationOptions {
   isHomeAway?: boolean;
 }
 
-/**
- * Helper to identify if an ID is a structural placeholder 
- */
 function isPlaceholder(id: string | null): boolean {
   if (!id) return true;
   return id === "BYE" || id.startsWith("QUALIFIER_") || id.startsWith("WINNER") || id.includes("-") === false;
 }
 
-/**
- * MatchGenerationEngine - Centralized engine for tournament match generation.
- * Handles all hierarchy levels: PHASE, GROUP, NODE.
- */
 export async function generateMatchesEngine({
   type,
   id,
@@ -56,9 +49,6 @@ export async function generateMatchesEngine({
   });
 }
 
-/**
- * Generates matches for an entire phase.
- */
 async function generatePhaseMatches(tx: any, phaseId: string, options: MatchGenerationOptions) {
   const phase = await tx.query.tournamentPhases.findFirst({
     where: eq(tournamentPhases.id, phaseId),
@@ -74,12 +64,11 @@ async function generatePhaseMatches(tx: any, phaseId: string, options: MatchGene
 
   const results = [];
 
-  // Generate for each group
   for (const group of phase.groups) {
     results.push(await generateGroupMatchesEngine(tx, group.id, options));
   }
 
-  // Generate for standalone nodes (bracket level)
+  // Legacy: standalone nodes (sans groupId)
   for (const node of phase.bracketNodes) {
     results.push(await generateNodeMatches(tx, node.id, options));
   }
@@ -92,9 +81,6 @@ async function generatePhaseMatches(tx: any, phaseId: string, options: MatchGene
   };
 }
 
-/**
- * Generates matches for a specific group.
- */
 async function generateGroupMatchesEngine(tx: any, groupId: string, options: MatchGenerationOptions) {
   const group = await tx.query.phaseGroups.findFirst({
     where: eq(phaseGroups.id, groupId),
@@ -106,7 +92,6 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
 
   if (!group) throw new Error("Group not found");
 
-  // Get participant registration IDs
   let participantIds = group.participants.map((p: any) => p.registrationId);
   
   if (options.seedingMethod === "RANDOM") {
@@ -116,7 +101,6 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
   const groupConfig = (group.config as any) || {};
   const isHomeAway = options.isHomeAway ?? groupConfig.isHomeAway ?? false;
   
-  // Generate match objects
   const generatedMatches = generateGroupMatches(
     participantIds.map((id: string) => ({ id })), 
     { returnType: isHomeAway ? "double" : "single" }
@@ -130,21 +114,13 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
     };
   }
 
-  // Persistence
   if (options.clearExisting) {
     await tx.delete(matches).where(eq(matches.groupId, groupId));
   }
 
-  // Find or create nodes for these matches if it's a Round Robin with multiple nodes (Journées)
-  // For standard groups, we usually have one node per group or one node per group stage.
-  // Logic: check for existing nodes or create them.
-  
   const existingNodes = await tx.select().from(bracketNodes).where(eq(bracketNodes.groupId, groupId));
   
-  // Create matches
   const matchValues = generatedMatches.map((m, idx) => {
-    // Determine which node this match belongs to (if multiple nodes exist)
-    // Round RR: round 1 -> node 1, etc.
     const node = existingNodes.find((n: any) => n.round === m.round) || existingNodes[0];
 
     return {
@@ -157,6 +133,7 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
       round: m.round || 1,
       matchNumber: idx + 1,
       matchCode: node ? `${node.nodeCode}-M${idx + 1}` : `G-M${idx + 1}`,
+      scheduledTime: getDefaultScheduledTime(m.round || 1, idx + 1),
       status: "PENDING",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -175,39 +152,72 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
 }
 
 /**
- * Generates matches for a specific node.
+ * ✅ CORRECTION: Génère les matchs pour un node en utilisant les participants du groupe parent
  */
 async function generateNodeMatches(tx: any, nodeId: string, options: MatchGenerationOptions) {
   const node = await tx.query.bracketNodes.findFirst({
     where: eq(bracketNodes.id, nodeId),
     with: {
-      phase: true
+      phase: true,
+      group: true  // ← IMPORTANT: récupérer le groupe parent
     }
   });
 
   if (!node) throw new Error("Node not found");
-  
-  const metadata = (node.metadata as any) || {};
-  const participants = metadata.participants || [];
 
-  if (participants.length < 2) {
-    return { success: true, nodeId, message: "Not enough participants for node match" };
+  let participantIds: string[] = [];
+
+  // ✅ PRIORITÉ 1: Participants via le groupe parent
+  if (node.groupId) {
+    const groupParticipants = await tx.query.phaseGroupParticipants.findMany({
+      where: eq(phaseGroupParticipants.groupId, node.groupId),
+    });
+    participantIds = groupParticipants.map((p: any) => p.registrationId);
   }
 
-  const generated = generateEliminationMatches(
-    participants.map((id: string) => ({ id })), 
-    node.round || 1
-  );
+  // ⚠️ FALLBACK: metadata.participants (legacy, pour compatibilité)
+  if (participantIds.length === 0) {
+    const metadata = (node.metadata as any) || {};
+    participantIds = metadata.participants || [];
+    
+    if (participantIds.length > 0) {
+      console.warn(`[DEPRECATED] Node ${node.id} uses metadata.participants. Consider migrating to phaseGroupParticipants.`);
+    }
+  }
+
+  if (participantIds.length < 2) {
+    return { success: true, nodeId, message: "Not enough participants for node match", participantCount: participantIds.length };
+  }
+
+  const metadata = (node.metadata as any) || {};
+  const isHomeAway = options.isHomeAway ?? metadata.isHomeAway ?? false;
+  
+  // Générer les matchs
+  let generatedMatches;
+  if (isHomeAway) {
+    const singles = generateEliminationMatches(participantIds.map(id => ({ id })), node.round || 1);
+    generatedMatches = [
+      ...singles,
+      ...singles.map(m => ({
+        ...m,
+        participant1: m.participant2,
+        participant2: m.participant1,
+        round: (m.round || 1) + 1
+      }))
+    ];
+  } else {
+    generatedMatches = generateEliminationMatches(participantIds.map(id => ({ id })), node.round || 1);
+  }
 
   if (options.dryRun) {
-    return { nodeId, matchCount: generated.length, matches: generated };
+    return { nodeId, matchCount: generatedMatches.length, matches: generatedMatches };
   }
 
   if (options.clearExisting) {
     await tx.delete(matches).where(eq(matches.bracketNodeId, nodeId));
   }
 
-  const matchValues = generated.map((m, idx) => ({
+  const matchValues = generatedMatches.map((m, idx) => ({
     editionId: node.phase.editionId,
     phaseId: node.phaseId,
     groupId: node.groupId,
@@ -217,10 +227,11 @@ async function generateNodeMatches(tx: any, nodeId: string, options: MatchGenera
     round: m.round || 1,
     matchNumber: idx + 1,
     matchCode: node.nodeCode ? `${node.nodeCode}` : `N-M${idx + 1}`,
+    scheduledTime: getDefaultScheduledTime(m.round || 1, idx + 1),
     status: "PENDING",
     createdAt: new Date(),
     updatedAt: new Date(),
-  })).filter(m => m.participant1RegistrationId || m.participant2RegistrationId); // Filter matches with only nulls if needed, or allow them
+  }));
 
   if (matchValues.length > 0) {
     await tx.insert(matches).values(matchValues);
@@ -229,6 +240,7 @@ async function generateNodeMatches(tx: any, nodeId: string, options: MatchGenera
   return {
     success: true,
     nodeId,
-    matchCount: matchValues.length
+    matchCount: matchValues.length,
+    source: node.groupId ? "group_participants" : "metadata_legacy"
   };
 }

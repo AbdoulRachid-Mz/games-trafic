@@ -30,3 +30,13 @@ export function getRoundLabel(roundIndex: number, totalRounds: number): string {
   const pow = Math.pow(2, distanceToFinal + 1);
   return `1/${pow} finale`;
 }
+
+export const getDefaultScheduledTime = (round: number, matchIndex: number): Date => {
+  const now = new Date();
+  // Ajouter N jours selon le round (ex: round 1 = jour 0, round 2 = +7 jours, etc.)
+  const daysToAdd = (round - 1) * 7;
+  const defaultDate = new Date(now);
+  defaultDate.setDate(now.getDate() + daysToAdd);
+  defaultDate.setHours(19, 0, 0, 0); // 19h par défaut
+  return defaultDate;
+};

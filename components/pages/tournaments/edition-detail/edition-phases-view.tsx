@@ -39,6 +39,15 @@ import {
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { GroupNodeCard } from "../matches/group-node-card";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from "@/components/ui/carousel";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EditionPhasesViewProps {
   phases: TournamentPhase[];
@@ -220,6 +229,9 @@ function PhaseSchemaView({
     { populate: ["member", "member.user", "member.team"] },
   );
 
+  // useScreen
+  const { isMobile } = useScreenSize();
+
   const { data: nodesRes, isLoading: nodesLoading } = usePhaseBracketNodes(
     phase.id,
     {
@@ -241,6 +253,7 @@ function PhaseSchemaView({
   if (nodesLoading || matchesLoading) {
     return <PhaseSchemaSkeleton />;
   }
+
 
   const nodes = nodesRes?.data || [];
   const matches = matchesRes?.data || [];
@@ -353,20 +366,60 @@ function PhaseSchemaView({
             </div>
           </div>
 
-          {/* Schéma selon le type de phase */}
           {isGroupStage && (
-            <GroupStageSchema
-              nodes={nodes}
-              matches={matches}
-              matchesByNode={matchesByNode}
-              nodesMap={nodesMap}
-              expandedGroup={expandedGroup}
-              setExpandedGroup={setExpandedGroup}
-              currentUserId={currentUserId}
-              isAdmin={isAdmin}
-              onUpdate={onUpdate}
-              phase={phase}
-            />
+            <div className="space-y-4">
+              <Typography
+                variant="h6"
+                weight="bold"
+                className="flex items-center gap-2 text-sm md:text-base"
+              >
+                <LayoutGrid className="h-4 w-4 text-primary" />
+                Groupes / Poules
+                <Badge variant="outline" className="text-[9px] ml-2">
+                  {nodes.length} groupe{nodes.length > 1 ? "s" : ""}
+                </Badge>
+              </Typography>
+
+              {isMobile ? (
+                // Vue mobile: carousel horizontal
+                <Carousel className="w-full">
+                  <CarouselContent className="-ml-2">
+                    {nodes.map((node: any) => (
+                      <CarouselItem
+                        key={node.id}
+                        className="pl-2 basis-full sm:basis-1/2"
+                      >
+                        <GroupNodeCard
+                          node={node}
+                          matchesByNode={matchesByNode}
+                          currentUserId={currentUserId}
+                          isAdmin={isAdmin}
+                          onUpdate={onUpdate}
+                          phase={phase}
+                        />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="left-0 h-7 w-7" />
+                  <CarouselNext className="right-0 h-7 w-7" />
+                </Carousel>
+              ) : (
+                // Vue desktop: grille
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {nodes.map((node: any) => (
+                    <GroupNodeCard
+                      key={node.id}
+                      node={node}
+                      matchesByNode={matchesByNode}
+                      currentUserId={currentUserId}
+                      isAdmin={isAdmin}
+                      onUpdate={onUpdate}
+                      phase={phase}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {isElimination && (

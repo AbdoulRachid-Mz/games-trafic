@@ -14,9 +14,12 @@ import {
   markPhaseCompleteAction,
   organizeNextPhaseAction,
   getQualifiedParticipantsPreviewAction,
+  getPhaseContextAction,
+  getPhaseGroupById,
+  getPhaseGroups,
+  generateMatchesAction,
 } from "@/actions/phases";
 import { designateEditionWinnerAction } from "@/actions/editions";
-// import { triggerConfetti } from "@/utils/confetti";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -24,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { fireConfettiPreset } from "@/utils/confetti";
+import { useQuery } from "@tanstack/react-query";
 
 interface MarkCompleteDialogProps {
   type: 'PHASE' | 'GROUP' | 'BRACKET_NODE';
@@ -31,10 +35,11 @@ interface MarkCompleteDialogProps {
   name: string;
   onComplete?: () => void;
   asFormOnly?: boolean;
-  // Pour les brackets nodes, on peut passer des infos supplémentaires
-  isLastPhase?: boolean;
-  phaseType?: string;
-  editionType?: string;
+  editionConfig?: {
+    competitionMode?: "AUTO" | "MANUAL";
+    competitionType?: string;
+  };
+  phaseId?: string; // Pour les groupes, permet de récupérer le contexte de la phase
 }
 
 export function MarkCompleteDialog({ 
@@ -43,9 +48,8 @@ export function MarkCompleteDialog({
   name, 
   onComplete, 
   asFormOnly = false,
-  isLastPhase = false,
-  phaseType = "",
-  editionType = "",
+  editionConfig = {},
+  phaseId: propPhaseId,
 }: MarkCompleteDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(asFormOnly);
@@ -62,16 +66,49 @@ export function MarkCompleteDialog({
   const [qualifiedPreview, setQualifiedPreview] = useState<Array<{ id: string; name: string; groupId: string; position?: number | null }>>([]);
   const [selectedQualifiedIds, setSelectedQualifiedIds] = useState<string[]>([]);
   const [showPreviewStep, setShowPreviewStep] = useState(false);
+  
+  // Infos groupe pour les groupes d'élimination
+  const [group, setGroup] = useState<any>(null);
+  const [phaseIdForGroup, setPhaseIdForGroup] = useState<string | null>(null);
 
   const router = useRouter();
   
-  // Vérifier si c'est une phase finale (plus de phase après)
-  const isFinalPhase = type === 'PHASE' && isLastPhase;
-  const isEliminationPhase = phaseType === "ELIMINATION" || phaseType === "KNOCKOUT";
-  const isGroupPhase = phaseType === "GROUP_STAGE" || phaseType === "ROUND_ROBIN";
+  // ✅ Contexte phase (si type === PHASE)
+  const { data: phaseContext, isLoading: isLoadingContext } = useQuery({
+    queryKey: ['phase-context', id],
+    queryFn: () => getPhaseContextAction(id),
+    enabled: type === 'PHASE' && !!id && isOpen,
+    staleTime: 1000 * 30,
+  });
+
+  // ✅ Déterminer le type de phase
+  const actualPhaseType = type === 'PHASE' 
+    ? phaseContext?.phaseType 
+    : (group?.phase?.phaseType || (type === 'GROUP' && group?.groupType === "ELIMINATION_ROUND" ? "ELIMINATION" : null));
   
-  const isAutoMode = editionType === "CHAMPIONS";
+  const isFinalPhase = type === 'PHASE' ? !phaseContext?.nextPhaseId : false;
+  const isEliminationPhase = actualPhaseType === "ELIMINATION" || actualPhaseType === "KNOCKOUT";
+  const isGroupPhase = actualPhaseType === "GROUP_STAGE" || actualPhaseType === "ROUND_ROBIN";
   
+  // ✅ Mode auto
+  const isAutoMode = editionConfig.competitionMode === "AUTO";
+  
+  // ✅ Chargement des infos du groupe (pour type === GROUP)
+  useEffect(() => {
+    if (type === 'GROUP' && isOpen) {
+      const loadGroup = async () => {
+        try {
+          const groupData = await getPhaseGroupById(id, { populate: ["phase"] });
+          setGroup(groupData);
+          setPhaseIdForGroup(groupData?.phaseId || null);
+        } catch (error) {
+          console.error("Error loading group:", error);
+        }
+      };
+      loadGroup();
+    }
+  }, [type, id, isOpen]);
+
   useEffect(() => {
     if (asFormOnly) {
       handleCheck();
@@ -81,8 +118,6 @@ export function MarkCompleteDialog({
   const handleCheck = async () => {
     setIsChecking(true);
     try {
-      // Pour les brackets nodes ou autres, le type doit exister dans checkPendingEntitiesAction
-      // Mais comme il a pu être retiré lors d'une refactorisation temporelle, je m'assure qu'on lance la fonction si elle existe
       const { checkPendingEntitiesAction } = await import("@/actions/phases");
       const result = await checkPendingEntitiesAction(type, id);
       if (result.success) {
@@ -123,13 +158,13 @@ export function MarkCompleteDialog({
   const isPowerOfTwo = (n: number) => n > 0 && (n & (n - 1)) === 0;
 
   const handleComplete = () => {
-    // Si on est sur une phase de groupes et qu'on va vers une phase éliminatoire, on propose la preview
+    // Preview step pour phases de groupes
     if (type === 'PHASE' && isGroupPhase && !isFinalPhase && !showPreviewStep) {
       setShowPreviewStep(true);
       return;
     }
 
-    // Validation Power of 2 si on va vers une élimination directe
+    // Validation Power of 2
     if (showPreviewStep && !isPowerOfTwo(selectedQualifiedIds.length)) {
       toast.error(`Le nombre de qualifiés (${selectedQualifiedIds.length}) doit être une puissance de 2 (2, 4, 8, 16, 32...) pour générer un arbre d'élimination.`);
       return;
@@ -154,10 +189,11 @@ export function MarkCompleteDialog({
 
         toast.success(`${name} marqué comme terminé avec succès !`);
 
-        // Pour les phases NON finales, organiser la phase suivante
-        if (type === 'PHASE' && markResult.nextPhaseId && !isFinalPhase) {
-          // En mode auto, on force la génération compète si non spécifié autrement
-          const organizeResult = await organizeNextPhaseAction(markResult.nextPhaseId, {
+        // ============================================================
+        // CAS 1: PHASE NON FINALE → organiser la phase suivante
+        // ============================================================
+        if (type === 'PHASE' && phaseContext?.nextPhaseId && !isFinalPhase) {
+          const organizeResult = await organizeNextPhaseAction(phaseContext.nextPhaseId, {
             generateNodes: isAutoMode ? true : generateNodes,
             generateMatches: isAutoMode ? true : generateMatches,
             seedMethod,
@@ -168,19 +204,19 @@ export function MarkCompleteDialog({
           });
           
           if (organizeResult.success) {
-            toast.success(`Phase "${markResult.nextPhaseName}" organisée avec succès !`);
+            toast.success(`Phase "${phaseContext.nextPhaseName}" organisée avec succès !`);
           } else {
             toast.warning(`Phase terminée mais erreur lors de l'organisation: ${organizeResult.error}`);
           }
         }
 
-        // Pour les phases FINALES, désigner le vainqueur et fêter ça !
+        // ============================================================
+        // CAS 2: PHASE FINALE → désigner le vainqueur
+        // ============================================================
         if (type === 'PHASE' && isFinalPhase) {
           try {
-            // Dans la phase finale, on cherche le participant à la position 1
             const previewRes = await getQualifiedParticipantsPreviewAction(id);
             if (previewRes.success && previewRes.qualified && previewRes.qualified.length > 0) {
-              // Le premier de la liste (trié par position) est notre gagnant
               const winner = previewRes.qualified[0];
               
               const winnerMetadata = {
@@ -193,7 +229,6 @@ export function MarkCompleteDialog({
 
               await designateEditionWinnerAction(markResult.editionId || id, winner.id, winnerMetadata);
               
-              // Celebration!
               fireConfettiPreset("success");
               toast.success(`Félicitations au vainqueur : ${winner.name} !`, {
                 icon: <Trophy className="h-4 w-4 text-yellow-500" />,
@@ -202,6 +237,45 @@ export function MarkCompleteDialog({
             }
           } catch (winnerErr) {
             console.error("Error designating winner:", winnerErr);
+          }
+        }
+
+        // ============================================================
+        // CAS 3: GROUPE D'ÉLIMINATION → organiser le round suivant
+        // ============================================================
+        if (type === 'GROUP' && isEliminationPhase && markResult?.success) {
+          const phaseToOrganize = phaseIdForGroup || group?.phaseId;
+          
+          if (phaseToOrganize) {
+            const groupsInPhase = await getPhaseGroups({
+              filters: { phaseId: phaseToOrganize },
+              options: { sortBy: "order", sortOrder: "asc" },
+              pagination: { page: 1, limit: 100 },
+            });
+            
+            const currentGroupOrder = group?.order;
+            const nextGroup = groupsInPhase.data.find((g: any) => g.order === currentGroupOrder + 1);
+            
+            if (nextGroup) {
+              // Récupérer les participants qualifiés depuis les résultats du groupe
+              const qualifiedIds = selectedQualifiedIds.length > 0 
+                ? selectedQualifiedIds 
+                : markResult.qualifiedIds || [];
+              
+              // Utiliser generateMatchesAction pour générer les matchs du round suivant
+              const generateResult = await generateMatchesAction("GROUP", nextGroup.id, {
+                clearExisting: false,
+                seedingMethod: seedMethod,
+                isHomeAway: isHomeAway,
+                matchFormat: matchFormat,
+              });
+              
+              if (generateResult.success) {
+                toast.success(`Round "${nextGroup.name}" organisé avec succès !`);
+              } else {
+                toast.warning(`Groupe terminé mais erreur lors de l'organisation du round suivant: ${generateResult.error}`);
+              }
+            }
           }
         }
 
@@ -230,7 +304,14 @@ export function MarkCompleteDialog({
 
   const typeLabel = type === 'PHASE' ? 'la phase' : type === 'GROUP' ? 'le groupe' : 'le nœud';
   const isBlocked = pendingEntities.length > 0;
-  const showPhaseConfig = type === 'PHASE' && !isFinalPhase && !isBlocked && !isChecking;
+  
+  // ✅ Afficher la configuration pour:
+  // - Phase non finale
+  // - Groupe d'élimination (pour configurer le round suivant)
+  const showConfig = (type === 'PHASE' && !isFinalPhase && !isBlocked && !isChecking) ||
+                     (type === 'GROUP' && isEliminationPhase && !isBlocked && !isChecking && group && !group.isCompleted);
+
+  const isLoading = isChecking || (type === 'PHASE' && isLoadingContext && isOpen);
 
   const content = (
     <div className="space-y-6 max-h-[80vh] overflow-y-auto">
@@ -256,7 +337,7 @@ export function MarkCompleteDialog({
         </div>
       </div>
 
-      {isChecking ? (
+      {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -369,24 +450,26 @@ export function MarkCompleteDialog({
                 </ul>
               </div>
 
-              {/* Configuration de la phase suivante (uniquement pour les phases NON finales) */}
-              {showPhaseConfig && (
+              {/* Configuration de l'étape suivante */}
+              {showConfig && (
                 <div className="space-y-4 pt-2 border-t">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Trophy className="h-4 w-4 text-primary" />
-                      <Label className="text-sm font-bold">Configuration de la phase suivante</Label>
+                      <Label className="text-sm font-bold">
+                        {type === 'PHASE' ? 'Configuration de la phase suivante' : 'Configuration du prochain round'}
+                      </Label>
                     </div>
                     {isAutoMode && (
                       <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">
-                        Mode Auto (Champions)
+                        Mode Auto
                       </Badge>
                     )}
                   </div>
 
                   {!isAutoMode ? (
                     <>
-                      {/* Format des matchs (pour élimination) */}
+                      {/* Format des matchs */}
                       {isEliminationPhase && (
                         <div className="space-y-2">
                           <Label className="text-xs font-medium">Format des matchs</Label>
@@ -440,12 +523,14 @@ export function MarkCompleteDialog({
                   ) : (
                     <div className="bg-primary/5 p-3 rounded-lg border border-primary/10">
                       <p className="text-xs text-muted-foreground italic">
-                        Les paramètres de la phase suivante (Aller-Retour, Format, Seed) sont gérés automatiquement selon le mode Champions.
+                        {type === 'PHASE' 
+                          ? "Les paramètres de la phase suivante (Aller-Retour, Format, Seed) sont gérés automatiquement."
+                          : "Les paramètres du prochain round sont gérés automatiquement."}
                       </p>
                     </div>
                   )}
 
-                  {/* Niveaux de génération - Toujours visibles mais avec warning en mode auto */}
+                  {/* Niveaux de génération */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-medium">Niveaux de génération</Label>
@@ -532,7 +617,7 @@ export function MarkCompleteDialog({
         {!isBlocked && !isChecking && (
           <Button
             onClick={handleComplete}
-            disabled={isProcessing}
+            disabled={isProcessing || isLoadingContext}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             {isProcessing ? (

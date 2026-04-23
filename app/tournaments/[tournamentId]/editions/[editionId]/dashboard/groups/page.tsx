@@ -90,21 +90,22 @@ export default async function GroupsDashboardPage({
   );
 
   // Filter groups by phase if phaseId is provided
-  const filteredPhases = phaseId
-    ? phasesWithGroups.filter((p) => p.id === phaseId)
-    : phasesWithGroups.filter(
-        (p) => p.phaseType === "GROUP_STAGE" || p.phaseType === "ROUND_ROBIN"
-      );
+// Remplacer le filtrage actuel par :
+const filteredPhases = phaseId
+  ? phasesWithGroups.filter((p) => p.id === phaseId)
+  : phasesWithGroups; // ✅ Afficher TOUTES les phases, pas seulement GROUP_STAGE/ROUND_ROBIN
 
-  const allGroups = filteredPhases.flatMap(
-    (p) =>
-      p.groups.map((g: any) => ({
-        ...g,
-        phaseName: p.name,
-        phaseId: p.id,
-        phaseType: p.phaseType,
-      })) || []
-  );
+// Ajouter un indicateur du type de phase sur chaque groupe
+const allGroups = filteredPhases.flatMap(
+  (p) =>
+    p.groups.map((g: any) => ({
+      ...g,
+      phaseName: p.name,
+      phaseId: p.id,
+      phaseType: p.phaseType, // ✅ Conserver le type pour l'affichage
+    })) || []
+);
+
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

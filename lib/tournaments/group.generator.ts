@@ -8,6 +8,10 @@ interface GenerateGroupsOptions {
   generateMatches?: boolean;
 }
 
+/**
+ * @note Cette fonction est utilisée principalement en mode MANUAL
+ * Pour le mode AUTO, utilisez setupGroupPhase dans generators.ts
+ */
 export function generateGroups(
   participants: Participant[],
   options: GenerateGroupsOptions

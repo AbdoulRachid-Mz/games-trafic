@@ -257,7 +257,7 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
   const bracketNodeId = searchParams.get("bracketNodeId") || undefined;
   const status = searchParams.get("status") || undefined;
   const search = searchParams.get("search") || undefined;
-  const view = (searchParams.get("view") as "list" | "tree" | "grid") || "list";
+  const view = (searchParams.get("view") as "list" | "tree" | "grid") || "grid";
   
   const currentPage = parseInt(page);
   const limit = 20;

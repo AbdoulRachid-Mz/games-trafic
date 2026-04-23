@@ -80,8 +80,10 @@ export function PhaseDetailActions({
                     type="PHASE"
                     id={phaseId}
                     name="Phase"
-                    phaseType={phaseType}
-                    editionType={editionType}
+                    editionConfig={{
+                        competitionMode: editionType === "AUTO" ? "AUTO" : "MANUAL",
+                        competitionType: phaseType,
+                    }}
                     onComplete={() => router.refresh()}
                 />
             )}

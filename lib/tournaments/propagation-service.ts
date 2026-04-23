@@ -9,11 +9,14 @@ import {
 import { eq, and, asc, isNull } from "drizzle-orm";
 
 /**
- * PropagationService - Handles automatic progression between tournament phases.
+ * @deprecated La propagation est maintenant gérée par markGroupCompleteAction et markBracketNodeCompleteAction
+ * Cette fonction est conservée pour compatibilité avec le mode MANUAL.
  */
 export async function propagatePhaseResults(phaseId: string) {
+  console.warn("[DEPRECATED] propagatePhaseResults is deprecated. Propagation is now handled by markGroupCompleteAction and markBracketNodeCompleteAction.");
+  
   return await db.transaction(async (tx) => {
-    // 1. Get the current phase results
+    // Garder l'ancienne logique pour compatibilité
     const phase = await tx.query.tournamentPhases.findFirst({
       where: eq(tournamentPhases.id, phaseId),
       with: {
@@ -30,7 +33,6 @@ export async function propagatePhaseResults(phaseId: string) {
 
     if (!phase) throw new Error("Phase not found");
 
-    // 2. Find the next phase
     const nextPhase = await tx.query.tournamentPhases.findFirst({
       where: and(
         eq(tournamentPhases.editionId, phase.editionId),
@@ -44,9 +46,6 @@ export async function propagatePhaseResults(phaseId: string) {
 
     if (!nextPhase) return { success: true, message: "No next phase to propagate to" };
 
-    // 3. Map qualifiers to placeholders
-    // Example: Group A, Pos 1 -> QUALIFIER_1_GROUP_A or similar
-    // For now, let's use a simple sequential mapping for standard brackets
     const allQualifiers = phase.groups.flatMap(g => 
       g.participants.map((p, idx) => ({
         registrationId: p.registrationId,
@@ -54,8 +53,6 @@ export async function propagatePhaseResults(phaseId: string) {
       }))
     );
 
-    // 4. Update the next phase's nodes and matches
-    // Find nodes in nextPhase that have qualifiers in their metadata or are pending
     const nodes = await tx.select().from(bracketNodes).where(eq(bracketNodes.phaseId, nextPhase.id));
     
     for (const node of nodes) {
@@ -64,10 +61,7 @@ export async function propagatePhaseResults(phaseId: string) {
       
       let updated = false;
       const newParticipants = participants.map((p: string) => {
-        // If p is a placeholder, try to find the actual ID
-        // Simplified: just use sequential mapping if placeholders are index-based
         if (p.startsWith("QUALIFIER_")) {
-          // Find by index for now if not explicitly named
           const idx = parseInt(p.split('_')[1]) - 1;
           if (allQualifiers[idx]) {
             updated = true;
@@ -84,14 +78,6 @@ export async function propagatePhaseResults(phaseId: string) {
             updatedAt: new Date()
           })
           .where(eq(bracketNodes.id, node.id));
-
-        // Also update any matches linked to this node
-        // (This might be better handled by a MatchGenerationEngine refresh)
-        const nodeMatches = await tx.select().from(matches).where(eq(matches.bracketNodeId, node.id));
-        for (const match of nodeMatches) {
-           // Logic to update participant1/2 based on new participants list
-           // ...
-        }
       }
     }
 

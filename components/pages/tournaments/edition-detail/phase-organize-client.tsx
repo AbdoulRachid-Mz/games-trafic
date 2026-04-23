@@ -1,7 +1,13 @@
 // @/components/pages/tournaments/edition-detail/phase-organize-client.tsx
 "use client";
 
-import { useState, useTransition, useCallback, useMemo, useEffect } from "react";
+import {
+  useState,
+  useTransition,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import {
   Card,
   CardContent,
@@ -16,7 +22,6 @@ import {
   Trash2,
   Loader2,
   Settings2,
-  GitBranch,
   RefreshCcw,
   CheckCircle2,
   AlertCircle,
@@ -28,12 +33,15 @@ import {
   ChevronUp,
   Trophy,
   Calendar,
-  ArrowRight,
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { organizeEditionStructure, generateMatchesAction, getStructurePreviewAction } from "@/actions/phases";
+import {
+  organizeEditionStructure,
+  generateMatchesAction,
+  getStructurePreviewAction,
+} from "@/actions/phases";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import Link from "next/link";
@@ -55,8 +63,17 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface PhaseOrganizeClientProps {
   tournamentId: string;
@@ -96,7 +113,8 @@ type DraftGroup = {
   };
 };
 
-const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateTempId = () =>
+  `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 export function PhaseOrganizeClient({
   tournamentId,
@@ -117,29 +135,47 @@ export function PhaseOrganizeClient({
   const [activeTab, setActiveTab] = useState<"draft" | "existing">("draft");
 
   // Héritage de la configuration parente
-  const defaultConfig = useMemo(() => ({
-    participantsPerGroup: inheritedConfig?.participantsPerGroup || 4,
-    groupsCount: inheritedConfig?.groupsCount || Math.ceil(sourceParticipants.length / 4) || 1,
-    isHomeAway: inheritedConfig?.isHomeAway || false,
-    pointsPerWin: inheritedConfig?.pointsPerWin || 3,
-    pointsPerDraw: inheritedConfig?.pointsPerDraw || 1,
-    pointsPerLoss: inheritedConfig?.pointsPerLoss || 0,
-    advanceCount: inheritedConfig?.advanceCount || 2,
-    seedingMethod: inheritedConfig?.seedingMethod || "RANDOM",
-    generateNodes: inheritedConfig?.generateNodes !== false,
-    generateMatches: inheritedConfig?.generateMatches !== false,
-    nodesType: inheritedConfig?.nodesType || (phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "ELIMINATION"),
-    roundsCount: inheritedConfig?.roundsCount || 5,
-  }), [inheritedConfig, phaseType, sourceParticipants.length]);
+  const defaultConfig = useMemo(
+    () => ({
+      participantsPerGroup: inheritedConfig?.participantsPerGroup || 4,
+      groupsCount:
+        inheritedConfig?.groupsCount ||
+        Math.ceil(sourceParticipants.length / 4) ||
+        1,
+      isHomeAway: inheritedConfig?.isHomeAway || false,
+      pointsPerWin: inheritedConfig?.pointsPerWin || 3,
+      pointsPerDraw: inheritedConfig?.pointsPerDraw || 1,
+      pointsPerLoss: inheritedConfig?.pointsPerLoss || 0,
+      advanceCount: inheritedConfig?.advanceCount || 2,
+      seedingMethod: inheritedConfig?.seedingMethod || "RANDOM",
+      generateNodes: inheritedConfig?.generateNodes !== false,
+      generateMatches: inheritedConfig?.generateMatches !== false,
+      nodesType:
+        inheritedConfig?.nodesType ||
+        (phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "ELIMINATION"),
+      roundsCount: inheritedConfig?.roundsCount || 5,
+    }),
+    [inheritedConfig, phaseType, sourceParticipants.length],
+  );
 
   const [groupsCount, setGroupsCount] = useState(defaultConfig.groupsCount);
-  const [participantsPerGroup, setParticipantsPerGroup] = useState(defaultConfig.participantsPerGroup);
-  const [seedingMethod, setSeedingMethod] = useState<"RANDOM" | "SEQUENTIAL" | "SNAKE">(defaultConfig.seedingMethod);
-  const [generateMatches, setGenerateMatches] = useState(defaultConfig.generateMatches);
-  const [groupPrefix, setGroupPrefix] = useState(phaseType === "ROUND_ROBIN" ? "Ligue" : "Groupe");
+  const [participantsPerGroup, setParticipantsPerGroup] = useState(
+    defaultConfig.participantsPerGroup,
+  );
+  const [seedingMethod, setSeedingMethod] = useState<
+    "RANDOM" | "SEQUENTIAL" | "SNAKE"
+  >(defaultConfig.seedingMethod);
+  const [generateMatches, setGenerateMatches] = useState(
+    defaultConfig.generateMatches,
+  );
+  const [groupPrefix, setGroupPrefix] = useState(
+    phaseType === "ROUND_ROBIN" ? "Ligue" : "Groupe",
+  );
   const [isHomeAway, setIsHomeAway] = useState(defaultConfig.isHomeAway);
   const [advanceCount, setAdvanceCount] = useState(defaultConfig.advanceCount);
-  const [nodesType, setNodesType] = useState<"ROUND_ROBIN" | "ELIMINATION" | "SWISS">(defaultConfig.nodesType);
+  const [nodesType, setNodesType] = useState<
+    "ROUND_ROBIN" | "ELIMINATION" | "SWISS"
+  >(defaultConfig.nodesType);
   const [roundsCount, setRoundsCount] = useState(defaultConfig.roundsCount);
 
   // Calcul du nombre de groupes optimisé
@@ -155,31 +191,39 @@ export function PhaseOrganizeClient({
   useEffect(() => {
     const updatePreview = async () => {
       if (sourceParticipants.length === 0) return;
-      
+
       setIsPreviewLoading(true);
       try {
         const actualGroupsCount = groupsCount || optimalGroupsCount;
-        const config = {
+        const previewConfig = {
           groupsCount: actualGroupsCount,
           advanceCount,
           isHomeAway,
           seedingMethod,
           generateMatches,
           nodesType,
-          roundsCount
+          roundsCount,
+          // ✅ Ajouter nodePrefix pour un meilleur preview
+          nodePrefix: groupPrefix,
         };
 
         const previewData = await getStructurePreviewAction(
           editionId,
-          [{
-            name: phaseName,
-            phaseType: phaseType as any,
-            order: 0,
-            config
-          }],
-          sourceParticipants.map(p => p.id)
+          [
+            {
+              name: phaseName,
+              phaseType: phaseType as
+                | "GROUP_STAGE"
+                | "ROUND_ROBIN"
+                | "ELIMINATION"
+                | "SWISS",
+              order: 0,
+              config: previewConfig,
+            },
+          ],
+          sourceParticipants.map((p) => p.id),
         );
-        
+
         setServerPreview(previewData?.phases?.[0] || null);
       } catch (error) {
         console.error("Preview error:", error);
@@ -190,35 +234,51 @@ export function PhaseOrganizeClient({
 
     const timer = setTimeout(updatePreview, 500);
     return () => clearTimeout(timer);
-  }, [groupsCount, optimalGroupsCount, advanceCount, isHomeAway, seedingMethod, generateMatches, nodesType, roundsCount, editionId, phaseId, phaseName, phaseType, sourceParticipants]);
+  }, [
+    groupsCount,
+    optimalGroupsCount,
+    advanceCount,
+    isHomeAway,
+    seedingMethod,
+    generateMatches,
+    nodesType,
+    roundsCount,
+    groupPrefix,
+    editionId,
+    phaseName,
+    phaseType,
+    sourceParticipants,
+  ]);
 
   const handleAutoGenerate = () => {
     const actualGroupsCount = groupsCount || optimalGroupsCount;
-    
+
     startTransition(async () => {
       try {
-        // On utilise organizeEditionStructure mais pour une seule phase (celle-ci)
         const result = await organizeEditionStructure(
           editionId,
-          [{
-            name: phaseName,
-            phaseType: phaseType as any,
-            order: 0, // Dans ce mode on réorganise souvent la phase
-            config: {
-              groupsCount: actualGroupsCount,
-              advanceCount,
-              isHomeAway,
-              seedingMethod,
-              generateGroups: true,
-              generateNodes: true,
-              generateMatches,
-              nodePrefix: groupPrefix,
-            }
-          }],
+          [
+            {
+              name: phaseName,
+              phaseType: phaseType as any,
+              order: 0,
+              config: {
+                groupsCount: actualGroupsCount,
+                advanceCount,
+                isHomeAway,
+                seedingMethod,
+                generateGroups: true,
+                generateNodes: true,
+                generateMatches,
+                nodePrefix: groupPrefix,
+              },
+            },
+          ],
           sourceParticipants.map((p) => p.id),
           {
-            clearExisting: true, // On remplace la structure actuelle de cette phase
-          }
+            clearExisting: true,
+            targetPhaseId: phaseId, // ✅ Ajouter targetPhaseId pour ne toucher que cette phase
+          },
         );
 
         if (result.success) {
@@ -226,23 +286,59 @@ export function PhaseOrganizeClient({
           router.refresh();
         }
       } catch (error: any) {
-        toast.error(error.message || "Erreur lors de la génération automatique.");
+        toast.error(
+          error.message || "Erreur lors de la génération automatique.",
+        );
       }
     });
   };
 
-  const handleGenerateMatches = () => {
+  // ✅ CORRECTION: generateMatchesAction utilise clearExisting, pas forceRecreate
+  const handleGenerateMatchesForPhase = () => {
     startTransition(async () => {
       try {
-        const result = await generateMatchesAction("PHASE", phaseId, { forceRecreate: false });
+        const result = await generateMatchesAction("PHASE", phaseId, {
+          clearExisting: false, // ✅ Option correcte
+          seedingMethod: seedingMethod === "RANDOM" ? "RANDOM" : "SEQUENTIAL",
+          isHomeAway,
+        });
         if (result.success) {
           toast.success("Matchs générés avec succès.");
           router.refresh();
         } else {
-          toast.error(result.error || "Erreur lors de la génération des matchs.");
+          toast.error(
+            result.error || "Erreur lors de la génération des matchs.",
+          );
         }
       } catch (error: any) {
-        toast.error(error.message || "Erreur lors de la génération des matchs.");
+        toast.error(
+          error.message || "Erreur lors de la génération des matchs.",
+        );
+      }
+    });
+  };
+
+  // ✅ NOUVELLE FONCTION: générer les matchs pour un groupe spécifique
+  const handleGenerateMatchesForGroup = (groupId: string) => {
+    startTransition(async () => {
+      try {
+        const result = await generateMatchesAction("GROUP", groupId, {
+          clearExisting: false,
+          seedingMethod: seedingMethod === "RANDOM" ? "RANDOM" : "SEQUENTIAL",
+          isHomeAway,
+        });
+        if (result.success) {
+          toast.success("Matchs générés avec succès pour le groupe.");
+          router.refresh();
+        } else {
+          toast.error(
+            result.error || "Erreur lors de la génération des matchs.",
+          );
+        }
+      } catch (error: any) {
+        toast.error(
+          error.message || "Erreur lors de la génération des matchs.",
+        );
       }
     });
   };
@@ -266,7 +362,7 @@ export function PhaseOrganizeClient({
         nodesConfig: {
           type: nodesType,
           roundsCount,
-          matchesPerNode: nodesType === "ROUND_ROBIN" ? 1 : 1,
+          matchesPerNode: 1,
         },
       },
     };
@@ -278,34 +374,58 @@ export function PhaseOrganizeClient({
     setDraftGroups(draftGroups.filter((_, i) => i !== index));
   };
 
-  const handleUpdateDraftGroup = (index: number, updates: Partial<DraftGroup>) => {
-    setDraftGroups(prev => {
+  const handleUpdateDraftGroup = (
+    index: number,
+    updates: Partial<DraftGroup>,
+  ) => {
+    setDraftGroups((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...updates };
       return updated;
     });
   };
 
-  const handleAssignParticipantToGroup = (groupId: string, registrationId: string) => {
-    setDraftGroups(prev => prev.map(group => {
-      if (group.id === groupId && !group.participantIds.includes(registrationId)) {
-        return { ...group, participantIds: [...group.participantIds, registrationId] };
-      }
-      return group;
-    }));
+  const handleAssignParticipantToGroup = (
+    groupId: string,
+    registrationId: string,
+  ) => {
+    setDraftGroups((prev) =>
+      prev.map((group) => {
+        if (
+          group.id === groupId &&
+          !group.participantIds.includes(registrationId)
+        ) {
+          return {
+            ...group,
+            participantIds: [...group.participantIds, registrationId],
+          };
+        }
+        return group;
+      }),
+    );
   };
 
-  const handleRemoveParticipantFromGroup = (groupId: string, registrationId: string) => {
-    setDraftGroups(prev => prev.map(group => {
-      if (group.id === groupId) {
-        return { ...group, participantIds: group.participantIds.filter(id => id !== registrationId) };
-      }
-      return group;
-    }));
+  const handleRemoveParticipantFromGroup = (
+    groupId: string,
+    registrationId: string,
+  ) => {
+    setDraftGroups((prev) =>
+      prev.map((group) => {
+        if (group.id === groupId) {
+          return {
+            ...group,
+            participantIds: group.participantIds.filter(
+              (id) => id !== registrationId,
+            ),
+          };
+        }
+        return group;
+      }),
+    );
   };
 
   const handleDistributeParticipants = () => {
-    const availableParticipants = sourceParticipants.map(p => p.id);
+    const availableParticipants = sourceParticipants.map((p) => p.id);
     const shuffled = [...availableParticipants];
     if (seedingMethod === "RANDOM") {
       for (let i = shuffled.length - 1; i > 0; i--) {
@@ -313,14 +433,14 @@ export function PhaseOrganizeClient({
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
     }
-    
+
     const groupsWithParticipants = draftGroups.map((group, idx) => {
       const start = idx * participantsPerGroup;
       const end = start + participantsPerGroup;
       const participantIds = shuffled.slice(start, end);
       return { ...group, participantIds };
     });
-    
+
     setDraftGroups(groupsWithParticipants);
     toast.success("Participants distribués dans les groupes");
   };
@@ -330,10 +450,9 @@ export function PhaseOrganizeClient({
 
     startTransition(async () => {
       try {
-        // Créer les groupes
         const { bulkCreatePhaseGroups } = await import("@/actions/phases");
         const createdGroups = await bulkCreatePhaseGroups(
-          draftGroups.map(g => ({
+          draftGroups.map((g) => ({
             phaseId,
             name: g.name,
             order: g.order + existingGroups.length,
@@ -346,24 +465,24 @@ export function PhaseOrganizeClient({
             isCompleted: false,
             isLocked: false,
             isDeleted: false,
-          }))
+          })),
         );
-        
-        // Assigner les participants
-        const { bulkCreatePhaseGroupParticipants } = await import("@/actions/phases");
+
+        const { bulkCreatePhaseGroupParticipants } =
+          await import("@/actions/phases");
         for (let i = 0; i < createdGroups.length; i++) {
           const group = createdGroups[i];
           const draftGroup = draftGroups[i];
           if (draftGroup.participantIds.length > 0) {
             await bulkCreatePhaseGroupParticipants(
-              draftGroup.participantIds.map(registrationId => ({
+              draftGroup.participantIds.map((registrationId) => ({
                 groupId: group.id,
                 registrationId,
-              }))
+              })),
             );
           }
         }
-        
+
         toast.success(`${createdGroups.length} groupe(s) créé(s) avec succès.`);
         setDraftGroups([]);
         router.refresh();
@@ -374,17 +493,17 @@ export function PhaseOrganizeClient({
   };
 
   const getName = (registrationId: string) => {
-    const reg = sourceParticipants.find(p => p.id === registrationId);
+    const reg = sourceParticipants.find((p) => p.id === registrationId);
     return reg?.member?.displayName || reg?.member?.user?.username || "Joueur";
   };
 
   const isParticipantAssigned = (registrationId: string) => {
-    return draftGroups.some(g => g.participantIds.includes(registrationId));
+    return draftGroups.some((g) => g.participantIds.includes(registrationId));
   };
 
   const getAvailableParticipants = () => {
-    const assignedIds = new Set(draftGroups.flatMap(g => g.participantIds));
-    return sourceParticipants.filter(p => !assignedIds.has(p.id));
+    const assignedIds = new Set(draftGroups.flatMap((g) => g.participantIds));
+    return sourceParticipants.filter((p) => !assignedIds.has(p.id));
   };
 
   return (
@@ -408,14 +527,17 @@ export function PhaseOrganizeClient({
             <AlertCircle className="h-6 w-6 text-amber-600" />
           </div>
           <div className="space-y-1">
-             <h4 className="font-bold text-amber-900 text-sm flex items-center gap-2">
-               Mode Assistant Actif
-             </h4>
-             <p className="text-amber-800 text-xs leading-relaxed">
-               Cette édition est actuellement gérée par l'Assistant (Mode Auto). 
-               Toute modification manuelle de la structure (ajout de groupes, matches) peut perturber l'arbre de compétition généré automatiquement. 
-               Il est vivement conseillé de basculer en <strong>Mode Manuel</strong> si vous souhaitez reprendre le contrôle total.
-             </p>
+            <h4 className="font-bold text-amber-900 text-sm flex items-center gap-2">
+              Mode Assistant Actif
+            </h4>
+            <p className="text-amber-800 text-xs leading-relaxed">
+              Cette édition est actuellement gérée par l'Assistant (Mode Auto).
+              Toute modification manuelle de la structure (ajout de groupes,
+              matches) peut perturber l'arbre de compétition généré
+              automatiquement. Il est vivement conseillé de basculer en{" "}
+              <strong>Mode Manuel</strong> si vous souhaitez reprendre le
+              contrôle total.
+            </p>
           </div>
         </div>
       )}
@@ -425,20 +547,28 @@ export function PhaseOrganizeClient({
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Info className="h-4 w-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider text-primary">Configuration héritée</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-primary">
+              Configuration héritée
+            </span>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             {inheritedConfig.participantsPerGroup && (
-              <Badge variant="secondary">{inheritedConfig.participantsPerGroup} part./groupe</Badge>
+              <Badge variant="secondary">
+                {inheritedConfig.participantsPerGroup} part./groupe
+              </Badge>
             )}
             {inheritedConfig.isHomeAway && (
               <Badge variant="secondary">Aller-Retour</Badge>
             )}
             {inheritedConfig.advanceCount && (
-              <Badge variant="secondary">{inheritedConfig.advanceCount} qualifiés/groupe</Badge>
+              <Badge variant="secondary">
+                {inheritedConfig.advanceCount} qualifiés/groupe
+              </Badge>
             )}
             {inheritedConfig.nodesType && (
-              <Badge variant="secondary">Nœuds: {inheritedConfig.nodesType}</Badge>
+              <Badge variant="secondary">
+                Nœuds: {inheritedConfig.nodesType}
+              </Badge>
             )}
           </div>
         </div>
@@ -461,18 +591,26 @@ export function PhaseOrganizeClient({
                 <div className="space-y-4">
                   <div className="bg-primary/5 p-3 rounded-lg border border-primary/20 space-y-2">
                     <p className="text-xs font-bold text-primary flex items-center gap-1.5">
-                      <Trophy className="h-3.5 w-3.5" /> Configuration Automatique
+                      <Trophy className="h-3.5 w-3.5" /> Configuration
+                      Automatique
                     </p>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      Ce tournoi utilise le mode Assistant (Auto). Les paramètres de cette phase sont définis globalement.
+                      Ce tournoi utilise le mode Assistant (Auto). Les
+                      paramètres de cette phase sont définis globalement.
                     </p>
                   </div>
                   <div className="space-y-1.5 opacity-70 cursor-not-allowed">
-                     <Label className="text-[10px] font-bold uppercase text-muted-foreground">Type de phase</Label>
-                     <div className="flex gap-1.5">
-                        <Badge variant="outline" className="text-[10px]">{phaseType}</Badge>
-                        <Badge variant="outline" className="text-[10px]">{nodesType}</Badge>
-                     </div>
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">
+                      Type de phase
+                    </Label>
+                    <div className="flex gap-1.5">
+                      <Badge variant="outline" className="text-[10px]">
+                        {phaseType}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {nodesType}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -483,13 +621,28 @@ export function PhaseOrganizeClient({
                       Type de phase
                     </Label>
                     <div className="flex gap-2">
-                      <Badge variant={phaseType === "ROUND_ROBIN" ? "default" : "outline"} className="text-xs">
+                      <Badge
+                        variant={
+                          phaseType === "ROUND_ROBIN" ? "default" : "outline"
+                        }
+                        className="text-xs"
+                      >
                         Championnat
                       </Badge>
-                      <Badge variant={phaseType === "GROUP_STAGE" ? "default" : "outline"} className="text-xs">
+                      <Badge
+                        variant={
+                          phaseType === "GROUP_STAGE" ? "default" : "outline"
+                        }
+                        className="text-xs"
+                      >
                         Groupes
                       </Badge>
-                      <Badge variant={phaseType === "ELIMINATION" ? "default" : "outline"} className="text-xs">
+                      <Badge
+                        variant={
+                          phaseType === "ELIMINATION" ? "default" : "outline"
+                        }
+                        className="text-xs"
+                      >
                         Élimination
                       </Badge>
                     </div>
@@ -500,20 +653,28 @@ export function PhaseOrganizeClient({
                     <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                       Organisation des nœuds
                     </Label>
-                    <Select value={nodesType} onValueChange={(v: any) => setNodesType(v)}>
+                    <Select
+                      value={nodesType}
+                      onValueChange={(v: any) => setNodesType(v)}
+                    >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ROUND_ROBIN">Round Robin (Journées)</SelectItem>
-                        <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
+                        <SelectItem value="ROUND_ROBIN">
+                          Round Robin (Journées)
+                        </SelectItem>
+                        <SelectItem value="ELIMINATION">
+                          Élimination directe
+                        </SelectItem>
                         <SelectItem value="SWISS">Système Suisse</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Groupes */}
-                  {(phaseType === "GROUP_STAGE" || nodesType === "ROUND_ROBIN") && (
+                  {(phaseType === "GROUP_STAGE" ||
+                    nodesType === "ROUND_ROBIN") && (
                     <>
                       <div className="space-y-2">
                         <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -524,7 +685,10 @@ export function PhaseOrganizeClient({
                             value={[groupsCount || optimalGroupsCount]}
                             onValueChange={(v) => setGroupsCount(v[0])}
                             min={1}
-                            max={Math.min(16, Math.ceil(sourceParticipants.length / 2))}
+                            max={Math.min(
+                              16,
+                              Math.ceil(sourceParticipants.length / 2),
+                            )}
                             step={1}
                             className="flex-1"
                           />
@@ -573,7 +737,9 @@ export function PhaseOrganizeClient({
                           step={2}
                           className="flex-1"
                         />
-                        <span className="w-12 text-center font-bold text-sm">{roundsCount}</span>
+                        <span className="w-12 text-center font-bold text-sm">
+                          {roundsCount}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -586,7 +752,10 @@ export function PhaseOrganizeClient({
                         checked={isHomeAway}
                         onCheckedChange={(v) => setIsHomeAway(!!v)}
                       />
-                      <Label htmlFor="home-away" className="text-xs font-medium cursor-pointer">
+                      <Label
+                        htmlFor="home-away"
+                        className="text-xs font-medium cursor-pointer"
+                      >
                         Aller-Retour (double confrontation)
                       </Label>
                     </div>
@@ -597,17 +766,23 @@ export function PhaseOrganizeClient({
                         checked={generateMatches}
                         onCheckedChange={(v) => setGenerateMatches(!!v)}
                       />
-                      <Label htmlFor="gen-matches" className="text-xs font-medium cursor-pointer">
+                      <Label
+                        htmlFor="gen-matches"
+                        className="text-xs font-medium cursor-pointer"
+                      >
                         Générer les matches immédiatement
                       </Label>
                     </div>
                   </div>
 
                   {/* Points */}
-                  {(phaseType === "ROUND_ROBIN" || nodesType === "ROUND_ROBIN") && (
+                  {(phaseType === "ROUND_ROBIN" ||
+                    nodesType === "ROUND_ROBIN") && (
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t">
                       <div>
-                        <Label className="text-[9px] text-muted-foreground">Points/V</Label>
+                        <Label className="text-[9px] text-muted-foreground">
+                          Points/V
+                        </Label>
                         <Input
                           type="number"
                           className="h-7 text-xs"
@@ -616,7 +791,9 @@ export function PhaseOrganizeClient({
                         />
                       </div>
                       <div>
-                        <Label className="text-[9px] text-muted-foreground">Points/N</Label>
+                        <Label className="text-[9px] text-muted-foreground">
+                          Points/N
+                        </Label>
                         <Input
                           type="number"
                           className="h-7 text-xs"
@@ -625,7 +802,9 @@ export function PhaseOrganizeClient({
                         />
                       </div>
                       <div>
-                        <Label className="text-[9px] text-muted-foreground">Points/D</Label>
+                        <Label className="text-[9px] text-muted-foreground">
+                          Points/D
+                        </Label>
                         <Input
                           type="number"
                           className="h-7 text-xs"
@@ -641,7 +820,10 @@ export function PhaseOrganizeClient({
                     <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                       Méthode de seeding
                     </Label>
-                    <Select value={seedingMethod} onValueChange={(v: any) => setSeedingMethod(v)}>
+                    <Select
+                      value={seedingMethod}
+                      onValueChange={(v: any) => setSeedingMethod(v)}
+                    >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
@@ -663,19 +845,26 @@ export function PhaseOrganizeClient({
                       className="w-full gap-2 font-bold"
                       disabled={isPending || sourceParticipants.length === 0}
                     >
-                      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                      {isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="h-4 w-4" />
+                      )}
                       Générer la Structure
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-amber-500" /> Action Déconseillée en Mode Auto
+                        <AlertCircle className="h-5 w-5 text-amber-500" />{" "}
+                        Action Déconseillée en Mode Auto
                       </AlertDialogTitle>
                       <AlertDialogDescription>
-                        Cette action va écraser la structure actuelle gérée par l'Assistant. 
-                        Cela peut entraîner des incohérences dans les qualifications automatiques.
-                        <br /><br />
+                        Cette action va écraser la structure actuelle gérée par
+                        l'Assistant. Cela peut entraîner des incohérences dans
+                        les qualifications automatiques.
+                        <br />
+                        <br />
                         Voulez-vous continuer ?
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -693,16 +882,20 @@ export function PhaseOrganizeClient({
                   onClick={handleAutoGenerate}
                   disabled={isPending || sourceParticipants.length === 0}
                 >
-                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCcw className="h-4 w-4" />
+                  )}
                   Générer la Structure
                 </Button>
               )}
-              
+
               {!generateMatches && (
                 <Button
                   variant="outline"
                   className="w-full gap-2"
-                  onClick={handleGenerateMatches}
+                  onClick={handleGenerateMatchesForPhase}
                   disabled={isPending || existingGroups.length === 0}
                 >
                   <Calendar className="h-4 w-4" />
@@ -720,7 +913,9 @@ export function PhaseOrganizeClient({
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="text-2xl font-black text-primary">{sourceParticipants.length}</div>
+              <div className="text-2xl font-black text-primary">
+                {sourceParticipants.length}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Participants disponibles pour cette phase
               </p>
@@ -733,18 +928,24 @@ export function PhaseOrganizeClient({
                   <>
                     <div className="flex justify-between text-xs">
                       <span>Groupes:</span>
-                      <span className="font-medium">{serverPreview.groups.length}</span>
+                      <span className="font-medium">
+                        {serverPreview.groups?.length || 0}
+                      </span>
                     </div>
                     <div className="flex justify-between text-xs mt-1">
                       <span>Matchs estimés:</span>
-                      <span className="font-medium text-primary font-bold">{serverPreview.matchesCount}</span>
+                      <span className="font-medium text-primary font-bold">
+                        {serverPreview.matchesCount || 0}
+                      </span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-2 italic">
-                      {serverPreview.seedingNote}
+                      {serverPreview.seedingNote || "Seed: " + seedingMethod}
                     </p>
                   </>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground">Aperçu indisponible</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Aperçu indisponible
+                  </p>
                 )}
               </div>
             </CardContent>
@@ -754,29 +955,55 @@ export function PhaseOrganizeClient({
         {/* Colonne droite: Draft des groupes */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-none shadow-xl">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as any)}
+              className="w-full"
+            >
               <CardHeader className="border-b pb-0">
                 <div className="flex items-center justify-between mb-2">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <LayoutGrid className="h-4 w-4 text-primary" /> Groupes
                   </CardTitle>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={handleAddDraftGroup} className="h-8 gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddDraftGroup}
+                      className="h-8 gap-1"
+                    >
                       <Plus className="h-3 w-3" /> Nouveau groupe
                     </Button>
                     {draftGroups.length > 0 && (
-                      <Button size="sm" variant="secondary" onClick={handleDistributeParticipants} className="h-8 gap-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleDistributeParticipants}
+                        className="h-8 gap-1"
+                      >
                         <Users className="h-3 w-3" /> Distribuer
                       </Button>
                     )}
                   </div>
                 </div>
                 <TabsList className="bg-transparent gap-6 p-0 h-10 justify-start">
-                  <TabsTrigger value="draft" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2">
-                    Draft <Badge variant="secondary" className="h-5 min-w-5 px-1">{draftGroups.length}</Badge>
+                  <TabsTrigger
+                    value="draft"
+                    className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2"
+                  >
+                    Draft{" "}
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1">
+                      {draftGroups.length}
+                    </Badge>
                   </TabsTrigger>
-                  <TabsTrigger value="existing" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2">
-                    Existants <Badge variant="outline" className="h-5 min-w-5 px-1">{existingGroups.length}</Badge>
+                  <TabsTrigger
+                    value="existing"
+                    className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 h-10 gap-2"
+                  >
+                    Existants{" "}
+                    <Badge variant="outline" className="h-5 min-w-5 px-1">
+                      {existingGroups.length}
+                    </Badge>
                   </TabsTrigger>
                 </TabsList>
               </CardHeader>
@@ -785,8 +1012,12 @@ export function PhaseOrganizeClient({
                   {draftGroups.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-40">
                       <LayoutGrid className="h-12 w-12 mb-3" />
-                      <p className="text-sm font-medium">Aucun groupe dans le draft</p>
-                      <p className="text-xs">Ajoutez des groupes ou utilisez l'auto-génération</p>
+                      <p className="text-sm font-medium">
+                        Aucun groupe dans le draft
+                      </p>
+                      <p className="text-xs">
+                        Ajoutez des groupes ou utilisez l'auto-génération
+                      </p>
                     </div>
                   ) : (
                     <div className="divide-y max-h-[600px] overflow-y-auto">
@@ -796,47 +1027,94 @@ export function PhaseOrganizeClient({
                           group={group}
                           index={idx}
                           isExpanded={expandedGroup === group.id}
-                          onToggleExpand={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)}
-                          onUpdate={(updates: any) => handleUpdateDraftGroup(idx, updates)}
+                          onToggleExpand={() =>
+                            setExpandedGroup(
+                              expandedGroup === group.id ? null : group.id,
+                            )
+                          }
+                          onUpdate={(updates: any) =>
+                            handleUpdateDraftGroup(idx, updates)
+                          }
                           onRemove={() => handleRemoveDraftGroup(idx)}
-                          onAssignParticipant={(regId: string) => handleAssignParticipantToGroup(group.id, regId)}
-                          onRemoveParticipant={(regId: string) => handleRemoveParticipantFromGroup(group.id, regId)}
+                          onAssignParticipant={(regId: string) =>
+                            handleAssignParticipantToGroup(group.id, regId)
+                          }
+                          onRemoveParticipant={(regId: string) =>
+                            handleRemoveParticipantFromGroup(group.id, regId)
+                          }
                           availableParticipants={getAvailableParticipants()}
                           allParticipants={sourceParticipants}
                           getName={getName}
                           isParticipantAssigned={isParticipantAssigned}
+                          onGenerateMatches={handleGenerateMatchesForGroup}
                         />
                       ))}
                     </div>
                   )}
                 </TabsContent>
-                <TabsContent value="existing" className="m-0 focus-visible:ring-0">
+                <TabsContent
+                  value="existing"
+                  className="m-0 focus-visible:ring-0"
+                >
                   {existingGroups.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-muted-foreground opacity-40">
                       <LayoutGrid className="h-12 w-12 mb-3" />
-                      <p className="text-sm font-medium">Aucun groupe existant</p>
+                      <p className="text-sm font-medium">
+                        Aucun groupe existant
+                      </p>
                     </div>
                   ) : (
                     <div className="divide-y max-h-[600px] overflow-y-auto">
                       {existingGroups.map((group) => (
-                        <div key={group.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                        <div
+                          key={group.id}
+                          className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                        >
                           <div className="flex items-center gap-4">
                             <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
                               {group.order + 1}
                             </div>
                             <div>
-                              <div className="font-bold text-sm">{group.name}</div>
+                              <div className="font-bold text-sm">
+                                {group.name}
+                              </div>
                               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                <span>{group.participantCount || 0} participants</span>
+                                <span>
+                                  {group.participantCount || 0} participants
+                                </span>
                                 <span>{group.matchCount || 0} matchs</span>
                               </div>
                             </div>
                           </div>
-                          <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
-                            <Link href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}/nodes`}>
-                              Gérer les nœuds <ChevronRight className="h-3 w-3 ml-1" />
-                            </Link>
-                          </Button>
+                          <div className="flex gap-2">
+                            {(!group.matchCount || group.matchCount === 0) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-xs"
+                                onClick={() =>
+                                  handleGenerateMatchesForGroup(group.id)
+                                }
+                                disabled={isPending}
+                              >
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Générer
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs"
+                              asChild
+                            >
+                              <Link
+                                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}/nodes`}
+                              >
+                                Gérer les nœuds{" "}
+                                <ChevronRight className="h-3 w-3 ml-1" />
+                              </Link>
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -857,18 +1135,25 @@ export function PhaseOrganizeClient({
                       className="h-12 px-6 rounded-full shadow-2xl gap-2 font-bold"
                       disabled={isPending}
                     >
-                      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      {isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )}
                       Sauvegarder {draftGroups.length} groupe(s)
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-amber-500" /> Confirmer la Création Manuelle
+                        <AlertCircle className="h-5 w-5 text-amber-500" />{" "}
+                        Confirmer la Création Manuelle
                       </AlertDialogTitle>
                       <AlertDialogDescription>
-                        Vous allez ajouter manuellement {draftGroups.length} groupe(s) à cette phase gérée par l'Assistant. 
-                        Il est recommandé de laisser l'Assistant gérer la structure pour éviter toute erreur de qualification.
+                        Vous allez ajouter manuellement {draftGroups.length}{" "}
+                        groupe(s) à cette phase gérée par l'Assistant. Il est
+                        recommandé de laisser l'Assistant gérer la structure
+                        pour éviter toute erreur de qualification.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -886,7 +1171,11 @@ export function PhaseOrganizeClient({
                   onClick={handleSaveGroups}
                   disabled={isPending}
                 >
-                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
                   Sauvegarder {draftGroups.length} groupe(s)
                 </Button>
               )}
@@ -912,6 +1201,7 @@ function GroupDraftCard({
   allParticipants,
   getName,
   isParticipantAssigned,
+  onGenerateMatches,
 }: any) {
   const getParticipantDisplay = (regId: string) => {
     const reg = allParticipants.find((p: any) => p.id === regId);
@@ -920,10 +1210,12 @@ function GroupDraftCard({
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-      <div className={cn(
-        "transition-all",
-        isExpanded ? "bg-primary/5" : "hover:bg-muted/30"
-      )}>
+      <div
+        className={cn(
+          "transition-all",
+          isExpanded ? "bg-primary/5" : "hover:bg-muted/30",
+        )}
+      >
         <CollapsibleTrigger asChild>
           <div className="flex items-center justify-between p-4 cursor-pointer">
             <div className="flex items-center gap-3">
@@ -938,23 +1230,34 @@ function GroupDraftCard({
                   onClick={(e) => e.stopPropagation()}
                 />
                 <div className="text-[10px] text-muted-foreground">
-                  {group.participantIds.length} / {group.config.participantsPerGroup} participants
+                  {group.participantIds.length} /{" "}
+                  {group.config.participantsPerGroup} participants
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={group.config.generateMatches ? "default" : "outline"} className="text-[9px]">
+              <Badge
+                variant={group.config.generateMatches ? "default" : "outline"}
+                className="text-[9px]"
+              >
                 {group.config.generateMatches ? "Matchs ✓" : "Sans matchs"}
               </Badge>
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
-              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
             </div>
           </div>
         </CollapsibleTrigger>
@@ -968,7 +1271,11 @@ function GroupDraftCard({
               </Label>
               <div className="flex flex-wrap gap-2">
                 {group.participantIds.map((regId: string) => (
-                  <Badge key={regId} variant="secondary" className="gap-1 pr-1 h-7 text-xs">
+                  <Badge
+                    key={regId}
+                    variant="secondary"
+                    className="gap-1 pr-1 h-7 text-xs"
+                  >
                     {getParticipantDisplay(regId)}
                     <Button
                       size="icon"
@@ -1003,21 +1310,39 @@ function GroupDraftCard({
             {/* Configuration du groupe */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div>
-                <Label className="text-[9px] text-muted-foreground">Participants max</Label>
+                <Label className="text-[9px] text-muted-foreground">
+                  Participants max
+                </Label>
                 <Input
                   type="number"
                   className="h-7 text-xs"
                   value={group.config.participantsPerGroup}
-                  onChange={(e) => onUpdate({ config: { ...group.config, participantsPerGroup: parseInt(e.target.value) || 4 } })}
+                  onChange={(e) =>
+                    onUpdate({
+                      config: {
+                        ...group.config,
+                        participantsPerGroup: parseInt(e.target.value) || 4,
+                      },
+                    })
+                  }
                 />
               </div>
               <div>
-                <Label className="text-[9px] text-muted-foreground">Qualifiés</Label>
+                <Label className="text-[9px] text-muted-foreground">
+                  Qualifiés
+                </Label>
                 <Input
                   type="number"
                   className="h-7 text-xs"
                   value={group.config.advanceCount}
-                  onChange={(e) => onUpdate({ config: { ...group.config, advanceCount: parseInt(e.target.value) || 2 } })}
+                  onChange={(e) =>
+                    onUpdate({
+                      config: {
+                        ...group.config,
+                        advanceCount: parseInt(e.target.value) || 2,
+                      },
+                    })
+                  }
                 />
               </div>
             </div>
@@ -1026,29 +1351,32 @@ function GroupDraftCard({
               <Checkbox
                 id={`home-away-${group.id}`}
                 checked={group.config.isHomeAway}
-                onCheckedChange={(v) => onUpdate({ config: { ...group.config, isHomeAway: !!v } })}
+                onCheckedChange={(v) =>
+                  onUpdate({ config: { ...group.config, isHomeAway: !!v } })
+                }
               />
-              <Label htmlFor={`home-away-${group.id}`} className="text-xs cursor-pointer">
+              <Label
+                htmlFor={`home-away-${group.id}`}
+                className="text-xs cursor-pointer"
+              >
                 Aller-Retour
               </Label>
             </div>
+
+            {/* ✅ Bouton pour générer les matchs directement depuis le draft */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full mt-2 text-xs"
+              onClick={() => onGenerateMatches(group.id)}
+              disabled={group.participantIds.length < 2}
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              Générer les matchs
+            </Button>
           </div>
         </CollapsibleContent>
       </div>
     </Collapsible>
   );
-}
-
-function calculateMatchesForGroup(participantCount: number, nodesType: string, isHomeAway: boolean, roundsCount: number): number {
-  if (nodesType === "ROUND_ROBIN") {
-    const matches = (participantCount * (participantCount - 1)) / 2;
-    return isHomeAway ? matches * 2 : matches;
-  }
-  if (nodesType === "ELIMINATION") {
-    return participantCount - 1;
-  }
-  if (nodesType === "SWISS") {
-    return roundsCount * Math.floor(participantCount / 2);
-  }
-  return 0;
 }

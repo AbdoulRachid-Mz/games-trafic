@@ -1,386 +1,372 @@
-🎯 OBJECTIF
+## OBJECTIF
 
-Refactoriser et corriger toute la gestion des phases, groupes, brackets (nodes) et matches pour garantir :
+Refonte complète de l'architecture des phases de tournoi pour éliminer la double source de vérité (metadata.participants vs phaseGroupParticipants) et uniformiser la gestion des participants.
 
-Cohérence stricte entre niveaux
-Respect des configurations parent/enfant
-Gestion intelligente des participants
-Création auto + manuelle fiable
-Progression automatique contrôlée
-UI/UX réaliste (niveau plateforme esport)
+## PRINCIPE FONDAMENTAL
 
-⚠️ IMPORTANT
-Ne rien recréer inutilement → corriger, adapter et unifier l’existant
+**UN SEUL ENDROIT POUR LES PARTICIPANTS : phaseGroupParticipants**
 
-1️⃣ 🔍 ANALYSE OBLIGATOIRE
+- Toute phase, tout groupe, tout bracket node utilise `phaseGroupParticipants` comme source unique
+- `metadata.participants` est SUPPRIMÉ progressivement
+- Les bracketNodes sont TOUJOURS rattachés à un group (même pour élimination directe)
 
-Avant toute modification, analyser :
+## NOUVEAU MODÈLE
+PHASE
+└── GROUPS (TOUJOURS)
+├── participants (via phaseGroupParticipants)
+└── bracketNodes (matchs du groupe)
 
-hooks (tanstack)
-server actions
-components (forms + bulk)
-pages (edition / dashboard)
-utils (génération / logique)
+text
 
-👉 Identifier :
+### Types de groupes par phase
 
-incohérences de hiérarchie
-mauvaise récupération des participants
-absence de validation métier
-logique de génération cassée
-2️⃣ 🧩 PRINCIPE FONDAMENTAL (CRITIQUE)
-🔗 CHAQUE NIVEAU DÉPEND DU PARENT
-Niveau	Source participants
-Edition	registrations
-Phase	édition / phase précédente
-Groupe	phase
-Bracket	groupe
-Match	bracket / groupe
-⚠️ RÈGLE ABSOLUE
+| Phase Type | Group représente |
+|------------|------------------|
+| GROUP_STAGE | Groupe A, B, C |
+| ROUND_ROBIN | Groupe unique |
+| ELIMINATION | Round (1/8, 1/4, Demi, Finale) |
+| SWISS | Round dynamique |
 
-❌ INTERDIT : utiliser les participants globaux
-✅ OBLIGATOIRE : utiliser ceux du niveau courant
+## TÂCHES À RÉALISER
 
-3️⃣ ⚙️ VALIDATION PAR CONFIG PARENTE
+### PARTIE 1 : BACKEND - ACTIONS
 
-Avant toute action (create / bulk / generate) :
+#### 1.1 Créer `getPhaseContextAction`
 
-Vérifier :
-type de phase (ROUND_ROBIN / ELIMINATION)
-config (nombre de qualifiés, matches, etc.)
-nombre de participants disponibles
-limite atteinte
-🎯 COMPORTEMENT
-SI limite atteinte :
-désactiver :
-bouton ajouter
-bouton générer
-bouton bulk
-4️⃣ 🎮 CORRECTION MATCHES (CRITIQUE)
-❌ Problème actuel
-participants = "À déterminer"
-✅ Solution
+Fichier : `@/actions/phases.ts`
 
-Dans fetch matches :
+```typescript
+export async function getPhaseContextAction(phaseId: string): Promise<{
+  isFinalPhase: boolean;
+  nextPhaseId: string | null;
+  nextPhaseName: string | null;
+  phaseType: string;
+  groupsCount: number;
+  qualifiedCount: number;
+  hasPendingEntities: boolean;
+}>
+Fonction : Retourne le contexte d'une phase pour le dialogue de clôture.
 
-➡️ JOIN OBLIGATOIRE :
+1.2 Refactor organizeNextPhaseAction
+Fichier : @/actions/phases.ts - cas ELIMINATION/KNOCKOUT
 
-participant1 → registration → user/team
-participant2 → registration → user/team
-Résultat UI :
+À remplacer : appel à setupBracketPhase
 
-👉 afficher :
+Par : création de groups par round
 
-nom joueur
-avatar
-tag
-5️⃣ 🧠 LOGIQUE BRACKETS AVEC PARTICIPANTS
-Problème :
+typescript
+// Nouvelle logique pour élimination directe
+async function setupEliminationGroups(tx, editionId, phase, participantRegIds, options) {
+  const participantCount = participantRegIds.length;
+  const totalRounds = Math.ceil(Math.log2(participantCount));
+  const createdGroups = [];
+  let currentParticipants = [...participantRegIds];
 
-Pas de table participants pour brackets
+  // Mélange si demandé
+  if (options.seedingMethod === "RANDOM") {
+    currentParticipants = shuffle(currentParticipants);
+  }
 
-✅ Solution
+  for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
+    const matchesThisRound = Math.pow(2, totalRounds - roundIndex - 1);
+    const groupName = getRoundName(matchesThisRound * 2);
 
-👉 stocker participants dans :
+    // Créer le group pour ce round
+    const [group] = await tx.insert(phaseGroups).values({
+      phaseId: phase.id,
+      name: groupName,
+      order: roundIndex,
+      participantCount: roundIndex === 0 ? participantCount : matchesThisRound * 2,
+      groupType: "ELIMINATION_ROUND",
+      config: {
+        round: roundIndex + 1,
+        advanceCount: matchesThisRound,
+        isHomeAway: options.isHomeAway || false,
+        matchFormat: options.matchFormat || "BEST_OF_1",
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
 
-bracketNode.config = {
-  participants: registrationIds[]
+    createdGroups.push(group);
+
+    // Assigner les participants UNIQUEMENT au premier round
+    if (roundIndex === 0) {
+      for (const regId of currentParticipants) {
+        await tx.insert(phaseGroupParticipants).values({
+          groupId: group.id,
+          registrationId: regId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
+
+    // Créer les bracketNodes pour ce group (un par match)
+    for (let matchIdx = 0; matchIdx < matchesThisRound; matchIdx++) {
+      const p1 = roundIndex === 0 ? currentParticipants[matchIdx * 2] : null;
+      const p2 = roundIndex === 0 ? currentParticipants[matchIdx * 2 + 1] : null;
+
+      const [node] = await tx.insert(bracketNodes).values({
+        phaseId: phase.id,
+        groupId: group.id,
+        nodeCode: `${groupName.slice(0, 3).toUpperCase()}-M${matchIdx + 1}`,
+        round: roundIndex + 1,
+        matchNumber: matchIdx + 1,
+        bracketType: "UPPER",
+        order: matchIdx,
+        metadata: {
+          requiresMatch: roundIndex === 0,
+          matchFormat: options.matchFormat || "BEST_OF_1",
+          isHomeAway: options.isHomeAway || false,
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+
+      // Générer les matchs uniquement pour le premier round
+      if (roundIndex === 0 && p1 && p2 && options.generateMatches) {
+        const matchesToCreate = options.isHomeAway ? 2 : 1;
+        for (let mIdx = 0; mIdx < matchesToCreate; mIdx++) {
+          await tx.insert(matches).values({
+            editionId,
+            phaseId: phase.id,
+            groupId: group.id,
+            bracketNodeId: node.id,
+            participant1RegistrationId: mIdx === 0 ? p1 : p2,
+            participant2RegistrationId: mIdx === 0 ? p2 : p1,
+            matchCode: matchesToCreate > 1 ? `${node.nodeCode}-L${mIdx + 1}` : node.nodeCode,
+            status: "PENDING",
+            round: roundIndex + 1,
+            matchNumber: matchIdx + 1,
+            metadata: {
+              format: options.matchFormat || "BEST_OF_1",
+              leg: mIdx + 1,
+            },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      }
+    }
+
+    // Préparer les participants pour le round suivant (placeholders)
+    currentParticipants = Array(matchesThisRound).fill(null).map((_, idx) => `WINNER_R${roundIndex + 1}_M${idx + 1}`);
+  }
+
+  return createdGroups;
 }
-⚙️ Règles :
-participants viennent du groupe parent
-un joueur ne peut être que dans un seul bracket du même groupe
-✅ Génération matches :
 
-basée uniquement sur :
-
-bracket.config.participants
-6️⃣ 🎲 GÉNÉRATION MATCHES (AUTO PRIORITAIRE)
-Priorité :
-
-👉 génération depuis bracketId
-
-Types :
-aléatoire
-aller simple
-aller-retour
-Contraintes :
-pas de duplication
-équilibre des rencontres
-7️⃣ 🧩 LOGIQUE PAR FORMAT
-🟣 ROUND ROBIN
-
-Structure :
-
-Phase unique
-Journées (Day 1, Day 2…)
-Chaque journée :
-plusieurs brackets
-plusieurs matches
-🔴 ELIMINATION
-
-Structure :
-
-arbres (Upper / Lower / Final)
-🧠 Naming automatique (OBLIGATOIRE)
-Elimination :
-Round 1 → "1/16 finale"
-Round 2 → "1/8 finale"
-Quarter → "Quart de finale"
-Semi → "Demi-finale"
-Final → "Finale"
-8️⃣ 🧠 ORGANISATION D’UNE PHASE
-
-Lors de création :
-
-Vérifier phase précédente :
-
-👉 filtrer participants :
-
-tous
-qualifiés
-éliminés
-⚙️ Config :
-nombre qualifiés
-distribution automatique
-9️⃣ 🔄 PROGRESSION AUTOMATIQUE
-À chaque résultat de match :
-vérifier :
-joueur a terminé ses matches ?
-est qualifié ?
-SI OUI :
-
-➡️ ouvrir dialog :
-
-"Ce joueur est qualifié, l’envoyer à la phase suivante ?"
-
-SI CONFIRMÉ :
-
-➡️ ajout automatique dans phase suivante
-
-🔟 ✅ VALIDATION MATCH (ROLE)
-SI :
-organisateur
-co-organisateur
-
-👉 match = auto confirmé
-
-SINON :
-
-👉 système de confirmation classique
-
-11️⃣ 📊 STATUT DES NIVEAUX
-
-Ajouter boutons :
-
-✅ Terminer groupe
-✅ Terminer bracket
-✅ Terminer phase
-✅ Terminer édition
-Effets :
-lock modifications
-update standings
-update editionResults
-12️⃣ 📈 STANDINGS AVANCÉS
-Ajouter filtres dynamiques :
-par phase
-par groupe
-par bracket
-UX :
-cascade :
-sélectionner phase
-sélectionner groupe
-sélectionner bracket
-13️⃣ 🧑‍💻 DASHBOARD — NOUVELLES PAGES
-
-Ajouter :
-
-📍 /dashboard/edition/[id]/groups
-liste tous les groupes
-filtres
-📍 /dashboard/edition/[id]/brackets
-tous les nodes
-filtres avancés
-📍 /dashboard/edition/[id]/matches
-pagination
-filtres
-gestion
-📍 /dashboard/edition/[id]/matches/[matchId]
-accès :
-participant :
-saisir score
-organisateur :
-full contrôle
-14️⃣ ⚠️ COHÉRENCE BULK & FORM
-
-Tous doivent :
-
-respecter config parent
-respecter participants disponibles
-empêcher doublons
-désactiver actions si limite atteinte
-15️⃣ 🚫 RÈGLES CRITIQUES
-❌ interdit :
-joueur dans 2 brackets même groupe
-match dupliqué
-participant hors scope
-16️⃣ 🔥 AMÉLIORATIONS PROPOSÉES
-💡 Smart features :
-✅ shuffle intelligent
-✅ équilibrage auto
-✅ preview avant création
-✅ compteur dynamique
-💡 UX :
-badges (qualified / eliminated)
-progression visuelle
-loading states propres
-17️⃣ 🎯 RÉSULTAT FINAL
-
-Un système :
-
-totalement cohérent
-robuste
-scalable
-réaliste (niveau esport)
-sans bugs de logique
-
-
-==========================volet 2====================
-🎯 Objectif
-
-Ajouter :
-
-Export des données clés d’une édition
-Priorisation UX des matches (mes matches)
-Pagination propre côté matches
-Structure extensible (PDF / CSV / JSON)
-📦 1. EXPORT DES DONNÉES (Edition)
-🔍 Scope
-
-Depuis la page editionId, ajouter un bouton :
-
-Exporter les données
-Dropdown :
-Export Participants
-Export Calendrier des matches
-Export complet (optionnel)
-📊 Données à exporter
-🧑 Participants (édition)
-Nom (displayName / teamName)
-GameTag
-Statut (checked-in, éliminé, qualifié)
-Stats :
-Matches joués
-Victoires / défaites
-Points
-Position (si dispo)
-⚔️ Matches (calendrier)
-MatchCode
-Phase / Groupe / Bracket
-Participants (nom + tag)
-Score
-Statut
-Date (scheduledTime)
-Round / Match number
-⚙️ Backend (actions)
-
-Créer :
-
-export async function exportEditionParticipants(editionId: string, format: 'csv' | 'json' | 'pdf')
-export async function exportEditionMatches(editionId: string, format: 'csv' | 'json' | 'pdf')
-📁 Format recommandé
-CSV (priorité)
-Simple à télécharger
-Compatible Excel
-JSON
-Pour API / debug
-PDF (option premium UX)
-Pour partage tournoi
-🧠 Logique
-Toujours enrichir avec :
-noms participants (join registrations → members)
-contexte (phase, groupe, bracket)
-Ne jamais retourner des IDs seuls
-🎮 2. PRIORISATION “MES MATCHES”
-📍 Dans tabs matches (editionId)
-🔝 Ordre d’affichage :
-Mes matches (prioritaires)
-Autres matches
-🧠 Détection “mes matches”
-match.participant1.userId === currentUser.id
-|| match.participant2.userId === currentUser.id
-🎨 UI
-Section séparée :
-🔥 Mes matches
-- liste (max 5 ou paginé)
-
-🌍 Tous les matches
-- liste classique
-⚡ Bonus UX
-Badge :
-YOU
-Highlight card (border primary)
-📄 3. PAGINATION MATCHES
-🎯 Page /matches
-⚙️ Backend
-getMatches({
-  editionId,
-  page = 1,
-  limit = 20,
-  filters
-})
-🔁 Réponse
-{
-  data: Match[],
-  total: number,
-  page: number,
-  totalPages: number
+function getRoundName(matchCount: number): string {
+  switch (matchCount) {
+    case 2: return "Finale";
+    case 4: return "Demi-finale";
+    case 8: return "Quart de finale";
+    case 16: return "Huitième de finale";
+    case 32: return "Seizième de finale";
+    case 64: return "Trente-deuxième de finale";
+    default: return `Top ${matchCount}`;
+  }
 }
-🧠 Frontend
-Chargement par lot : 20 matches
-Boutons :
-Suivant / Précédent
-ou infinite scroll (optionnel)
-📌 Important
+1.3 Refactor markGroupCompleteAction
+Fichier : @/actions/phases.ts
 
-Toujours récupérer :
+Ajouter la propagation automatique vers le group suivant pour les phases élimination.
 
-participants (JOIN registrations → members)
-éviter “À déterminer” si data existe
-📊 4. AMÉLIORATION TAB MATCHES (editionId)
-🔁 Remplacer le vide actuel par :
-Stats rapides :
-Total matches
-Terminés
-En cours
-Liste :
-10 matches récents
-Bouton :
-Voir tous les matches
-🧠 5. COHÉRENCE GLOBALE
-⚠️ Règles
-Toujours hydrater :
-participants
-contexte (phase/group/bracket)
-Jamais afficher :
-IDs bruts
-"À déterminer" si données existent
-🚀 6. BONUS (RECOMMANDÉ)
-📥 Export depuis dashboard admin
-Export par :
-Phase
-Groupe
-Bracket
-📅 Export calendrier intelligent
+typescript
+// Dans markGroupCompleteAction, après avoir marqué les qualifiés
+if (group.groupType === "ELIMINATION_ROUND") {
+  const nextGroup = await getNextEliminationGroup(tx, group.id);
+  if (nextGroup) {
+    const qualified = await getQualifiedParticipantsForGroup(tx, group.id);
+    for (const q of qualified) {
+      await tx.insert(phaseGroupParticipants).values({
+        groupId: nextGroup.id,
+        registrationId: q.registrationId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  }
+}
+1.4 Refactor markBracketNodeCompleteAction
+Fichier : @/actions/phases.ts
 
-Tri par :
+Supprimer la logique de propagation vers parentNode
 
-ORDER BY scheduledTime ASC
-📊 Export standings
-Ajouter aussi :
-classement complet (édition / groupe / bracket)
-✅ RÉSULTAT ATTENDU
-Export pro (type e-sport platform)
-UX claire pour les joueurs
-Matches lisibles et priorisés
-Pagination performante
-Données exploitables (Excel / partage)
+Remplacer par : mise à jour des stats + si tous les nodes du group sont terminés → marquer group comme complet
+
+typescript
+// Après avoir déterminé le winnerId
+// 1. Mettre à jour le bracketNode
+await tx.update(bracketNodes).set({
+  isCompleted: true,
+  winnerRegistrationId: winnerId,
+  updatedAt: new Date(),
+}).where(eq(bracketNodes.id, nodeId));
+
+// 2. Vérifier si tous les nodes du group sont terminés
+const groupNodes = await tx.query.bracketNodes.findMany({
+  where: and(eq(bracketNodes.groupId, node.groupId), eq(bracketNodes.isDeleted, false)),
+});
+const allCompleted = groupNodes.every(n => n.isCompleted);
+
+if (allCompleted && node.groupId) {
+  // Marquer le group comme complet
+  await markGroupCompleteAction(node.groupId);
+}
+1.5 Refactor getQualifiedParticipantsPreviewAction
+Fichier : @/actions/phases.ts
+
+Supprimer le cas "CASE BRACKET"
+
+Toujours utiliser les groups
+
+typescript
+// Supprimer ce bloc :
+else if (phase.bracketNodes && phase.bracketNodes.length > 0) { ... }
+
+// Remplacer par une logique unifiée basée sur les groups
+1.6 Supprimer generateBracketMatches
+Fichier : @/actions/phases.ts
+
+Marquer comme @deprecated
+
+Rediriger vers generateMatchesAction
+
+typescript
+export async function generateBracketMatches(bracketNodeId: string, config?: any) {
+  console.warn("generateBracketMatches is deprecated, use generateMatchesAction instead");
+  return generateMatchesAction("NODE", bracketNodeId, config);
+}
+1.7 Créer getGroupQualifiedPreviewAction
+Fichier : @/actions/phases.ts
+
+typescript
+export async function getGroupQualifiedPreviewAction(groupId: string): Promise<{
+  success: boolean;
+  qualified: Array<{ registrationId: string; name: string; position: number }>;
+}>
+PARTIE 2 : FRONTEND - COMPOSANTS
+2.1 Refactor MarkCompleteDialog
+Fichier : @/components/pages/tournaments/edition-detail/mark-complete-dialog.tsx
+
+Remplacer isLastPhase (prop) par appel à getPhaseContextAction
+
+Supprimer isLastPhase des props
+
+typescript
+// Avant :
+const isFinalPhase = type === 'PHASE' && isLastPhase;
+
+// Après :
+const { data: context } = useQuery({
+  queryKey: ['phase-context', id],
+  queryFn: () => getPhaseContextAction(id),
+  enabled: type === 'PHASE' && !!id && isOpen,
+});
+const isFinalPhase = !context?.nextPhaseId;
+2.2 Refactor BracketNodeMatchesOrganizeClient
+Fichier : @/components/pages/tournaments/edition-detail/bracket-node-matches-organize-client.tsx
+
+Remplacer metadata.participants par phaseGroupParticipants
+
+Remplacer participant1RegistrationId/participant2RegistrationId par les vrais IDs
+
+Supprimer generateBracketMatches au profit de generateMatchesAction
+
+2.3 Refactor GenerateGroupMatchesDialog
+Fichier : @/components/pages/tournaments/edition-detail/generate-group-matches-dialog.tsx
+
+Simplifier : ne génère que les matchs pour un group
+
+Utiliser generateMatchesAction("GROUP", groupId, options)
+
+Supprimer la logique de sélection de brackets (c'est l'affaire du backend)
+
+2.4 Refactor GroupDetailClient
+Fichier : app/.../groups/[groupId]/GroupDetailClient.tsx
+
+Remplacer l'appel à organizeNextPhaseAction par generateMatchesAction
+
+Ajouter un onglet "Round" pour l'élimination directe
+
+2.5 Refactor PhaseDetailClient
+Fichier : app/.../phases/[phaseId]/phase-detail-client.tsx
+
+Remplacer l'appel à organizeNextPhaseAction pour les groupes par generateMatchesAction
+
+2.6 Refactor ClientBracketNodeDetailPage
+Fichier : app/.../brackets/[bracketId]/client-page.tsx
+
+Remplacer nodeParticipants (metadata) par requête sur phaseGroupParticipants
+
+Remplacer generateBracketMatches par generateMatchesAction
+
+2.7 bloquer les pages obsolètes
+group-nodes-organize/page.tsx (si GroupNodesOrganizeClient n'existe pas ou est obsolète)
+
+brackets/[bracketId]/organize/page.tsx (fusionner avec la page detail)
+
+PARTIE 3 : LIBRAIRIES
+3.1 Refactor structure-engine.ts
+Supprimer setupBracketPhase
+
+Utiliser setupEliminationGroups à la place
+
+3.2 Refactor generators.ts
+Supprimer setupBracketPhase
+
+Ajouter setupEliminationGroups
+
+3.3 Supprimer propagation-service.ts
+Logique déplacée dans markGroupCompleteAction
+
+3.4 Supprimer tree.engine.ts
+Plus nécessaire avec la nouvelle architecture
+
+PARTIE 4 : TYPES
+4.1 Mettre à jour les types
+Fichier : @/database/schema.ts
+
+typescript
+// Ajouter groupType = "ELIMINATION_ROUND"
+export const phaseGroups = pgTable('phase_groups', {
+  // ...
+  groupType: text('group_type').default('ROUND_ROBIN'), // Ajouter 'ELIMINATION_ROUND'
+  // ...
+});
+PARTIE 5 : MIGRATION DB
+5.1 Créer une migration
+sql
+-- Ajouter la valeur 'ELIMINATION_ROUND' à l'enum group_type
+ALTER TYPE group_type ADD VALUE IF NOT EXISTS 'ELIMINATION_ROUND';
+
+-- Pour les brackets nodes existants en élimination, créer les groups manquants
+-- (script à écrire selon les données existantes)
+CONTRAINTES
+Backward compatibility : Les anciennes données doivent continuer à fonctionner
+
+Pas de regression : Les fonctionnalités existantes (group_stage, round_robin, swiss) ne sont pas cassées
+
+Progressive : On peut déployer par phase (d'abord backend, puis front)
+
+Typage strict : Toutes les nouvelles fonctions ont des types TypeScript explicites
+
+LIVRABLES ATTENDUS
+Code modifié des fichiers listés
+
+Nouvelles migrations DB
+
+Mise à jour des types
+
+Suppression des fichiers obsolètes
+
+Documentation des breaking changes (si applicable)
+
+COMMENCER PAR
+Refactor de organizeNextPhaseAction (cas ELIMINATION)
+
+Refactor de markGroupCompleteAction (propagation)
+
+Refactor de MarkCompleteDialog

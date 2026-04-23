@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
@@ -18,12 +18,20 @@ import {
   MoreVertical,
   Edit,
   Trash2,
+  ChevronLeft,
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
-import useEmblaCarousel from "embla-carousel-react";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +45,7 @@ import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
 import { EditionJoinDialog } from "./edition-join-dialog";
+import { EditionPaymentDialog } from "./edition-payment-dialog";
 import { InteractionButton } from "@/components/shared/interaction-button";
 
 interface EditionDetailHeaderProps {
@@ -68,19 +77,26 @@ export function EditionDetailHeader({
   isRegistered,
   recentMatches = [],
 }: EditionDetailHeaderProps) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-  const { isMobile } = useScreenSize();
-
-  // Autoplay functionality: 15 seconds
-  React.useEffect(() => {
-    if (!emblaApi) return;
-    const intervalId = setInterval(() => {
-      emblaApi.scrollNext();
-    }, 15000);
-    return () => clearInterval(intervalId);
-  }, [emblaApi]);
+  const [api, setApi] = useState<CarouselApi>();
+  const { isMobile, screenSize } = useScreenSize();
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
+
+  // Autoplay: 15 secondes
+  useEffect(() => {
+    if (!api) return;
+    const interval = setInterval(() => {
+      api.scrollNext();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [api]);
+
+  // Nombre d'items visibles selon la taille d'écran
+  const getItemsPerView = () => {
+    if (screenSize.width < 640) return 1;
+    if (screenSize.width < 1024) return 2;
+    return 3;
+  };
 
   const dropdownData = [
     {
@@ -172,15 +188,6 @@ export function EditionDetailHeader({
     return type === "ONLINE" ? "🌐" : "📍";
   };
 
-  const handleDelete = () => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette édition ?")) {
-      deleteMutation.mutate(edition.id, {
-        onSuccess: () => {
-          router.push(`/tournaments/${tournament.id}`);
-        },
-      });
-    }
-  };
   const visibleActions = dropdownData.filter(
     (item) => !item.requireOrganizer || isOrganizer,
   );
@@ -189,192 +196,202 @@ export function EditionDetailHeader({
 
   return (
     <div className="relative border-b bg-gradient-to-b from-background via-background to-muted/10">
-      {/* Bannière Carousel */}
-      <div
-        className="relative h-64 md:h-80 overflow-hidden bg-muted/20"
-        ref={emblaRef}
-      >
-        <div className="flex h-full">
-          {/* Slide 1: Cover Image */}
-          <div className="flex-[0_0_100%] min-w-0 relative h-full group">
-            {tournament.coverImage ? (
-              <Image
-                src={tournament.coverImage}
-                alt={tournament.name}
-                fill
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-                priority
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 md:left-24 md:translate-x-0 hidden md:block">
-              <Badge className="bg-primary/80 backdrop-blur-md border-primary/20 text-white px-4 py-1.5 uppercase tracking-[0.2em] text-[10px] font-black italic">
-                Official Cover
-              </Badge>
-            </div>
-          </div>
-
-          {/* Matches Slides */}
-          {recentMatches.map((match, idx) => (
-            <Link
-              key={match.id}
-              href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
-              className="flex-[0_0_100%] lg:flex-[0_0_50%] xl:flex-[0_0_33.333%] min-w-0 relative h-full px-2 py-4"
-            >
-              <div className="absolute inset-0 pointer-events-none">
-                {tournament.coverImage && (
+      {/* Bannière Carousel avec shadcn/ui */}
+      <div className="relative w-full overflow-hidden">
+        <Carousel
+          setApi={setApi}
+          opts={{
+            loop: true,
+            align: "start",
+            slidesToScroll: 1,
+          }}
+          className="w-full"
+        >
+          <CarouselContent>
+            {/* Slide 1: Cover Image */}
+            <CarouselItem className="relative h-48 sm:h-64 md:h-80 lg:h-96">
+              <div className="relative w-full h-full group">
+                {tournament.coverImage ? (
                   <Image
                     src={tournament.coverImage}
-                    alt="match"
+                    alt={tournament.name}
                     fill
-                    className="object-cover opacity-10 blur-sm scale-110"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    priority
                   />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
                 )}
-              </div>
-
-              <div className="h-full w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden group/card hover:border-primary/30 transition-colors">
-                {/* Decorative background circle */}
-                <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover/card:bg-primary/20 transition-colors" />
-
-                <div className="flex items-center justify-between mb-4">
-                  <Badge
-                    variant="outline"
-                    className="bg-background/20 backdrop-blur-sm border-white/10 text-[10px] uppercase font-bold tracking-widest text-white/70"
-                  >
-                    {match.phase?.name || "Match"}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+                <div className="absolute bottom-3 left-4 md:bottom-6 md:left-8">
+                  <Badge className="bg-primary/80 backdrop-blur-md border-primary/20 text-white px-2 py-0.5 md:px-3 md:py-1 uppercase tracking-[0.1em] text-[8px] md:text-[10px] font-black italic">
+                    Édition #{edition.editionNumber}
                   </Badge>
-                  <div className="flex items-center gap-1.5 text-[10px] text-white/50 font-medium italic">
-                    <Clock className="h-3 w-3" />
-                    {match.status === "COMPLETED"
-                      ? "Terminé"
-                      : format(
-                          new Date(match.scheduledTime || match.createdAt),
-                          "HH:mm",
-                          { locale: fr },
-                        )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-6 md:gap-8 flex-1">
-                  {/* Participant 1 */}
-                  <div className="flex flex-col items-center gap-3 flex-1 text-center">
-                    <div className="relative">
-                      <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-muted/20 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform relative">
-                        {match.participant1?.member?.team?.logo ||
-                        match.participant1?.member?.user?.profileImage ? (
-                          <Image
-                            src={
-                              match.participant1?.member?.team?.logo ||
-                              match.participant1?.member?.user?.profileImage ||
-                              match.participant1?.member?.user?.image ||
-                              "/icons/avatar-500.png"
-                            }
-                            alt="participant1"
-                            fill
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-white/20 font-black">?</div>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-xs md:text-sm font-bold text-white line-clamp-1 truncate w-full uppercase tracking-tighter">
-                      {match.participant1?.member?.team?.name ||
-                        match.participant1?.member?.user?.username ||
-                        "À déterminer"}
-                    </span>
-                  </div>
-
-                  {/* Score / VS */}
-                  <div className="flex flex-col items-center gap-1">
-                    {match.status === "COMPLETED" ? (
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "text-2xl md:text-3xl font-black italic",
-                            (match.score1 ?? 0) > (match.score2 ?? 0)
-                              ? "text-primary shadow-primary/20"
-                              : "text-white/90",
-                          )}
-                        >
-                          {match.score1 ?? 0}
-                        </span>
-                        <span className="text-white/20 font-black">-</span>
-                        <span
-                          className={cn(
-                            "text-2xl md:text-3xl font-black italic",
-                            (match.score2 ?? 0) > (match.score1 ?? 0)
-                              ? "text-primary shadow-primary/20"
-                              : "text-white/90",
-                          )}
-                        >
-                          {match.score2 ?? 0}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="h-8 w-12 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
-                        <span className="text-xs font-black italic text-primary">
-                          VS
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Participant 2 */}
-                  <div className="flex flex-col items-center gap-3 flex-1 text-center">
-                    <div className="relative">
-                      <div className="h-12 w-12 md:h-16 md:w-16 rounded-full bg-muted/20 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform relative">
-                        {match.participant2?.member?.team?.logo ||
-                        match.participant2?.member?.user?.profileImage ? (
-                          <Image
-                            src={
-                              match.participant2?.member?.team?.logo ||
-                              match.participant2?.member?.user?.profileImage ||
-                              match.participant2?.member?.user?.image ||
-                              "/icons/avatar-500.png"
-                            }
-                            alt=""
-                            fill
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-white/20 font-black">?</div>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-xs md:text-sm font-bold text-white line-clamp-1 truncate w-full uppercase tracking-tighter">
-                      {match.participant2?.member?.team?.name ||
-                        match.participant2?.member?.user?.username ||
-                        "À déterminer"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-white/5 flex justify-center">
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="text-[10px] text-white/30 hover:text-primary h-auto p-0 uppercase font-black"
-                    asChild
-                  >
-                    <Link
-                      href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
-                    >
-                      Voir les détails <ChevronRight className="h-3 w-3 ml-1" />
-                    </Link>
-                  </Button>
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
+            </CarouselItem>
+
+            {/* Slides des matchs récents */}
+            {recentMatches.map((match, idx) => (
+              <CarouselItem
+                key={match.id}
+                className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4"
+              >
+                <Link
+                  href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
+                  className="block h-full"
+                >
+                  <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card">
+                    {/* Background avec overlay */}
+                    <div className="absolute inset-0">
+                      {tournament.coverImage && (
+                        <Image
+                          src={tournament.coverImage}
+                          alt="background"
+                          fill
+                          className="object-cover opacity-20 blur-sm scale-110"
+                        />
+                      )}
+                    </div>
+                    
+                    {/* Contenu de la carte */}
+                    <div className="relative h-full w-full bg-gradient-to-br from-background/95 via-background/90 to-primary/5 backdrop-blur-sm p-3 md:p-5 flex flex-col justify-between">
+                      {/* Header de la carte */}
+                      <div className="flex items-center justify-between mb-2 md:mb-4">
+                        <Badge
+                          variant="outline"
+                          className="bg-background/50 backdrop-blur-sm border-white/10 text-[8px] md:text-[10px] uppercase font-bold tracking-wider text-muted-foreground"
+                        >
+                          {match.phase?.name || "Match"}
+                        </Badge>
+                        <div className="flex items-center gap-1 text-[8px] md:text-[10px] text-muted-foreground">
+                          <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                          {match.status === "COMPLETED"
+                            ? "Terminé"
+                            : match.scheduledTime
+                              ? format(new Date(match.scheduledTime), "HH:mm", { locale: fr })
+                              : "À planifier"}
+                        </div>
+                      </div>
+
+                      {/* Participants et score */}
+                      <div className="flex items-center justify-center gap-2 md:gap-4 flex-1">
+                        {/* Participant 1 */}
+                        <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
+                          <div className="relative">
+                            <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
+                              {match.participant1?.member?.team?.logo ||
+                              match.participant1?.member?.user?.profileImage ? (
+                                <Image
+                                  src={
+                                    match.participant1?.member?.team?.logo ||
+                                    match.participant1?.member?.user?.profileImage ||
+                                    match.participant1?.member?.user?.image ||
+                                    "/icons/avatar-500.png"
+                                  }
+                                  alt="participant1"
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="text-white/20 font-black text-xs md:text-base">?</div>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
+                            {match.participant1?.member?.team?.name ||
+                              match.participant1?.member?.user?.username ||
+                              "TBD"}
+                          </span>
+                        </div>
+
+                        {/* Score / VS */}
+                        <div className="flex flex-col items-center">
+                          {match.status === "COMPLETED" ? (
+                            <div className="flex items-center gap-1 md:gap-2">
+                              <span
+                                className={cn(
+                                  "text-lg md:text-2xl font-black italic",
+                                  (match.score1 ?? 0) > (match.score2 ?? 0)
+                                    ? "text-primary"
+                                    : "text-foreground",
+                                )}
+                              >
+                                {match.score1 ?? 0}
+                              </span>
+                              <span className="text-muted-foreground text-xs md:text-sm">-</span>
+                              <span
+                                className={cn(
+                                  "text-lg md:text-2xl font-black italic",
+                                  (match.score2 ?? 0) > (match.score1 ?? 0)
+                                    ? "text-primary"
+                                    : "text-foreground",
+                                )}
+                              >
+                                {match.score2 ?? 0}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="h-6 w-10 md:h-8 md:w-14 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
+                              <span className="text-[10px] md:text-xs font-black italic text-primary">
+                                VS
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Participant 2 */}
+                        <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
+                          <div className="relative">
+                            <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
+                              {match.participant2?.member?.team?.logo ||
+                              match.participant2?.member?.user?.profileImage ? (
+                                <Image
+                                  src={
+                                    match.participant2?.member?.team?.logo ||
+                                    match.participant2?.member?.user?.profileImage ||
+                                    match.participant2?.member?.user?.image ||
+                                    "/icons/avatar-500.png"
+                                  }
+                                  alt="participant2"
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="text-white/20 font-black text-xs md:text-base">?</div>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
+                            {match.participant2?.member?.team?.name ||
+                              match.participant2?.member?.user?.username ||
+                              "TBD"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-2 md:mt-4 pt-1 md:pt-2 border-t border-white/5 flex justify-center">
+                        <span className="text-[8px] md:text-[9px] text-muted-foreground/60 uppercase tracking-wider">
+                          Cliquez pour voir les détails
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          
+          {/* Navigation buttons */}
+          <CarouselPrevious className="left-2 md:left-4 h-7 w-7 md:h-8 md:w-8 bg-background/80 backdrop-blur-sm border-white/20" />
+          <CarouselNext className="right-2 md:right-4 h-7 w-7 md:h-8 md:w-8 bg-background/80 backdrop-blur-sm border-white/20" />
+        </Carousel>
       </div>
 
       {/* Informations */}
-      <div className="container mx-auto px-2 relative -mt-16">
-        <div className="flex flex-col lg:flex-row items-start lg:items-end gap-4">
+      <div className="container mx-auto px-3 md:px-4 relative -mt-8 md:-mt-12 z-10">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 md:gap-4">
           {/* Logo/Badge */}
           <motion.div
             initial={{ scale: 0 }}
@@ -382,7 +399,7 @@ export function EditionDetailHeader({
             className="relative"
           >
             <div className="relative">
-              <div className="w-24 relative h-24 md:w-28 md:h-28 rounded-xl border-4 border-background bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-2xl">
+              <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-xl border-4 border-background bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-2xl overflow-hidden">
                 <Image
                   src={
                     edition.tournament?.profileImage ??
@@ -390,44 +407,39 @@ export function EditionDetailHeader({
                   }
                   alt={edition.name || "edition image profile"}
                   fill
-                  className="h-full w-full object-cover"
+                  className="object-cover"
                 />
-                {/* <Trophy className="h-12 w-12 md:h-14 md:w-14 text-primary" /> */}
               </div>
-
-              {/* Statut */}
               <div className="absolute -bottom-2 -right-2">
-                <Badge className={getStatusColor(edition.status || "UPCOMING")}>
+                <Badge className={cn(getStatusColor(edition.status || "UPCOMING"), "text-[8px] md:text-[10px] px-1.5 py-0 md:px-2 md:py-0.5")}>
                   {getStatusLabel(edition.status || "UPCOMING")}
                 </Badge>
               </div>
             </div>
           </motion.div>
 
-          {/* Informations */}
+          {/* Infos */}
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1 md:mb-2">
               <Typography
-                variant="h1"
+                variant="h2"
                 weight="bold"
-                className="text-2xl md:text-4xl"
+                className="text-xl md:text-2xl lg:text-3xl"
               >
                 {edition.name || `Édition #${edition.editionNumber}`}
               </Typography>
-
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="gap-1">
-                  <span className="text-lg">
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant="outline" className="gap-0.5 text-[9px] md:text-xs">
+                  <span className="text-xs md:text-sm">
                     {getLocationIcon(edition.locationType || "ONLINE")}
                   </span>
-                  {edition.locationType === "ONLINE"
-                    ? "En ligne"
-                    : "Présentiel"}
+                  <span className="hidden sm:inline ml-0.5">
+                    {edition.locationType === "ONLINE" ? "En ligne" : "Présentiel"}
+                  </span>
                 </Badge>
-
                 {edition.entryFee && Number(edition.entryFee) > 0 && (
-                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 gap-1">
-                    <Trophy className="h-3 w-3" />
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 gap-0.5 text-[9px] md:text-xs">
+                    <Trophy className="h-2.5 w-2.5 md:h-3 md:w-3" />
                     {edition.entryFee} {edition.prizeCurrency || "GTC"}
                   </Badge>
                 )}
@@ -436,24 +448,24 @@ export function EditionDetailHeader({
 
             {edition.tagline && (
               <Typography
-                variant="body-lg"
-                className="max-w-3xl mb-4 text-muted-foreground"
+                variant="body-sm"
+                className="max-w-2xl mb-2 md:mb-3 text-muted-foreground text-xs md:text-sm"
               >
                 {edition.tagline}
               </Typography>
             )}
 
-            <div className="flex flex-wrap gap-4 md:gap-8 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
+            <div className="flex flex-wrap gap-3 md:gap-6 text-xs md:text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
                 <span>
-                  {format(new Date(edition.startDate), "d MMMM yyyy", {
+                  {format(new Date(edition.startDate), "d MMM yyyy", {
                     locale: fr,
                   })}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
+              <div className="flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
                 <span>
                   {edition.registrations?.length || 0} /{" "}
                   {edition.maxParticipants} participants
@@ -462,29 +474,30 @@ export function EditionDetailHeader({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center max-md:my-2 max-md:w-full gap-3">
-            {primaryActions.map((action, index) => (
-              <Button
-                key={index}
-                variant="default"
-                size="sm"
-                onClick={action.onClick}
-                disabled={action.disabled}
-                className="gap-2 flex-1"
-              >
-                {action.icon && <action.icon className="h-4 w-4" />}
-                {action.label}
-              </Button>
-            ))}
+          {/* Actions */}
+          <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
+            <div className="flex-1 sm:flex-initial flex gap-2">
+              {primaryActions.map((action, index) => (
+                <Button
+                  key={index}
+                  variant="default"
+                  size="sm"
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                  className="gap-1.5 text-xs flex-1 sm:flex-initial"
+                >
+                  {action.icon && <action.icon className="h-3.5 w-3.5" />}
+                  <span className="hidden xs:inline">{action.label}</span>
+                </Button>
+              ))}
+            </div>
             {secondaryActions.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="icon" className="h-8 w-8">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-
                 <DropdownMenuContent align="end">
                   {secondaryActions.map((action, index) => (
                     <DropdownMenuItem
@@ -493,9 +506,10 @@ export function EditionDetailHeader({
                       disabled={action.disabled}
                       className={cn(
                         action.variant === "destructive" && "text-destructive",
+                        "text-xs",
                       )}
                     >
-                      {action.icon && <action.icon className="h-4 w-4 mr-2" />}
+                      {action.icon && <action.icon className="h-3.5 w-3.5 mr-2" />}
                       {action.label}
                     </DropdownMenuItem>
                   ))}

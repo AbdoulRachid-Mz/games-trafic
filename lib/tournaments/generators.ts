@@ -251,6 +251,7 @@ export async function setupBracketPhase(
   participantRegIds: string[],
   options: GeneratorOptions
 ) {
+  console.warn("[DEPRECATED] setupBracketPhase is deprecated. Use setupEliminationGroups instead.");
   const workingRegIds = [...participantRegIds];
   const participantCount = workingRegIds.length;
   

@@ -2,9 +2,15 @@ import { generateEliminationMatches } from "./match.generator";
 import { Bracket, BracketNode, MatchType, Participant } from "./types";
 import { generateId, shuffle } from "./utils";
 
+/**
+ * @deprecated Utilisez setupEliminationGroups dans phases.ts à la place
+ * Cette fonction est conservée pour compatibilité avec le mode MANUAL.
+ */
 export function generateSingleEliminationBracket(
   participants: Participant[]
 ): Bracket {
+  console.warn("[DEPRECATED] generateSingleEliminationBracket is deprecated. Use setupEliminationGroups instead.");
+  
   const shuffled = shuffle(participants);
   const nodes: BracketNode[] = [];
 
