@@ -28,6 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { fireConfettiPreset } from "@/utils/confetti";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 interface MarkCompleteDialogProps {
   type: 'PHASE' | 'GROUP' | 'BRACKET_NODE';
@@ -63,9 +64,11 @@ export function MarkCompleteDialog({
   const [seedMethod, setSeedMethod] = useState<'RANDOM' | 'ORDERED'>('RANDOM');
   
   // Preview et sélection des qualifiés
-  const [qualifiedPreview, setQualifiedPreview] = useState<Array<{ id: string; name: string; groupId: string; position?: number | null }>>([]);
+  const [qualifiedPreview, setQualifiedPreview] = useState<Array<{ id: string; name: string; groupId: string; position?: number | null; image?: string; email?: string; phone?: string }>>([]);
   const [selectedQualifiedIds, setSelectedQualifiedIds] = useState<string[]>([]);
   const [showPreviewStep, setShowPreviewStep] = useState(false);
+  const [showWinnerStep, setShowWinnerStep] = useState(false);
+  const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null);
   
   // Infos groupe pour les groupes d'élimination
   const [group, setGroup] = useState<any>(null);
@@ -170,12 +173,55 @@ export function MarkCompleteDialog({
       return;
     }
 
+    if (showWinnerStep) {
+      if (!selectedWinnerId) {
+        toast.error("Veuillez sélectionner un vainqueur.");
+        return;
+      }
+
+      startTransition(async () => {
+        try {
+          const winner = qualifiedPreview.find(p => p.id === selectedWinnerId);
+          if (!winner) throw new Error("Vainqueur introuvable");
+
+          const winnerMetadata = {
+            id: winner.id,
+            username: winner.name,
+            image: winner.image,
+            email: winner.email,
+            phone: winner.phone,
+          };
+
+          const res = await designateEditionWinnerAction(phaseContext?.editionId || id, winner.id, winnerMetadata);
+          
+          if (res.success) {
+            fireConfettiPreset("success");
+            toast.success(`Félicitations au vainqueur : ${winner.name} !`, {
+              icon: <Trophy className="h-4 w-4 text-yellow-500" />,
+              duration: 10000,
+            });
+            handleClose();
+            router.refresh();
+          } else {
+            toast.error(res.error || "Erreur lors de la désignation du vainqueur");
+          }
+        } catch (error: any) {
+          toast.error(error.message || "Une erreur est survenue");
+        }
+      });
+      return;
+    }
+
     startTransition(async () => {
       try {
         let markResult: any;
         
         if (type === 'GROUP') {
-          markResult = await markGroupCompleteAction(id);
+          markResult = await markGroupCompleteAction(id, {
+            seedingMethod: seedMethod === "ORDERED" ? "SEQUENTIAL" : seedMethod,
+            isHomeAway: isHomeAway,
+            matchFormat: matchFormat,
+          });
         } else if (type === 'PHASE') {
           markResult = await markPhaseCompleteAction(id);
         } else if (type === 'BRACKET_NODE') {
@@ -217,66 +263,30 @@ export function MarkCompleteDialog({
           try {
             const previewRes = await getQualifiedParticipantsPreviewAction(id);
             if (previewRes.success && previewRes.qualified && previewRes.qualified.length > 0) {
-              const winner = previewRes.qualified[0];
-              
-              const winnerMetadata = {
-                id: winner.id,
-                username: winner.name,
-                image: winner.image,
-                email: winner.email,
-                phone: winner.phone,
-              };
-
-              await designateEditionWinnerAction(markResult.editionId || id, winner.id, winnerMetadata);
-              
-              fireConfettiPreset("success");
-              toast.success(`Félicitations au vainqueur : ${winner.name} !`, {
-                icon: <Trophy className="h-4 w-4 text-yellow-500" />,
-                duration: 10000,
-              });
+              setQualifiedPreview(previewRes.qualified);
+              setSelectedWinnerId(previewRes.qualified[0].id);
+              setShowWinnerStep(true);
+              return; // On s'arrête ici pour laisser l'utilisateur confirmer le gagnant
+            } else {
+              // Si pas de preview possible, on termine quand même
+              toast.info("Phase finale terminée, mais impossible de détecter automatiquement le vainqueur.");
+              handleClose();
+              router.refresh();
             }
           } catch (winnerErr) {
-            console.error("Error designating winner:", winnerErr);
+            console.error("Error preparing winner selection:", winnerErr);
+            handleClose();
+            router.refresh();
           }
         }
 
         // ============================================================
-        // CAS 3: GROUPE D'ÉLIMINATION → organiser le round suivant
+        // CAS 3: GROUPE D'ÉLIMINATION → Géré par markGroupCompleteAction
         // ============================================================
         if (type === 'GROUP' && isEliminationPhase && markResult?.success) {
-          const phaseToOrganize = phaseIdForGroup || group?.phaseId;
-          
-          if (phaseToOrganize) {
-            const groupsInPhase = await getPhaseGroups({
-              filters: { phaseId: phaseToOrganize },
-              options: { sortBy: "order", sortOrder: "asc" },
-              pagination: { page: 1, limit: 100 },
-            });
-            
-            const currentGroupOrder = group?.order;
-            const nextGroup = groupsInPhase.data.find((g: any) => g.order === currentGroupOrder + 1);
-            
-            if (nextGroup) {
-              // Récupérer les participants qualifiés depuis les résultats du groupe
-              const qualifiedIds = selectedQualifiedIds.length > 0 
-                ? selectedQualifiedIds 
-                : markResult.qualifiedIds || [];
-              
-              // Utiliser generateMatchesAction pour générer les matchs du round suivant
-              const generateResult = await generateMatchesAction("GROUP", nextGroup.id, {
-                clearExisting: false,
-                seedingMethod: seedMethod,
-                isHomeAway: isHomeAway,
-                matchFormat: matchFormat,
-              });
-              
-              if (generateResult.success) {
-                toast.success(`Round "${nextGroup.name}" organisé avec succès !`);
-              } else {
-                toast.warning(`Groupe terminé mais erreur lors de l'organisation du round suivant: ${generateResult.error}`);
-              }
-            }
-          }
+           if (markResult.propagatedCount > 0) {
+             toast.success(`${markResult.propagatedCount} participants propagés au round suivant.`);
+           }
         }
 
         setIsOpen(false);
@@ -606,28 +616,112 @@ export function MarkCompleteDialog({
         </>
       )}
 
+      {/* Étape Vainqueur */}
+      {showWinnerStep && (
+        <div className="space-y-6 py-4">
+          <div className="flex flex-col items-center justify-center text-center space-y-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-yellow-500/20 blur-3xl rounded-full" />
+              <Trophy className="h-20 w-20 text-yellow-500 relative animate-bounce" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-black uppercase italic tracking-tighter">
+                Désignation du Champion
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Confirmez le vainqueur final de cette édition.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Sélectionnez le vainqueur
+            </Label>
+            <RadioGroup
+              value={selectedWinnerId || ""}
+              onValueChange={setSelectedWinnerId}
+              className="grid grid-cols-1 gap-2"
+            >
+              {qualifiedPreview.slice(0, 4).map((p) => (
+                <div 
+                  key={p.id}
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer group",
+                    selectedWinnerId === p.id 
+                      ? "border-yellow-500 bg-yellow-500/5 shadow-lg shadow-yellow-500/10" 
+                      : "border-muted hover:border-muted-foreground/30 hover:bg-muted/30"
+                  )}
+                  onClick={() => setSelectedWinnerId(p.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <RadioGroupItem value={p.id} id={p.id} className="sr-only" />
+                    <div className="h-10 w-10 rounded-full bg-muted overflow-hidden border-2 border-background">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary font-bold">
+                          {p.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{p.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                        {p.position === 1 ? "Premier (Suggéré)" : `Position #${p.position}`}
+                      </p>
+                    </div>
+                  </div>
+                  {selectedWinnerId === p.id && (
+                    <Trophy className="h-5 w-5 text-yellow-500" />
+                  )}
+                </div>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex gap-3 items-start">
+            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900/80 dark:text-amber-200/80 space-y-1">
+              <p className="font-bold">Attention</p>
+              <p>La désignation du vainqueur clôturera officiellement l&apos;édition. Cette action sera visible par tous les membres.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Boutons */}
       <div className="flex justify-end gap-2 pt-2 sticky bottom-0 bg-background">
         <Button variant="outline" disabled={isProcessing} onClick={() => {
-          if (showPreviewStep) setShowPreviewStep(false);
+          if (showWinnerStep) setShowWinnerStep(false);
+          else if (showPreviewStep) setShowPreviewStep(false);
           else handleClose();
         }}>
-          {showPreviewStep ? "Retour" : "Annuler"}
+          {showPreviewStep || showWinnerStep ? "Retour" : "Annuler"}
         </Button>
         {!isBlocked && !isChecking && (
           <Button
             onClick={handleComplete}
             disabled={isProcessing || isLoadingContext}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className={cn(
+              "font-bold",
+              showWinnerStep 
+                ? "bg-yellow-500 hover:bg-yellow-600 text-black shadow-lg shadow-yellow-500/20" 
+                : "bg-green-600 hover:bg-green-700 text-white"
+            )}
           >
             {isProcessing ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : showWinnerStep ? (
+              <Trophy className="h-4 w-4 mr-2" />
             ) : (
               <Trophy className="h-4 w-4 mr-2" />
             )}
-            {showPreviewStep 
-              ? "Valider et Générer la suite" 
-              : isFinalPhase ? "Clôturer la phase finale" : "Clôturer et organiser la suite"}
+            {showWinnerStep 
+              ? "Confirmer le Champion" 
+              : showPreviewStep 
+                ? "Valider et Générer la suite" 
+                : isFinalPhase ? "Clôturer la phase finale" : "Clôturer et organiser la suite"}
           </Button>
         )}
       </div>

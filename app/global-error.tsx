@@ -21,8 +21,8 @@ export default function GlobalError({
             </p>
             <button
               onClick={() => {
-                reset();
                 window.location.reload();
+                reset();
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition"
             >

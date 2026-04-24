@@ -2699,7 +2699,11 @@ export async function checkPendingEntitiesAction(
  * Marque un groupe comme terminé avec qualification des participants
  * CORRIGÉ : Gère les groupes d'élimination (brackets) correctement
  */
-export async function markGroupCompleteAction(groupId: string) {
+export async function markGroupCompleteAction(groupId: string, options: {
+  seedingMethod?: "RANDOM" | "SEQUENTIAL" | "SNAKE";
+  isHomeAway?: boolean;
+  matchFormat?: 'BEST_OF_1' | 'BEST_OF_3' | 'BEST_OF_5';
+} = {}) {
   try {
     const group = await db.query.phaseGroups.findFirst({
       where: eq(phaseGroups.id, groupId),
@@ -2850,8 +2854,9 @@ export async function markGroupCompleteAction(groupId: string) {
 
           // 2. Récupérer la configuration du groupe suivant
           const nextGroupConfig = (nextGroup.config as any) || {};
-          const isHomeAway = nextGroupConfig.isHomeAway || false;
-          const matchFormat = nextGroupConfig.matchFormat || "BEST_OF_1";
+          const isHomeAway = options.isHomeAway !== undefined ? options.isHomeAway : (nextGroupConfig.isHomeAway || false);
+          const matchFormat = options.matchFormat !== undefined ? options.matchFormat : (nextGroupConfig.matchFormat || "BEST_OF_1");
+          const seedingMethod = options.seedingMethod !== undefined ? options.seedingMethod : (nextGroupConfig.seedingMethod || nextGroupConfig.seedMethod || "RANDOM");
 
           // 3. Vérifier si le groupe suivant a déjà des brackets
           const existingNodes = await tx.query.bracketNodes.findMany({
@@ -2859,28 +2864,98 @@ export async function markGroupCompleteAction(groupId: string) {
               eq(bracketNodes.groupId, nextGroup.id),
               eq(bracketNodes.isDeleted, false),
             ),
+            orderBy: [asc(bracketNodes.order)],
           });
 
-          // 4. Supprimer les anciens brackets et matchs si on force (ou si on veut recréer)
-          if (existingNodes.length > 0) {
-            // Optionnel: on peut les garder et ne créer que ce qui manque
-            // Pour l'instant, on ne fait rien - l'utilisateur pourra régénérer manuellement
-          } else {
-            // 5. Créer la structure pour le groupe suivant
-            const participantsList = qualifiedRegistrationIds;
-            const participantCount = participantsList.length;
+          // 4. Gérer le remplissage des brackets existants ou la création de nouveaux
+          const participantsList = qualifiedRegistrationIds;
+          const participantCount = participantsList.length;
 
-            if (participantCount >= 2) {
-              // Mélanger si demandé
-              let shuffledParticipants = [...participantsList];
-              if (nextGroupConfig.seedMethod === "RANDOM") {
-                shuffledParticipants = shuffle(shuffledParticipants);
+          if (participantCount >= 2) {
+            // Mélanger si demandé
+            let shuffledParticipants = [...participantsList];
+            if (seedingMethod === "RANDOM") {
+              shuffledParticipants = shuffle(shuffledParticipants);
+            }
+
+            if (existingNodes.length > 0) {
+              // --- CAS A: REMPLIR LES BRACKETS EXISTANTS ---
+              console.log(`[PROPAGATION] Remplissage de ${existingNodes.length} brackets existants avec ${participantCount} participants.`);
+              
+              for (let i = 0; i < existingNodes.length; i++) {
+                const node = existingNodes[i];
+                const p1 = shuffledParticipants[i * 2];
+                const p2 = shuffledParticipants[i * 2 + 1];
+
+                if (!p1) continue;
+
+                // Mise à jour du metadata du node avec les participants réels
+                const currentMetadata = (node.metadata as any) || {};
+                const updatedParticipants = [p1];
+                if (p2) updatedParticipants.push(p2);
+
+                await tx.update(bracketNodes)
+                  .set({
+                    metadata: {
+                      ...currentMetadata,
+                      participants: updatedParticipants,
+                    },
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(bracketNodes.id, node.id));
+
+                // Si les matchs n'existent pas encore pour ce node, on peut les créer ici
+                // Ou on peut laisser l'utilisateur utiliser le MatchGenerationDialog
+                // Mais pour une fluidité max, on vérifie s'il y a des matchs
+                const nodeMatches = await tx.query.matches.findMany({
+                  where: and(
+                    eq(matches.bracketNodeId, node.id),
+                    eq(matches.isDeleted, false)
+                  )
+                });
+
+                if (nodeMatches.length === 0 && p1 && p2) {
+                  const matchesToCreate = isHomeAway ? 2 : 1;
+                  for (let mIdx = 0; mIdx < matchesToCreate; mIdx++) {
+                    await tx.insert(matches).values({
+                      editionId: group.phase?.editionId as string,
+                      phaseId: group.phaseId,
+                      groupId: nextGroup.id,
+                      bracketNodeId: node.id,
+                      participant1RegistrationId: mIdx === 0 ? p1 : p2,
+                      participant2RegistrationId: mIdx === 0 ? p2 : p1,
+                      matchCode: matchesToCreate > 1 ? `${node.nodeCode}-L${mIdx + 1}` : node.nodeCode,
+                      status: "PENDING",
+                      round: node.round ?? 1,
+                      matchNumber: node.matchNumber ?? 1,
+                      metadata: {
+                        format: isHomeAway ? "HOME_AWAY" : matchFormat,
+                        leg: mIdx + 1,
+                      },
+                      scheduledTime: getDefaultScheduledTime(node.round ?? 1, node.matchNumber ?? 1),
+                      createdAt: new Date(),
+                      updatedAt: new Date(),
+                    });
+                  }
+                } else if (nodeMatches.length > 0 && p1 && p2) {
+                  // Mettre à jour les participants des matchs existants s'ils sont PENDING
+                  for (let mIdx = 0; mIdx < nodeMatches.length; mIdx++) {
+                    const match = nodeMatches[mIdx];
+                    if (match.status === "PENDING") {
+                      await tx.update(matches)
+                        .set({
+                          participant1RegistrationId: mIdx === 0 ? p1 : p2,
+                          participant2RegistrationId: mIdx === 0 ? p2 : p1,
+                          updatedAt: new Date(),
+                        })
+                        .where(eq(matches.id, match.id));
+                    }
+                  }
+                }
               }
-
-              // Nombre de matchs pour ce round
+            } else {
+              // --- CAS B: CRÉER LES BRACKETS (Logique existante) ---
               const matchesThisRound = Math.floor(participantCount / 2);
-
-              // Créer les bracket nodes et les matchs
               for (let matchIdx = 0; matchIdx < matchesThisRound; matchIdx++) {
                 const p1 = shuffledParticipants[matchIdx * 2];
                 const p2 = shuffledParticipants[matchIdx * 2 + 1];
@@ -2903,7 +2978,7 @@ export async function markGroupCompleteAction(groupId: string) {
                       matchFormat: matchFormat,
                       isHomeAway: isHomeAway,
                       format: isHomeAway ? "HOME_AWAY" : matchFormat,
-                      participants: [p1, p2], // Pour l'affichage UI
+                      participants: [p1, p2],
                     },
                     createdAt: new Date(),
                     updatedAt: new Date(),
@@ -4199,6 +4274,7 @@ export async function getPhaseContextAction(phaseId: string): Promise<{
   groupsCount: number;
   qualifiedCount: number;
   hasPendingEntities: boolean;
+  editionId: string;
 }> {
   const phase = await db.query.tournamentPhases.findFirst({
     where: eq(tournamentPhases.id, phaseId),
@@ -4246,6 +4322,7 @@ export async function getPhaseContextAction(phaseId: string): Promise<{
     groupsCount: phase.groups.length,
     qualifiedCount,
     hasPendingEntities: pending.pendingEntities.length > 0,
+    editionId: phase.editionId,
   };
 }
 

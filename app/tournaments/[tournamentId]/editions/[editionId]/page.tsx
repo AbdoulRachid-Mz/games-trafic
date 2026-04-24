@@ -30,6 +30,11 @@ export async function generateMetadata({
     title: edition
       ? `Édition ${edition.name || `#${edition.editionNumber}`}`
       : "Édition Inconnue",
+    description: edition
+      ? `Édition ${edition.name || `#${edition.editionNumber}`}`
+      : "Édition Inconnue",
+    keywords: "tournoi, édition, matchs",
+    robots: "index, follow",
   };
 }
 

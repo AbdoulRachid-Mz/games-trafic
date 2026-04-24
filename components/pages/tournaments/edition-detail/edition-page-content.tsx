@@ -345,38 +345,6 @@ export function EditionPageContent({
 
         <div className="flex flex-col lg:flex-row gap-4 md:gap-8 items-start">
           <div className="flex-1 w-full space-y-4 md:space-y-6">
-            {/* Organizer dashboard link */}
-            {isOrganizer && (
-              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-4 duration-500">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <Shield className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold">
-                      Vous organisez cette édition
-                    </h3>
-                    <p className="text-muted-foreground text-xs">
-                      Accédez au dashboard pour gérer les phases, participants
-                      et matchs.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="w-full sm:w-auto shadow-lg shadow-primary/20"
-                  asChild
-                >
-                  <Link
-                    href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}
-                  >
-                    Dashboard organisateur
-                  </Link>
-                </Button>
-              </div>
-            )}
-
             {!isRegistered && (
               <div className="bg-card border rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm">
                 <div>
@@ -412,6 +380,38 @@ export function EditionPageContent({
               swipeable
               showNavButtons
             />
+
+            {/* Organizer dashboard link */}
+            {isOrganizer && (
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Shield className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold">
+                      Vous organisez cette édition
+                    </h3>
+                    <p className="text-muted-foreground text-xs">
+                      Accédez au dashboard pour gérer les phases, participants
+                      et matchs.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full sm:w-auto shadow-lg shadow-primary/20"
+                  asChild
+                >
+                  <Link
+                    href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}
+                  >
+                    Dashboard organisateur
+                  </Link>
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* <div className="hidden lg:block w-80 space-y-6">

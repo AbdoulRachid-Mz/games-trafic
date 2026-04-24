@@ -24,6 +24,7 @@ import Link from "next/link";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { updateMatchResult } from "@/actions/tournaments";
 import { toast } from "sonner";
+import { Typography } from "../ui/typography";
 
 interface MatchCardProps {
   match: any;
@@ -72,15 +73,19 @@ export function MatchCard({
     p2?.name ||
     "À déterminer";
 
-  const p1Id = match.participant1?.member?.userId || match.participant1?.member?.id;
-  const p2Id = match.participant2?.member?.userId || match.participant2?.member?.id;
+  const p1Id =
+    match.participant1?.member?.userId || match.participant1?.member?.id;
+  const p2Id =
+    match.participant2?.member?.userId || match.participant2?.member?.id;
 
   const p1Image =
     match.participant1?.member?.avatar ||
-    p1?.profileImage || "/icons/avatar-500.png"
+    p1?.profileImage ||
+    "/icons/avatar-500.png";
   const p2Image =
     match.participant2?.member?.avatar ||
-    p2?.profileImage || "/icons/avatar-500.png"
+    p2?.profileImage ||
+    "/icons/avatar-500.png";
 
   const isParticipant =
     currentUserId &&
@@ -136,12 +141,19 @@ export function MatchCard({
     switch (match.status) {
       case "PENDING":
         return (
-          <Badge variant="outline" className="bg-slate-100 text-slate-700 text-[10px] h-5 px-1.5">
+          <Badge
+            variant="outline"
+            className="bg-slate-100 text-slate-700 text-[10px] h-5 px-1.5"
+          >
             Programmé
           </Badge>
         );
       case "IN_PROGRESS":
-        return <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5 px-1.5">En cours</Badge>;
+        return (
+          <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5 px-1.5">
+            En cours
+          </Badge>
+        );
       case "PENDING_REVIEW":
         return (
           <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5 px-1.5">
@@ -161,9 +173,17 @@ export function MatchCard({
           </Badge>
         );
       case "DISPUTED":
-        return <Badge variant="destructive" className="text-[10px] h-5 px-1.5">Litige</Badge>;
+        return (
+          <Badge variant="destructive" className="text-[10px] h-5 px-1.5">
+            Litige
+          </Badge>
+        );
       default:
-        return <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{match.status}</Badge>;
+        return (
+          <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+            {match.status}
+          </Badge>
+        );
     }
   };
 
@@ -175,7 +195,7 @@ export function MatchCard({
         className={cn(
           "group relative overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md cursor-pointer",
           getBorderColor(),
-          className
+          className,
         )}
         onClick={onView}
       >
@@ -186,7 +206,9 @@ export function MatchCard({
               <Clock className="h-3 w-3 text-muted-foreground" />
               <span className="text-[9px] text-muted-foreground">
                 {match.scheduledTime
-                  ? format(new Date(match.scheduledTime), "dd MMM HH:mm", { locale: fr })
+                  ? format(new Date(match.scheduledTime), "dd MMM HH:mm", {
+                      locale: fr,
+                    })
                   : "À planifier"}
               </span>
             </div>
@@ -218,18 +240,20 @@ export function MatchCard({
                   "w-7 h-7 rounded-md flex items-center justify-center font-bold text-sm",
                   isCompleted && match.score1 > match.score2
                     ? "bg-green-100 text-green-700"
-                    : "bg-slate-100 text-slate-700"
+                    : "bg-slate-100 text-slate-700",
                 )}
               >
                 {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
               </div>
-              <span className="text-[10px] font-medium text-muted-foreground">vs</span>
+              <span className="text-[10px] font-medium text-muted-foreground">
+                vs
+              </span>
               <div
                 className={cn(
                   "w-7 h-7 rounded-md flex items-center justify-center font-bold text-sm",
                   isCompleted && match.score2 > match.score1
                     ? "bg-green-100 text-green-700"
-                    : "bg-slate-100 text-slate-700"
+                    : "bg-slate-100 text-slate-700",
                 )}
               >
                 {match.status === "PENDING" ? "-" : (match.score2 ?? 0)}
@@ -293,55 +317,68 @@ export function MatchCard({
     "group relative overflow-hidden rounded-xl border bg-card transition-all hover:shadow-md",
     getBorderColor(),
     isCompact ? "p-2" : "p-3 sm:p-4",
-    className
+    className,
   );
 
   const headerClasses = cn(
     "flex items-center justify-between",
-    isCompact ? "mb-1.5" : "mb-3 sm:mb-4"
+    isCompact ? "mb-1.5" : "mb-3 sm:mb-4",
   );
 
   const participantsGrid = cn(
-    "grid items-center gap-3 sm:gap-4",
-    isList
-      ? "grid-cols-[auto,1fr,auto,auto,1fr,auto] justify-between"
-      : "grid-cols-[1fr,auto,1fr]"
+    "items-center gap-3 sm:gap-4",
+    isList ? "flex justify-between" : "grid grid-cols-[1fr,auto,1fr]",
   );
 
   const scoreCenter = cn(
     "flex flex-col items-center gap-0.5 sm:gap-1",
-    isList && "flex-row gap-1 sm:gap-2"
+    isList && "flex-row gap-1 sm:gap-2",
   );
 
   const buttonWrapper = cn(
     "mt-3 flex gap-2",
-    isCompact ? "mt-2" : isList ? "mt-2 sm:mt-3" : "mt-4 sm:mt-6"
+    isCompact ? "mt-2" : isList ? "mt-2 sm:mt-3" : "mt-4 sm:mt-6",
   );
 
   return (
     <div className={wrapperClasses}>
       {/* Header */}
       <div className={headerClasses}>
-        <div className={cn("flex", isList ? "flex-row items-center gap-2" : "flex-col gap-0.5 sm:gap-1")}>
+        <div
+          className={cn(
+            "flex",
+            isList
+              ? "flex-row items-center gap-2"
+              : "flex-col gap-0.5 sm:gap-1",
+          )}
+        >
           <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
             <Clock className={cn("h-3 w-3", isCompact && "h-2.5 w-2.5")} />
             {match.scheduledTime
-              ? format(new Date(match.scheduledTime), "dd MMM, HH:mm", { locale: fr })
+              ? format(new Date(match.scheduledTime), "dd MMM, HH:mm", {
+                  locale: fr,
+                })
               : "Non planifié"}
           </div>
-          <div className={cn("flex items-center gap-1.5", isList ? "ml-2" : "")}>
+          <div
+            className={cn("flex items-center gap-1.5", isList ? "ml-2" : "")}
+          >
             {match.phase?.name && (
               <Badge
                 variant="secondary"
                 className={cn(
-                  "text-[8px] sm:text-[9px] h-3.5 sm:h-4 px-1 sm:px-1.5"
+                  "text-[8px] sm:text-[9px] h-3.5 sm:h-4 px-1 sm:px-1.5",
                 )}
               >
                 {match.phase.name}
               </Badge>
             )}
             {match.round && (
-              <span className={cn("font-bold uppercase tracking-wider text-muted-foreground/70 text-[8px] sm:text-[9px]")}>
+              <span
+                className={cn(
+                  "font-bold uppercase tracking-wider text-muted-foreground/70 text-[8px] sm:text-[9px]",
+                )}
+              >
                 R{match.round}
               </span>
             )}
@@ -353,11 +390,25 @@ export function MatchCard({
       {/* Participants et scores */}
       <div className={participantsGrid}>
         {/* Participant 1 */}
-        <div className={cn("flex items-center gap-2", isList ? "" : "flex-col text-center")}>
-          <Avatar className={cn(getAvatarSize(), "border-2 border-background ring-2 ring-slate-100 group-hover:ring-primary/20 transition-all")}>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            isList ? "flex-col" : "flex-col text-center",
+          )}
+        >
+          <Avatar
+            className={cn(
+              getAvatarSize(),
+              "border-2 border-background ring-2 ring-slate-100 group-hover:ring-primary/20 transition-all",
+            )}
+          >
             <AvatarImage src={p1Image} />
             <AvatarFallback className="bg-slate-50 text-slate-400 text-xs sm:text-sm">
-              <User className={cn(isCompact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5")} />
+              <User
+                className={cn(
+                  isCompact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5",
+                )}
+              />
             </AvatarFallback>
           </Avatar>
           <div className="space-y-0.5">
@@ -366,7 +417,7 @@ export function MatchCard({
               className={cn(
                 "truncate font-semibold text-foreground hover:text-primary transition-colors text-left",
                 getNameMaxWidth(),
-                isCompact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+                isCompact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm",
               )}
             >
               {p1Name}
@@ -381,30 +432,64 @@ export function MatchCard({
 
         {/* Score / VS */}
         <div className={scoreCenter}>
-          <div className={cn("flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors", getScoreBoxSize())}>
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors",
+              getScoreBoxSize(),
+            )}
+          >
             {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
           </div>
           {isList ? (
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground mx-1 sm:mx-2">vs</span>
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground mx-1 sm:mx-2">
+              vs
+            </span>
           ) : (
-            <span className="text-[10px] sm:text-sm font-medium text-muted-foreground">vs</span>
+            <span className="text-[10px] sm:text-sm font-medium text-muted-foreground">
+              vs
+            </span>
           )}
-          <div className={cn("flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors", getScoreBoxSize())}>
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors",
+              getScoreBoxSize(),
+            )}
+          >
             {match.status === "PENDING" ? "-" : (match.score2 ?? 0)}
           </div>
           {match.status === "COMPLETED" && !isCompact && (
-            <div className="mt-1 text-[8px] sm:text-[9px] uppercase tracking-wider font-bold text-primary flex items-center gap-0.5">
-              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> Officiel
-            </div>
+            <Typography
+              tooltipContent="Officiel"
+              hasTooltip={true}
+              tooltipSide={"top"}
+              className="mt-1 text-[8px]  sm:text-[9px] uppercase tracking-wider font-bold text-primary flex items-center gap-0.5"
+            >
+              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />{" "}
+              <span className="hidden md:block">&nbsp; Officiel</span>
+            </Typography>
           )}
         </div>
 
         {/* Participant 2 */}
-        <div className={cn("flex items-center gap-2", isList ? "" : "flex-col text-center")}>
-          <Avatar className={cn(getAvatarSize(), "border-2 border-background ring-2 ring-slate-100 group-hover:ring-primary/20 transition-all")}>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            isList ? "flex-col" : "flex-col text-center",
+          )}
+        >
+          <Avatar
+            className={cn(
+              getAvatarSize(),
+              "border-2 border-background ring-2 ring-slate-100 group-hover:ring-primary/20 transition-all",
+            )}
+          >
             <AvatarImage src={p2Image} />
             <AvatarFallback className="bg-slate-50 text-slate-400 text-xs sm:text-sm">
-              <User className={cn(isCompact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5")} />
+              <User
+                className={cn(
+                  isCompact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5",
+                )}
+              />
             </AvatarFallback>
           </Avatar>
           <div className="space-y-0.5">
@@ -413,7 +498,7 @@ export function MatchCard({
               className={cn(
                 "truncate font-semibold text-foreground hover:text-primary transition-colors text-left",
                 getNameMaxWidth(),
-                isCompact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+                isCompact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm",
               )}
             >
               {p2Name}
@@ -438,7 +523,7 @@ export function MatchCard({
             size={isCompact ? "xs" : "sm"}
             className={cn(
               "w-full gap-1.5 text-xs sm:text-sm transition-all",
-              canSubmit && "shadow-md shadow-primary/20"
+              canSubmit && "shadow-md shadow-primary/20",
             )}
           >
             {canSubmit ? (
@@ -462,7 +547,7 @@ export function MatchCard({
             variant="default"
           >
             <Button
-              size="icon"
+              size={isCompact ? "xs" : "sm"}
               variant="outline"
               className="shrink-0 border-primary/20 text-primary hover:bg-primary/5 h-8 w-8 sm:h-9 sm:w-9"
               title="Validation Admin"
@@ -475,7 +560,10 @@ export function MatchCard({
 
       {/* Proof indicator */}
       {match.proofUrl && match.status !== "COMPLETED" && (
-        <div className="absolute top-2 right-2 p-1 bg-primary/10 rounded-full" title="Preuve disponible">
+        <div
+          className="absolute top-2 right-2 p-1 bg-primary/10 rounded-full"
+          title="Preuve disponible"
+        >
           <Camera className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
         </div>
       )}

@@ -577,7 +577,7 @@ export function OrganizeWizardClient({
     } = autoConfig;
 
     const getDepthOptions = (isGroupPhase: boolean) => ({
-      generateGroups: isGroupPhase ? true : false,
+      generateGroups: isGroupPhase ? depth.groups : false,
       generateNodes: depth.brackets,
       generateMatches: depth.brackets && depth.matches,
     });
@@ -1330,10 +1330,7 @@ function AutoModeConfig({
                   onConfigChange({ ...autoConfig, groupsQualifiedCount: v[0] })
                 }
                 min={1}
-                max={Math.min(
-                  16,
-                  Math.floor(currentParticipantsCount / 2) || 8,
-                )}
+                max={Math.max(1, currentParticipantsCount - 1)}
                 step={1}
                 className="flex-1"
               />
@@ -1408,7 +1405,7 @@ function AutoModeConfig({
                     })
                   }
                   min={1}
-                  max={4}
+                  max={Math.max(1, Math.floor(currentParticipantsCount / (autoConfig.groupsCount || 1)) - 1)}
                   step={1}
                   className="flex-1"
                 />

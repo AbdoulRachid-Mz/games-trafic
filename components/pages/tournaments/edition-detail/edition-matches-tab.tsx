@@ -301,7 +301,7 @@ export function EditionMatchesTab({
               setAllMatchesPage(1);
             }}
           >
-            <SelectTrigger className="h-10 w-[150px] border-none bg-muted/50 font-bold text-[11px] uppercase tracking-wider rounded-xl">
+            <SelectTrigger className="h-10 w-[150px] max-md:w-[100px] max-sm:w-[80px] border-none bg-muted/50 font-bold text-[11px] uppercase tracking-wider rounded-xl">
               <Filter className="h-3 w-3 mr-2 text-primary" />
               <SelectValue placeholder="État" />
             </SelectTrigger>
@@ -329,6 +329,7 @@ export function EditionMatchesTab({
                 <span className="text-[11px] font-black uppercase tracking-wider">
                   Export
                 </span>
+                <ChevronDown className="h-4 w-4 text-primary" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl p-2 w-48">

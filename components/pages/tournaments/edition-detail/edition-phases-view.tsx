@@ -109,16 +109,16 @@ export function EditionPhasesView({
       <div className="relative">
         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-muted to-transparent -translate-y-1/2 hidden md:block" />
 
-        <div className="relative flex flex-col md:flex-row items-center justify-between gap-6 md:gap-2 overflow-x-auto pb-6 px-2 scrollbar-hide">
+        <div className="relative flex items-center justify-between gap-6 md:gap-2 overflow-x-auto pb-6 px-2 scrollbar-hide">
           {sortedPhases.map((phase, idx) => {
             const isActive = activePhaseId === phase.id;
             const isCompleted = phase.isCompleted;
             const isLast = idx === sortedPhases.length - 1;
             const phaseTypeIcon =
               phase.phaseType === "ELIMINATION" ? (
-                <Trophy className="h-4 w-4" />
+                <Trophy className="h-4 w-4 max-md:h-3 max-md:w-3" />
               ) : (
-                <LayoutGrid className="h-4 w-4" />
+                <LayoutGrid className="h-4 w-4 max-md:h-3 max-md:w-3" />
               );
 
             return (
@@ -129,7 +129,7 @@ export function EditionPhasesView({
               >
                 <div
                   className={cn(
-                    "relative z-10 w-14 h-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-300",
+                    "relative z-10 w-14 max-md:w-10 max-md:h-10 h-14 rounded-2xl flex items-center justify-center border-2 transition-all duration-300",
                     isActive
                       ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
                       : isCompleted
@@ -138,9 +138,9 @@ export function EditionPhasesView({
                   )}
                 >
                   {isCompleted ? (
-                    <CheckCircle2 className="h-6 w-6" />
+                    <CheckCircle2 className="h-6 w-6 max-md:h-5 max-md:w-5" />
                   ) : (
-                    <span className="font-bold text-lg">{idx + 1}</span>
+                    <span className="font-bold text-lg max-md:text-sm">{idx + 1}</span>
                   )}
                 </div>
 
@@ -149,7 +149,7 @@ export function EditionPhasesView({
                     {phaseTypeIcon}
                     <span
                       className={cn(
-                        "text-[9px] font-black uppercase tracking-wider",
+                        "text-[9px] max-md:text-[8px] font-black uppercase tracking-wider",
                         isActive ? "text-primary" : "text-muted-foreground",
                       )}
                     >
@@ -171,7 +171,7 @@ export function EditionPhasesView({
                   {phase.isActive && (
                     <Badge
                       variant="default"
-                      className="mt-1 text-[8px] h-4 bg-primary/20 text-primary"
+                      className="mt-1 text-[8px] max-md:text-[6px] h-4 bg-primary/20 text-primary"
                     >
                       ACTIVE
                     </Badge>
@@ -665,7 +665,7 @@ function EliminationSchema({
           Tableau d'élimination
         </Typography>
         <div className="relative overflow-x-auto pb-4">
-          <div className="flex justify-center items-start gap-6 min-w-max p-4">
+          <div className="flex justify-center items-start gap-6 max-md:gap-3 min-w-max p-4">
             {sortedRounds
               .map(([roundNum, roundMatches]) => {
                 const distanceToFinal = totalRounds - roundNum;
@@ -702,7 +702,7 @@ function EliminationSchema({
                   acc.push(
                     <div
                       key={`arrow-${idx}`}
-                      className="flex items-center h-full pt-8"
+                      className="flex items-center h-full pt-8 max-md:pt-6"
                     >
                       <ArrowRight className="h-5 w-5 text-muted-foreground/50" />
                     </div>,
@@ -732,7 +732,7 @@ function EliminationSchema({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-md:space-y-4">
       <Typography
         variant="h6"
         weight="bold"
@@ -742,7 +742,7 @@ function EliminationSchema({
         Tableau d'élimination
       </Typography>
       <div className="relative overflow-x-auto pb-4">
-        <div className="flex justify-center items-start gap-6 min-w-max p-4">
+        <div className="flex justify-center items-start gap-6 max-md:gap-4 min-w-max p-4">
           {Array.from(nodesByRound.entries())
             .sort((a, b) => a[0] - b[0])
             .map(([roundNum, roundNodes]) => {
@@ -755,7 +755,7 @@ function EliminationSchema({
 
               return (
                 <div key={roundNum} className="space-y-3">
-                  <div className="text-center text-[9px] font-bold uppercase text-muted-foreground">
+                  <div className="text-center text-[9px] max-md:text-[7px] font-bold uppercase text-muted-foreground">
                     {roundName}
                   </div>
                   <div className="space-y-3">
@@ -770,9 +770,9 @@ function EliminationSchema({
                       return (
                         <div
                           key={node.id}
-                          className="border rounded-lg p-2 min-w-[180px] bg-card/50"
+                          className="border rounded-lg p-2 min-w-[180px] max-md:min-w-[150px] bg-card/50"
                         >
-                          <div className="text-[8px] text-muted-foreground text-center mb-1">
+                          <div className="text-[8px] max-md:text-[7px] text-muted-foreground text-center mb-1">
                             {nodeName}
                           </div>
                           {nodeMatches.length > 0 ? (
@@ -787,7 +787,7 @@ function EliminationSchema({
                               />
                             ))
                           ) : (
-                            <div className="text-center text-[9px] text-muted-foreground py-2">
+                            <div className="text-center text-[9px] max-md:text-[7px] text-muted-foreground py-2">
                               À déterminer
                             </div>
                           )}
@@ -804,9 +804,9 @@ function EliminationSchema({
                 acc.push(
                   <div
                     key={`arrow-${idx}`}
-                    className="flex items-center h-full pt-8"
+                    className="flex items-center h-full pt-8 max-md:pt-6"
                   >
-                    <ArrowRight className="h-5 w-5 text-muted-foreground/50" />
+                    <ArrowRight className="h-5 w-5 max-md:h-4 max-md:w-4 text-muted-foreground/50" />
                   </div>,
                 );
               }
@@ -840,22 +840,22 @@ function RoundCard({
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="py-3 px-4 bg-muted/30">
+      <CardHeader className="py-3 px-4 max-md:py-2 bg-muted/30">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+            <div className="h-6 w-6 max-md:h-5 max-md:w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] max-md:text-[8px] font-bold text-primary">
               {roundNumber}
             </div>
-            <span className="font-bold text-sm">
+            <span className="font-bold text-sm max-md:text-xs">
               {getRoundName(roundNumber, matches.length)}
             </span>
           </div>
-          <Badge variant="outline" className="text-[9px]">
+          <Badge variant="outline" className="text-[9px] max-md:text-[7px]">
             {matches.length} matchs
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-3 space-y-2">
+      <CardContent className="p-3 max-md:p-2 space-y-3 max-md:space-y-2">
         {matches.map((match: any) => (
           <MiniMatchCard
             key={match.id}
@@ -960,7 +960,7 @@ function MiniMatchCard({
             <>
               <span
                 className={cn(
-                  "min-w-[20px] text-center",
+                  "min-w-[20px] max-md-min-w-[16px] text-center",
                   (match.score1 || 0) > (match.score2 || 0) &&
                     "text-emerald-600",
                 )}
@@ -970,7 +970,7 @@ function MiniMatchCard({
               <span className="text-muted-foreground">-</span>
               <span
                 className={cn(
-                  "min-w-[20px] text-center",
+                  "min-w-[20px] max-md:min-w-[16px] text-center",
                   (match.score2 || 0) > (match.score1 || 0) &&
                     "text-emerald-600",
                 )}
@@ -979,7 +979,7 @@ function MiniMatchCard({
               </span>
             </>
           ) : (
-            <span className="text-[9px] text-muted-foreground">vs</span>
+            <span className="text-[9px] max-md:text-[7px] text-muted-foreground">vs</span>
           )}
         </div>
 

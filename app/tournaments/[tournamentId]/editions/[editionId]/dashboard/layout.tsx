@@ -149,7 +149,7 @@ export default function EditionDashboardLayout({
         sidebarBgType="default"
       />
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1  overflow-y-auto p-4 space-y-6">
         <SidebarGroup label="Vue d'ensemble" sidebarBgType="default">
           {editionOverview.map((item) => (
             <SidebarItem
@@ -175,9 +175,9 @@ export default function EditionDashboardLayout({
 
       <SidebarFooter
         user={{
-          username: "Organisateur",
-          profileImage: undefined,
-          status: "online",
+          username: user?.fullName || "Organisateur",
+          profileImage: user?.image || user?.profileImage || "/icons/avatar-500.png",
+          status: user ? "online" : "offline",
         }}
         sidebarBgType="default"
       />

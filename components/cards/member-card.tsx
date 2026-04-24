@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,9 @@ import {
   Eye,
   MessageSquare,
   Phone,
+  X,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,6 +29,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TournamentMemberWithRelations } from "@/database/schema";
 import { cn } from "@/lib/utils";
 import { useScreenSize } from "@/hooks/use-screen";
@@ -52,321 +63,446 @@ export function MemberCard({
   showDetail,
   actions,
 }: MemberCardProps) {
+  const router = useRouter();
+  const { isMobile, isTablet } = useScreenSize();
   const user = member?.user;
   const role = member.role || "PARTICIPANT";
   const isActive = member.isActive ?? true;
   const isBanned = member.isBanned ?? false;
   const isMe = member.userId === user?.id;
-  const { isMobile } = useScreenSize();
 
-  // Helper to determine role color/icon
   const getRoleBadge = (role: string) => {
     switch (role) {
       case "ORGANIZER":
+        return (
+          <Badge className="bg-amber-500 hover:bg-amber-600 text-[9px] md:text-[10px] px-1.5 py-0">
+            <Trophy className="w-2.5 h-2.5 mr-0.5" /> Org
+          </Badge>
+        );
       case "CO_ORGANIZER":
         return (
-          <Badge className="bg-amber-500 hover:bg-amber-600">
-            <Trophy className="w-3 h-3 mr-1" /> {role}
+          <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-[9px] md:text-[10px] px-1.5 py-0">
+            <ShieldCheck className="w-2.5 h-2.5 mr-0.5" /> Co-Org
           </Badge>
         );
       case "REFEREE":
         return (
-          <Badge variant="outline">
-            <Shield className="w-3 h-3 mr-1" /> REFEREE
+          <Badge variant="outline" className="text-[9px] md:text-[10px] px-1.5 py-0">
+            <Shield className="w-2.5 h-2.5 mr-0.5" /> Ref
           </Badge>
         );
-      case "COMMENTATOR":
-        return <Badge variant="secondary">COMMENTATOR</Badge>;
-      case "SPECTATOR":
-        return <Badge variant="outline">SPECTATOR</Badge>;
       default:
         return (
-          <Badge variant="secondary">
-            <User className="w-3 h-3 mr-1" /> PARTICIPANT
+          <Badge variant="secondary" className="text-[9px] md:text-[10px] px-1.5 py-0">
+            <User className="w-2.5 h-2.5 mr-0.5" /> Part
           </Badge>
         );
     }
   };
 
+  const handleWhatsApp = () => {
+    const phone = (member as any).contactPhone || (user as any)?.phoneNumber;
+    if (phone) {
+      window.open(`https://wa.me/${phone.replace(/[^0-9]/g, "")}`, "_blank");
+    }
+  };
+
+  const handleCall = () => {
+    const phone = (member as any).contactPhone || (user as any)?.phoneNumber;
+    if (phone) {
+      window.location.href = `tel:${phone}`;
+    }
+  };
+
+  const handleEmail = () => {
+    const email = member.contactEmail;
+    if (email) {
+      window.location.href = `mailto:${email}`;
+    }
+  };
+
+  // ============================================================
+  // MODE LISTE
+  // ============================================================
   if (viewMode === "list") {
+    const isCompact = isMobile;
+    
     return (
-      <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-10 w-10 border">
+      <div className="flex items-center justify-between p-3 md:p-4 rounded-xl border bg-card hover:bg-accent/5 transition-colors group">
+        <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+          <Avatar className="h-8 w-8 md:h-10 md:w-10 border shrink-0">
             <AvatarImage
               src={member.avatar || user?.profileImage || "/icons/avatar-2.png"}
               alt={member.displayName || user?.username || "User"}
             />
-            <AvatarFallback>
+            <AvatarFallback className="text-xs md:text-sm bg-primary/10 text-primary font-bold">
               {(member.displayName || user?.username || "U")
                 .substring(0, 2)
                 .toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <div className="font-medium flex items-center gap-2">
-              {member.displayName || user?.username || "Utilisateur inconnu"}
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+              <span className="font-bold text-sm md:text-base truncate max-w-[120px] md:max-w-[200px]">
+                {member.displayName || user?.username || "Utilisateur"}
+              </span>
               {getRoleBadge(role)}
-              {isBanned && <Badge variant="destructive">BANNED</Badge>}
-              {!isActive && <Badge variant="secondary">INACTIVE</Badge>}
+              {isBanned && <Badge variant="destructive" className="text-[8px] md:text-[9px] px-1">Banni</Badge>}
+              {isMe && <Badge variant="default" className="text-[8px] md:text-[9px] px-1 bg-primary/80">Moi</Badge>}
             </div>
-            {member.contactEmail && (
-              <div className="text-xs text-muted-foreground">
-                {member.contactEmail}
+            
+            {!isCompact && (
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                {member.contactEmail && (
+                  <span className="truncate max-w-[120px] md:max-w-[200px]">
+                    {member.contactEmail}
+                  </span>
+                )}
+                {member.team && !isTablet && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                    <span className="truncate max-w-[100px]">{member.team.name}</span>
+                  </span>
+                )}
               </div>
             )}
-            {
-              member.user?.phoneNumber && (
-                <ActiveLink icon={<Phone className="w-4 h-4" />} href={`tel:${member.user?.phoneNumber}`} className="text-xs text-muted-foreground" />
-              )
-            }
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {userDisplay === "organizer" && member.userId && !isMe && (
-            <Button
-              variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
-              size="sm"
-              className={cn(
-                "gap-2 h-8",
-                role === "CO_ORGANIZER"
-                  ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
-                  : "",
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Actions rapides sur desktop */}
+          {!isMobile && (
+            <>
+              {member.contactEmail && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 md:h-8 md:w-8 text-muted-foreground hover:text-primary"
+                        onClick={handleEmail}
+                      >
+                        <Mail className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Envoyer un email</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
-              onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
-            >
-              {role === "CO_ORGANIZER" ? (
-                <ShieldCheck className="h-4 w-4" />
-              ) : (
-                <Shield className="h-4 w-4" />
+              {(member.contactPhone || user?.phoneNumber) && (
+                <>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 md:h-8 md:w-8 text-muted-foreground hover:text-green-600"
+                          onClick={handleWhatsApp}
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>WhatsApp</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 md:h-8 md:w-8 text-muted-foreground hover:text-blue-600"
+                          onClick={handleCall}
+                        >
+                          <Phone className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Appeler</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </>
               )}
-              <span className="hidden sm:inline">
-                {role === "CO_ORGANIZER"
-                  ? "Co-organisateur"
-                  : "Nommer Co-organisateur"}
-              </span>
-            </Button>
+            </>
           )}
 
-          {member.team && (
-            <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-primary/50" />
-              {member.team.name}
-            </div>
-          )}
-
-          {userDisplay !== "member" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem asChild>
-                  <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Voir le profil
-                  </Link>
+          {/* Dropdown menu pour toutes les actions */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
+                <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuItem asChild>
+                <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
+                  <Eye className="h-3.5 w-3.5 mr-2" />
+                  Voir le profil
+                </Link>
+              </DropdownMenuItem>
+              
+              {(member.contactEmail) && (
+                <DropdownMenuItem onClick={handleEmail}>
+                  <Mail className="h-3.5 w-3.5 mr-2" />
+                  Envoyer un email
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
-                  disabled={!member.userId || isMe}
-                >
-                  {role === "CO_ORGANIZER"
-                    ? "Retirer co-organisateur"
-                    : "Nommer co-organisateur"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {actions?.onDelete && (
+              )}
+              
+              {(member.contactPhone || user?.phoneNumber) && (
+                <>
+                  <DropdownMenuItem onClick={handleWhatsApp}>
+                    <MessageSquare className="h-3.5 w-3.5 mr-2" />
+                    WhatsApp
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCall}>
+                    <Phone className="h-3.5 w-3.5 mr-2" />
+                    Appeler
+                  </DropdownMenuItem>
+                </>
+              )}
+              
+              {userDisplay === "organizer" && member.userId && !isMe && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+                  >
+                    {role === "CO_ORGANIZER" ? (
+                      <>
+                        <ShieldAlert className="h-3.5 w-3.5 mr-2" />
+                        Retirer co-organisateur
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="h-3.5 w-3.5 mr-2" />
+                        Nommer co-organisateur
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                </>
+              )}
+              
+              {actions?.onDelete && (
+                <>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive"
                     onClick={() => actions.onDelete!(member.id)}
                   >
+                    <X className="h-3.5 w-3.5 mr-2" />
                     Retirer du tournoi
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     );
   }
 
-  // Grid View
-  return (
-    <Card className="overflow-hidden group hover:shadow-xl transition-all duration-300 border-none bg-gradient-to-br from-card to-card/50 relative">
-      <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+  // ============================================================
+  // MODE GRILLE
+  // ============================================================
+  const isCompactGrid = isMobile;
+  const avatarSize = isCompactGrid ? "h-16 w-16" : "h-20 w-20 md:h-24 md:w-24";
+  const avatarFallbackSize = isCompactGrid ? "text-lg" : "text-xl md:text-2xl";
 
-      <CardContent className="p-6 flex flex-col items-center text-center gap-4 relative z-10">
-        {userDisplay !== "member" && (
-          <div className="absolute top-2 right-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:bg-background/80"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => actions?.onViewProfile?.(member.id)}
-                >
-                  Voir le profil
+  return (
+    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300 border border-border/50 bg-gradient-to-br from-card to-card/80">
+      {/* Actions en absolute top-right */}
+      <div className="absolute top-2 right-2 z-10">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 md:h-8 md:w-8 bg-background/50 backdrop-blur-sm rounded-full hover:bg-background/80"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem asChild>
+              <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
+                <Eye className="h-3.5 w-3.5 mr-2" />
+                Voir le profil
+              </Link>
+            </DropdownMenuItem>
+            
+            {(member.contactEmail) && (
+              <DropdownMenuItem onClick={handleEmail}>
+                <Mail className="h-3.5 w-3.5 mr-2" />
+                Envoyer un email
+              </DropdownMenuItem>
+            )}
+            
+            {(member.contactPhone || user?.phoneNumber) && (
+              <>
+                <DropdownMenuItem onClick={handleWhatsApp}>
+                  <MessageSquare className="h-3.5 w-3.5 mr-2" />
+                  WhatsApp
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCall}>
+                  <Phone className="h-3.5 w-3.5 mr-2" />
+                  Appeler
+                </DropdownMenuItem>
+              </>
+            )}
+            
+            {userDisplay === "organizer" && member.userId && !isMe && (
+              <>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
-                  disabled={!member.userId || isMe}
                 >
-                  {role === "CO_ORGANIZER"
-                    ? "Retirer co-organisateur"
-                    : "Nommer co-organisateur"}
+                  {role === "CO_ORGANIZER" ? (
+                    <>
+                      <ShieldAlert className="h-3.5 w-3.5 mr-2" />
+                      Retirer co-organisateur
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-3.5 w-3.5 mr-2" />
+                      Nommer co-organisateur
+                    </>
+                  )}
                 </DropdownMenuItem>
+              </>
+            )}
+            
+            {actions?.onDelete && (
+              <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive"
-                  onClick={() => actions?.onDelete?.(member.id)}
+                  onClick={() => actions.onDelete!(member.id)}
                 >
-                  Retirer
+                  <X className="h-3.5 w-3.5 mr-2" />
+                  Retirer du tournoi
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
+      <CardContent className={cn(
+        "flex flex-col items-center text-center",
+        isCompactGrid ? "p-4" : "p-4 md:p-6"
+      )}>
+        {/* Avatar */}
         <div className="relative">
-          <Avatar className="h-24 w-24 border-4 border-background shadow-xl scale-100 group-hover:scale-105 transition-transform duration-300">
+          <Avatar className={cn(avatarSize, "border-4 border-background shadow-xl group-hover:scale-105 transition-transform duration-300")}>
             <AvatarImage
               src={member.avatar || user?.profileImage || "/icons/avatar-2.png"}
               alt={member.displayName || user?.username || "User"}
             />
-            <AvatarFallback className="text-2xl bg-primary/10 text-primary font-black italic">
+            <AvatarFallback className={cn(avatarFallbackSize, "bg-primary/10 text-primary font-bold")}>
               {(member.displayName || user?.username || "U")
                 .substring(0, 2)
                 .toUpperCase()}
             </AvatarFallback>
           </Avatar>
           {isActive && (
-            <span
-              className="absolute bottom-1 right-1 h-5 w-5 bg-green-500 border-4 border-background rounded-full shadow-sm"
-              title="Actif"
-            />
+            <span className="absolute bottom-0 right-0 h-3 w-3 md:h-4 md:w-4 bg-green-500 border-2 border-background rounded-full" />
           )}
         </div>
 
-        <div className="space-y-1 w-full flex flex-col items-center">
-          <h3
-            className="font-black italic uppercase tracking-tighter text-lg truncate max-w-full"
-            title={member.displayName || user?.username || "Inconnu"}
-          >
-            {member.displayName || user?.username || "Inconnu"}
+        {/* Nom et badges */}
+        <div className="mt-3 md:mt-4 space-y-1 w-full">
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            <h3 className="font-bold text-sm md:text-base truncate max-w-[150px] md:max-w-[180px]">
+              {member.displayName || user?.username || "Inconnu"}
+            </h3>
             {isMe && (
-              <Badge className="ml-2 bg-primary text-[10px] h-4">Moi</Badge>
+              <Badge variant="default" className="text-[8px] md:text-[9px] h-4 px-1 bg-primary/80">Moi</Badge>
             )}
-          </h3>
-          <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-            <Mail className="w-3 h-3" />
-            {member.contactEmail || "Pas d'email"}
-          </p>
-        </div>
+          </div>
+          
+          {/* Badges rôles */}
+          <div className="flex items-center justify-center gap-1 flex-wrap">
+            {getRoleBadge(role)}
+            {isBanned && (
+              <Badge variant="destructive" className="text-[8px] md:text-[9px] px-1">Banni</Badge>
+            )}
+          </div>
 
-        <div className="flex flex-wrap gap-2 justify-center w-full min-h-[24px]">
-          {getRoleBadge(role)}
-          {isBanned && (
-            <Badge variant="destructive" className="animate-pulse">
-              BANNED
-            </Badge>
-          )}
-          {member.team && (
-            <Badge
-              variant="outline"
-              className="bg-background/50 backdrop-blur-sm border-primary/20 flex items-center justify-center gap-2"
-              title={member.team.name}
-            >
-              <Trophy className="w-3 h-3 mr-1 text-primary" />
-              {member.team.name}
+          {/* Équipe */}
+          {member.team && !isCompactGrid && (
+            <Badge variant="outline" className="text-[8px] md:text-[9px] gap-1">
+              <Trophy className="w-2.5 h-2.5" />
+              {member.team.name.length > 20 ? member.team.name.slice(0, 20) + "..." : member.team.name}
             </Badge>
           )}
         </div>
 
-        <div className="grid grid-cols-2 w-full gap-2 mt-2 pt-4 border-t border-primary/10">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full font-bold h-9 bg-primary/5 hover:bg-primary/10 text-primary border-none"
-            asChild
-          >
-            <ActiveLink href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
-              <Eye className="w-3 h-3 mr-2" />
-              Profil
-            </ActiveLink>
-          </Button>
+        {/* Informations de contact (compact sur mobile) */}
+        {!isCompactGrid && (member.contactEmail || member.contactPhone || user?.phoneNumber) && (
+          <div className="mt-2 text-[10px] md:text-xs text-muted-foreground space-y-0.5">
+            {member.contactEmail && (
+              <div className="truncate max-w-[180px] md:max-w-[200px]">
+                ✉️ {member.contactEmail.length > 25 ? member.contactEmail.slice(0, 25) + "..." : member.contactEmail}
+              </div>
+            )}
+            {(member.contactPhone || user?.phoneNumber) && (
+              <div className="truncate max-w-[180px] md:max-w-[200px]">
+                📱 {(member.contactPhone || user?.phoneNumber)?.slice(0, 15)}
+              </div>
+            )}
+          </div>
+        )}
 
-          {(member.contactPhone || user?.phoneNumber) && (
+        {/* Boutons d'action rapides (uniquement sur desktop) */}
+        {!isCompactGrid && (
+          <div className="grid grid-cols-2 gap-2 w-full mt-3 md:mt-4 pt-3 md:pt-4 border-t border-border/50">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
-              className="w-full font-bold h-9 border-green-500/20 hover:bg-green-500/10 text-green-600"
-              onClick={() => {
-                const phone =
-                  (member as any).contactPhone || (user as any)?.phoneNumber;
-                if (phone)
-                  window.open(
-                    `https://wa.me/${phone.replace(/[^0-9]/g, "")}`,
-                    "_blank",
-                  );
-              }}
+              className="w-full text-[10px] md:text-xs h-8 md:h-9 gap-1"
+              asChild
             >
-              <MessageSquare className="w-3 h-3 mr-2" />
-              WhatsApp
+              <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
+                <Eye className="w-3 h-3" />
+                Profil
+              </Link>
             </Button>
-          )}
 
-          {userDisplay === "organizer" && member.userId && !isMe && (
-            <Button
-              variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
-              size="sm"
-              className={cn(
-                "w-full font-bold h-9 col-span-2",
-                role === "CO_ORGANIZER"
-                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                  : "",
-              )}
-              onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
-            >
-              {role === "CO_ORGANIZER" ? (
-                <ShieldCheck className="h-4 w-4 mr-2" />
-              ) : (
-                <Shield className="h-4 w-4 mr-2" />
-              )}
-              {role === "CO_ORGANIZER"
-                ? "Co-organisateur"
-                : "Nommer Co-organisateur"}
-            </Button>
-          )}
+            {userDisplay === "organizer" && member.userId && !isMe && (
+              <Button
+                variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
+                size="sm"
+                className={cn(
+                  "w-full text-[10px] md:text-xs h-8 md:h-9 gap-1",
+                  role === "CO_ORGANIZER" && "bg-amber-500/10 text-amber-600"
+                )}
+                onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+              >
+                {role === "CO_ORGANIZER" ? (
+                  <ShieldAlert className="w-3 h-3" />
+                ) : (
+                  <ShieldCheck className="w-3 h-3" />
+                )}
+                <span className="hidden sm:inline">
+                  {role === "CO_ORGANIZER" ? "Co-Org" : "Nommer"}
+                </span>
+              </Button>
+            )}
+          </div>
+        )}
 
-          {member.team && isMe && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full font-bold h-9 col-span-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
-              onClick={actions?.onManage!}
-            >
-              <PenSquare className="w-3 h-3 mr-2" />
-              Gérer l&apos;équipe
-            </Button>
-          )}
-        </div>
-
-        {member.joinedAt && (
-          <div className="text-[10px] text-muted-foreground font-medium opacity-60">
-            Dpuis le {new Date(member.joinedAt).toLocaleDateString()}
+        {/* Date d'adhésion (masquée sur mobile) */}
+        {member.joinedAt && !isCompactGrid && (
+          <div className="text-[9px] md:text-[10px] text-muted-foreground/50 mt-2">
+            Depuis {new Date(member.joinedAt).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })}
           </div>
         )}
       </CardContent>

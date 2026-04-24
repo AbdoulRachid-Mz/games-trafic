@@ -22,6 +22,7 @@ import {
   Search,
   Filter,
   LayoutGrid,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -53,6 +54,7 @@ import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { updateMatchResult } from "@/actions/tournaments";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 interface EditionCalendarTimelineProps {
   editionId: string;
@@ -139,10 +141,10 @@ export function EditionCalendarTimeline({
   return (
     <div className="space-y-6">
       {/* Filtres */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-start sm:items-center">
         <div className="flex flex-wrap gap-3">
           <Select value={selectedPhaseId} onValueChange={setSelectedPhaseId}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-fit">
               <SelectValue placeholder="Toutes les phases" />
             </SelectTrigger>
             <SelectContent>
@@ -157,7 +159,7 @@ export function EditionCalendarTimeline({
 
           {groups.length > 0 && selectedPhaseId !== "all" && (
             <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px] max-md:w-full">
                 <SelectValue placeholder="Tous les groupes" />
               </SelectTrigger>
               <SelectContent>
@@ -178,7 +180,7 @@ export function EditionCalendarTimeline({
             size="sm"
             onClick={() => setShowUnplanned(!showUnplanned)}
             className={cn(
-              "gap-2",
+              "gap-2 max-md:flex-1",
               showUnplanned && "bg-amber-500/10 text-amber-600 border-amber-500/20"
             )}
           >
@@ -190,6 +192,7 @@ export function EditionCalendarTimeline({
             variant="outline"
             size="sm"
             onClick={() => setCurrentDate(new Date())}
+            className="max-md:flex-1"
           >
             Aujourd'hui
           </Button>
@@ -197,38 +200,54 @@ export function EditionCalendarTimeline({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard
-          label="Total matchs"
-          value={totalMatches}
-          icon={<CalendarDays className="h-4 w-4" />}
-          color="blue"
-        />
-        <StatCard
-          label="Terminés"
-          value={completedMatches}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          color="green"
-        />
-        <StatCard
-          label="En cours"
-          value={inProgressMatches}
-          icon={<Clock className="h-4 w-4" />}
-          color="yellow"
-        />
-        <StatCard
-          label="Mes matchs"
-          value={myMatches}
-          icon={<Users className="h-4 w-4" />}
-          color="purple"
-        />
-        <StatCard
-          label="Phases"
-          value={phases.length}
-          icon={<GitBranch className="h-4 w-4" />}
-          color="indigo"
-        />
-      </div>
+      <StatsCarousel
+        data={[
+          {
+            title: "Total matchs",
+            value: totalMatches,
+            icon: <CalendarDays className="h-4 w-4" />,
+            // bgType: "blue",
+            className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+          },
+          {
+            title: "Terminés",
+            value: completedMatches,
+            icon: <CheckCircle2 className="h-4 w-4" />,
+            // bgType: "green",
+            className: "bg-green-500/10 text-green-600 border-green-500/20",
+          },
+          {
+            title: "En cours",
+            value: inProgressMatches,
+            icon: <Clock className="h-4 w-4" />,
+            // bgType: "yellow",
+            className: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+          },
+          {
+            title: "Mes matchs",
+            value: myMatches,
+            icon: <Users className="h-4 w-4" />,
+            // bgType: "purple",
+            className: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+          },
+          {
+            title: "Phases",
+            value: phases.length,
+            icon: <GitBranch className="h-4 w-4" />,
+            // bgType: "indigo",
+            className: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+          },
+        ]}
+        mode="auto"
+        withNavButtons
+        itemsPerView={{
+          mobile: 2,
+          md: 3,
+          lg: 4,
+          xl: 5,
+        }}
+        gap={12}
+      />
 
       {showUnplanned ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">

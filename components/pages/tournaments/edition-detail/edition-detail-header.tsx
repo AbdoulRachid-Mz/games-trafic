@@ -85,10 +85,16 @@ export function EditionDetailHeader({
   // Autoplay: 15 secondes
   useEffect(() => {
     if (!api) return;
-    const interval = setInterval(() => {
-      api.scrollNext();
+    
+    const intervalId = setInterval(() => {
+      if (api.canScrollNext()) {
+        api.scrollNext();
+      } else {
+        api.scrollTo(0);
+      }
     }, 15000);
-    return () => clearInterval(interval);
+
+    return () => clearInterval(intervalId);
   }, [api]);
 
   // Nombre d'items visibles selon la taille d'écran
@@ -231,8 +237,49 @@ export function EditionDetailHeader({
               </div>
             </CarouselItem>
 
+            {/* Si terminé, afficher le Champion */}
+            {edition.status === "COMPLETED" && edition.winnerMetadata ? (
+              <CarouselItem className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4">
+                <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card border-2 border-yellow-500/50 shadow-xl shadow-yellow-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-background to-background" />
+                  
+                  <div className="relative h-full w-full p-4 md:p-6 flex flex-col items-center justify-center text-center space-y-4">
+                    <div className="absolute top-4 right-4">
+                      <Trophy className="h-6 w-6 text-yellow-500 animate-pulse" />
+                    </div>
+                    
+                    <Badge className="bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border-yellow-500/50 uppercase tracking-widest text-[10px]">
+                      Champion de l'Édition
+                    </Badge>
+                    
+                    <div className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-muted overflow-hidden border-4 border-yellow-500 shadow-lg relative">
+                      {(edition.winnerMetadata as any).image ? (
+                        <Image
+                          src={(edition.winnerMetadata as any).image}
+                          alt={(edition.winnerMetadata as any).username || "Champion"}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary text-2xl font-bold">
+                          {((edition.winnerMetadata as any).username || "C").charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-black italic tracking-tighter text-foreground">
+                        {(edition.winnerMetadata as any).username}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">Félicitations pour cette victoire !</p>
+                    </div>
+                  </div>
+                </div>
+              </CarouselItem>
+            ) : null}
+
             {/* Slides des matchs récents */}
-            {recentMatches.map((match, idx) => (
+            {edition.status !== "COMPLETED" && recentMatches.map((match, idx) => (
               <CarouselItem
                 key={match.id}
                 className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4"
@@ -422,7 +469,7 @@ export function EditionDetailHeader({
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1 md:mb-2">
               <Typography
-                variant="h2"
+                variant="h3"
                 weight="bold"
                 className="text-xl md:text-2xl lg:text-3xl"
               >

@@ -34,6 +34,7 @@ import {
   Trophy,
   Calendar,
   Info,
+  Play,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -45,6 +46,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import Link from "next/link";
+import { MatchGenerationDialog } from "./match-generation-dialog";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -848,24 +850,18 @@ export function PhaseOrganizeClient({
                       {isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <RefreshCcw className="h-4 w-4" />
+                        <Play className="h-4 w-4 fill-current" />
                       )}
-                      Générer la Structure
+                      Générer la phase
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-amber-500" />{" "}
-                        Action Déconseillée en Mode Auto
-                      </AlertDialogTitle>
+                      <AlertDialogTitle>Confirmation</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Cette action va écraser la structure actuelle gérée par
-                        l'Assistant. Cela peut entraîner des incohérences dans
-                        les qualifications automatiques.
-                        <br />
-                        <br />
-                        Voulez-vous continuer ?
+                        L'Assistant va organiser cette phase automatiquement.
+                        Toute structure existante pour cette phase sera
+                        réinitialisée.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -877,18 +873,26 @@ export function PhaseOrganizeClient({
                   </AlertDialogContent>
                 </AlertDialog>
               ) : (
-                <Button
-                  className="w-full gap-2 font-bold"
-                  onClick={handleAutoGenerate}
-                  disabled={isPending || sourceParticipants.length === 0}
-                >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCcw className="h-4 w-4" />
-                  )}
-                  Générer la Structure
-                </Button>
+                <div className="w-full space-y-2">
+                  <Button
+                    className="w-full gap-2 font-bold"
+                    onClick={handleSaveGroups}
+                    disabled={isPending || draftGroups.length === 0}
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    Sauvegarder l&apos;organisation
+                  </Button>
+                  
+                  <MatchGenerationDialog 
+                    editionId={editionId}
+                    phaseId={phaseId}
+                    phaseType={phaseType}
+                  />
+                </div>
               )}
 
               {!generateMatches && (
