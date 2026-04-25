@@ -2828,7 +2828,7 @@ if ((phaseType === "ELIMINATION" || phaseType === "KNOCKOUT") && qualifiedRegist
   );
   
   if (propagationResult.propagated) {
-    console.log(`[markGroupCompleteAction] Propagation réussie: ${propagationResult.propagatedCount} qualifiés vers le round ${propagationResult.nextGroupOrder + 1}`);
+    console.log(`[markGroupCompleteAction] Propagation réussie: ${propagationResult.propagatedCount} qualifiés vers le round ${(propagationResult?.nextGroupOrder || 0) + 1}`);
   } else if (propagationResult.isFinal) {
     console.log(`[markGroupCompleteAction] Phase élimination terminée - finale jouée`);
   } else {
