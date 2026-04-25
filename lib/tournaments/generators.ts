@@ -6,9 +6,10 @@ import {
   bracketNodes, 
   matches 
 } from "@/database/schema";
-import { eq, and, sql } from "drizzle-orm";
-import { shuffle, chunk } from "./utils";
-import { generateGroupMatches } from "./match.generator";
+import { eq, and, sql, asc } from "drizzle-orm";
+import { shuffle, chunk, getDefaultScheduledTime } from "./utils";
+import { generateGroupMatches, generateEliminationMatches } from "./match.generator";
+import { getEliminationRoundName } from "./get-name";
 
 /**
  * Helper to identify if an ID is a structural placeholder (e.g. QUALIFIER_1, WINNER) 
@@ -242,16 +243,15 @@ export async function setupGroupPhase(
 }
 
 /**
- * Set up an Elimination (Bracket) phase
+ * Set up an Elimination (Bracket) phase with groups per level
  */
-export async function setupBracketPhase(
+export async function setupEliminationGroups(
   tx: any,
   editionId: string,
   phase: any,
   participantRegIds: string[],
   options: GeneratorOptions
 ) {
-  console.warn("[DEPRECATED] setupBracketPhase is deprecated. Use setupEliminationGroups instead.");
   const workingRegIds = [...participantRegIds];
   const participantCount = workingRegIds.length;
   
@@ -261,17 +261,52 @@ export async function setupBracketPhase(
   let matchCounter = 1;
   let previousRoundNodes: any[] = [];
   const allCreatedNodes = [];
+  const createdGroups = [];
 
   // Build tree from Finals down to Round 1
   for (let round = totalRounds; round >= 1; round--) {
     const matchesThisRound = Math.pow(2, totalRounds - round);
+    const roundParticipantCount = matchesThisRound * 2;
+    const groupName = getEliminationRoundName(roundParticipantCount);
+    
+    // Create group for this round
+    const [group] = await tx.insert(phaseGroups).values({
+      phaseId: phase.id,
+      name: groupName,
+      order: round - 1, // Round 1 is order 0, Round 2 is order 1, etc.
+      participantCount: round === 1 ? participantCount : 0, 
+      groupType: 'ELIMINATION',
+      config: {
+        isHomeAway: options.isHomeAway || false,
+        generateMatches: options.generateMatches !== false,
+        advanceCount: matchesThisRound, // IMPORTANT: Autant de qualifiés que de matchs
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+    
+    createdGroups.push(group);
+
+    // If first round, assign participants to the group
+    if (round === 1 && workingRegIds.length > 0) {
+      for (const regId of workingRegIds) {
+        if (!isPlaceholder(regId)) {
+          await tx.insert(phaseGroupParticipants).values({
+            groupId: group.id,
+            registrationId: regId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      }
+    }
+
     const currentRoundNodes = [];
 
     for (let i = 0; i < matchesThisRound; i++) {
       const p1 = round === 1 ? workingRegIds[i * 2] || null : null;
       const p2 = round === 1 ? workingRegIds[i * 2 + 1] || null : null;
 
-      // Find parent from the previous iteration (which processed round + 1)
       let parentNodeId = null;
       let childPosition = null;
       
@@ -279,13 +314,13 @@ export async function setupBracketPhase(
         const parentIndex = Math.floor(i / 2);
         if (previousRoundNodes[parentIndex]) {
           parentNodeId = previousRoundNodes[parentIndex].id;
-          // Even index = UPPER (slot 0 in parent), Odd index = LOWER (slot 1 in parent)
           childPosition = i % 2 === 0 ? "UPPER" : "LOWER";
         }
       }
 
       const [node] = await tx.insert(bracketNodes).values({
         phaseId: phase.id,
+        groupId: group.id, // Link node to the group of its round
         nodeCode: `R${round}-M${i + 1}`,
         round,
         matchNumber: matchCounter++,
@@ -297,7 +332,7 @@ export async function setupBracketPhase(
           participants: [p1, p2].filter(Boolean),
           requiresMatch: round === 1 ? !!p1 && !!p2 : false,
           generateMatches: options.generateMatches !== false,
-          matchesCount: 1,
+          matchesCount: options.isHomeAway ? 2 : 1,
           format: 'BEST_OF_1'
         },
         createdAt: new Date(),
@@ -306,36 +341,51 @@ export async function setupBracketPhase(
 
       currentRoundNodes.push(node);
       allCreatedNodes.push({ node, round, i, p1, p2 });
-    }
 
-    // Keep these nodes to act as parents for the next iteration (round - 1)
-    previousRoundNodes = currentRoundNodes;
-  }
-
-  // Generate matches ONLY for the first round if options permit
-  if (options.generateMatches !== false) {
-    const round1Nodes = allCreatedNodes.filter(n => n.round === 1);
-    for (const { node, p1, p2, i } of round1Nodes) {
-      if (p1 && p2 && !isPlaceholder(p1) && !isPlaceholder(p2)) {
+      // Generate matches for the node if requested
+      if (options.generateMatches !== false) {
         const matchesToCreate = options.isHomeAway ? 2 : 1;
         for (let mIdx = 0; mIdx < matchesToCreate; mIdx++) {
           await tx.insert(matches).values({
             editionId,
             phaseId: phase.id,
+            groupId: group.id,
             bracketNodeId: node.id,
-            participant1RegistrationId: mIdx === 0 ? p1 : p2, 
-            participant2RegistrationId: mIdx === 0 ? p2 : p1,
+            participant1RegistrationId: round === 1 ? (mIdx === 0 ? p1 : p2) : null, 
+            participant2RegistrationId: round === 1 ? (mIdx === 0 ? p2 : p1) : null,
             matchCode: matchesToCreate > 1 ? `${node.nodeCode}-A${mIdx + 1}` : `${node.nodeCode}`,
             status: 'PENDING',
-            round: 1,
-            matchNumber: i + 1,
+            round: round,
+            matchNumber: node.matchNumber,
+            metadata: {
+              format: options.isHomeAway ? "HOME_AWAY" : "BEST_OF_1",
+              leg: mIdx + 1,
+            },
+            scheduledTime: getDefaultScheduledTime(round, node.matchNumber),
             createdAt: new Date(),
             updatedAt: new Date(),
           });
         }
       }
     }
+
+    previousRoundNodes = currentRoundNodes;
   }
+
+  return createdGroups;
+}
+
+/**
+ * @deprecated Use setupEliminationGroups instead
+ */
+export async function setupBracketPhase(
+  tx: any,
+  editionId: string,
+  phase: any,
+  participantRegIds: string[],
+  options: GeneratorOptions
+) {
+  return await setupEliminationGroups(tx, editionId, phase, participantRegIds, options);
 }
 
 /**

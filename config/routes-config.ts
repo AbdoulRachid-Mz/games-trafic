@@ -479,7 +479,28 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     hideFloatingActions: true,
     hideTopMiddleOnScroll: true,
     activeFabActionId: "create-tournament",
-    dockLinks: defaultDockLinks,
+    dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: false },
+      {
+        href: "/marketplace",
+        label: "Marché",
+        icon: "marketplace",
+        requireAuth: false,
+      },
+      { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
+      {
+        href: "/games",
+        label: "Jeux",
+        icon: "tournaments",
+        requireAuth: false,
+      },
+      {
+        href: "/game-clips",
+        label: "Clips",
+        icon: "clips",
+        requireAuth: false,
+      },
+    ],
     fabActions: defaultFABActions,
   },
   {

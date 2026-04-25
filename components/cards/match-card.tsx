@@ -522,7 +522,7 @@ export function MatchCard({
             variant={canSubmit ? "default" : "outline"}
             size={isCompact ? "xs" : "sm"}
             className={cn(
-              "w-full gap-1.5 text-xs sm:text-sm transition-all",
+              "flex-1 gap-1.5 text-xs sm:text-sm transition-all",
               canSubmit && "shadow-md shadow-primary/20",
             )}
           >
@@ -549,7 +549,7 @@ export function MatchCard({
             <Button
               size={isCompact ? "xs" : "sm"}
               variant="outline"
-              className="shrink-0 border-primary/20 text-primary hover:bg-primary/5 h-8 w-8 sm:h-9 sm:w-9"
+              className="shrink-0 border-primary/20 text-primary hover:bg-primary/5"
               title="Validation Admin"
             >
               <ShieldAlert className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

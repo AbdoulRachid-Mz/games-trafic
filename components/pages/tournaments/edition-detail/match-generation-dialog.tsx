@@ -18,6 +18,7 @@ export function MatchGenerationDialog({
   groupId,
   disabled = false,
   onSuccess,
+  config,
 }: {
   phaseId: string;
   editionId: string;
@@ -25,6 +26,7 @@ export function MatchGenerationDialog({
   groupId?: string;
   disabled?: boolean;
   onSuccess?: () => void;
+  config?: any;
 }) {
   const [open, setOpen] = useState(false);
   const { generateMatches } = useMatchManager(phaseId);
@@ -40,10 +42,10 @@ export function MatchGenerationDialog({
         const result = await organizeEditionStructure(
           editionId,
           [{
-            name: "Phase", // Idéalement le nom réel
+            name: "Phase", 
             phaseType: phaseType as any,
-            order: 0,
-            config: { generateGroups: true, generateNodes: true, generateMatches: true }
+            order: config?.order || 0,
+            config: config || { generateGroups: true, generateNodes: true, generateMatches: true }
           }],
           [], // participants existants auto
           { clearExisting: true, targetPhaseId: phaseId }

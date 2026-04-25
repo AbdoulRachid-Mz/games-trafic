@@ -89,24 +89,32 @@ export function EditionPageContent({
       label: "Participants",
       value: `${edition.currentParticipants || registrations.length}/${edition.maxParticipants || "∞"}`,
       color: "text-blue-500",
+      link: `?activeTab=participants`,
+      className: "bg-blue-500/10",
     },
     {
       icon: <Target className="h-5 w-5" />,
       label: "Check-in",
       value: checkedInCount,
       color: "text-indigo-500",
+      link: `?activeTab=participants`,
+      className: "bg-indigo-500/10",
     },
     {
       icon: <Trophy className="h-5 w-5" />,
       label: "Matchs joués",
       value: edition.completedMatchCount || 0,
       color: "text-green-500",
+      link: `?activeTab=matches`,
+      className: "bg-green-500/10",
     },
     {
       icon: <Calendar className="h-5 w-5" />,
       label: "Phases",
       value: phases.length,
+      link: `?activeTab=phases`,
       color: "text-purple-500",
+      className: "bg-purple-500/10",
     },
     ...(Number(edition.entryFee) > 0
       ? [
@@ -115,6 +123,7 @@ export function EditionPageContent({
             label: "Frais",
             value: `${edition.entryFee} ${edition.prizeCurrency || "GTC"}`,
             color: "text-amber-500",
+            className: "bg-amber-500/10",
           },
         ]
       : []),
@@ -340,6 +349,7 @@ export function EditionPageContent({
         {/* Stats Carousel */}
         <StatsCarousel
           data={editionStats}
+          className="my-3"
           itemsPerView={{ mobile: 2, lg: 4, xl: 5 }}
         />
 

@@ -623,12 +623,12 @@ export function OrganizeWizardClient({
         },
       });
 
-      // 2. Éliminations Directes (UNE SEULE PHASE)
+      // 2. Phase Éliminatoire (nomenclature LDC correcte)
       const koOptions = getDepthOptions(false);
       
       phases.push({
         id: generateTempId(),
-        name: isHomeAwayElimination ? "Phase Finale (A/R)" : "Phase Finale",
+        name: isHomeAwayElimination ? "Phase éliminatoire (A/R)" : "Phase éliminatoire",
         phaseType: "ELIMINATION",
         order: 1,
         participantSource: "PHASE_QUALIFIED",
@@ -662,7 +662,7 @@ export function OrganizeWizardClient({
     }
 
     return phases;
-  }, [autoConfig, isPowerOfTwo, getNearestLowerPowerOfTwo]);
+  }, [autoConfig]);
 
   // Mettre à jour le preview via le serveur
   useEffect(() => {
@@ -1212,10 +1212,12 @@ function AutoModeConfig({
     setIsSaving(false);
   };
 
-  function getRoundDisplayName(roundNumber: number, totalQualified: number): string {
-  const matchCount = totalQualified / Math.pow(2, roundNumber);
-  return getEliminationRoundName(matchCount * 2);
-}
+  // Limites dynamiques basées sur les participants
+  const maxGroupsCount = Math.max(1, Math.floor(currentParticipantsCount / 2));
+  const safeGroupsCount = Math.min(autoConfig.groupsCount || 1, maxGroupsCount);
+  const participantsPerGroup = safeGroupsCount > 0 ? Math.floor(currentParticipantsCount / safeGroupsCount) : 0;
+  const maxQualifiedPerGroup = Math.max(1, participantsPerGroup - 1);
+  const safeQualifiedCount = Math.min(autoConfig.groupsQualifiedCount, maxQualifiedPerGroup);
 
   return (
     <div className="space-y-6">
@@ -1373,31 +1375,46 @@ function AutoModeConfig({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-medium">Nombre de groupes</Label>
+              <Label className="text-xs font-medium">Nombre de groupes
+                <span className="ml-2 text-[10px] text-muted-foreground font-normal">
+                  (max {maxGroupsCount} pour {currentParticipantsCount} participants)
+                </span>
+              </Label>
               <div className="flex items-center gap-3">
                 <Slider
-                  value={[autoConfig.groupsCount || 1]}
-                  onValueChange={(v) =>
-                    onConfigChange({ ...autoConfig, groupsCount: v[0] })
-                  }
+                  value={[Math.min(autoConfig.groupsCount || 1, maxGroupsCount)]}
+                  onValueChange={(v) => {
+                    const newGroupsCount = v[0];
+                    const newParticipantsPerGroup = Math.floor(currentParticipantsCount / newGroupsCount);
+                    const newMaxQualified = Math.max(1, newParticipantsPerGroup - 1);
+                    const newQualified = Math.min(autoConfig.groupsQualifiedCount, newMaxQualified);
+                    onConfigChange({ ...autoConfig, groupsCount: newGroupsCount, groupsQualifiedCount: newQualified });
+                  }}
                   min={1}
-                  max={16}
+                  max={maxGroupsCount}
                   step={1}
                   className="flex-1"
                 />
                 <span className="w-8 text-center font-bold text-sm">
-                  {autoConfig.groupsCount}
+                  {Math.min(autoConfig.groupsCount, maxGroupsCount)}
                 </span>
               </div>
+              {currentParticipantsCount > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {Math.floor(currentParticipantsCount / Math.min(autoConfig.groupsCount || 1, maxGroupsCount))} participants/groupe
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-medium">
-                Qualifiés par groupe
+              <Label className="text-xs font-medium">Qualifiés par groupe
+                <span className="ml-2 text-[10px] text-muted-foreground font-normal">
+                  (max {maxQualifiedPerGroup})
+                </span>
               </Label>
               <div className="flex items-center gap-3">
                 <Slider
-                  value={[autoConfig.groupsQualifiedCount]}
+                  value={[Math.min(autoConfig.groupsQualifiedCount, maxQualifiedPerGroup)]}
                   onValueChange={(v) =>
                     onConfigChange({
                       ...autoConfig,
@@ -1405,28 +1422,29 @@ function AutoModeConfig({
                     })
                   }
                   min={1}
-                  max={Math.max(1, Math.floor(currentParticipantsCount / (autoConfig.groupsCount || 1)) - 1)}
+                  max={maxQualifiedPerGroup}
                   step={1}
                   className="flex-1"
                 />
                 <span className="w-8 text-center font-bold text-sm">
-                  {autoConfig.groupsQualifiedCount}
+                  {Math.min(autoConfig.groupsQualifiedCount, maxQualifiedPerGroup)}
                 </span>
               </div>
+              <p className="text-[10px] text-muted-foreground">
+                Total qualifiés : {Math.min(autoConfig.groupsCount, maxGroupsCount)} × {Math.min(autoConfig.groupsQualifiedCount, maxQualifiedPerGroup)} = <span className="font-bold text-primary">{Math.min(autoConfig.groupsCount, maxGroupsCount) * Math.min(autoConfig.groupsQualifiedCount, maxQualifiedPerGroup)}</span> en phase éliminatoire
+              </p>
             </div>
 
             {/* Knockout Strategy choice */}
             {(() => {
-              const qualifiedTotal =
-                (autoConfig.groupsCount || 4) * autoConfig.groupsQualifiedCount;
-              const isPowerOfTwo = (n: number) =>
-                (n & (n - 1)) === 0 && n !== 0;
+              const qualifiedTotal = safeGroupsCount * safeQualifiedCount;
+              const isPowerOfTwo = (n: number) => (n & (n - 1)) === 0 && n !== 0;
 
               if (qualifiedTotal > 0 && !isPowerOfTwo(qualifiedTotal)) {
                 return (
                   <div className="space-y-3 pt-2 border-t border-primary/10">
                     <Label className="text-xs font-bold text-primary">
-                      Gestion du tableau ({qualifiedTotal} qualifiés)
+                      Gestion du tableau ({qualifiedTotal} qualifiés — non puissance de 2)
                     </Label>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
@@ -1471,32 +1489,27 @@ function AutoModeConfig({
             })()}
           </div>
 
+
           {/* Dynamic Knockout Preview Box inside CHAMPIONS config */}
           {(() => {
-            const qualifiedTotal =
-              (autoConfig.groupsCount || 4) * autoConfig.groupsQualifiedCount;
-            const rounds = Math.ceil(Math.log2(qualifiedTotal));
-            const stages = [];
+            const qualifiedTotal = safeGroupsCount * safeQualifiedCount;
+            const rounds = Math.ceil(Math.log2(Math.max(2, qualifiedTotal)));
+            const stages: string[] = [];
 
-            if (rounds >= 1 && qualifiedTotal >= 2) stages.unshift("Finale");
-            if (rounds >= 2 && qualifiedTotal >= 4)
-              stages.unshift("Demi-finale");
-            if (rounds >= 3 && qualifiedTotal >= 8)
-              stages.unshift("Quart de finale");
-            if (rounds >= 4 && qualifiedTotal >= 16)
-              stages.unshift("Huitièmes");
-            if (rounds >= 5 && qualifiedTotal >= 32)
-              stages.unshift("Seizièmes");
-            if (rounds >= 6 && qualifiedTotal >= 64)
-              stages.unshift("Trente-deuxièmes");
-            if (rounds >= 7 && qualifiedTotal >= 128)
-              stages.unshift("Soixante-quatrièmes");
+            // Nommage LDC correct selon le nombre de qualifiés
+            if (qualifiedTotal >= 2) stages.unshift("Finale");
+            if (qualifiedTotal >= 4) stages.unshift("Demi-finale");
+            if (qualifiedTotal >= 8) stages.unshift("1/4 de finale");
+            if (qualifiedTotal >= 16) stages.unshift("1/8 de finale");
+            if (qualifiedTotal >= 32) stages.unshift("1/16 de finale");
+            if (qualifiedTotal >= 64) stages.unshift("1/32 de finale");
+            if (qualifiedTotal >= 128) stages.unshift("1/64 de finale");
 
             return (
               <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 mt-2">
                 <Label className="text-xs font-bold text-primary flex items-center gap-2 mb-3">
-                  <ShieldCheck className="h-4 w-4" />
-                  Structure Phase Finale générée ({qualifiedTotal} qualifiés)
+                  <Trophy className="h-4 w-4" />
+                  Phase éliminatoire ({qualifiedTotal} qualifiés)
                 </Label>
                 <div className="flex items-center flex-wrap gap-2 text-sm">
                   {stages.map((stage, idx) => (
@@ -1504,7 +1517,7 @@ function AutoModeConfig({
                       key={idx}
                       className="flex items-center gap-2 text-muted-foreground font-medium"
                     >
-                      <div className="px-2 py-1 bg-background border rounded text-xs shadow-sm">
+                      <div className={`px-2 py-1 border rounded text-xs shadow-sm ${idx === stages.length - 1 ? "bg-primary text-primary-foreground border-primary font-bold" : "bg-background"}`}>
                         {stage}
                       </div>
                       {idx < stages.length - 1 && (
@@ -1519,9 +1532,7 @@ function AutoModeConfig({
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-3 leading-tight">
-                  Les phases finales débuteront automatiquement selon le nombre
-                  de qualifiés calculé ({autoConfig.groupsQualifiedCount} par
-                  groupe × {autoConfig.groupsCount} groupes).
+                  {safeGroupsCount} groupe(s) × {safeQualifiedCount} qualifié(s) = <strong>{qualifiedTotal}</strong> en phase éliminatoire.
                 </p>
               </div>
             );

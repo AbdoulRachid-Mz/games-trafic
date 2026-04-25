@@ -85,7 +85,7 @@ export function EditionDetailHeader({
   // Autoplay: 15 secondes
   useEffect(() => {
     if (!api) return;
-    
+
     const intervalId = setInterval(() => {
       if (api.canScrollNext()) {
         api.scrollNext();
@@ -204,6 +204,15 @@ export function EditionDetailHeader({
     <div className="relative border-b bg-gradient-to-b from-background via-background to-muted/10">
       {/* Bannière Carousel avec shadcn/ui */}
       <div className="relative w-full overflow-hidden">
+        {/* interaction button */}
+        <InteractionButton
+          entityType="EDITION"
+          entityId={edition.id}
+          type="follow"
+          className="absolute bg-primary/20 text-primary backdrop-blur top-4 right-4 z-10"
+          withCount
+          iconOnly={true}
+        />
         <Carousel
           setApi={setApi}
           opts={{
@@ -242,36 +251,43 @@ export function EditionDetailHeader({
               <CarouselItem className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4">
                 <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card border-2 border-yellow-500/50 shadow-xl shadow-yellow-500/20">
                   <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-background to-background" />
-                  
+
                   <div className="relative h-full w-full p-4 md:p-6 flex flex-col items-center justify-center text-center space-y-4">
                     <div className="absolute top-4 right-4">
                       <Trophy className="h-6 w-6 text-yellow-500 animate-pulse" />
                     </div>
-                    
+
                     <Badge className="bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border-yellow-500/50 uppercase tracking-widest text-[10px]">
                       Champion de l'Édition
                     </Badge>
-                    
+
                     <div className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-muted overflow-hidden border-4 border-yellow-500 shadow-lg relative">
                       {(edition.winnerMetadata as any).image ? (
                         <Image
                           src={(edition.winnerMetadata as any).image}
-                          alt={(edition.winnerMetadata as any).username || "Champion"}
+                          alt={
+                            (edition.winnerMetadata as any).username ||
+                            "Champion"
+                          }
                           fill
                           className="object-cover"
                         />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary text-2xl font-bold">
-                          {((edition.winnerMetadata as any).username || "C").charAt(0)}
+                          {(
+                            (edition.winnerMetadata as any).username || "C"
+                          ).charAt(0)}
                         </div>
                       )}
                     </div>
-                    
+
                     <div>
                       <h3 className="text-xl md:text-2xl font-black italic tracking-tighter text-foreground">
                         {(edition.winnerMetadata as any).username}
                       </h3>
-                      <p className="text-xs text-muted-foreground mt-1">Félicitations pour cette victoire !</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Félicitations pour cette victoire !
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -279,157 +295,172 @@ export function EditionDetailHeader({
             ) : null}
 
             {/* Slides des matchs récents */}
-            {edition.status !== "COMPLETED" && recentMatches.map((match, idx) => (
-              <CarouselItem
-                key={match.id}
-                className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4"
-              >
-                <Link
-                  href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
-                  className="block h-full"
+            {edition.status !== "COMPLETED" &&
+              recentMatches.map((match, idx) => (
+                <CarouselItem
+                  key={match.id}
+                  className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4"
                 >
-                  <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card">
-                    {/* Background avec overlay */}
-                    <div className="absolute inset-0">
-                      {tournament.coverImage && (
-                        <Image
-                          src={tournament.coverImage}
-                          alt="background"
-                          fill
-                          className="object-cover opacity-20 blur-sm scale-110"
-                        />
-                      )}
-                    </div>
-                    
-                    {/* Contenu de la carte */}
-                    <div className="relative h-full w-full bg-gradient-to-br from-background/95 via-background/90 to-primary/5 backdrop-blur-sm p-3 md:p-5 flex flex-col justify-between">
-                      {/* Header de la carte */}
-                      <div className="flex items-center justify-between mb-2 md:mb-4">
-                        <Badge
-                          variant="outline"
-                          className="bg-background/50 backdrop-blur-sm border-white/10 text-[8px] md:text-[10px] uppercase font-bold tracking-wider text-muted-foreground"
-                        >
-                          {match.phase?.name || "Match"}
-                        </Badge>
-                        <div className="flex items-center gap-1 text-[8px] md:text-[10px] text-muted-foreground">
-                          <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" />
-                          {match.status === "COMPLETED"
-                            ? "Terminé"
-                            : match.scheduledTime
-                              ? format(new Date(match.scheduledTime), "HH:mm", { locale: fr })
-                              : "À planifier"}
-                        </div>
+                  <Link
+                    href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
+                    className="block h-full"
+                  >
+                    <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card">
+                      {/* Background avec overlay */}
+                      <div className="absolute inset-0">
+                        {tournament.coverImage && (
+                          <Image
+                            src={tournament.coverImage}
+                            alt="background"
+                            fill
+                            className="object-cover opacity-20 blur-sm scale-110"
+                          />
+                        )}
                       </div>
 
-                      {/* Participants et score */}
-                      <div className="flex items-center justify-center gap-2 md:gap-4 flex-1">
-                        {/* Participant 1 */}
-                        <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
-                          <div className="relative">
-                            <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
-                              {match.participant1?.member?.team?.logo ||
-                              match.participant1?.member?.user?.profileImage ? (
-                                <Image
-                                  src={
-                                    match.participant1?.member?.team?.logo ||
-                                    match.participant1?.member?.user?.profileImage ||
-                                    match.participant1?.member?.user?.image ||
-                                    "/icons/avatar-500.png"
-                                  }
-                                  alt="participant1"
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <div className="text-white/20 font-black text-xs md:text-base">?</div>
-                              )}
-                            </div>
+                      {/* Contenu de la carte */}
+                      <div className="relative h-full w-full bg-gradient-to-br from-background/95 via-background/90 to-primary/5 backdrop-blur-sm p-3 md:p-5 flex flex-col justify-between">
+                        {/* Header de la carte */}
+                        <div className="flex items-center justify-between mb-2 md:mb-4">
+                          <Badge
+                            variant="outline"
+                            className="bg-background/50 backdrop-blur-sm border-white/10 text-[8px] md:text-[10px] uppercase font-bold tracking-wider text-muted-foreground"
+                          >
+                            {match.phase?.name || "Match"}
+                          </Badge>
+                          <div className="flex items-center gap-1 text-[8px] md:text-[10px] text-muted-foreground">
+                            <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                            {match.status === "COMPLETED"
+                              ? "Terminé"
+                              : match.scheduledTime
+                                ? format(
+                                    new Date(match.scheduledTime),
+                                    "HH:mm",
+                                    { locale: fr },
+                                  )
+                                : "À planifier"}
                           </div>
-                          <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
-                            {match.participant1?.member?.team?.name ||
-                              match.participant1?.member?.user?.username ||
-                              "TBD"}
+                        </div>
+
+                        {/* Participants et score */}
+                        <div className="flex items-center justify-center gap-2 md:gap-4 flex-1">
+                          {/* Participant 1 */}
+                          <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
+                            <div className="relative">
+                              <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
+                                {match.participant1?.member?.team?.logo ||
+                                match.participant1?.member?.user
+                                  ?.profileImage ? (
+                                  <Image
+                                    src={
+                                      match.participant1?.member?.team?.logo ||
+                                      match.participant1?.member?.user
+                                        ?.profileImage ||
+                                      match.participant1?.member?.user?.image ||
+                                      "/icons/avatar-500.png"
+                                    }
+                                    alt="participant1"
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="text-white/20 font-black text-xs md:text-base">
+                                    ?
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
+                              {match.participant1?.member?.team?.name ||
+                                match.participant1?.member?.user?.username ||
+                                "TBD"}
+                            </span>
+                          </div>
+
+                          {/* Score / VS */}
+                          <div className="flex flex-col items-center">
+                            {match.status === "COMPLETED" ? (
+                              <div className="flex items-center gap-1 md:gap-2">
+                                <span
+                                  className={cn(
+                                    "text-lg md:text-2xl font-black italic",
+                                    (match.score1 ?? 0) > (match.score2 ?? 0)
+                                      ? "text-primary"
+                                      : "text-foreground",
+                                  )}
+                                >
+                                  {match.score1 ?? 0}
+                                </span>
+                                <span className="text-muted-foreground text-xs md:text-sm">
+                                  -
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-lg md:text-2xl font-black italic",
+                                    (match.score2 ?? 0) > (match.score1 ?? 0)
+                                      ? "text-primary"
+                                      : "text-foreground",
+                                  )}
+                                >
+                                  {match.score2 ?? 0}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="h-6 w-10 md:h-8 md:w-14 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
+                                <span className="text-[10px] md:text-xs font-black italic text-primary">
+                                  VS
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Participant 2 */}
+                          <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
+                            <div className="relative">
+                              <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
+                                {match.participant2?.member?.team?.logo ||
+                                match.participant2?.member?.user
+                                  ?.profileImage ? (
+                                  <Image
+                                    src={
+                                      match.participant2?.member?.team?.logo ||
+                                      match.participant2?.member?.user
+                                        ?.profileImage ||
+                                      match.participant2?.member?.user?.image ||
+                                      "/icons/avatar-500.png"
+                                    }
+                                    alt="participant2"
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="text-white/20 font-black text-xs md:text-base">
+                                    ?
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
+                              {match.participant2?.member?.team?.name ||
+                                match.participant2?.member?.user?.username ||
+                                "TBD"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="mt-2 md:mt-4 pt-1 md:pt-2 border-t border-white/5 flex justify-center">
+                          <span className="text-[8px] md:text-[9px] text-muted-foreground/60 uppercase tracking-wider">
+                            Cliquez pour voir les détails
                           </span>
                         </div>
-
-                        {/* Score / VS */}
-                        <div className="flex flex-col items-center">
-                          {match.status === "COMPLETED" ? (
-                            <div className="flex items-center gap-1 md:gap-2">
-                              <span
-                                className={cn(
-                                  "text-lg md:text-2xl font-black italic",
-                                  (match.score1 ?? 0) > (match.score2 ?? 0)
-                                    ? "text-primary"
-                                    : "text-foreground",
-                                )}
-                              >
-                                {match.score1 ?? 0}
-                              </span>
-                              <span className="text-muted-foreground text-xs md:text-sm">-</span>
-                              <span
-                                className={cn(
-                                  "text-lg md:text-2xl font-black italic",
-                                  (match.score2 ?? 0) > (match.score1 ?? 0)
-                                    ? "text-primary"
-                                    : "text-foreground",
-                                )}
-                              >
-                                {match.score2 ?? 0}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="h-6 w-10 md:h-8 md:w-14 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
-                              <span className="text-[10px] md:text-xs font-black italic text-primary">
-                                VS
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Participant 2 */}
-                        <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
-                          <div className="relative">
-                            <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
-                              {match.participant2?.member?.team?.logo ||
-                              match.participant2?.member?.user?.profileImage ? (
-                                <Image
-                                  src={
-                                    match.participant2?.member?.team?.logo ||
-                                    match.participant2?.member?.user?.profileImage ||
-                                    match.participant2?.member?.user?.image ||
-                                    "/icons/avatar-500.png"
-                                  }
-                                  alt="participant2"
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <div className="text-white/20 font-black text-xs md:text-base">?</div>
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
-                            {match.participant2?.member?.team?.name ||
-                              match.participant2?.member?.user?.username ||
-                              "TBD"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="mt-2 md:mt-4 pt-1 md:pt-2 border-t border-white/5 flex justify-center">
-                        <span className="text-[8px] md:text-[9px] text-muted-foreground/60 uppercase tracking-wider">
-                          Cliquez pour voir les détails
-                        </span>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </CarouselItem>
-            ))}
+                  </Link>
+                </CarouselItem>
+              ))}
           </CarouselContent>
-          
+
           {/* Navigation buttons */}
           <CarouselPrevious className="left-2 md:left-4 h-7 w-7 md:h-8 md:w-8 bg-background/80 backdrop-blur-sm border-white/20" />
           <CarouselNext className="right-2 md:right-4 h-7 w-7 md:h-8 md:w-8 bg-background/80 backdrop-blur-sm border-white/20" />
@@ -458,7 +489,12 @@ export function EditionDetailHeader({
                 />
               </div>
               <div className="absolute -bottom-2 -right-2">
-                <Badge className={cn(getStatusColor(edition.status || "UPCOMING"), "text-[8px] md:text-[10px] px-1.5 py-0 md:px-2 md:py-0.5")}>
+                <Badge
+                  className={cn(
+                    getStatusColor(edition.status || "UPCOMING"),
+                    "text-[8px] md:text-[10px] px-1.5 py-0 md:px-2 md:py-0.5",
+                  )}
+                >
                   {getStatusLabel(edition.status || "UPCOMING")}
                 </Badge>
               </div>
@@ -476,12 +512,17 @@ export function EditionDetailHeader({
                 {edition.name || `Édition #${edition.editionNumber}`}
               </Typography>
               <div className="flex flex-wrap gap-1.5">
-                <Badge variant="outline" className="gap-0.5 text-[9px] md:text-xs">
+                <Badge
+                  variant="outline"
+                  className="gap-0.5 text-[9px] md:text-xs"
+                >
                   <span className="text-xs md:text-sm">
                     {getLocationIcon(edition.locationType || "ONLINE")}
                   </span>
                   <span className="hidden sm:inline ml-0.5">
-                    {edition.locationType === "ONLINE" ? "En ligne" : "Présentiel"}
+                    {edition.locationType === "ONLINE"
+                      ? "En ligne"
+                      : "Présentiel"}
                   </span>
                 </Badge>
                 {edition.entryFee && Number(edition.entryFee) > 0 && (
@@ -534,7 +575,7 @@ export function EditionDetailHeader({
                   className="gap-1.5 text-xs flex-1 sm:flex-initial"
                 >
                   {action.icon && <action.icon className="h-3.5 w-3.5" />}
-                  <span className="hidden xs:inline">{action.label}</span>
+                  <span className="">{action.label}</span>
                 </Button>
               ))}
             </div>
@@ -556,7 +597,9 @@ export function EditionDetailHeader({
                         "text-xs",
                       )}
                     >
-                      {action.icon && <action.icon className="h-3.5 w-3.5 mr-2" />}
+                      {action.icon && (
+                        <action.icon className="h-3.5 w-3.5 mr-2" />
+                      )}
                       {action.label}
                     </DropdownMenuItem>
                   ))}

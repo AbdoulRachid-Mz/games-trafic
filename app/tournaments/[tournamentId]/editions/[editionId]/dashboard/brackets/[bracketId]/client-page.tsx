@@ -155,7 +155,6 @@ export default function ClientBracketNodeDetailPage({
     FINAL: "bg-purple-100 text-purple-700 border-purple-200",
   };
 
-  const nodeParticipants = (node?.metadata as any)?.participants || [];
 
   // Handler pour le rafraîchissement
   const handleRefresh = () => {
@@ -174,6 +173,27 @@ export default function ClientBracketNodeDetailPage({
       toast.error("Erreur lors de la suppression");
     }
   };
+  
+  const nodeParticipants = (node?.metadata as any)?.participants || [];
+  
+  // Fusionner les participants du groupe et ceux du bracket (priorité aux métadonnées du nœud pour cet affichage spécifique)
+  const allPossibleParticipants = [...nodeParticipants];
+  groupParticipants.forEach((p) => {
+    if (p.registrationId && !allPossibleParticipants.includes(p.registrationId)) {
+      allPossibleParticipants.push(p.registrationId);
+    }
+  });
+
+  const participantsList = allPossibleParticipants.map((regId) => {
+    const reg = registrations.find((r: any) => r.id === regId) as any;
+    const gp = groupParticipants.find(p => p.registrationId === regId);
+    return {
+      registrationId: regId,
+      displayName: reg?.member?.displayName || reg?.member?.user?.username || reg?.member?.team?.name || "Joueur",
+      teamName: reg?.member?.team?.name,
+      isQualified: gp?.qualified || false,
+    };
+  });
 
   const menuActions: MenuItemAction[] = [
     {
@@ -197,21 +217,7 @@ export default function ClientBracketNodeDetailPage({
             phaseId={node?.phaseId || ""}
             groupId={node?.groupId || null}
             bracketNodeId={bracketId}
-            participants={groupParticipants.map((p) => {
-              const reg = registrations.find(
-                (r: any) => r.id === p.registrationId,
-              ) as any;
-              return {
-                registrationId: p.registrationId || "",
-                displayName:
-                  reg?.member?.displayName ||
-                  reg?.member?.user?.username ||
-                  reg?.member?.team?.name ||
-                  "Joueur",
-                teamName: reg?.member?.team?.name,
-                isQualified: p.qualified || false,
-              };
-            })}
+            participants={participantsList}
             currentMatchesCount={matches.length}
             inheritedConfig={(node?.metadata as any)?.matchConfig}
             asFormOnly

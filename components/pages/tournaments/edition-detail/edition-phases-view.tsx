@@ -178,11 +178,11 @@ export function EditionPhasesView({
                   )}
                 </div>
 
-                {!isLast && (
+                {/* {!isLast && (
                   <div className="md:hidden absolute -bottom-6 left-1/2 transform -translate-x-1/2">
                     <ArrowRight className="h-4 w-4 text-muted-foreground rotate-90" />
                   </div>
-                )}
+                )} */}
               </div>
             );
           })}

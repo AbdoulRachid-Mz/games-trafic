@@ -131,6 +131,7 @@ export function PhaseOrganizeClient({
 }: PhaseOrganizeClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
   const isAutoMode = editionConfig.competitionMode === "AUTO";
   const [draftGroups, setDraftGroups] = useState<DraftGroup[]>([]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
@@ -891,6 +892,7 @@ export function PhaseOrganizeClient({
                     editionId={editionId}
                     phaseId={phaseId}
                     phaseType={phaseType}
+                    config={inheritedConfig}
                   />
                 </div>
               )}
@@ -1233,9 +1235,11 @@ function GroupDraftCard({
                   onChange={(e) => onUpdate({ name: e.target.value })}
                   onClick={(e) => e.stopPropagation()}
                 />
-                <div className="text-[10px] text-muted-foreground">
-                  {group.participantIds.length} /{" "}
-                  {group.config.participantsPerGroup} participants
+                <div className="text-[10px] text-muted-foreground flex items-center gap-2">
+                  <span>{group.participantIds.length} /{" "}
+                  {group.config.participantsPerGroup} participants</span>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                  <span>{group.matchCount || 0} matchs</span>
                 </div>
               </div>
             </div>

@@ -10,7 +10,8 @@ import {
 } from "@/database/schema";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { shuffle, chunk } from "./utils";
-import { setupLeaguePhase, setupGroupPhase, setupBracketPhase, setupSwissPhase } from "./generators";
+import { setupLeaguePhase, setupGroupPhase, setupEliminationGroups, setupSwissPhase } from "./generators";
+import { getEliminationRoundName } from "./get-name";
 
 export interface PhaseBlueprint {
   name: string;
@@ -130,7 +131,7 @@ export async function createStructureEngine({
         const totalQualifiers = (groups?.length || 0) * advanceCount;
         currentPhaseParticipants = Array.from({ length: totalQualifiers }, (_, idx) => `QUALIFIER_${idx + 1}`);
       } else if (phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT") {
-        await setupBracketPhase(tx, editionId, phase, currentPhaseParticipants, genOptions);
+        await setupEliminationGroups(tx, editionId, phase, currentPhaseParticipants, genOptions);
         currentPhaseParticipants = ["WINNER"];
       } else if (phase.phaseType === "SWISS") {
         await setupSwissPhase(tx, editionId, phase, currentPhaseParticipants, {
@@ -255,15 +256,23 @@ async function generatePreview(phases: PhaseBlueprint[], participantRegIds: stri
       phaseMatches += totalRRMatches;
       currentParticipantsCount = p.config.advanceCount || Math.min(8, currentParticipantsCount);
     } else if (p.phaseType === "ELIMINATION" || p.phaseType === "KNOCKOUT") {
-      const rounds = Math.ceil(Math.log2(currentParticipantsCount));
-      const totalKMatches = currentParticipantsCount - 1;
-      phasePreview.groups.push({
-        name: "Tableau",
-        participantCount: currentParticipantsCount,
-        matchesCount: totalKMatches,
-        rounds
-      });
-      phaseMatches += totalKMatches;
+      const totalRounds = Math.ceil(Math.log2(currentParticipantsCount || 2));
+      let phaseMatches = 0;
+      
+      for (let round = totalRounds; round >= 1; round--) {
+        const matchesThisRound = Math.pow(2, totalRounds - round);
+        const roundParticipantCount = matchesThisRound * 2;
+        const groupName = getEliminationRoundName(roundParticipantCount);
+        
+        phasePreview.groups.push({
+          name: groupName,
+          participantCount: round === 1 ? currentParticipantsCount : roundParticipantCount,
+          matchesCount: matchesThisRound * (p.config.isHomeAway ? 2 : 1),
+          round
+        });
+        phaseMatches += matchesThisRound * (p.config.isHomeAway ? 2 : 1);
+      }
+      phasePreview.matchesCount = phaseMatches;
       currentParticipantsCount = 1;
     }
 

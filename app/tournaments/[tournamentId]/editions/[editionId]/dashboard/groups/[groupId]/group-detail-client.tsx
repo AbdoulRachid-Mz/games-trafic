@@ -669,6 +669,7 @@ export function GroupDetailClient({
                             key={match.id}
                             match={match}
                             isAdmin={true}
+                            viewMode="list"
                             onUpdate={() => window.location.reload()}
                           />
                         ))}
@@ -707,6 +708,7 @@ export function GroupDetailClient({
                               <MatchCard
                                 key={match.id}
                                 match={match}
+                                viewMode="list"
                                 isAdmin={true}
                                 onUpdate={() => window.location.reload()}
                               />
@@ -723,6 +725,7 @@ export function GroupDetailClient({
                   <MatchCard
                     key={match.id}
                     match={match}
+                    viewMode="list"
                     isAdmin={true}
                     onUpdate={() => window.location.reload()}
                   />

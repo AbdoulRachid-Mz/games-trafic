@@ -101,10 +101,18 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
   const groupConfig = (group.config as any) || {};
   const isHomeAway = options.isHomeAway ?? groupConfig.isHomeAway ?? false;
   
-  const generatedMatches = generateGroupMatches(
-    participantIds.map((id: string) => ({ id })), 
-    { returnType: isHomeAway ? "double" : "single" }
-  );
+  let generatedMatches;
+  if (group.groupType === 'ELIMINATION') {
+    generatedMatches = generateEliminationMatches(
+      participantIds.map((id: string) => ({ id })), 
+      1
+    );
+  } else {
+    generatedMatches = generateGroupMatches(
+      participantIds.map((id: string) => ({ id })), 
+      { returnType: isHomeAway ? "double" : "single" }
+    );
+  }
 
   if (options.dryRun) {
     return {
@@ -165,31 +173,22 @@ async function generateNodeMatches(tx: any, nodeId: string, options: MatchGenera
 
   if (!node) throw new Error("Node not found");
 
-  let participantIds: string[] = [];
+  // ✅ PRIORITÉ 1: metadata.participants (spécifique à ce nœud/match)
+  const metadata = (node.metadata as any) || {};
+  let participantIds: string[] = metadata.participants || [];
 
-  // ✅ PRIORITÉ 1: Participants via le groupe parent
-  if (node.groupId) {
+  // ⚠️ FALLBACK: Participants via le groupe parent (seulement si vide)
+  if (participantIds.length === 0 && node.groupId) {
     const groupParticipants = await tx.query.phaseGroupParticipants.findMany({
       where: eq(phaseGroupParticipants.groupId, node.groupId),
     });
     participantIds = groupParticipants.map((p: any) => p.registrationId);
   }
 
-  // ⚠️ FALLBACK: metadata.participants (legacy, pour compatibilité)
-  if (participantIds.length === 0) {
-    const metadata = (node.metadata as any) || {};
-    participantIds = metadata.participants || [];
-    
-    if (participantIds.length > 0) {
-      console.warn(`[DEPRECATED] Node ${node.id} uses metadata.participants. Consider migrating to phaseGroupParticipants.`);
-    }
-  }
-
   if (participantIds.length < 2) {
     return { success: true, nodeId, message: "Not enough participants for node match", participantCount: participantIds.length };
   }
 
-  const metadata = (node.metadata as any) || {};
   const isHomeAway = options.isHomeAway ?? metadata.isHomeAway ?? false;
   
   // Générer les matchs

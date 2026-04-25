@@ -25,6 +25,8 @@ import {
   EyeOff,
   Lock,
   Unlock,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -60,6 +62,7 @@ export function MatchControlClient({
   const { user } = useAuthContext();
   const [isPending, startTransition] = useTransition();
   const [isEditing, setIsEditing] = useState(false);
+  const [adminForceEdit, setAdminForceEdit] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState({
     score1: match.score1 ?? 0,
@@ -75,7 +78,8 @@ export function MatchControlClient({
     p2Name: match.participant2?.member?.displayName || "Participant 2",
     score1: match.score1 ?? 0,
     score2: match.score2 ?? 0,
-    winnerName: ""
+    winnerName: "",
+    progressionResult: null as any
   });
 
   // Déterminer les rôles
@@ -109,7 +113,7 @@ export function MatchControlClient({
   const canConfirmMatch = isAdmin && !isMatchCompleted;
   
   // Déterminer si l'utilisateur peut modifier le score (admin ou participant si match non terminé)
-  const canEditScore = (isAdmin && !isMatchCompleted) || (isParticipant && isMatchPending);
+  const canEditScore = (isAdmin && (!isMatchCompleted || adminForceEdit)) || (isParticipant && isMatchPending);
 
   // Auto-focus sur le formulaire si autoSubmit est true
   useEffect(() => {
@@ -122,9 +126,10 @@ export function MatchControlClient({
     }
   }, [autoSubmit, canSubmitResult, isAdmin, isParticipant]);
 
-  const handleScoreChange = (field: "score1" | "score2", value: string) => {
+  const handleScoreChange = (field: "score1" | "score2", value: string | number) => {
     if (!canEditScore) return;
-    const val = parseInt(value) || 0;
+    let val = typeof value === "string" ? parseInt(value) : value;
+    if (isNaN(val) || val < 0) val = 0;
     setFormData(prev => ({ ...prev, [field]: val }));
   };
 
@@ -166,11 +171,16 @@ export function MatchControlClient({
           p2Name: match.participant2?.member?.displayName || "Participant 2",
           score1: formData.score1,
           score2: formData.score2,
-          winnerName: result.winnerName || (formData.score1 > formData.score2 ? match.participant1?.member?.displayName : match.participant2?.member?.displayName)
+          winnerName: result.winnerName || (formData.score1 > formData.score2 ? match.participant1?.member?.displayName : match.participant2?.member?.displayName),
+          progressionResult: result.progressionResult
         });
         setShouldShowConfetti(!!result.needsProgression);
         setShowCelebration(true);
-        if (result.needsProgression) {
+        if (result.progressionResult?.isPhaseComplete) {
+          toast.info("La phase est terminée !");
+        } else if (result.progressionResult?.isGroupComplete) {
+          toast.info("Le groupe est terminé !");
+        } else if (result.needsProgression) {
           toast.info(`${result.winnerName || "Le vainqueur"} est qualifié pour la phase suivante !`);
         }
         router.refresh();
@@ -266,6 +276,20 @@ export function MatchControlClient({
           </CardDescription>
         </CardHeader>
         
+        {isAdmin && isMatchCompleted && !adminForceEdit && (
+          <div className="px-6 pb-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setAdminForceEdit(true)}
+              className="w-full border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+            >
+              <Unlock className="h-4 w-4 mr-2" />
+              Déverrouiller le résultat
+            </Button>
+          </div>
+        )}
+        
         <CardContent className="space-y-6">
           {/* Score inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center justify-center py-4 px-2">
@@ -276,17 +300,39 @@ export function MatchControlClient({
                   <Badge variant="outline" className="ml-2 text-[8px]">Vous</Badge>
                 )}
               </Label>
-              <Input
-                type="number"
-                min={0}
-                value={formData.score1}
-                disabled={!canEditScore}
-                onChange={(e) => handleScoreChange("score1", e.target.value)}
-                className={cn(
-                  "h-20 text-4xl font-black text-center bg-background border-2 shadow-sm",
-                  canEditScore && "focus:border-primary focus:ring-2 focus:ring-primary/20"
-                )}
-              />
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  disabled={!canEditScore || formData.score1 <= 0}
+                  onClick={() => handleScoreChange("score1", formData.score1 - 1)}
+                >
+                  <Minus className="h-5 w-5" />
+                </Button>
+                <Input
+                  type="number"
+                  min={0}
+                  value={formData.score1}
+                  disabled={!canEditScore}
+                  onChange={(e) => handleScoreChange("score1", e.target.value)}
+                  className={cn(
+                    "h-20 text-4xl font-black text-center bg-background border-2 shadow-sm w-24",
+                    canEditScore && "focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  disabled={!canEditScore}
+                  onClick={() => handleScoreChange("score1", formData.score1 + 1)}
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
             
             <div className="space-y-3 text-center">
@@ -296,17 +342,39 @@ export function MatchControlClient({
                   <Badge variant="outline" className="ml-2 text-[8px]">Vous</Badge>
                 )}
               </Label>
-              <Input
-                type="number"
-                value={formData.score2}
-                min={0}
-                disabled={!canEditScore}
-                onChange={(e) => handleScoreChange("score2", e.target.value)}
-                className={cn(
-                  "h-20 text-4xl font-black text-center bg-background border-2 shadow-sm",
-                  canEditScore && "focus:border-primary focus:ring-2 focus:ring-primary/20"
-                )}
-              />
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  disabled={!canEditScore || formData.score2 <= 0}
+                  onClick={() => handleScoreChange("score2", formData.score2 - 1)}
+                >
+                  <Minus className="h-5 w-5" />
+                </Button>
+                <Input
+                  type="number"
+                  value={formData.score2}
+                  min={0}
+                  disabled={!canEditScore}
+                  onChange={(e) => handleScoreChange("score2", e.target.value)}
+                  className={cn(
+                    "h-20 text-4xl font-black text-center bg-background border-2 shadow-sm w-24",
+                    canEditScore && "focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  disabled={!canEditScore}
+                  onClick={() => handleScoreChange("score2", formData.score2 + 1)}
+                >
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -470,6 +538,9 @@ export function MatchControlClient({
         onOpenChange={setShowCelebration}
         matchData={celebrationData}
         showConfetti={shouldShowConfetti}
+        onOrganizeNext={() => {
+          router.push(`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`);
+        }}
       />
     </div>
   );

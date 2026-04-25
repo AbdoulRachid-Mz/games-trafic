@@ -26,15 +26,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { createTournamentEdition } from "@/actions/tournaments";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Controller } from "react-hook-form";
-import { createInsertSchema } from "drizzle-zod";
-import { tournamentEditions } from "@/database/schema";
 
+// Schéma simplifié - accepter string pour startDate
 const formSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
   editionNumber: z.number().int().min(1),
-  startDate: z.date(),
+  startDate: z.string().min(1, "La date est requise"),
   maxParticipants: z.number().int().min(1).nullable().optional(),
   prizePool: z.string().nullable().optional(),
   prizeCurrency: z.string().min(1),
@@ -58,6 +57,14 @@ interface CreateEditionFormProps {
   nextEditionNumber: number;
 }
 
+// Helper pour formater une date au format YYYY-MM-DD
+const formatDateForInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export function CreateEditionForm({
   tournamentId,
   nextEditionNumber,
@@ -75,7 +82,7 @@ export function CreateEditionForm({
     defaultValues: {
       name: `Édition ${nextEditionNumber}`,
       editionNumber: nextEditionNumber,
-      startDate: new Date(),
+      startDate: formatDateForInput(new Date()),
       maxParticipants: 32,
       prizePool: "0",
       prizeCurrency: "GTC",
@@ -96,11 +103,19 @@ export function CreateEditionForm({
   const onSubmit: SubmitHandler<FormValues> = async (values) => {
     setLoading(true);
     try {
+      // Convertir la string en Date pour l'API
+      const startDate = new Date(values.startDate);
+      
+      // Vérifier que la date est valide
+      if (isNaN(startDate.getTime())) {
+        throw new Error("Date invalide");
+      }
+
       await createTournamentEdition({
         ...values,
         tournamentId,
         status: "UPCOMING",
-        startDate: values.startDate,
+        startDate,
       } as any);
 
       toast.success("Édition créée avec succès");
@@ -140,7 +155,7 @@ export function CreateEditionForm({
                 <FieldContent>
                   <Input
                     type="number"
-                    {...register("editionNumber")}
+                    {...register("editionNumber", { valueAsNumber: true })}
                     aria-invalid={!!errors.editionNumber}
                   />
                   {errors.editionNumber && <FieldError errors={[errors.editionNumber]} />}
@@ -164,7 +179,7 @@ export function CreateEditionForm({
                 <FieldContent>
                   <Input
                     type="number"
-                    {...register("maxParticipants")}
+                    {...register("maxParticipants", { valueAsNumber: true })}
                     aria-invalid={!!errors.maxParticipants}
                   />
                   {errors.maxParticipants && <FieldError errors={[errors.maxParticipants]} />}
@@ -176,6 +191,7 @@ export function CreateEditionForm({
                 <FieldContent>
                   <Input
                     type="number"
+                    step="0.01"
                     {...register("prizePool")}
                     aria-invalid={!!errors.prizePool}
                   />
@@ -190,7 +206,7 @@ export function CreateEditionForm({
                     control={control}
                     name="locationType"
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choisir le type" />
                         </SelectTrigger>
@@ -213,7 +229,7 @@ export function CreateEditionForm({
                     control={control}
                     name="editionConfig.competitionType"
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value ?? "LDC"}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choisir le type" />
                         </SelectTrigger>
@@ -228,7 +244,7 @@ export function CreateEditionForm({
                   />
                 </FieldContent>
                 <FieldDescription>
-                   Définit la structure de base du tournoi.
+                  Définit la structure de base du tournoi.
                 </FieldDescription>
               </Field>
 
@@ -239,7 +255,7 @@ export function CreateEditionForm({
                     control={control}
                     name="editionConfig.competitionMode"
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value ?? "AUTO"}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choisir le mode" />
                         </SelectTrigger>

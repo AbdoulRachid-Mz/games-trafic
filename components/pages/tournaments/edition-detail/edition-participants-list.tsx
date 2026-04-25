@@ -68,11 +68,11 @@ export function EditionParticipantsList({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          <div className="relative flex-1 min-w-[200px] lg:max-w-xs">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher un participant..."
-              className="pl-9 bg-card h-10"
+              className="pl-9 bg-card h-8 md:h-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -97,47 +97,39 @@ export function EditionParticipantsList({
             >
               <List className="h-4 w-4" />
             </Button>
+
+            <Select onValueChange={(val: string) => handleExport(val as any)}>
+              <SelectTrigger className="h-8 px-1 md:px-4 w-full md:w-[160px] bg-primary text-white hover:bg-primary/90 border-none shadow-sm">
+                <div className="flex items-center">
+                  <Download className="h-4 w-4 mr-2" />
+                  <SelectValue
+                    placeholder="Exporter"
+                    className="hidden md:inline"
+                  />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pdf">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-red-500" />
+                    <span>Liste PDF</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="csv">
+                  <div className="flex items-center gap-2">
+                    <FileDown className="h-4 w-4 text-green-500" />
+                    <span>Format CSV</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="json">
+                  <div className="flex items-center gap-2">
+                    <FileJson className="h-4 w-4 text-blue-500" />
+                    <span>Format JSON</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          {/* <EditionBestPlayersStats 
-            editionId={editionId}
-            trigger={
-              <Button variant="outline" size="sm" className="h-10 px-4 whitespace-nowrap gap-2 bg-card hover:bg-muted border-dashed border-primary/30">
-                <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                <span className="hidden sm:inline">Stats & Hall of Fame</span>
-                <span className="sm:hidden text-xs">Stats</span>
-              </Button>
-            }
-          /> */}
-
-          <Select onValueChange={(val: string) => handleExport(val as any)}>
-            <SelectTrigger className="h-10 px-4 w-full sm:w-[160px] bg-primary text-white hover:bg-primary/90 border-none shadow-sm">
-              <div className="flex items-center">
-                <Download className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Exporter" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pdf">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-red-500" />
-                  <span>Liste PDF</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="csv">
-                <div className="flex items-center gap-2">
-                  <FileDown className="h-4 w-4 text-green-500" />
-                  <span>Format CSV</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="json">
-                <div className="flex items-center gap-2">
-                  <FileJson className="h-4 w-4 text-blue-500" />
-                  <span>Format JSON</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 

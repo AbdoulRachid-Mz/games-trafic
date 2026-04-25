@@ -14,8 +14,10 @@ interface MatchSuccessDialogProps {
     score1: number;
     score2: number;
     winnerName?: string;
+    progressionResult?: any;
   };
   onClose?: () => void;
+  onOrganizeNext?: () => void;
   showConfetti?: boolean;
 }
 
@@ -24,14 +26,83 @@ export function MatchSuccessDialog({
   onOpenChange, 
   matchData,
   onClose,
+  onOrganizeNext,
   showConfetti = true 
 }: MatchSuccessDialogProps) {
+  const pr = matchData.progressionResult;
+  let title = "Match Clôturé !";
+  let description = "Le résultat a été validé officiellement et enregistré dans le bracket.";
+  
+  if (pr?.isEditionComplete) {
+    title = "Édition Terminée !";
+    description = "C'était le dernier match du tournoi. Le grand vainqueur est connu !";
+  } else if (pr?.isPhaseComplete) {
+    title = "Phase Terminée !";
+    description = "Tous les matchs de cette phase sont terminés. Les qualifiés sont validés.";
+  } else if (pr?.isGroupComplete) {
+    title = "Groupe Terminé !";
+    description = "Tous les matchs de ce groupe sont terminés. Le classement est définitif.";
+  }
+
+  const actions = [
+    {
+      label: "Partager le résultat",
+      onClick: () => {
+        if (navigator.share) {
+          navigator.share({
+            title: 'Résultat Match',
+            text: `${matchData.p1Name} ${matchData.score1} - ${matchData.score2} ${matchData.p2Name}`,
+            url: window.location.href,
+          }).catch(console.error);
+        } else {
+          navigator.clipboard.writeText(`${matchData.p1Name} ${matchData.score1} - ${matchData.score2} ${matchData.p2Name}`);
+          alert("Lien copié dans le presse-papier !");
+        }
+      },
+      variant: "outline" as const,
+      icon: <Share2 className="h-4 w-4" />,
+    }
+  ];
+
+  if (pr?.nextLevelToOrganize && pr?.competitionMode === "MANUAL" && onOrganizeNext) {
+    actions.push({
+      label: `Organiser ${pr.nextLevelToOrganize.name}`,
+      onClick: () => {
+        onOpenChange(false);
+        onOrganizeNext();
+      },
+      variant: "default" as const,
+      primary: true,
+      icon: <ArrowRight className="h-4 w-4" />,
+    } as any);
+    actions.push({
+      label: "Plus tard",
+      onClick: () => {
+        onOpenChange(false);
+        if (onClose) onClose();
+      },
+      variant: "outline" as const,
+      icon: undefined as any,
+    } as any);
+  } else {
+    actions.push({
+      label: "Continuer",
+      onClick: () => {
+        onOpenChange(false);
+        if (onClose) onClose();
+      },
+      variant: "default" as const,
+      primary: true,
+      icon: <ArrowRight className="h-4 w-4" />,
+    } as any);
+  }
+
   return (
     <SuccessDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Match Clôturé !"
-      description="Le résultat a été validé officiellement et enregistré dans le bracket."
+      title={title}
+      description={description}
       confettiType={showConfetti ? "celebration" : "none"}
       content={
         <div className="space-y-6 py-4">
@@ -72,35 +143,7 @@ export function MatchSuccessDialog({
           )}
         </div>
       }
-      actions={[
-        {
-          label: "Partager le résultat",
-          onClick: () => {
-            if (navigator.share) {
-              navigator.share({
-                title: 'Résultat Match',
-                text: `${matchData.p1Name} ${matchData.score1} - ${matchData.score2} ${matchData.p2Name}`,
-                url: window.location.href,
-              }).catch(console.error);
-            } else {
-              navigator.clipboard.writeText(`${matchData.p1Name} ${matchData.score1} - ${matchData.score2} ${matchData.p2Name}`);
-              alert("Lien copié dans le presse-papier !");
-            }
-          },
-          variant: "outline",
-          icon: <Share2 className="h-4 w-4" />,
-        },
-        {
-          label: "Continuer",
-          onClick: () => {
-            onOpenChange(false);
-            if (onClose) onClose();
-          },
-          variant: "default",
-          primary: true,
-          icon: <ArrowRight className="h-4 w-4" />,
-        }
-      ]}
+      actions={actions}
     />
   );
 }

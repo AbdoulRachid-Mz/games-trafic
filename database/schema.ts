@@ -2528,6 +2528,10 @@ export const bracketNodesRelations = relations(bracketNodes, ({ one, many }) => 
   }),
   childNodes: many(bracketNodes, { relationName: 'bracket_parent' }),
   matches: many(matches),
+  winnerRegistration: one(editionRegistrations, {
+    fields: [bracketNodes.winnerRegistrationId],
+    references: [editionRegistrations.id],
+  }),
 }));
 
 export const matchesRelations = relations(matches, ({ one }) => ({

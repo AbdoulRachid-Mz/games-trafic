@@ -28,6 +28,10 @@ import Image from "next/image";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import { CalendarCogIcon } from "@/components/icons/calendar-cog";
 import { ArrowRightIcon } from "@/components/icons/arrow-right";
+import { EditionDashboardActions } from "@/components/pages/tournaments/edition-detail/edition-dashboard-actions";
+import { db } from "@/lib/db";
+import { bracketNodes, phaseGroupParticipants, phaseGroups } from "@/database/schema";
+import { eq, and, desc, isNull, asc } from "drizzle-orm";
 
 interface PageProps {
   params: Promise<{
@@ -107,8 +111,52 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
 
   const editionConfig = (edition.editionConfig as EditionConfig) || {};
 
+  // Tentative de détection du vainqueur potentiel
+  let potentialWinnerId = edition.winnerId || undefined;
+  let potentialWinnerName = (edition.winnerMetadata as any)?.displayName || undefined;
+
+  if (!potentialWinnerId && phasesResponse.data.length > 0) {
+    const lastPhase = phasesResponse.data[phasesResponse.data.length - 1];
+    
+    if (lastPhase.phaseType === "ELIMINATION" || lastPhase.phaseType === "KNOCKOUT") {
+      // Trouver le noeud final (celui qui n'a pas de parent)
+      const finalNode = await db.query.bracketNodes.findFirst({
+        where: and(eq(bracketNodes.phaseId, lastPhase.id), isNull(bracketNodes.parentNodeId)),
+        with: { winnerRegistration: { with: { member: true } } }
+      });
+      if (finalNode?.winnerRegistrationId) {
+        potentialWinnerId = finalNode.winnerRegistrationId;
+        potentialWinnerName = finalNode.winnerRegistration?.member?.displayName || "Gagnant Finale";
+      }
+    } else if (lastPhase.phaseType === "ROUND_ROBIN" || lastPhase.phaseType === "GROUP_STAGE") {
+      // Trouver le premier du classement du dernier groupe
+      const lastGroup = await db.query.phaseGroups.findFirst({
+        where: eq(phaseGroups.id, lastPhase.id), // Si une seule ligue
+        orderBy: [desc(phaseGroups.order)]
+      });
+      if (lastGroup) {
+        const topParticipant = await db.query.phaseGroupParticipants.findFirst({
+          where: eq(phaseGroupParticipants.groupId, lastGroup.id),
+          orderBy: [asc(phaseGroupParticipants.position)],
+          with: { registration: { with: { member: true } } }
+        });
+        if (topParticipant) {
+          potentialWinnerId = topParticipant.registrationId;
+          potentialWinnerName = topParticipant.registration?.member?.displayName || "Leader Classement";
+        }
+      }
+    }
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      <EditionDashboardActions 
+        tournamentId={tournamentId}
+        editionId={editionId}
+        status={edition.status || "DRAFT"}
+        potentialWinnerId={potentialWinnerId}
+        potentialWinnerName={potentialWinnerName}
+      />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <Typography variant="h3" weight="bold" className="tracking-tight">

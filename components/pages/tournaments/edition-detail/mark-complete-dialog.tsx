@@ -160,148 +160,146 @@ export function MarkCompleteDialog({
 
   const isPowerOfTwo = (n: number) => n > 0 && (n & (n - 1)) === 0;
 
-  const handleComplete = () => {
-    // Preview step pour phases de groupes
-    if (type === 'PHASE' && isGroupPhase && !isFinalPhase && !showPreviewStep) {
-      setShowPreviewStep(true);
-      return;
-    }
+ const handleComplete = () => {
+  // Preview step pour phases de groupes
+  if (type === 'PHASE' && isGroupPhase && !isFinalPhase && !showPreviewStep) {
+    setShowPreviewStep(true);
+    return;
+  }
 
-    // Validation Power of 2
-    if (showPreviewStep && !isPowerOfTwo(selectedQualifiedIds.length)) {
-      toast.error(`Le nombre de qualifiés (${selectedQualifiedIds.length}) doit être une puissance de 2 (2, 4, 8, 16, 32...) pour générer un arbre d'élimination.`);
-      return;
-    }
+  // Validation Power of 2
+  if (showPreviewStep && !isPowerOfTwo(selectedQualifiedIds.length)) {
+    toast.error(`Le nombre de qualifiés (${selectedQualifiedIds.length}) doit être une puissance de 2 (2, 4, 8, 16, 32...) pour générer un arbre d'élimination.`);
+    return;
+  }
 
-    if (showWinnerStep) {
-      if (!selectedWinnerId) {
-        toast.error("Veuillez sélectionner un vainqueur.");
-        return;
-      }
-
-      startTransition(async () => {
-        try {
-          const winner = qualifiedPreview.find(p => p.id === selectedWinnerId);
-          if (!winner) throw new Error("Vainqueur introuvable");
-
-          const winnerMetadata = {
-            id: winner.id,
-            username: winner.name,
-            image: winner.image,
-            email: winner.email,
-            phone: winner.phone,
-          };
-
-          const res = await designateEditionWinnerAction(phaseContext?.editionId || id, winner.id, winnerMetadata);
-          
-          if (res.success) {
-            fireConfettiPreset("success");
-            toast.success(`Félicitations au vainqueur : ${winner.name} !`, {
-              icon: <Trophy className="h-4 w-4 text-yellow-500" />,
-              duration: 10000,
-            });
-            handleClose();
-            router.refresh();
-          } else {
-            toast.error(res.error || "Erreur lors de la désignation du vainqueur");
-          }
-        } catch (error: any) {
-          toast.error(error.message || "Une erreur est survenue");
-        }
-      });
+  if (showWinnerStep) {
+    if (!selectedWinnerId) {
+      toast.error("Veuillez sélectionner un vainqueur.");
       return;
     }
 
     startTransition(async () => {
       try {
-        let markResult: any;
+        const winner = qualifiedPreview.find(p => p.id === selectedWinnerId);
+        if (!winner) throw new Error("Vainqueur introuvable");
+
+        const winnerMetadata = {
+          id: winner.id,
+          username: winner.name,
+          image: winner.image,
+          email: winner.email,
+          phone: winner.phone,
+        };
+
+        const res = await designateEditionWinnerAction(phaseContext?.editionId || id, winner.id, winnerMetadata);
         
-        if (type === 'GROUP') {
-          markResult = await markGroupCompleteAction(id, {
-            seedingMethod: seedMethod === "ORDERED" ? "SEQUENTIAL" : seedMethod,
-            isHomeAway: isHomeAway,
-            matchFormat: matchFormat,
+        if (res.success) {
+          fireConfettiPreset("success");
+          toast.success(`Félicitations au vainqueur : ${winner.name} !`, {
+            icon: <Trophy className="h-4 w-4 text-yellow-500" />,
+            duration: 10000,
           });
-        } else if (type === 'PHASE') {
-          markResult = await markPhaseCompleteAction(id);
-        } else if (type === 'BRACKET_NODE') {
-          markResult = await markBracketNodeCompleteAction(id);
+          setIsOpen(false);
+          if (onComplete) onComplete();
+          router.refresh();
+        } else {
+          toast.error(res.error || "Erreur lors de la désignation du vainqueur");
         }
-
-        if (!markResult?.success) {
-          toast.error(markResult?.error || "Erreur lors de la clôture");
-          return;
-        }
-
-        toast.success(`${name} marqué comme terminé avec succès !`);
-
-        // ============================================================
-        // CAS 1: PHASE NON FINALE → organiser la phase suivante
-        // ============================================================
-        if (type === 'PHASE' && phaseContext?.nextPhaseId && !isFinalPhase) {
-          const organizeResult = await organizeNextPhaseAction(phaseContext.nextPhaseId, {
-            generateNodes: isAutoMode ? true : generateNodes,
-            generateMatches: isAutoMode ? true : generateMatches,
-            seedMethod,
-            isHomeAway,
-            matchFormat,
-            force: true,
-            customQualifiedIds: selectedQualifiedIds,
-          });
-          
-          if (organizeResult.success) {
-            toast.success(`Phase "${phaseContext.nextPhaseName}" organisée avec succès !`);
-          } else {
-            toast.warning(`Phase terminée mais erreur lors de l'organisation: ${organizeResult.error}`);
-          }
-        }
-
-        // ============================================================
-        // CAS 2: PHASE FINALE → désigner le vainqueur
-        // ============================================================
-        if (type === 'PHASE' && isFinalPhase) {
-          try {
-            const previewRes = await getQualifiedParticipantsPreviewAction(id);
-            if (previewRes.success && previewRes.qualified && previewRes.qualified.length > 0) {
-              setQualifiedPreview(previewRes.qualified);
-              setSelectedWinnerId(previewRes.qualified[0].id);
-              setShowWinnerStep(true);
-              return; // On s'arrête ici pour laisser l'utilisateur confirmer le gagnant
-            } else {
-              // Si pas de preview possible, on termine quand même
-              toast.info("Phase finale terminée, mais impossible de détecter automatiquement le vainqueur.");
-              handleClose();
-              router.refresh();
-            }
-          } catch (winnerErr) {
-            console.error("Error preparing winner selection:", winnerErr);
-            handleClose();
-            router.refresh();
-          }
-        }
-
-        // ============================================================
-        // CAS 3: GROUPE D'ÉLIMINATION → Géré par markGroupCompleteAction
-        // ============================================================
-        if (type === 'GROUP' && isEliminationPhase && markResult?.success) {
-           if (markResult.propagatedCount > 0) {
-             toast.success(`${markResult.propagatedCount} participants propagés au round suivant.`);
-           }
-        }
-
-        setIsOpen(false);
-        router.refresh();
-        if (onComplete) onComplete();
-        
-        if (asFormOnly) {
-          router.back();
-        }
-        
-      } catch (error) {
-        toast.error("Une erreur est survenue");
+      } catch (error: any) {
+        toast.error(error.message || "Une erreur est survenue");
       }
     });
-  };
+    return;
+  }
+
+  startTransition(async () => {
+    try {
+      let markResult: any;
+      
+      if (type === 'GROUP') {
+        // ✅ Passer les bonnes options pour la propagation
+        markResult = await markGroupCompleteAction(id, {
+          seedingMethod: seedMethod === "ORDERED" ? "SEQUENTIAL" : seedMethod,
+          isHomeAway: isHomeAway,
+          matchFormat: matchFormat,
+        });
+        
+        // ✅ Si c'est un groupe d'élimination avec propagation automatique
+        if (markResult?.success && isEliminationPhase && markResult.propagatedCount > 0) {
+          toast.success(`${markResult.qualifiedCount} participant(s) qualifié(s) pour le round suivant.`);
+          // Rafraîchir pour voir le nouveau round
+          router.refresh();
+        }
+        
+      } else if (type === 'PHASE') {
+        markResult = await markPhaseCompleteAction(id);
+      } else if (type === 'BRACKET_NODE') {
+        markResult = await markBracketNodeCompleteAction(id);
+      }
+
+      if (!markResult?.success) {
+        toast.error(markResult?.error || "Erreur lors de la clôture");
+        return;
+      }
+
+      toast.success(`${name} marqué comme terminé avec succès !`);
+
+      // ============================================================
+      // CAS 1: PHASE NON FINALE → organiser la phase suivante
+      // ============================================================
+      if (type === 'PHASE' && phaseContext?.nextPhaseId && !isFinalPhase) {
+        const organizeResult = await organizeNextPhaseAction(phaseContext.nextPhaseId, {
+          generateNodes: isAutoMode ? true : generateNodes,
+          generateMatches: isAutoMode ? true : generateMatches,
+          seedMethod,
+          isHomeAway,
+          matchFormat,
+          force: true,
+          customQualifiedIds: selectedQualifiedIds,
+        });
+        
+        if (organizeResult.success) {
+          toast.success(`Phase "${phaseContext.nextPhaseName}" organisée avec succès !`);
+          router.refresh();
+        } else {
+          toast.warning(`Phase terminée mais erreur lors de l'organisation: ${organizeResult.error}`);
+        }
+      }
+
+      // ============================================================
+      // CAS 2: PHASE FINALE → désigner le vainqueur
+      // ============================================================
+      if (type === 'PHASE' && isFinalPhase) {
+        try {
+          const previewRes = await getQualifiedParticipantsPreviewAction(id);
+          if (previewRes.success && previewRes.qualified && previewRes.qualified.length > 0) {
+            setQualifiedPreview(previewRes.qualified);
+            setSelectedWinnerId(previewRes.qualified[0].id);
+            setShowWinnerStep(true);
+            return;
+          } else {
+            toast.info("Phase finale terminée, mais impossible de détecter automatiquement le vainqueur.");
+          }
+        } catch (winnerErr) {
+          console.error("Error preparing winner selection:", winnerErr);
+        }
+      }
+
+      setIsOpen(false);
+      router.refresh();
+      if (onComplete) onComplete();
+      
+      if (asFormOnly) {
+        router.back();
+      }
+      
+    } catch (error) {
+      console.error("Complete error:", error);
+      toast.error("Une erreur est survenue");
+    }
+  });
+};
 
   const handleClose = () => {
     if (!isProcessing) {
