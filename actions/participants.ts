@@ -47,7 +47,7 @@ import { db } from "@/lib/db";
  */
 export async function getTournamentById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<Tournament | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
@@ -83,7 +83,7 @@ export async function getTournamentById(
  * Liste les tournois avec pagination, filtres et options
  */
 export async function getTournaments(
-  query: ListQuery<TournamentFilters> = {}
+  query: ListQuery<TournamentFilters> = {},
 ): Promise<PaginationResponse<Tournament>> {
   try {
     const {
@@ -142,7 +142,7 @@ export async function getTournaments(
  * Crée un nouveau tournoi
  */
 export async function createTournament(
-  data: Omit<Tournament, "id" | "createdAt" | "updatedAt">
+  data: Omit<Tournament, "id" | "createdAt" | "updatedAt">,
 ): Promise<Tournament> {
   try {
     const result = await db
@@ -161,7 +161,7 @@ export async function createTournament(
  */
 export async function updateTournament(
   id: string,
-  data: Partial<Omit<Tournament, "id" | "createdAt">>
+  data: Partial<Omit<Tournament, "id" | "createdAt">>,
 ): Promise<Tournament> {
   try {
     const result = await db
@@ -205,7 +205,7 @@ export async function deleteTournament(id: string): Promise<Tournament> {
  * Récupère un membre de tournoi par son ID
  */
 export async function getTournamentMemberById(
-  id: string
+  id: string,
 ): Promise<TournamentMember | null> {
   try {
     const result = await db
@@ -224,7 +224,7 @@ export async function getTournamentMemberById(
  * Liste les membres d'un tournoi avec pagination et filtres
  */
 export async function getTournamentMembers(
-  query: ListQuery<TournamentMemberFilters> = {}
+  query: ListQuery<TournamentMemberFilters> = {},
 ): Promise<PaginationResponse<TournamentMember>> {
   try {
     const {
@@ -235,7 +235,7 @@ export async function getTournamentMembers(
     const offset = (pagination.page - 1) * pagination.limit;
     const whereConditions = buildTournamentMemberWhereConditions(
       filters,
-      options
+      options,
     );
 
     const membersQuery = db
@@ -286,7 +286,7 @@ export async function getTournamentMembers(
  * Ajoute un membre à un tournoi
  */
 export async function addTournamentMember(
-  data: NewTournamentMember
+  data: NewTournamentMember,
 ): Promise<TournamentMember> {
   try {
     const result = await db.insert(tournamentMembers).values(data).returning();
@@ -302,7 +302,7 @@ export async function addTournamentMember(
  */
 export async function updateTournamentMember(
   id: string,
-  data: Partial<NewTournamentMember>
+  data: Partial<NewTournamentMember>,
 ): Promise<TournamentMember> {
   try {
     const result = await db
@@ -323,7 +323,7 @@ export async function updateTournamentMember(
  * Supprime un membre de tournoi
  */
 export async function removeTournamentMember(
-  id: string
+  id: string,
 ): Promise<TournamentMember> {
   try {
     const result = await db
@@ -349,7 +349,7 @@ export async function removeTournamentMember(
  */
 export async function getTeamById(
   id: string,
-  options?: { populate?: string[] }
+  options?: { populate?: string[] },
 ): Promise<Team | null> {
   try {
     if (options?.populate && options.populate.length > 0) {
@@ -362,7 +362,7 @@ export async function getTeamById(
             : undefined,
           members: options.populate.includes("members") ? true : undefined,
           tournamentMemberships: options.populate.includes(
-            "tournamentMemberships"
+            "tournamentMemberships",
           )
             ? true
             : undefined,
@@ -386,7 +386,7 @@ export async function getTeamById(
  * Liste les équipes avec pagination, filtres et options
  */
 export async function getTeams(
-  query: ListQuery<TeamFilters> = {}
+  query: ListQuery<TeamFilters> = {},
 ): Promise<PaginationResponse<Team>> {
   try {
     const {
@@ -445,7 +445,7 @@ export async function getTeams(
  * Crée une nouvelle équipe
  */
 export async function createTeam(
-  data: Omit<Team, "id" | "createdAt" | "updatedAt">
+  data: Omit<Team, "id" | "createdAt" | "updatedAt">,
 ): Promise<Team> {
   try {
     const result = await db
@@ -464,7 +464,7 @@ export async function createTeam(
  */
 export async function updateTeam(
   id: string,
-  data: Partial<Omit<Team, "id" | "createdAt">>
+  data: Partial<Omit<Team, "id" | "createdAt">>,
 ): Promise<Team> {
   try {
     const result = await db
@@ -508,7 +508,7 @@ export async function deleteTeam(id: string): Promise<Team> {
  * Récupère un membre d'équipe par son ID
  */
 export async function getTeamMemberById(
-  id: string
+  id: string,
 ): Promise<TeamMember | null> {
   try {
     const result = await db
@@ -527,7 +527,7 @@ export async function getTeamMemberById(
  * Liste les membres d'une équipe avec pagination et filtres
  */
 export async function getTeamMembers(
-  query: ListQuery<TeamMemberFilters> = {}
+  query: ListQuery<TeamMemberFilters> = {},
 ): Promise<PaginationResponse<TeamMember>> {
   try {
     const {
@@ -600,7 +600,7 @@ export async function addTeamMember(data: NewTeamMember): Promise<TeamMember> {
  */
 export async function updateTeamMember(
   id: string,
-  data: Partial<NewTeamMember>
+  data: Partial<NewTeamMember>,
 ): Promise<TeamMember> {
   try {
     const result = await db
@@ -644,7 +644,7 @@ export async function removeTeamMember(id: string): Promise<TeamMember> {
  */
 function buildTournamentWhereConditions(
   filters: TournamentFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
   if (!options.includeDeleted)
@@ -663,7 +663,7 @@ function buildTournamentWhereConditions(
     conditions.push(inArray(tournaments.status, filters.statuses));
   if (filters.requiresAccessCode !== undefined)
     conditions.push(
-      eq(tournaments.requiresAccessCode, filters.requiresAccessCode)
+      eq(tournaments.requiresAccessCode, filters.requiresAccessCode),
     );
   if (filters.themeId)
     conditions.push(eq(tournaments.themeId, filters.themeId));
@@ -672,36 +672,56 @@ function buildTournamentWhereConditions(
 
   if (filters.maxParticipantsMin !== undefined)
     conditions.push(
-      gte(tournaments.maxParticipantsPerEdition, filters.maxParticipantsMin)
+      gte(tournaments.maxParticipantsPerEdition, filters.maxParticipantsMin),
     );
   if (filters.maxParticipantsMax !== undefined)
     conditions.push(
-      lte(tournaments.maxParticipantsPerEdition, filters.maxParticipantsMax)
+      lte(tournaments.maxParticipantsPerEdition, filters.maxParticipantsMax),
     );
   if (filters.currentParticipantsMin !== undefined)
     conditions.push(
-      gte(sql`(SELECT COUNT(*) FROM edition_registrations er JOIN tournament_editions te ON er.edition_id = te.id WHERE te.tournament_id = ${tournaments.id} AND er.status = 'REGISTERED')`, filters.currentParticipantsMin)
+      gte(
+        sql`(SELECT COUNT(*) FROM edition_registrations er JOIN tournament_editions te ON er.edition_id = te.id WHERE te.tournament_id = ${tournaments.id} AND er.status = 'REGISTERED')`,
+        filters.currentParticipantsMin,
+      ),
     );
   if (filters.currentParticipantsMax !== undefined)
     conditions.push(
-      lte(sql`(SELECT COUNT(*) FROM edition_registrations er JOIN tournament_editions te ON er.edition_id = te.id WHERE te.tournament_id = ${tournaments.id} AND er.status = 'REGISTERED')`, filters.currentParticipantsMax)
+      lte(
+        sql`(SELECT COUNT(*) FROM edition_registrations er JOIN tournament_editions te ON er.edition_id = te.id WHERE te.tournament_id = ${tournaments.id} AND er.status = 'REGISTERED')`,
+        filters.currentParticipantsMax,
+      ),
     );
   if (filters.totalParticipantsMin !== undefined)
     conditions.push(
-      gte(tournaments.totalParticipants, filters.totalParticipantsMin)
+      gte(tournaments.totalParticipants, filters.totalParticipantsMin),
     );
   if (filters.totalParticipantsMax !== undefined)
     conditions.push(
-      lte(tournaments.totalParticipants, filters.totalParticipantsMax)
+      lte(tournaments.totalParticipants, filters.totalParticipantsMax),
     );
   if (filters.prizePoolMin !== undefined)
-    conditions.push(gte(sql`(SELECT COALESCE(SUM(prize_pool), 0) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, String(filters.prizePoolMin)));
+    conditions.push(
+      gte(
+        sql`(SELECT COALESCE(SUM(prize_pool), 0) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        String(filters.prizePoolMin),
+      ),
+    );
   if (filters.prizePoolMax !== undefined)
-    conditions.push(lte(sql`(SELECT COALESCE(SUM(prize_pool), 0) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, String(filters.prizePoolMax)));
+    conditions.push(
+      lte(
+        sql`(SELECT COALESCE(SUM(prize_pool), 0) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        String(filters.prizePoolMax),
+      ),
+    );
   if (filters.totalPrizePoolMin !== undefined)
-    conditions.push(gte(tournaments.totalPrizePool, String(filters.totalPrizePoolMin)));
+    conditions.push(
+      gte(tournaments.totalPrizePool, String(filters.totalPrizePoolMin)),
+    );
   if (filters.totalPrizePoolMax !== undefined)
-    conditions.push(lte(tournaments.totalPrizePool, String(filters.totalPrizePoolMax)));
+    conditions.push(
+      lte(tournaments.totalPrizePool, String(filters.totalPrizePoolMax)),
+    );
   if (filters.viewCountMin !== undefined)
     conditions.push(gte(tournaments.viewCount, filters.viewCountMin));
   if (filters.viewCountMax !== undefined)
@@ -709,21 +729,45 @@ function buildTournamentWhereConditions(
 
   if (filters.startDateFrom)
     conditions.push(
-      gte(sql`(SELECT MIN(start_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, new Date(filters.startDateFrom))
+      gte(
+        sql`(SELECT MIN(start_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        new Date(filters.startDateFrom),
+      ),
     );
   if (filters.startDateTo)
-    conditions.push(lte(sql`(SELECT MIN(start_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, new Date(filters.startDateTo)));
+    conditions.push(
+      lte(
+        sql`(SELECT MIN(start_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        new Date(filters.startDateTo),
+      ),
+    );
   if (filters.endDateFrom)
-    conditions.push(gte(sql`(SELECT MAX(end_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, new Date(filters.endDateFrom)));
+    conditions.push(
+      gte(
+        sql`(SELECT MAX(end_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        new Date(filters.endDateFrom),
+      ),
+    );
   if (filters.endDateTo)
-    conditions.push(lte(sql`(SELECT MAX(end_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, new Date(filters.endDateTo)));
+    conditions.push(
+      lte(
+        sql`(SELECT MAX(end_date) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        new Date(filters.endDateTo),
+      ),
+    );
   if (filters.registrationDeadlineFrom)
     conditions.push(
-      gte(sql`(SELECT MIN(registration_deadline) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, new Date(filters.registrationDeadlineFrom))
+      gte(
+        sql`(SELECT MIN(registration_deadline) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        new Date(filters.registrationDeadlineFrom),
+      ),
     );
   if (filters.registrationDeadlineTo)
     conditions.push(
-      lte(sql`(SELECT MIN(registration_deadline) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`, new Date(filters.registrationDeadlineTo))
+      lte(
+        sql`(SELECT MIN(registration_deadline) FROM tournament_editions WHERE tournament_id = ${tournaments.id})`,
+        new Date(filters.registrationDeadlineTo),
+      ),
     );
 
   if (filters.createdFrom)
@@ -739,7 +783,7 @@ function buildTournamentWhereConditions(
  */
 function buildTournamentMemberWhereConditions(
   filters: TournamentMemberFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
   if (!options.includeDeleted)
@@ -764,14 +808,18 @@ function buildTournamentMemberWhereConditions(
     conditions.push(eq(tournamentMembers.isVerified, filters.isVerified));
   if (filters.gameLevel)
     conditions.push(
-      ilike(tournamentMembers.verificationLevel, `%${filters.gameLevel}%`)
+      ilike(tournamentMembers.verificationLevel, `%${filters.gameLevel}%`),
     );
   if (filters.clubName)
     conditions.push(ilike(tournamentMembers.clubName, `%${filters.clubName}%`));
   if (filters.totalEditionsMin !== undefined)
-    conditions.push(gte(tournamentMembers.totalEditions, filters.totalEditionsMin));
+    conditions.push(
+      gte(tournamentMembers.totalEditions, filters.totalEditionsMin),
+    );
   if (filters.totalEditionsMax !== undefined)
-    conditions.push(lte(tournamentMembers.totalEditions, filters.totalEditionsMax));
+    conditions.push(
+      lte(tournamentMembers.totalEditions, filters.totalEditionsMax),
+    );
   if (filters.totalWinsMin !== undefined)
     conditions.push(gte(tournamentMembers.totalWins, filters.totalWinsMin));
   if (filters.totalWinsMax !== undefined)
@@ -781,27 +829,37 @@ function buildTournamentMemberWhereConditions(
   if (filters.totalLossesMax !== undefined)
     conditions.push(lte(tournamentMembers.totalLosses, filters.totalLossesMax));
   if (filters.totalMatchesMin !== undefined)
-    conditions.push(gte(tournamentMembers.totalMatches, filters.totalMatchesMin));
+    conditions.push(
+      gte(tournamentMembers.totalMatches, filters.totalMatchesMin),
+    );
   if (filters.totalMatchesMax !== undefined)
-    conditions.push(lte(tournamentMembers.totalMatches, filters.totalMatchesMax));
+    conditions.push(
+      lte(tournamentMembers.totalMatches, filters.totalMatchesMax),
+    );
   if (filters.rankingPointsMin !== undefined)
-    conditions.push(gte(tournamentMembers.rankingPoints, filters.rankingPointsMin));
+    conditions.push(
+      gte(tournamentMembers.rankingPoints, filters.rankingPointsMin),
+    );
   if (filters.rankingPointsMax !== undefined)
-    conditions.push(lte(tournamentMembers.rankingPoints, filters.rankingPointsMax));
+    conditions.push(
+      lte(tournamentMembers.rankingPoints, filters.rankingPointsMax),
+    );
 
   if (filters.joinedFrom)
     conditions.push(
-      gte(tournamentMembers.joinedAt, new Date(filters.joinedFrom))
+      gte(tournamentMembers.joinedAt, new Date(filters.joinedFrom)),
     );
   if (filters.joinedTo)
-    conditions.push(lte(tournamentMembers.joinedAt, new Date(filters.joinedTo)));
+    conditions.push(
+      lte(tournamentMembers.joinedAt, new Date(filters.joinedTo)),
+    );
   if (filters.lastActiveFrom)
     conditions.push(
-      gte(tournamentMembers.lastActive, new Date(filters.lastActiveFrom))
+      gte(tournamentMembers.lastActive, new Date(filters.lastActiveFrom)),
     );
   if (filters.lastActiveTo)
     conditions.push(
-      lte(tournamentMembers.lastActive, new Date(filters.lastActiveTo))
+      lte(tournamentMembers.lastActive, new Date(filters.lastActiveTo)),
     );
 
   return conditions.length > 0 ? and(...conditions) : undefined;
@@ -812,7 +870,7 @@ function buildTournamentMemberWhereConditions(
  */
 function buildTeamWhereConditions(
   filters: TeamFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
   if (!options.includeDeleted) conditions.push(eq(teams.isDeleted, false));
@@ -854,7 +912,7 @@ function buildTeamWhereConditions(
  */
 function buildTeamMemberWhereConditions(
   filters: TeamMemberFilters,
-  options: QueryOptions = {}
+  options: QueryOptions = {},
 ) {
   const conditions = [];
   if (filters.isActive !== undefined)

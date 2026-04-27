@@ -303,7 +303,7 @@ export function MatchControlClient({
               <div className="flex items-center justify-center gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive"
                   size="icon"
                   className="h-12 w-12 rounded-full flex-shrink-0"
                   disabled={!canEditScore || formData.score1 <= 0}
@@ -318,15 +318,15 @@ export function MatchControlClient({
                   disabled={!canEditScore}
                   onChange={(e) => handleScoreChange("score1", e.target.value)}
                   className={cn(
-                    "h-20 text-4xl font-black text-center bg-background border-2 shadow-sm w-24",
+                    "h-20 max-md:h-12 text-4xl max-md:text-2xl font-black text-center bg-background border-2 shadow-sm w-24 max-md:w-16",
                     canEditScore && "focus:border-primary focus:ring-2 focus:ring-primary/20"
                   )}
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="icon"
-                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full text-primary bg-primary/10  flex-shrink-0"
                   disabled={!canEditScore}
                   onClick={() => handleScoreChange("score1", formData.score1 + 1)}
                 >
@@ -345,9 +345,9 @@ export function MatchControlClient({
               <div className="flex items-center justify-center gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive"
                   size="icon"
-                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full flex-shrink-0"
                   disabled={!canEditScore || formData.score2 <= 0}
                   onClick={() => handleScoreChange("score2", formData.score2 - 1)}
                 >
@@ -360,15 +360,15 @@ export function MatchControlClient({
                   disabled={!canEditScore}
                   onChange={(e) => handleScoreChange("score2", e.target.value)}
                   className={cn(
-                    "h-20 text-4xl font-black text-center bg-background border-2 shadow-sm w-24",
+                    "h-20 max-md:h-14 text-4xl max-md:text-2xl font-black text-center bg-background border-2 shadow-sm w-24 max-md:w-16",
                     canEditScore && "focus:border-primary focus:ring-2 focus:ring-primary/20"
                   )}
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="icon"
-                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full text-primary bg-primary/10 flex-shrink-0"
                   disabled={!canEditScore}
                   onClick={() => handleScoreChange("score2", formData.score2 + 1)}
                 >

@@ -15,7 +15,7 @@ import { getEliminationRoundName } from "./get-name";
  * Helper to identify if an ID is a structural placeholder (e.g. QUALIFIER_1, WINNER) 
  * instead of a real UUID from edition_registrations.
  */
-function isPlaceholder(id: string | null): boolean {
+export function isPlaceholder(id: string | null): boolean {
   if (!id) return true;
   return id.startsWith("QUALIFIER_") || id.startsWith("WINNER") || id.includes("-") === false;
 }
@@ -27,6 +27,7 @@ export interface GeneratorOptions {
   generateMatches?: boolean;
   isHomeAway?: boolean;
   nodePrefix?: string;
+  matchFormat?: string;
 }
 
 /**

@@ -1,16 +1,21 @@
 import { db } from "@/lib/db";
-import { 
-  tournamentPhases, 
-  phaseGroups, 
-  phaseGroupParticipants, 
-  bracketNodes, 
+import {
+  tournamentPhases,
+  phaseGroups,
+  phaseGroupParticipants,
+  bracketNodes,
   matches,
   editionRegistrations,
-  tournamentMembers
+  tournamentMembers,
 } from "@/database/schema";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { shuffle, chunk } from "./utils";
-import { setupLeaguePhase, setupGroupPhase, setupEliminationGroups, setupSwissPhase } from "./generators";
+import {
+  setupLeaguePhase,
+  setupGroupPhase,
+  setupEliminationGroups,
+  setupSwissPhase,
+} from "./generators";
 import { getEliminationRoundName } from "./get-name";
 
 export interface PhaseBlueprint {
@@ -18,7 +23,7 @@ export interface PhaseBlueprint {
   phaseType: any;
   order: number;
   config: any;
-  participantSource: 'EDITION' | 'PHASE_QUALIFIED' | 'PREVIOUS_PHASE';
+  participantSource: "EDITION" | "PHASE_QUALIFIED" | "PREVIOUS_PHASE";
 }
 
 export interface StructureEngineOptions {
@@ -36,14 +41,18 @@ export async function createStructureEngine({
   editionId,
   phases,
   participantRegIds,
-  options = {}
+  options = {},
 }: {
   editionId: string;
   phases: PhaseBlueprint[];
   participantRegIds: string[];
   options?: StructureEngineOptions;
 }) {
-  const { dryRun = false, clearExisting = false, autoInitializeFirstPhase = true } = options;
+  const {
+    dryRun = false,
+    clearExisting = false,
+    autoInitializeFirstPhase = true,
+  } = options;
 
   if (dryRun) {
     return await generatePreview(phases, participantRegIds);
@@ -52,10 +61,10 @@ export async function createStructureEngine({
   return await db.transaction(async (tx) => {
     // 1. Clear existing structure if requested
     if (clearExisting) {
-      // Deleting phases cascades to groups, nodes, and matches
-      await tx.delete(tournamentPhases).where(eq(tournamentPhases.editionId, editionId));
+      await tx
+        .delete(tournamentPhases)
+        .where(eq(tournamentPhases.editionId, editionId));
     } else if (options.clearExistingInPhase && options.targetPhaseId) {
-      // Localized clearing for a specific phase
       const pId = options.targetPhaseId;
       await tx.delete(matches).where(eq(matches.phaseId, pId));
       await tx.delete(bracketNodes).where(eq(bracketNodes.phaseId, pId));
@@ -64,20 +73,20 @@ export async function createStructureEngine({
 
     // 2. Insert or Retrieve Phases
     let createdPhases: any[] = [];
-    
+
     if (options.targetPhaseId) {
       const existingPhase = await tx.query.tournamentPhases.findFirst({
-        where: eq(tournamentPhases.id, options.targetPhaseId)
+        where: eq(tournamentPhases.id, options.targetPhaseId),
       });
       if (!existingPhase) throw new Error("Phase cible introuvable");
-      
-      // Optionnel: Mettre à jour le type de phase si nécessaire
+
       if (existingPhase.phaseType !== phases[0].phaseType) {
-        await tx.update(tournamentPhases)
+        await tx
+          .update(tournamentPhases)
           .set({ phaseType: phases[0].phaseType, updatedAt: new Date() })
           .where(eq(tournamentPhases.id, options.targetPhaseId));
       }
-      
+
       createdPhases = [existingPhase];
     } else {
       createdPhases = await tx
@@ -88,21 +97,29 @@ export async function createStructureEngine({
             editionId,
             createdAt: new Date(),
             updatedAt: new Date(),
-          }))
+          })),
         )
         .returning();
     }
 
-    if (!autoInitializeFirstPhase || !participantRegIds || participantRegIds.length === 0) {
+    if (
+      !autoInitializeFirstPhase ||
+      !participantRegIds ||
+      participantRegIds.length === 0
+    ) {
       return { success: true, phaseCount: createdPhases.length };
     }
 
     // 3. Initialize Phases and Propagation
-    // Intelligent seeding: Group by team/club to avoid collisions in first phase
     const participantsWithInfo = await getParticipantsInfo(participantRegIds);
     const seededParticipants = intelligentSeeding(participantsWithInfo);
-    
-    let currentPhaseParticipants = seededParticipants.map(p => p.registrationId);
+
+    // ✅ Pour la première phase, on utilise les vrais IDs
+    let currentPhaseParticipants = seededParticipants.map(
+      (p) => p.registrationId,
+    );
+    // ✅ Garder une trace des qualifiés réels pour la propagation
+    let actualQualifiers: string[] = [];
 
     for (let i = 0; i < createdPhases.length; i++) {
       const phase = createdPhases[i];
@@ -118,20 +135,61 @@ export async function createStructureEngine({
       };
 
       if (phase.phaseType === "ROUND_ROBIN") {
-        await setupLeaguePhase(tx, editionId, phase, currentPhaseParticipants, genOptions);
+        await setupLeaguePhase(
+          tx,
+          editionId,
+          phase,
+          currentPhaseParticipants,
+          genOptions,
+        );
+        // Pour ROUND_ROBIN, les qualifiés seront déterminés plus tard
+        actualQualifiers = [];
       } else if (phase.phaseType === "GROUP_STAGE") {
-        const groups = await setupGroupPhase(tx, editionId, phase, currentPhaseParticipants, {
-          ...genOptions,
-          groupsCount: phaseConfig.groupsCount,
-          participantsPerGroup: phaseConfig.participantsPerGroup,
-        });
+        const groups = await setupGroupPhase(
+          tx,
+          editionId,
+          phase,
+          currentPhaseParticipants,
+          {
+            ...genOptions,
+            groupsCount: phaseConfig.groupsCount,
+            participantsPerGroup: phaseConfig.participantsPerGroup,
+          },
+        );
 
-        // Look-ahead for knockout propagation
         const advanceCount = phaseConfig.advanceCount || 2;
         const totalQualifiers = (groups?.length || 0) * advanceCount;
-        currentPhaseParticipants = Array.from({ length: totalQualifiers }, (_, idx) => `QUALIFIER_${idx + 1}`);
-      } else if (phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT") {
-        await setupEliminationGroups(tx, editionId, phase, currentPhaseParticipants, genOptions);
+
+        // ✅ Stocker les placeholders pour la prochaine phase (représentation symbolique)
+        // Mais PAS pour générer des matchs immédiatement
+        currentPhaseParticipants = Array.from(
+          { length: totalQualifiers },
+          (_, idx) => `QUALIFIER_${idx + 1}`,
+        );
+      } else if (
+        phase.phaseType === "ELIMINATION" ||
+        phase.phaseType === "KNOCKOUT"
+      ) {
+        // ✅ Pour l'élimination, on utilise les vrais participants si disponibles,
+        // sinon on ne crée pas les matchs (juste la structure)
+        const hasRealParticipants = currentPhaseParticipants.every(
+          (id) =>
+            id && !id.startsWith("QUALIFIER_") && !id.startsWith("WINNER"),
+        );
+
+        // ✅ Si on a des placeholders, on désactive la génération des matchs
+        const optionsWithConditionalMatches = {
+          ...genOptions,
+          generateMatches: genOptions.generateMatches && hasRealParticipants,
+        };
+
+        await setupEliminationGroups(
+          tx,
+          editionId,
+          phase,
+          currentPhaseParticipants,
+          optionsWithConditionalMatches,
+        );
         currentPhaseParticipants = ["WINNER"];
       } else if (phase.phaseType === "SWISS") {
         await setupSwissPhase(tx, editionId, phase, currentPhaseParticipants, {
@@ -139,7 +197,10 @@ export async function createStructureEngine({
           roundsCount: phaseConfig.roundsCount,
         });
         const advanceCount = phaseConfig.advanceCount || 8;
-        currentPhaseParticipants = Array.from({ length: advanceCount }, (_, idx) => `QUALIFIER_${idx + 1}`);
+        currentPhaseParticipants = Array.from(
+          { length: advanceCount },
+          (_, idx) => `QUALIFIER_${idx + 1}`,
+        );
       }
     }
 
@@ -154,20 +215,20 @@ async function getParticipantsInfo(regIds: string[]) {
   if (!regIds || regIds.length === 0) return [];
 
   // Filter out placeholders (e.g. QUALIFIER_1) from query
-  const realRegIds = regIds.filter(id => id && id.includes("-")); // Simple uuid check
+  const realRegIds = regIds.filter((id) => id && id.includes("-")); // Simple uuid check
   if (realRegIds.length === 0) return [];
 
   const registrations = await db.query.editionRegistrations.findMany({
     where: inArray(editionRegistrations.id, realRegIds),
     with: {
-      member: true
-    }
+      member: true,
+    },
   });
 
-  return registrations.map(reg => ({
+  return registrations.map((reg) => ({
     registrationId: reg.id,
     teamId: (reg.member as any)?.teamId,
-    clubName: (reg.member as any)?.clubName
+    clubName: (reg.member as any)?.clubName,
   }));
 }
 
@@ -179,7 +240,7 @@ function intelligentSeeding(participants: any[]) {
   const teamGroups: Record<string, any[]> = {};
   const noTeam: any[] = [];
 
-  participants.forEach(p => {
+  participants.forEach((p) => {
     const key = p.teamId || p.clubName;
     if (key) {
       if (!teamGroups[key]) teamGroups[key] = [];
@@ -192,9 +253,9 @@ function intelligentSeeding(participants: any[]) {
   // Interleave participants from different teams
   const sorted: any[] = [];
   const teamLists = Object.values(teamGroups);
-  
-  let maxLen = Math.max(...teamLists.map(l => l.length), 0);
-  
+
+  let maxLen = Math.max(...teamLists.map((l) => l.length), 0);
+
   for (let i = 0; i < maxLen; i++) {
     for (const list of teamLists) {
       if (list[i]) sorted.push(list[i]);
@@ -207,12 +268,15 @@ function intelligentSeeding(participants: any[]) {
 /**
  * Generates a preview of the structure without saving to DB.
  */
-async function generatePreview(phases: PhaseBlueprint[], participantRegIds: string[]) {
+async function generatePreview(
+  phases: PhaseBlueprint[],
+  participantRegIds: string[],
+) {
   const preview: any = {
     phases: [],
     totalParticipants: participantRegIds.length,
     totalMatches: 0,
-    estimatedDays: 0
+    estimatedDays: 0,
   };
 
   let currentParticipantsCount = participantRegIds.length;
@@ -225,50 +289,60 @@ async function generatePreview(phases: PhaseBlueprint[], participantRegIds: stri
       type: p.phaseType,
       participantCount: currentParticipantsCount,
       groups: [],
-      seedingNote: idx === 0 ? "Répartition initiale par équipe" : "Qualificatifs de la phase précédente",
-      matchesCount: 0
+      seedingNote:
+        idx === 0
+          ? "Répartition initiale par équipe"
+          : "Qualificatifs de la phase précédente",
+      matchesCount: 0,
     };
 
     let phaseMatches = 0;
 
     if (p.phaseType === "GROUP_STAGE") {
-      const groupsCount = p.config.groupsCount || Math.ceil(currentParticipantsCount / (p.config.participantsPerGroup || 4));
+      const groupsCount =
+        p.config.groupsCount ||
+        Math.ceil(
+          currentParticipantsCount / (p.config.participantsPerGroup || 4),
+        );
       const perGroup = Math.ceil(currentParticipantsCount / groupsCount);
       const matchesPerGroup = (perGroup * (perGroup - 1)) / 2;
-      
+
       for (let i = 0; i < groupsCount; i++) {
         phasePreview.groups.push({
           name: `Groupe ${String.fromCharCode(65 + i)}`,
           participantCount: perGroup,
-          matchesCount: matchesPerGroup
+          matchesCount: matchesPerGroup,
         });
         phaseMatches += matchesPerGroup;
       }
       currentParticipantsCount = groupsCount * (p.config.advanceCount || 2);
     } else if (p.phaseType === "ROUND_ROBIN") {
-      const matches = (currentParticipantsCount * (currentParticipantsCount - 1)) / 2;
+      const matches =
+        (currentParticipantsCount * (currentParticipantsCount - 1)) / 2;
       const totalRRMatches = p.config.isHomeAway ? matches * 2 : matches;
       phasePreview.groups.push({
         name: "Ligue",
         participantCount: currentParticipantsCount,
-        matchesCount: totalRRMatches
+        matchesCount: totalRRMatches,
       });
       phaseMatches += totalRRMatches;
-      currentParticipantsCount = p.config.advanceCount || Math.min(8, currentParticipantsCount);
+      currentParticipantsCount =
+        p.config.advanceCount || Math.min(8, currentParticipantsCount);
     } else if (p.phaseType === "ELIMINATION" || p.phaseType === "KNOCKOUT") {
       const totalRounds = Math.ceil(Math.log2(currentParticipantsCount || 2));
       let phaseMatches = 0;
-      
+
       for (let round = totalRounds; round >= 1; round--) {
         const matchesThisRound = Math.pow(2, totalRounds - round);
         const roundParticipantCount = matchesThisRound * 2;
         const groupName = getEliminationRoundName(roundParticipantCount);
-        
+
         phasePreview.groups.push({
           name: groupName,
-          participantCount: round === 1 ? currentParticipantsCount : roundParticipantCount,
+          participantCount:
+            round === 1 ? currentParticipantsCount : roundParticipantCount,
           matchesCount: matchesThisRound * (p.config.isHomeAway ? 2 : 1),
-          round
+          round,
         });
         phaseMatches += matchesThisRound * (p.config.isHomeAway ? 2 : 1);
       }
@@ -277,13 +351,13 @@ async function generatePreview(phases: PhaseBlueprint[], participantRegIds: stri
     }
 
     phasePreview.matchesCount = phaseMatches;
-    
+
     // Only count matches that will be actually created NOW (real participants)
-    const isRealPhase = idx === 0 || p.participantSource === 'EDITION';
+    const isRealPhase = idx === 0 || p.participantSource === "EDITION";
     if (isRealPhase) {
       preview.totalMatches += phaseMatches;
     }
-    
+
     preview.phases.push(phasePreview);
   });
 

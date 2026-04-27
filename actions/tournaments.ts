@@ -297,8 +297,11 @@ export async function isUserTournamentOrganizer(
 ): Promise<boolean> {
   try {
     const tournament = await db.query.tournaments.findFirst({
-      where: (tournaments, { eq, or }) => 
-        or(eq(tournaments.id, tournamentId), eq(tournaments.slug, tournamentId)),
+      where: (tournaments, { eq, or }) =>
+        or(
+          eq(tournaments.id, tournamentId),
+          eq(tournaments.slug, tournamentId),
+        ),
       columns: { id: true, organizerId: true },
     });
 
@@ -411,15 +414,16 @@ export async function getTournamentEditions(
           currentParticipants: editions.currentParticipants,
           maxParticipants: editions.maxParticipants,
         };
-        const col = options.sortBy && sortableColumns[options.sortBy]
-          ? sortableColumns[options.sortBy]
-          : editions.createdAt;
+        const col =
+          options.sortBy && sortableColumns[options.sortBy]
+            ? sortableColumns[options.sortBy]
+            : editions.createdAt;
         return [order(col)];
       },
       with: {
         tournament: {
           columns: TOURNAMENT_CARD_COLUMNS,
-        }
+        },
       } as any,
     });
 
@@ -1745,7 +1749,6 @@ export async function updateEditionResultForParticipant(
       }
     }
 
-
     // 2. UPSERT edition_results — une seule ligne par (editionId, registrationId)
     const resultData = {
       editionId,
@@ -1781,7 +1784,10 @@ export async function updateEditionResultForParticipant(
 /**
  * Clôture définitivement une édition de tournoi et désigne le vainqueur.
  */
-export async function finalizeTournamentEditionAction(editionId: string, winnerRegistrationId: string) {
+export async function finalizeTournamentEditionAction(
+  editionId: string,
+  winnerRegistrationId: string,
+) {
   try {
     return await db.transaction(async (tx) => {
       // 1. Récupérer les infos du gagnant
@@ -1789,16 +1795,20 @@ export async function finalizeTournamentEditionAction(editionId: string, winnerR
         where: eq(editionRegistrations.id, winnerRegistrationId),
         with: {
           member: {
-            with: { user: true }
-          }
-        }
+            with: { user: true },
+          },
+        },
       });
 
       if (!winnerReg) throw new Error("Vainqueur introuvable");
 
       const winnerMetadata = {
-        displayName: winnerReg.member?.displayName || winnerReg.member?.user?.username || "Champion",
-        avatar: winnerReg.member?.avatar || winnerReg.member?.user?.image || null,
+        displayName:
+          winnerReg.member?.displayName ||
+          winnerReg.member?.user?.username ||
+          "Champion",
+        avatar:
+          winnerReg.member?.avatar || winnerReg.member?.user?.image || null,
         gameTag: winnerReg.member?.gameTag || null,
         clubName: winnerReg.member?.clubName || null,
         registrationId: winnerRegistrationId,
@@ -1807,7 +1817,8 @@ export async function finalizeTournamentEditionAction(editionId: string, winnerR
       };
 
       // 2. Mettre à jour l'édition
-      await tx.update(tournamentEditions)
+      await tx
+        .update(tournamentEditions)
         .set({
           status: "COMPLETED",
           endDate: new Date(),
@@ -1818,7 +1829,8 @@ export async function finalizeTournamentEditionAction(editionId: string, winnerR
         .where(eq(tournamentEditions.id, editionId));
 
       // 3. Mettre à jour le résultat de l'édition (position 1)
-      await tx.insert(editionResults)
+      await tx
+        .insert(editionResults)
         .values({
           editionId,
           registrationId: winnerRegistrationId,
@@ -1833,7 +1845,7 @@ export async function finalizeTournamentEditionAction(editionId: string, winnerR
         });
 
       revalidatePath(`/tournaments/dashboard`);
-      
+
       return { success: true, winner: winnerMetadata.displayName };
     });
   } catch (error: any) {
@@ -1957,7 +1969,7 @@ export async function submitMatchResult(
       proofUrl,
       updatedAt: new Date(),
     };
-    
+
     // pas de score negatif
     if (score1 < 0 || score2 < 0) {
       throw new Error("Le score ne peut pas être négatif");
@@ -2053,7 +2065,7 @@ export async function confirmMatchResult(
  */
 export async function checkIfLastMatchForWinner(
   winnerRegistrationId: string,
-  bracketNodeId: string
+  bracketNodeId: string,
 ): Promise<boolean> {
   try {
     // Récupérer le bracket node actuel
@@ -2073,27 +2085,30 @@ export async function checkIfLastMatchForWinner(
         eq(matches.bracketNodeId, bracketNodeId),
         or(
           eq(matches.participant1RegistrationId, winnerRegistrationId),
-          eq(matches.participant2RegistrationId, winnerRegistrationId)
+          eq(matches.participant2RegistrationId, winnerRegistrationId),
         ),
-        eq(matches.status, "COMPLETED")
+        eq(matches.status, "COMPLETED"),
       ),
     });
 
     // Pour un bracket simple, un seul match par joueur suffit
     // Pour un bracket avec plusieurs rounds, il faut vérifier si c'est le dernier
-    if (currentNode.phase?.phaseType === "ELIMINATION" || currentNode.phase?.phaseType === "KNOCKOUT") {
+    if (
+      currentNode.phase?.phaseType === "ELIMINATION" ||
+      currentNode.phase?.phaseType === "KNOCKOUT"
+    ) {
       // Dans ton architecture, on vérifie s'il y a un groupe (tour) suivant
       const nextGroup = await db.query.phaseGroups.findFirst({
         where: and(
           eq(phaseGroups.phaseId, currentNode.phaseId),
           gt(phaseGroups.order, currentNode.group?.order || 0),
-          eq(phaseGroups.isDeleted, false)
-        )
+          eq(phaseGroups.isDeleted, false),
+        ),
       });
 
       // S'il n'y a pas de groupe suivant, c'est le dernier match (Finale)
       if (!nextGroup) return true;
-      
+
       // S'il y a un groupe suivant, ce n'est pas son dernier match dans l'édition
       return false;
     }
@@ -2105,12 +2120,14 @@ export async function checkIfLastMatchForWinner(
           eq(matches.groupId, currentNode.groupId || ""),
           or(
             eq(matches.participant1RegistrationId, winnerRegistrationId),
-            eq(matches.participant2RegistrationId, winnerRegistrationId)
-          )
+            eq(matches.participant2RegistrationId, winnerRegistrationId),
+          ),
         ),
       });
 
-      const completedCount = allMatchesInGroup.filter(m => m.status === "COMPLETED").length;
+      const completedCount = allMatchesInGroup.filter(
+        (m) => m.status === "COMPLETED",
+      ).length;
       const totalCount = allMatchesInGroup.length;
 
       return completedCount === totalCount && totalCount > 0;
@@ -2126,7 +2143,9 @@ export async function checkIfLastMatchForWinner(
 /**
  * Récupère la phase suivante dans l'ordre de l'édition
  */
-export async function getNextPhase(currentPhaseId: string): Promise<TournamentPhase | null> {
+export async function getNextPhase(
+  currentPhaseId: string,
+): Promise<TournamentPhase | null> {
   try {
     // Récupérer la phase actuelle
     const currentPhase = await db.query.tournamentPhases.findFirst({
@@ -2139,14 +2158,14 @@ export async function getNextPhase(currentPhaseId: string): Promise<TournamentPh
     const allPhases = await db.query.tournamentPhases.findMany({
       where: and(
         eq(tournamentPhases.editionId, currentPhase.editionId),
-        eq(tournamentPhases.isDeleted, false)
+        eq(tournamentPhases.isDeleted, false),
       ),
       orderBy: [asc(tournamentPhases.order)],
     });
 
     // Trouver l'index de la phase actuelle
-    const currentIndex = allPhases.findIndex(p => p.id === currentPhaseId);
-    
+    const currentIndex = allPhases.findIndex((p) => p.id === currentPhaseId);
+
     if (currentIndex === -1 || currentIndex + 1 >= allPhases.length) {
       return null;
     }
@@ -2161,7 +2180,9 @@ export async function getNextPhase(currentPhaseId: string): Promise<TournamentPh
 /**
  * Récupère une registration avec les infos du membre (user/team)
  */
-export async function getRegistrationWithMember(registrationId: string): Promise<any> {
+export async function getRegistrationWithMember(
+  registrationId: string,
+): Promise<any> {
   try {
     const registration = await db.query.editionRegistrations.findFirst({
       where: eq(editionRegistrations.id, registrationId),
@@ -2254,28 +2275,42 @@ export async function adminConfirmMatchResult(
     }
 
     // Appel au nouveau moteur central de progression
-    const { progressTournamentAfterMatch } = await import("@/lib/tournaments/progression-engine");
-    const progressionResult = await progressTournamentAfterMatch(updatedMatch.id);
-    
+    const { progressTournamentAfterMatch } =
+      await import("@/lib/tournaments/progression-engine");
+    const progressionResult = await progressTournamentAfterMatch(
+      updatedMatch.id,
+    );
+
     let progressionInfo: any = { progressionResult };
-    
+
     // Rétrocompatibilité avec l'ancien code du front-end
-    if (progressionResult.isNodeComplete || progressionResult.isGroupComplete || progressionResult.isPhaseComplete) {
-       progressionInfo.needsProgression = true;
-       
-       if (progressionResult.winners && progressionResult.winners.length > 0) {
-         const winnerReg = await getRegistrationWithMember(progressionResult.winners[0]);
-         progressionInfo.winnerName = winnerReg?.member?.displayName || "Le joueur";
-         progressionInfo.winnerRegistrationId = progressionResult.winners[0];
-       } else if (updatedMatch.winnerRegistrationId) {
-         const winnerReg = await getRegistrationWithMember(updatedMatch.winnerRegistrationId);
-         progressionInfo.winnerName = winnerReg?.member?.displayName || "Le joueur";
-         progressionInfo.winnerRegistrationId = updatedMatch.winnerRegistrationId;
-       }
-       
-       if (progressionResult.nextLevelToOrganize?.type === 'PHASE') {
-         progressionInfo.nextPhaseId = progressionResult.nextLevelToOrganize.id;
-       }
+    if (
+      progressionResult.isNodeComplete ||
+      progressionResult.isGroupComplete ||
+      progressionResult.isPhaseComplete
+    ) {
+      progressionInfo.needsProgression = true;
+
+      if (progressionResult.winners && progressionResult.winners.length > 0) {
+        const winnerReg = await getRegistrationWithMember(
+          progressionResult.winners[0],
+        );
+        progressionInfo.winnerName =
+          winnerReg?.member?.displayName || "Le joueur";
+        progressionInfo.winnerRegistrationId = progressionResult.winners[0];
+      } else if (updatedMatch.winnerRegistrationId) {
+        const winnerReg = await getRegistrationWithMember(
+          updatedMatch.winnerRegistrationId,
+        );
+        progressionInfo.winnerName =
+          winnerReg?.member?.displayName || "Le joueur";
+        progressionInfo.winnerRegistrationId =
+          updatedMatch.winnerRegistrationId;
+      }
+
+      if (progressionResult.nextLevelToOrganize?.type === "PHASE") {
+        progressionInfo.nextPhaseId = progressionResult.nextLevelToOrganize.id;
+      }
     }
 
     // Sync cumulative edition results for both participants

@@ -78,6 +78,30 @@ export async function propagatePhaseResults(phaseId: string) {
             updatedAt: new Date()
           })
           .where(eq(bracketNodes.id, node.id));
+
+        // ✅ NEW: Also insert into phaseGroupParticipants if the node belongs to a group
+        if (updated && node.groupId) {
+          for (const regId of newParticipants) {
+            // Only insert real registration IDs (UUIDs), not placeholders
+            if (!regId || regId.startsWith("QUALIFIER_") || regId.startsWith("WINNER_")) continue;
+
+            const exists = await tx.query.phaseGroupParticipants.findFirst({
+              where: and(
+                eq(phaseGroupParticipants.groupId, node.groupId),
+                eq(phaseGroupParticipants.registrationId, regId)
+              )
+            });
+
+            if (!exists) {
+              await tx.insert(phaseGroupParticipants).values({
+                groupId: node.groupId,
+                registrationId: regId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+            }
+          }
+        }
       }
     }
 

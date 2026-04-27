@@ -230,6 +230,8 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
       await tx.update(products).set({
         status: 'VENDU',
         deliveredToUserId: order.buyerId,
+        shopId: sql`null`,
+        userId: order.buyerId,
         deliveredAt: new Date()
       }).where(eq(products.id, order.productId));
 
