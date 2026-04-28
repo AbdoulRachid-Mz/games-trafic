@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { ClientGameClipsContent, ClientGameClipsContentSkeleton } from "./client-page";
+import { ClientGameClipsContent } from "./client-page";
+import { GameTraficsLoader } from "@/components/game-clips/game-trafics-loader";
 
 // mise en cache
 
@@ -37,7 +38,7 @@ export const metadata = {
 export default function GameClipsPage() {
   return (
     <Suspense fallback={
-      <ClientGameClipsContentSkeleton />
+      <GameTraficsLoader />
     }>
       <ClientGameClipsContent />
     </Suspense>

@@ -474,6 +474,52 @@ export async function updateUserWallet(
 }
 
 /**
+ * Met à jour le PIN d'un wallet de manière sécurisée
+ */
+export async function updateWalletPinAction(
+  walletId: string,
+  currentPin: string,
+  newPin: string
+): Promise<{ success: boolean; error?: string; wallet?: UserWallet }> {
+  try {
+    // 1. Vérifier le PIN actuel
+    const verification = await verifyWalletPin(walletId, currentPin);
+    if (!verification.success) {
+      return { success: false, error: verification.error || 'PIN actuel incorrect' };
+    }
+
+    // 2. Valider la force du nouveau PIN
+    const validation = WalletUtils.validatePinStrength(newPin);
+    if (!validation.isValid) {
+      return { success: false, error: validation.errors.join(', ') };
+    }
+
+    // 3. Hasher le nouveau PIN
+    const pinHash = await WalletUtils.hashPin(newPin);
+
+    // 4. Mettre à jour le wallet
+    const [updatedWallet] = await db
+      .update(userWallets)
+      .set({
+        pinHash,
+        updatedAt: new Date(),
+      })
+      .where(eq(userWallets.id, walletId))
+      .returning();
+
+    if (!updatedWallet) {
+      return { success: false, error: 'Wallet non trouvé' };
+    }
+
+    revalidatePath('/wallet/settings');
+    return { success: true, wallet: updatedWallet };
+  } catch (error) {
+    console.error('Error in updateWalletPinAction:', error);
+    return { success: false, error: 'Erreur interne lors de la mise à jour du PIN' };
+  }
+}
+
+/**
  * Met à jour le solde d'un wallet
  */
 export async function updateWalletBalance(

@@ -3,30 +3,38 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { InteractionButton } from "@/components/shared/interaction-button";
-import { Settings, Key, Edit3, UserPlus, Check, FingerprintPattern } from "lucide-react";
+import {
+  Settings,
+  Edit3,
+  LayoutDashboard,
+  MoreVertical,
+  Fingerprint,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { FingerprintIcon } from "@/components/icons/fingerprint";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ProfileActionsProps {
   userId: string;
   isOwnProfile: boolean;
   profileCompletion?: number;
+  hasPasskey?: boolean;
 }
 
 export function ProfileActions({
   userId,
   isOwnProfile,
   profileCompletion = 0,
+  hasPasskey = false,
 }: ProfileActionsProps) {
   const router = useRouter();
   const [isAddingPasskey, setIsAddingPasskey] = useState(false);
@@ -57,72 +65,62 @@ export function ProfileActions({
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
       >
-        {/* Passkey button with tooltip */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleAddPasskey}
-                disabled={isAddingPasskey}
-                className="relative"
-              >
-                <FingerprintIcon size={16} />
-                {profileCompletion > 50 && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Ajouter une passkey pour sécuriser votre compte</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
-        {/* Complete profile button */}
-        <Button asChild variant={profileCompletion < 100 ? "default" : "outline"}>
-          <Link href="/profile/settings" className="gap-2">
-            {profileCompletion < 100 ? (
-              <>
-                <Edit3 className="h-4 w-4" />
-                Compléter mon profil ({profileCompletion}%)
-              </>
-            ) : (
-              <>
-                <Check className="h-4 w-4" />
-                Profil complété
-              </>
-            )}
-          </Link>
-        </Button>
-
-        {/* Settings button */}
-        <Button variant="ghost" size="icon" asChild>
+        {/* Edit Profile button (always visible) */}
+        <Button variant="outline" size="sm" asChild className="gap-2">
           <Link href="/profile/settings">
             <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Paramètres</span>
           </Link>
         </Button>
 
-        {/* dashboard */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/dashboard">
-                  <UserPlus className="h-4 w-4" />
-                </Link>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Accéder au tableau de bord</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {/* Dropdown for more options */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-9 w-9">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {/* Complete profile - only if < 70% */}
+            {profileCompletion < 70 && (
+              <DropdownMenuItem
+                onClick={() => router.push("/profile/settings")}
+                className="gap-2 cursor-pointer"
+              >
+                <Edit3 className="h-4 w-4" />
+                <span>Compléter mon profil ({profileCompletion}%)</span>
+              </DropdownMenuItem>
+            )}
+
+            {/* Add passkey - only if no passkey */}
+            {!hasPasskey && (
+              <DropdownMenuItem
+                onClick={handleAddPasskey}
+                disabled={isAddingPasskey}
+                className="gap-2 cursor-pointer"
+              >
+                <Fingerprint className="h-4 w-4" />
+                <span>{isAddingPasskey ? "Configuration..." : "Ajouter une passkey"}</span>
+              </DropdownMenuItem>
+            )}
+
+            <DropdownMenuSeparator />
+
+            {/* Dashboard */}
+            <DropdownMenuItem
+              onClick={() => router.push("/dashboard")}
+              className="gap-2 cursor-pointer"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span>Tableau de bord</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </motion.div>
     );
   }
 
+  // Public profile - show follow button
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}

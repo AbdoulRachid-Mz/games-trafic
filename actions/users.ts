@@ -164,7 +164,7 @@ export async function getProfile(
       // Pour minimal, on ne récupère que les infos de base + existence de wallet/vip
       const [wallet, vip, pk] = await Promise.all([
         db
-          .select({ id: userWallets.id, financialAccountId: userWallets.financialAccountId, cardNumberHash: userWallets.cardNumberHash })
+          .select({ id: userWallets.id, financialAccountId: userWallets.financialAccountId, cardNumberHash: userWallets.cardNumberHash, isActive: userWallets.isActive, isLocked: userWallets.isLocked })
           .from(userWallets)
           .where(eq(userWallets.userId, userId))
           .limit(1)

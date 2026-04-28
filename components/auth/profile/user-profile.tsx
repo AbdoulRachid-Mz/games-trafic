@@ -543,7 +543,7 @@ export function UserProfile({ userId, username, email }: UserProfileProps) {
         )}
 
         {/* Onglets personnalisés */}
-        <ProfileTabs profileUser={profileUser} isOwnProfile={isOwnProfile} onUpdate={async () => { await refreshUser(); }} />
+        <ProfileTabs profileUser={profileUser} isOwnProfile={isOwnProfile} />
       </div>
 
       {/* Drawer QR Code */}

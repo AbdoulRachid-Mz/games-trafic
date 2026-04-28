@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
-import { AlertDialog, AlertDialogContent } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
@@ -1137,7 +1137,8 @@ export function MarkCompleteDialog({
       </Button>
 
       <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-        <AlertDialogContent className="max-w-2xl">{content}</AlertDialogContent>
+        <AlertDialogTitle className="hidden">Confirmation</AlertDialogTitle>
+        <AlertDialogContent className="md:max-w-3xl w-[95vw] overflow-auto max-h-[85vh]">{content}</AlertDialogContent>
       </AlertDialog>
     </>
   );

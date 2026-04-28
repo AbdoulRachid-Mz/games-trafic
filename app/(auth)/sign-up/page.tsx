@@ -19,7 +19,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Phone, Sparkles, ChevronRight, Key } from "lucide-react";
+import { Mail, Lock, User, Phone, Sparkles, ChevronRight, Key, Cross } from "lucide-react";
+import { ArrowRightIcon } from "@/components/icons/arrow-right";
 
 // Schéma Zod
 const signupSchema = z
@@ -132,6 +133,14 @@ export default function SignUpPage() {
         transition={{ duration: 0.5 }}
         className="max-w-fit w-full"
       >
+        {/* skip button */}
+        <button
+          onClick={() => router.push("/")}
+          className="fixed bg-white/95 backdrop-blur-sm px-4 py-1 rounded-full top-4 right-4 text-slate-900 font-bold "
+        >
+          <ArrowRightIcon className="h-4 w-4" />
+          Ignorer
+        </button>
         {/* Logo */}
         <div className="text-center mb-6">
           <motion.div

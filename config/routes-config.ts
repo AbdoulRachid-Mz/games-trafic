@@ -75,12 +75,6 @@ export const defaultDockLinks: DockLinkConfig[] = [
     requireAuth: false,
   },
   {
-    href: "/shops",
-    label: "Boutiques",
-    icon: "shops",
-    requireAuth: false,
-  },
-  {
     href: "/tournaments",
     label: "Tournois",
     icon: "tournaments",
@@ -121,7 +115,7 @@ export const defaultFABActions: FABAction[] = [
     id: "send-signal",
     label: "Signaler un problème",
     type: "link",
-    url: "/signals/create",
+    url: "/signals?create=true",
     requiresAuth: false,
   },
 ];
@@ -245,7 +239,9 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     footer: false,
     leftBar: false,
     rightBar: false,
+    hideTopMiddleOnScroll: true,
     dockLinks: [
+      { href: "/", label: "Accueil", icon: "home", requireAuth: true },
       { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
       {
         href: "/wallet/transactions",
@@ -287,6 +283,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: ["/wallet/transactions", "/wallet/transactions/**"],
     name: "transactions",
+    styleGroup: "wallet",
+    requireAuth: true,
+  },
+  {
+    path: ["/wallet/transactions", "/wallet/transactions/create"],
+    name: "create-transaction",
     styleGroup: "wallet",
     requireAuth: true,
   },
@@ -598,6 +600,23 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     showOnTap: true,
     hideTopMiddleOnScroll: true,
     activeFabActionId: "create-shop",
+    dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
+  },
+  {
+    path: "/signals",
+    name: "Signals",
+    excludeLayout: false,
+    breadcrumbs: true,
+    footer: true,
+    topMiddle: true,
+    leftBar: true,
+    rightBar: false,
+    navigationLinks: true,
+    floatingActions: true,
+    showOnTap: true,
+    hideTopMiddleOnScroll: true,
+    activeFabActionId: "send-signal",
     dockLinks: defaultDockLinks,
     fabActions: defaultFABActions,
   },

@@ -305,7 +305,7 @@ export function MatchControlClient({
                   type="button"
                   variant="destructive"
                   size="icon"
-                  className="h-12 w-12 rounded-full flex-shrink-0"
+                  className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full flex-shrink-0"
                   disabled={!canEditScore || formData.score1 <= 0}
                   onClick={() => handleScoreChange("score1", formData.score1 - 1)}
                 >

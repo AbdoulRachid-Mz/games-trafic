@@ -87,10 +87,18 @@ export function AdvancedUserCard({
 
   const appInfo = {
     name: "GAMES TRAFICS",
-    logo: "/images/icons/logo/game_logo.png",
+    logo: "/icons/gt-primary.png",
     email: "games-trafics@gmail.com",
     phoneNumber: "+227 96021553",
     address: "Tahoua-Niger",
+    socialMedia: [
+      { name: "Facebook", url: "https://facebook.com/games.trafics", icon: "facebook" },
+      { name: "Tiktok", url: "https://tiktok.com/games.trafics", icon: "tiktok" },
+      { name: "Youtube", url: "https://youtube.com/games.trafics", icon: "youtube" },
+      { name: "Twitter", url: "https://twitter.com/games_trafics", icon: "twitter" },
+      { name: "Instagram", url: "https://instagram.com/games.trafics", icon: "instagram" },
+      { name: "LinkedIn", url: "https://linkedin.com/company/games-trafics", icon: "linkedin" },
+    ]
   };
 
   const handleRefresh = async () => {

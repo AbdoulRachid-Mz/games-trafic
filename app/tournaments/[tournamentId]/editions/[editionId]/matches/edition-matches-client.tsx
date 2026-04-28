@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Trophy, 
-  Calendar, 
-  Swords, 
-  Filter, 
-  ChevronDown, 
+import {
+  Trophy,
+  Calendar,
+  Swords,
+  Filter,
+  ChevronDown,
   ChevronUp,
   Download,
   FileSpreadsheet,
@@ -23,7 +23,8 @@ import {
   Zap,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft,
 } from "lucide-react";
 import {
   Select,
@@ -44,7 +45,11 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useAuthContext } from "@/contexts/auth-context";
 import { usePhases } from "@/hooks/use-phase-manager";
 import { useGroups } from "@/hooks/use-group-manager";
@@ -68,20 +73,37 @@ interface EditionMatchesClientProps {
 }
 
 // Composant pour l'avatar d'un participant
-function ParticipantAvatar({ participant, size = "md" }: { participant: any; size?: "sm" | "md" | "lg" }) {
+function ParticipantAvatar({
+  participant,
+  size = "md",
+}: {
+  participant: any;
+  size?: "sm" | "md" | "lg";
+}) {
   const sizeClasses = {
     sm: "h-8 w-8",
     md: "h-10 w-10",
-    lg: "h-12 w-12"
+    lg: "h-12 w-12",
   };
 
   const router = useRouter();
-  
-  const name = participant?.member?.displayName || participant?.member?.user?.username || "?";
-  const image = participant?.member?.avatar || participant?.member?.user?.profileImage || "icons/avatar.png";
-  
+
+  const name =
+    participant?.member?.displayName ||
+    participant?.member?.user?.username ||
+    "?";
+  const image =
+    participant?.member?.avatar ||
+    participant?.member?.user?.profileImage ||
+    "icons/avatar.png";
+
   return (
-    <div className={cn("shrink-0 relative rounded-full bg-muted border-2 border-background shadow-sm flex items-center justify-center overflow-hidden", sizeClasses[size])}>
+    <div
+      className={cn(
+        "shrink-0 relative rounded-full bg-muted border-2 border-background shadow-sm flex items-center justify-center overflow-hidden",
+        sizeClasses[size],
+      )}
+    >
       {image ? (
         <Image src={image} fill className="object-cover" alt={name} />
       ) : (
@@ -92,9 +114,17 @@ function ParticipantAvatar({ participant, size = "md" }: { participant: any; siz
 }
 
 // Composant pour la carte d'un match
-function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: any) {
-  const isUserParticipant = match.participant1?.member?.userId === userId || match.participant2?.member?.userId === userId;
-  
+function PublicMatchCard({
+  match,
+  tournamentId,
+  editionId,
+  userId,
+  isAdmin,
+}: any) {
+  const isUserParticipant =
+    match.participant1?.member?.userId === userId ||
+    match.participant2?.member?.userId === userId;
+
   const router = useRouter();
 
   const getScoreClass = () => {
@@ -103,18 +133,49 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
     if (match.score2 > match.score1) return "text-emerald-600 font-bold";
     return "";
   };
-  
+
   const getStatusBadge = () => {
     const status = match.status || "PENDING";
-    const config: Record<string, { label: string; className: string; icon: any }> = {
-      COMPLETED: { label: "Terminé", className: "bg-emerald-500/10 text-emerald-600 border-emerald-200", icon: CheckCircle2 },
-      IN_PROGRESS: { label: "En cours", className: "bg-blue-500/10 text-blue-600 border-blue-200", icon: Clock },
-      PENDING_REVIEW: { label: "À valider", className: "bg-amber-500/10 text-amber-600 border-amber-200", icon: AlertCircle },
-      DISPUTED: { label: "Litige", className: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertCircle },
-      PENDING: { label: "Programmé", className: "bg-muted text-muted-foreground border-border", icon: Calendar },
+    const config: Record<
+      string,
+      { label: string; className: string; icon: any }
+    > = {
+      COMPLETED: {
+        label: "Terminé",
+        className: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+        icon: CheckCircle2,
+      },
+      IN_PROGRESS: {
+        label: "En cours",
+        className: "bg-blue-500/10 text-blue-600 border-blue-200",
+        icon: Clock,
+      },
+      PENDING_REVIEW: {
+        label: "À valider",
+        className: "bg-amber-500/10 text-amber-600 border-amber-200",
+        icon: AlertCircle,
+      },
+      DISPUTED: {
+        label: "Litige",
+        className: "bg-destructive/10 text-destructive border-destructive/20",
+        icon: AlertCircle,
+      },
+      PENDING: {
+        label: "Programmé",
+        className: "bg-muted text-muted-foreground border-border",
+        icon: Calendar,
+      },
     };
     const { label, className, icon: Icon } = config[status] || config.PENDING;
-    return <Badge variant="outline" className={cn("text-[10px] uppercase font-bold gap-1", className)}><Icon className="h-3 w-3" />{label}</Badge>;
+    return (
+      <Badge
+        variant="outline"
+        className={cn("text-[10px] uppercase font-bold gap-1", className)}
+      >
+        <Icon className="h-3 w-3" />
+        {label}
+      </Badge>
+    );
   };
 
   const cardContent = (
@@ -133,18 +194,25 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
         </div>
         {getStatusBadge()}
       </div>
-      
+
       {/* Participants */}
       <div className="flex items-center justify-between gap-3">
         {/* Participant 1 */}
-        <div className="flex-1 text-center" >
+        <div className="flex-1 text-center">
           <div className="flex justify-center mb-2">
             <ParticipantAvatar participant={match.participant1} size="md" />
           </div>
-          <div className="font-medium text-sm truncate" onClick={() => router.push(`/tournaments/${match.tournamentId}/members/${match.participant1?.member?.id}`)}>
-            {match.participant1?.member?.displayName || 
-             match.participant1?.member?.user?.username || 
-             "TBD"}
+          <div
+            className="font-medium text-sm truncate"
+            onClick={() =>
+              router.push(
+                `/tournaments/${match.tournamentId}/members/${match.participant1?.member?.id}`,
+              )
+            }
+          >
+            {match.participant1?.member?.displayName ||
+              match.participant1?.member?.user?.username ||
+              "TBD"}
           </div>
           {match.participant1?.member?.team?.name && (
             <div className="text-[10px] text-muted-foreground truncate">
@@ -152,7 +220,7 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
             </div>
           )}
         </div>
-        
+
         {/* Score */}
         <div className="shrink-0 flex flex-col items-center gap-1">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg font-bold text-lg">
@@ -166,16 +234,16 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
             </div>
           )}
         </div>
-        
+
         {/* Participant 2 */}
         <div className="flex-1 text-center">
           <div className="flex justify-center mb-2">
             <ParticipantAvatar participant={match.participant2} size="md" />
           </div>
           <div className="font-medium text-sm truncate">
-            {match.participant2?.member?.displayName || 
-             match.participant2?.member?.user?.username || 
-             "TBD"}
+            {match.participant2?.member?.displayName ||
+              match.participant2?.member?.user?.username ||
+              "TBD"}
           </div>
           {match.participant2?.member?.team?.name && (
             <div className="text-[10px] text-muted-foreground truncate">
@@ -186,13 +254,18 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
       </div>
     </CardContent>
   );
-  
+
   return (
-    <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
-      <Card className={cn(
-        "transition-all hover:shadow-xl hover:border-primary/50 cursor-pointer h-full group", 
-        isUserParticipant && "border-primary/50 bg-primary/5 shadow-primary/5"
-      )}>
+    <Link
+      href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}
+    >
+      <Card
+        className={cn(
+          "transition-all hover:shadow-xl hover:border-primary/50 cursor-pointer h-full group",
+          isUserParticipant &&
+            "border-primary/50 bg-primary/5 shadow-primary/5",
+        )}
+      >
         {cardContent}
       </Card>
     </Link>
@@ -200,23 +273,24 @@ function PublicMatchCard({ match, tournamentId, editionId, userId, isAdmin }: an
 }
 
 // Composant pour un nœud de bracket (journée/round)
-function BracketNodeSection({ 
-  node, 
-  tournamentId, 
-  editionId, 
-  userId, 
+function BracketNodeSection({
+  node,
+  tournamentId,
+  editionId,
+  userId,
   isAdmin,
-  defaultOpen = false 
+  defaultOpen = false,
 }: any) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const matches = node.matches || [];
-  
+
   if (matches.length === 0) return null;
-  
+
   // Déterminer le nom du nœud
-  const nodeName = node.metadata?.name || node.name || node.nodeCode || `Round ${node.round}`;
+  const nodeName =
+    node.metadata?.name || node.name || node.nodeCode || `Round ${node.round}`;
   const nodeType = node.metadata?.nodeType || node.nodeType;
-  
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="mb-4">
@@ -235,13 +309,18 @@ function BracketNodeSection({
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-[9px]">
-                {matches.filter((m: any) => m.status === "COMPLETED").length}/{matches.length}
+                {matches.filter((m: any) => m.status === "COMPLETED").length}/
+                {matches.length}
               </Badge>
-              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {isOpen ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
             </div>
           </div>
         </CollapsibleTrigger>
-        
+
         <CollapsibleContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             {matches.map((match: any) => (
@@ -262,22 +341,28 @@ function BracketNodeSection({
 }
 
 // Composant pour un groupe
-function GroupSection({ group, tournamentId, editionId, userId, isAdmin }: any) {
+function GroupSection({
+  group,
+  tournamentId,
+  editionId,
+  userId,
+  isAdmin,
+}: any) {
   const [isOpen, setIsOpen] = useState(true);
   const nodes = group.bracketNodes || [];
   const directMatches = group.matches || [];
-  
+
   // Regrouper les matchs par bracketNode
   const matchesByNode = new Map();
   nodes.forEach((node: any) => {
     matchesByNode.set(node.id, node.matches || []);
   });
-  
+
   // Matchs sans bracketNode
   const orphanMatches = directMatches.filter((m: any) => !m.bracketNodeId);
-  
+
   if (nodes.length === 0 && orphanMatches.length === 0) return null;
-  
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="mb-6">
@@ -293,12 +378,20 @@ function GroupSection({ group, tournamentId, editionId, userId, isAdmin }: any) 
               </div>
             </div>
             <Badge variant="secondary">
-              {nodes.reduce((acc: number, node: any) => acc + (node.matches?.length || 0), 0) + orphanMatches.length} matchs
+              {nodes.reduce(
+                (acc: number, node: any) => acc + (node.matches?.length || 0),
+                0,
+              ) + orphanMatches.length}{" "}
+              matchs
             </Badge>
-            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {isOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </div>
         </CollapsibleTrigger>
-        
+
         <CollapsibleContent>
           <div className="pl-4 pt-4 space-y-6">
             {/* Nodes (journées) */}
@@ -312,11 +405,13 @@ function GroupSection({ group, tournamentId, editionId, userId, isAdmin }: any) 
                 isAdmin={isAdmin}
               />
             ))}
-            
+
             {/* Matchs orphelins */}
             {orphanMatches.length > 0 && (
               <div className="space-y-3">
-                <div className="text-sm font-medium text-muted-foreground">Matchs directs</div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Matchs directs
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {orphanMatches.map((match: any) => (
                     <PublicMatchCard
@@ -339,13 +434,19 @@ function GroupSection({ group, tournamentId, editionId, userId, isAdmin }: any) 
 }
 
 // Composant pour une phase
-function PhaseSection({ phase, tournamentId, editionId, userId, isAdmin }: any) {
+function PhaseSection({
+  phase,
+  tournamentId,
+  editionId,
+  userId,
+  isAdmin,
+}: any) {
   const [isOpen, setIsOpen] = useState(true);
   const groups = phase.groups || [];
   const directMatches = phase.matches || [];
-  
+
   if (groups.length === 0 && directMatches.length === 0) return null;
-  
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="mb-8">
@@ -357,18 +458,33 @@ function PhaseSection({ phase, tournamentId, editionId, userId, isAdmin }: any) 
             <div className="flex-1">
               <div className="font-bold text-lg">{phase.name}</div>
               <div className="text-xs text-muted-foreground">
-                {phase.phaseType === "ROUND_ROBIN" ? "Championnat" : 
-                 phase.phaseType === "GROUP_STAGE" ? "Phase de groupes" :
-                 phase.phaseType === "ELIMINATION" ? "Élimination directe" : "Phase"}
+                {phase.phaseType === "ROUND_ROBIN"
+                  ? "Championnat"
+                  : phase.phaseType === "GROUP_STAGE"
+                    ? "Phase de groupes"
+                    : phase.phaseType === "ELIMINATION"
+                      ? "Élimination directe"
+                      : "Phase"}
               </div>
             </div>
             <Badge variant="secondary" className="text-sm">
-              {groups.reduce((acc: number, g: any) => acc + (g.bracketNodes?.length || 0) + (g.matches?.length || 0), 0) + directMatches.length} matchs
+              {groups.reduce(
+                (acc: number, g: any) =>
+                  acc +
+                  (g.bracketNodes?.length || 0) +
+                  (g.matches?.length || 0),
+                0,
+              ) + directMatches.length}{" "}
+              matchs
             </Badge>
-            {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+            {isOpen ? (
+              <ChevronUp className="h-5 w-5" />
+            ) : (
+              <ChevronDown className="h-5 w-5" />
+            )}
           </div>
         </CollapsibleTrigger>
-        
+
         <CollapsibleContent>
           <div className="pl-6 pt-6 space-y-6">
             {/* Groups */}
@@ -382,11 +498,13 @@ function PhaseSection({ phase, tournamentId, editionId, userId, isAdmin }: any) 
                 isAdmin={isAdmin}
               />
             ))}
-            
+
             {/* Matchs directs de la phase */}
             {directMatches.length > 0 && (
               <div className="space-y-4">
-                <div className="text-sm font-medium text-muted-foreground">Matchs de la phase</div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Matchs de la phase
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {directMatches.map((match: any) => (
                     <PublicMatchCard
@@ -409,32 +527,40 @@ function PhaseSection({ phase, tournamentId, editionId, userId, isAdmin }: any) 
 }
 
 // Composant principal
-export function EditionMatchesClient({ editionId, tournamentId }: EditionMatchesClientProps) {
+export function EditionMatchesClient({
+  editionId,
+  tournamentId,
+}: EditionMatchesClientProps) {
   const { user } = useAuthContext();
-  const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "list">("list");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
-  
+
   // Fetch data
   const { data: edition } = useEdition(editionId);
-  const { data: editionTree, isLoading: isLoadingTree } = useEditionDetailTree(editionId);
+  const { data: editionTree, isLoading: isLoadingTree } =
+    useEditionDetailTree(editionId);
   const { data: phasesRes, isLoading: isLoadingPhases } = usePhases(editionId);
   const { data: isOrganizer } = useIsUserTournamentOrganizer(
     edition?.tournamentId || "",
     user?.id || "",
   );
-  
+  const router = useRouter();
+
   // Fetch matches for list view
   const { data: matchesRes, isLoading: isLoadingMatches } = useMatchList({
-    filters: { editionId, phaseId: selectedPhaseId !== "all" ? selectedPhaseId : undefined },
-    pagination: { limit: 200, page: 1 }
+    filters: {
+      editionId,
+      phaseId: selectedPhaseId !== "all" ? selectedPhaseId : undefined,
+    },
+    pagination: { limit: 200, page: 1 },
   });
-  
+
   const { data: myMatches } = useMyMatches(editionId, user?.id || "");
-  
+
   const phases = phasesRes?.data || [];
   const matches = matchesRes?.data || [];
-  
+
   // Filter tree data based on selected phase
   const phasesWithMatches = useMemo(() => {
     const allPhases = editionTree?.phases || [];
@@ -444,53 +570,65 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
 
   const groupsInSelectedPhase = useMemo(() => {
     if (selectedPhaseId === "all") return [];
-    const phase = editionTree?.phases?.find((p: any) => p.id === selectedPhaseId);
+    const phase = editionTree?.phases?.find(
+      (p: any) => p.id === selectedPhaseId,
+    );
     return phase?.groups || [];
   }, [editionTree, selectedPhaseId]);
 
   useEffect(() => {
     setSelectedGroupId("all");
   }, [selectedPhaseId]);
-  
+
   const isLoading = isLoadingTree || isLoadingPhases || isLoadingMatches;
-  
+
   // Export handlers
-  const handleExport = useCallback(async (format: "csv" | "json" | "pdf" | "excel", scope: "all" | "phase") => {
-    try {
-      const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
-      
-      const filters: any = { editionId };
-      if (scope === "phase" && selectedPhaseId !== "all") {
-        filters.phaseId = selectedPhaseId;
-      }
-      
-      const result = await exportMatchesToFormat(editionId, format, filters);
-      if (result.success && result.data) {
-        const rawData = JSON.parse(result.data);
-        const config = {
-          filename: result.filename || `matches_${scope}_${editionId}`,
-          title: scope === "phase" ? `Matchs - Phase ${selectedPhaseId}` : "Tous les matchs",
-          subtitle: `Édition: ${editionId.slice(0, 8)}`,
-        };
+  const handleExport = useCallback(
+    async (
+      format: "csv" | "json" | "pdf" | "excel",
+      scope: "all" | "phase",
+    ) => {
+      try {
+        const { exportData: exportToFormat, createExportData } =
+          await import("@/utils/export-utils");
 
-        const tableData = createExportData(rawData, "matches");
-        await exportToFormat(format, tableData, config);
+        const filters: any = { editionId };
+        if (scope === "phase" && selectedPhaseId !== "all") {
+          filters.phaseId = selectedPhaseId;
+        }
 
-        toast.success(`Export ${format.toUpperCase()} réussi`, {
-          description: `${result.count || rawData.length} matchs exportés`
-        });
-      } else {
-        toast.error(result.error || "Erreur lors de l'export");
+        const result = await exportMatchesToFormat(editionId, format, filters);
+        if (result.success && result.data) {
+          const rawData = JSON.parse(result.data);
+          const config = {
+            filename: result.filename || `matches_${scope}_${editionId}`,
+            title:
+              scope === "phase"
+                ? `Matchs - Phase ${selectedPhaseId}`
+                : "Tous les matchs",
+            subtitle: `Édition: ${editionId.slice(0, 8)}`,
+          };
+
+          const tableData = createExportData(rawData, "matches");
+          await exportToFormat(format, tableData, config);
+
+          toast.success(`Export ${format.toUpperCase()} réussi`, {
+            description: `${result.count || rawData.length} matchs exportés`,
+          });
+        } else {
+          toast.error(result.error || "Erreur lors de l'export");
+        }
+      } catch (error: any) {
+        toast.error(error.message || "Erreur lors de l'export");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de l'export");
-    }
-  }, [editionId, selectedPhaseId]);
-  
+    },
+    [editionId, selectedPhaseId],
+  );
+
   // Mes matchs section
   const MyMatchesCard = () => {
     if (!myMatches?.myMatches.length) return null;
-    
+
     return (
       <Card className="border-primary/30 bg-primary/5 mb-8">
         <CardHeader className="pb-3">
@@ -517,13 +655,32 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
       </Card>
     );
   };
-  
+
   return (
     <div className="container max-w-6xl mx-auto py-8 px-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <Typography variant="h2" weight="bold" className="flex items-center gap-2">
+          <Typography
+            variant="h2"
+            weight="bold"
+            className="flex items-center gap-2"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="mr-1"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Typography
+              variant="body-sm"
+              theme="muted"
+              className="ml-2 max-md:hidden"
+            >
+              Retour
+            </Typography>
             <Trophy className="h-7 w-7 text-primary" />
             Matchs du tournoi
           </Typography>
@@ -531,7 +688,7 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
             {edition?.name || `Édition ${edition?.editionNumber}`}
           </Typography>
         </div>
-        
+
         <div className="flex items-center gap-3">
           {/* Phase filter for list view */}
           {viewMode === "list" && phases.length > 0 && (
@@ -542,12 +699,14 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
               <SelectContent>
                 <SelectItem value="all">Toutes les phases</SelectItem>
                 {phases.map((phase: any) => (
-                  <SelectItem key={phase.id} value={phase.id}>{phase.name}</SelectItem>
+                  <SelectItem key={phase.id} value={phase.id}>
+                    {phase.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
-          
+
           {/* View toggle */}
           <div className="flex bg-muted p-1 rounded-lg">
             <Button
@@ -569,7 +728,7 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
               <span className="text-xs hidden sm:inline">Liste</span>
             </Button>
           </div>
-          
+
           {/* Export button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -582,15 +741,20 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
               <DropdownMenuLabel>Format d'export</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleExport("excel", "all")}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel - Tous les matchs
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel - Tous les
+                matchs
               </DropdownMenuItem>
               {selectedPhaseId !== "all" && (
-                <DropdownMenuItem onClick={() => handleExport("excel", "phase")}>
-                  <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel - Cette phase
+                <DropdownMenuItem
+                  onClick={() => handleExport("excel", "phase")}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel - Cette
+                  phase
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={() => handleExport("csv", "all")}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV - Tous les matchs
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV - Tous les
+                matchs
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport("json", "all")}>
                 <FileJson className="h-4 w-4 mr-2" /> JSON
@@ -602,20 +766,22 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
           </DropdownMenu>
         </div>
       </div>
-      
+
       {/* Mes matchs */}
       {user?.id && <MyMatchesCard />}
-      
+
       {/* Loading state */}
       {isLoading && (
         <Card className="border-none shadow-none bg-transparent">
           <CardContent className="py-20 text-center">
             <div className="animate-spin h-8 w-8 border-b-2 border-primary mx-auto rounded-full" />
-            <p className="mt-4 text-muted-foreground">Chargement des matchs...</p>
+            <p className="mt-4 text-muted-foreground">
+              Chargement des matchs...
+            </p>
           </CardContent>
         </Card>
       )}
-      
+
       {/* Tree view - Organisation par phases > groupes > brackets */}
       {!isLoading && viewMode === "tree" && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -626,7 +792,10 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
                 variant={selectedPhaseId === "all" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setSelectedPhaseId("all")}
-                className={cn("rounded-xl transition-all font-bold", selectedPhaseId === "all" && "shadow-lg")}
+                className={cn(
+                  "rounded-xl transition-all font-bold",
+                  selectedPhaseId === "all" && "shadow-lg",
+                )}
               >
                 Toutes les phases
               </Button>
@@ -636,7 +805,10 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
                   variant={selectedPhaseId === phase.id ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setSelectedPhaseId(phase.id)}
-                  className={cn("rounded-xl transition-all font-bold", selectedPhaseId === phase.id && "shadow-lg")}
+                  className={cn(
+                    "rounded-xl transition-all font-bold",
+                    selectedPhaseId === phase.id && "shadow-lg",
+                  )}
                 >
                   {phase.name}
                 </Button>
@@ -647,20 +819,28 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
           {/* Group Selector with StatsCarousel */}
           {selectedPhaseId !== "all" && groupsInSelectedPhase.length > 0 && (
             <div className="space-y-3">
-              <Typography variant="body-sm" weight="bold" theme="muted" className="px-2 uppercase tracking-widest">
+              <Typography
+                variant="body-sm"
+                weight="bold"
+                theme="muted"
+                className="px-2 uppercase tracking-widest"
+              >
                 Groupes
               </Typography>
-              <StatsCarousel 
-                mode="auto" 
+              <StatsCarousel
+                mode="auto"
                 itemsPerView={{ mobile: 2, md: 3, lg: 4, xl: 5 }}
                 gap={10}
                 className="pb-2"
               >
                 <Button
                   variant={selectedGroupId === "all" ? "default" : "outline"}
-                  className={cn("w-full h-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all", 
-                    selectedGroupId === "all" ? "border-primary shadow-lg shadow-primary/20" : "hover:border-primary/50 hover:bg-primary/5")
-                  }
+                  className={cn(
+                    "w-full h-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all",
+                    selectedGroupId === "all"
+                      ? "border-primary shadow-lg shadow-primary/20"
+                      : "hover:border-primary/50 hover:bg-primary/5",
+                  )}
                   onClick={() => setSelectedGroupId("all")}
                 >
                   <Layers className="h-4 w-4" />
@@ -669,14 +849,21 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
                 {groupsInSelectedPhase.map((group: any) => (
                   <Button
                     key={group.id}
-                    variant={selectedGroupId === group.id ? "default" : "outline"}
-                    className={cn("w-full h-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all", 
-                      selectedGroupId === group.id ? "border-primary shadow-lg shadow-primary/20" : "hover:border-primary/50 hover:bg-primary/5")
+                    variant={
+                      selectedGroupId === group.id ? "default" : "outline"
                     }
+                    className={cn(
+                      "w-full h-16 rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all",
+                      selectedGroupId === group.id
+                        ? "border-primary shadow-lg shadow-primary/20"
+                        : "hover:border-primary/50 hover:bg-primary/5",
+                    )}
                     onClick={() => setSelectedGroupId(group.id)}
                   >
                     <Users className="h-4 w-4" />
-                    <span className="text-[10px] font-black uppercase truncate max-w-full px-2">{group.name}</span>
+                    <span className="text-[10px] font-black uppercase truncate max-w-full px-2">
+                      {group.name}
+                    </span>
                   </Button>
                 ))}
               </StatsCarousel>
@@ -700,16 +887,23 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
                   {selectedPhaseId === "all" && (
                     <div className="flex items-center gap-4 mb-4">
                       <div className="h-px flex-1 bg-gradient-to-r from-transparent to-border" />
-                      <Typography variant="h4" weight="bold" className="uppercase tracking-tighter text-muted-foreground/50">
+                      <Typography
+                        variant="h4"
+                        weight="bold"
+                        className="uppercase tracking-tighter text-muted-foreground/50"
+                      >
                         {phase.name}
                       </Typography>
                       <div className="h-px flex-1 bg-gradient-to-l from-transparent to-border" />
                     </div>
                   )}
-                  
+
                   <div className="space-y-8">
                     {(phase.groups || [])
-                      .filter((g: any) => selectedGroupId === "all" || g.id === selectedGroupId)
+                      .filter(
+                        (g: any) =>
+                          selectedGroupId === "all" || g.id === selectedGroupId,
+                      )
                       .map((group: any) => (
                         <GroupSection
                           key={group.id}
@@ -727,7 +921,7 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
           )}
         </div>
       )}
-      
+
       {/* List view - Simple liste avec filtres */}
       {!isLoading && viewMode === "list" && (
         <div className="space-y-4">
@@ -756,22 +950,31 @@ export function EditionMatchesClient({ editionId, tournamentId }: EditionMatches
           )}
         </div>
       )}
-      
+
       {/* Footer stats */}
       {!isLoading && matches.length > 0 && (
         <div className="mt-8 pt-6 border-t text-center text-sm text-muted-foreground">
           <div className="flex items-center justify-center gap-6 flex-wrap">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span>Terminés: {matches.filter((m: any) => m.status === "COMPLETED").length}</span>
+              <span>
+                Terminés:{" "}
+                {matches.filter((m: any) => m.status === "COMPLETED").length}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-blue-500" />
-              <span>En cours: {matches.filter((m: any) => m.status === "IN_PROGRESS").length}</span>
+              <span>
+                En cours:{" "}
+                {matches.filter((m: any) => m.status === "IN_PROGRESS").length}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>Programmés: {matches.filter((m: any) => m.status === "PENDING").length}</span>
+              <span>
+                Programmés:{" "}
+                {matches.filter((m: any) => m.status === "PENDING").length}
+              </span>
             </div>
           </div>
         </div>

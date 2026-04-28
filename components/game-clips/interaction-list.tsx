@@ -1,48 +1,91 @@
+// components/game-clips/interaction-list.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { getEntityInteractionsWithRelations } from "@/actions/interactions";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Typography } from "@/components/ui/typography";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EntityType } from "@/database/schema";
+import { useClipEngineStore } from "@/hooks/use-clip-engine";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { getEntityInteractionsWithRelations } from "@/actions/interactions";
+import { Typography } from "../ui/typography";
+
+type EntityType =
+  | "GAMECLIP"
+  | "POST"
+  | "PRODUCT"
+  | "SHOP"
+  | "USER"
+  | "GAME"
+  | "TOURNAMENT"
+  | "BLOG"
+  | "MESSAGE"
+  | "TEAM"
+  | "THEME"
+  | "NEWS"
+  | "GROUP"
+  | "ANNOUNCEMENT"
+  | "SERVICE"
+  | "GUIDE"
+  | "COMMENT"
+  | "MATCH"
+  | "GAME_ITEM"
+  | "PARTNER"
+  | "EDITION";
+
+interface Interaction {
+  id: string;
+  type: string;
+  createdAt: Date;
+  user: {
+    id: string;
+    username: string;
+    fullName?: string;
+    profileImage?: string;
+  };
+}
 
 interface InteractionListProps {
   entityId: string;
   entityType: EntityType;
-  interactionType: "LIKE" | "SHARE" | "FOLLOW";
+  interactionType: "LIKE" | "SHARE" | "FOLLOW" | "BOOKMARK";
   className?: string;
 }
 
-export function InteractionList({
+function InteractionListContent({
   entityId,
   entityType,
   interactionType,
   className,
 }: InteractionListProps) {
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["interactions", entityId, entityType, interactionType],
-    queryFn: async ({ pageParam = 1 }) => {
-      const res = await getEntityInteractionsWithRelations(
-        entityId,
-        entityType,
-        { types: interactionType === "SHARE" ? ["VIEW"] : [interactionType] },
-        { page: pageParam, limit: 20 },
-        { sortBy: "createdAt", sortOrder: "desc" }
-      );
-      return {
-        items: res.data,
-        nextPage: res.pagination.hasNext ? pageParam + 1 : undefined
-      };
-    },
-    getNextPageParam: (lastPage) => lastPage.nextPage,
-    initialPageParam: 1,
-    enabled: !!entityId && !!entityType,
-  });
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["interactions", entityId, entityType, interactionType],
+      queryFn: async ({ pageParam = 1 }) => {
+        const res = await getEntityInteractionsWithRelations(
+          entityId,
+          entityType,
+          { types: interactionType === "SHARE" ? ["VIEW"] : [interactionType] },
+          { page: pageParam, limit: 20 },
+          { sortBy: "createdAt", sortOrder: "desc" },
+        );
+        return {
+          items: res.data,
+          nextPage: res.pagination.hasNext ? pageParam + 1 : undefined,
+        };
+      },
+      getNextPageParam: (lastPage) => lastPage.nextPage,
+      initialPageParam: 1,
+      enabled: !!entityId && !!entityType,
+    });
 
-  const interactions = data?.pages.flatMap(page => page.items) || [];
+  const interactions = data?.pages.flatMap((page) => page.items) || [];
 
   if (isLoading) {
     return (
@@ -64,7 +107,7 @@ export function InteractionList({
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-2", className)}>
       {interactions.map((interaction) => (
         <div
           key={interaction.id}
@@ -78,22 +121,24 @@ export function InteractionList({
           </Avatar>
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <Typography variant="body-sm" className="font-bold text-white">
+              <span className="text-sm font-bold text-white">
                 @{interaction.user?.username}
-              </Typography>
+              </span>
               <span className="text-[10px] text-white/30">
-              
                 {interaction.createdAt
-                  ? new Date(interaction.createdAt).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short'
-                    })
+                  ? new Date(interaction.createdAt).toLocaleDateString(
+                      "fr-FR",
+                      {
+                        day: "numeric",
+                        month: "short",
+                      },
+                    )
                   : null}
               </span>
             </div>
-            <Typography variant="caption1" className="text-white/40">
+            <span className="text-xs text-white/40">
               {interaction.user?.fullName || "Utilisateur"}
-            </Typography>
+            </span>
           </div>
           <div className="text-xs text-white/20 uppercase font-bold">
             {interactionType.toLowerCase()}
@@ -117,3 +162,92 @@ export function InteractionList({
     </div>
   );
 }
+
+// Sheet wrapper that pauses playback when open
+interface InteractionSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  entityId: string;
+  entityType: EntityType;
+  interactionType: "LIKE" | "SHARE" | "FOLLOW" | "BOOKMARK";
+  title?: string;
+}
+
+export function InteractionSheet({
+  open,
+  onOpenChange,
+  entityId,
+  entityType,
+  interactionType,
+  title,
+}: InteractionSheetProps) {
+  const setGlobalPause = useClipEngineStore((s) => s.setGlobalPause);
+
+  // Pause playback when sheet is open
+  useEffect(() => {
+    if (open) {
+      setGlobalPause(true);
+    } else {
+      setGlobalPause(false);
+    }
+  }, [open, setGlobalPause]);
+
+  const getTitle = () => {
+    if (title) return title;
+    switch (interactionType) {
+      case "LIKE":
+        return "Likes";
+      case "BOOKMARK":
+        return "Sauvegardes";
+      case "SHARE":
+        return "Partages";
+      case "FOLLOW":
+        return "Abonnes";
+      default:
+        return "Interactions";
+    }
+  };
+
+  const getIcon = () => {
+    switch (interactionType) {
+      case "LIKE":
+        return "❤️";
+      case "BOOKMARK":
+        return "🔖";
+      case "SHARE":
+        return "🔗";
+      case "FOLLOW":
+        return "👥";
+      default:
+        return "✨";
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="h-[70vh] rounded-t-[2.5rem] border-t border-white/10 bg-[#0a0a0b] p-0 overflow-hidden"
+      >
+        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-4 mb-2" />
+        <SheetHeader className="px-6 pb-4 border-b border-white/5">
+          <SheetTitle className="text-white flex items-center gap-3">
+            <span className="text-lg">{getIcon()}</span>
+            <span className="font-black tracking-tight text-xl">
+              {getTitle()}
+            </span>
+          </SheetTitle>
+        </SheetHeader>
+        <div className="h-full overflow-y-auto pt-4 pb-32 px-4">
+          <InteractionListContent
+            entityId={entityId}
+            entityType={entityType}
+            interactionType={interactionType}
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export { InteractionListContent as InteractionList };

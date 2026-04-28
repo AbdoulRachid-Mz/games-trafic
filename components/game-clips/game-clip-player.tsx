@@ -1,5 +1,7 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
-import { InteractionButton } from "@/components/shared/interaction-button";
+// @/components/game-clips/game-clip-player.tsx
+"use client";
+
+import React, { useState, useCallback, useRef, useEffect, memo } from "react";
 import {
   MessageCircle,
   Share2,
@@ -7,145 +9,333 @@ import {
   Plus,
   Volume2,
   VolumeX,
-  Play,
+  Bookmark,
+  BookmarkCheck,
+  Download,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Typography } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
-import { shareContent } from "@/lib/share";
-import { GameClipCard } from "@/types/view-models";
-import { useGameClips } from "@/hooks/use-game-clips";
-import { useAuthContext } from "@/contexts/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { ClipMediaController } from "./clip-media-controller";
+import { ClipMediaController, type MediaItem } from "./clip-media-controller";
 import { useClipEngineStore } from "@/hooks/use-clip-engine";
 
+// Minimal type for what we need
+interface ClipData {
+  id: string;
+  videoUrl?: string | null;
+  thumbnailUrl?: string | null;
+  images?: string[] | null;
+  caption?: string | null;
+  authorId: string;
+  author?: {
+    id: string;
+    username?: string | null;
+    profileImage?: string | null;
+  } | null;
+  game?: {
+    id: string;
+    name: string;
+    profileImage?: string | null;
+  } | null;
+  stats?: {
+    likesCount?: number;
+    commentsCount?: number;
+    viewsCount?: number;
+    liked?: boolean;
+    bookmarked?: boolean;
+  } | null;
+}
+
 interface GameClipPlayerProps {
-  clip: GameClipCard;
+  clip: ClipData;
+  clipIndex: number;
   isActive: boolean;
+  isPreload?: boolean;
+  userId?: string;
   onComplete: () => void;
   onCommentsToggle?: () => void;
+  onLike?: () => void;
+  onBookmark?: () => void;
+  onShare?: () => void;
   onNext?: () => void;
   onPrev?: () => void;
 }
 
-export function GameClipPlayer({
+export const GameClipPlayer = memo(function GameClipPlayer({
   clip,
+  clipIndex,
   isActive,
+  isPreload = false,
+  userId,
   onComplete,
   onCommentsToggle,
+  onLike,
+  onBookmark,
+  onShare,
   onNext,
   onPrev,
 }: GameClipPlayerProps) {
-  const [showControls, setShowControls] = useState(false);
   const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
+  const [localLiked, setLocalLiked] = useState(clip.stats?.liked ?? false);
+  const [localBookmarked, setLocalBookmarked] = useState(
+    clip.stats?.bookmarked ?? false,
+  );
+  const [localLikesCount, setLocalLikesCount] = useState(
+    clip.stats?.likesCount ?? 0,
+  );
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const doubleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const doubleTapHeartTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { shareClip, isSharing } = useGameClips();
-  const { user } = useAuthContext();
   const router = useRouter();
-  
+
+  // Get store state
   const isGloballyPaused = useClipEngineStore((s) => s.isGloballyPaused);
+  const isLongPressing = useClipEngineStore((s) => s.isLongPressing);
   const playbackMode = useClipEngineStore((s) => s.playbackMode);
-  const setGlobalPause = useClipEngineStore((s) => s.setGlobalPause);
   const muted = useClipEngineStore((s) => s.muted);
   const toggleMute = useClipEngineStore((s) => s.toggleMute);
-  const setUserInteracting = useClipEngineStore((s) => s.setUserInteracting);
+  const setGlobalPause = useClipEngineStore((s) => s.setGlobalPause);
+  const setIsLongPressing = useClipEngineStore((s) => s.setIsLongPressing);
+
+  // Sync local state with props
+  useEffect(() => {
+    setLocalLiked(clip.stats?.liked ?? false);
+    setLocalBookmarked(clip.stats?.bookmarked ?? false);
+    setLocalLikesCount(clip.stats?.likesCount ?? 0);
+  }, [clip.stats?.liked, clip.stats?.bookmarked, clip.stats?.likesCount]);
 
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-      if (doubleTapTimerRef.current) clearTimeout(doubleTapTimerRef.current);
+      if (doubleTapHeartTimerRef.current)
+        clearTimeout(doubleTapHeartTimerRef.current);
     };
   }, []);
 
-  const mediaItems = [
+  // Build media items array: video first, then images
+  const mediaItems: MediaItem[] = [
     ...(clip.videoUrl ? [{ type: "video" as const, url: clip.videoUrl }] : []),
     ...(clip.images?.map((url) => ({ type: "image" as const, url })) || []),
   ];
 
+  // Double tap to like
   const handleDoubleTap = useCallback(() => {
-    if (user) {
-      setShowDoubleTapHeart(true);
-      if (doubleTapTimerRef.current) clearTimeout(doubleTapTimerRef.current);
-      doubleTapTimerRef.current = setTimeout(() => setShowDoubleTapHeart(false), 1000);
-    }
-  }, [user]);
+    if (!userId) return;
 
-  const handleShare = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await shareContent({
-      title: "Regardez ce clip sur Games Trafics",
-      text: clip.caption || `Clip de ${clip.author?.username}`,
-      url: `${window.location.origin}/game-clips?activeClipId=${clip.id}`,
-    });
-    if (user && user.id !== clip.authorId) {
-      shareClip(clip.id);
-    }
-  };
+    // Show heart animation
+    setShowDoubleTapHeart(true);
+    if (doubleTapHeartTimerRef.current)
+      clearTimeout(doubleTapHeartTimerRef.current);
+    doubleTapHeartTimerRef.current = setTimeout(
+      () => setShowDoubleTapHeart(false),
+      1000,
+    );
 
-  // Improved Long press for pause
-  const handleTouchStart = useCallback(() => {
+    // Like if not already liked
+    if (!localLiked) {
+      setLocalLiked(true);
+      setLocalLikesCount((prev) => prev + 1);
+      onLike?.();
+    }
+  }, [userId, localLiked, onLike]);
+
+  // Tap center to toggle pause
+  const handleTapCenter = useCallback(() => {
+    setGlobalPause(!isGloballyPaused);
+  }, [isGloballyPaused, setGlobalPause]);
+
+  // Long press handlers
+  const handlePointerDown = useCallback(() => {
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
+      setIsLongPressing(true);
       setGlobalPause(true);
-      setUserInteracting(true, "longpress");
-    }, 400); // threshold for long press
-  }, [setGlobalPause, setUserInteracting]);
+    }, 400);
+  }, [setIsLongPressing, setGlobalPause]);
 
-  const handleTouchEnd = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    setGlobalPause(false);
-    setUserInteracting(false);
-  }, [setGlobalPause, setUserInteracting]);
+    if (isLongPressing) {
+      setIsLongPressing(false);
+      setGlobalPause(false);
+    }
+  }, [isLongPressing, setIsLongPressing, setGlobalPause]);
 
-  const handleTapCenter = useCallback(() => {
-    setGlobalPause(!isGloballyPaused);
-    setUserInteracting(true, "tap");
-    setTimeout(() => setUserInteracting(false), 500);
-  }, [isGloballyPaused, setGlobalPause, setUserInteracting]);
+  const handlePointerLeave = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  // Like handler
+  const handleLike = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!userId) return;
+
+      setLocalLiked((prev) => !prev);
+      setLocalLikesCount((prev) => (localLiked ? prev - 1 : prev + 1));
+      onLike?.();
+    },
+    [userId, localLiked, onLike],
+  );
+
+  // Bookmark handler
+  const handleBookmark = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!userId) return;
+
+      setLocalBookmarked((prev) => !prev);
+      onBookmark?.();
+    },
+    [userId, onBookmark],
+  );
+
+  // Share handler
+  const handleShare = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      const shareData = {
+        title: "Regardez ce clip",
+        text: clip.caption || `Clip de ${clip.author?.username}`,
+        url: `${window.location.origin}/game-clips?activeClipId=${clip.id}`,
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          onShare?.();
+        } catch (err) {
+          // User cancelled or error
+          if ((err as Error).name !== "AbortError") {
+            console.warn("[v0] Share failed:", err);
+          }
+        }
+      } else {
+        // Fallback: copy to clipboard
+        try {
+          await navigator.clipboard.writeText(shareData.url);
+          toast.success("Lien copie dans le presse-papier");
+          onShare?.();
+        } catch {
+          console.warn("[v0] Clipboard write failed");
+        }
+      }
+    },
+    [clip.id, clip.caption, clip.author?.username, onShare],
+  );
+
+  // Download handler
+  const handleDownload = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+
+      // Determine what to download: video or first image
+      const downloadUrl = clip.videoUrl || clip.images?.[0];
+      if (!downloadUrl) {
+        toast.error("Aucun media a telecharger");
+        return;
+      }
+
+      setIsDownloading(true);
+
+      try {
+        const response = await fetch(downloadUrl);
+        if (!response.ok) throw new Error("Download failed");
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+
+        // Generate filename
+        const extension = clip.videoUrl ? "mp4" : "jpg";
+        const filename = `clip_${clip.id}_${Date.now()}.${extension}`;
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        toast.success("Telechargement lance");
+      } catch (err) {
+        console.error("[v0] Download failed:", err);
+        toast.error("Echec du telechargement");
+      } finally {
+        setIsDownloading(false);
+      }
+    },
+    [clip.id, clip.videoUrl, clip.images],
+  );
+
+  // If preload only, render minimal content
+  if (isPreload && !isActive) {
+    return (
+      <div className="relative h-full w-full bg-black">
+        {/* Preload thumbnail or first frame */}
+        {(clip.thumbnailUrl || clip.images?.[0]) && (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30 blur-2xl"
+            style={{
+              backgroundImage: `url(${clip.thumbnailUrl || clip.images?.[0]})`,
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full bg-black overflow-hidden group cursor-pointer"
-      onMouseEnter={() => setShowControls(true)}
-      onMouseMove={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
-      onDoubleClick={handleDoubleTap}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
+      className="relative h-full w-full bg-black overflow-hidden"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
+      onPointerCancel={handlePointerUp}
     >
-      {/* Background Blur */}
+      {/* Blurred Background */}
       <div
         className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110 pointer-events-none"
         style={{
-          backgroundImage: clip.videoUrl
-            ? `url(${clip.thumbnailUrl || clip.videoUrl})`
-            : `url(${clip.images?.[0]})`,
+          backgroundImage: clip.thumbnailUrl
+            ? `url(${clip.thumbnailUrl})`
+            : clip.videoUrl
+              ? `url(${clip.videoUrl})`
+              : clip.images?.[0]
+                ? `url(${clip.images[0]})`
+                : undefined,
         }}
       />
 
       {/* Media Controller */}
       <ClipMediaController
         mediaItems={mediaItems}
+        clipIndex={clipIndex}
         isActive={isActive}
         isGloballyPaused={isGloballyPaused}
+        isLongPressing={isLongPressing}
         playbackMode={playbackMode}
         muted={muted}
         onComplete={onComplete}
         onTapCenter={handleTapCenter}
         onTapLeft={onPrev}
         onTapRight={onNext}
+        onDoubleTap={handleDoubleTap}
       />
 
       {/* Double Tap Heart Animation */}
@@ -155,166 +345,176 @@ export function GameClipPlayer({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1.5, opacity: 1 }}
             exit={{ scale: 2, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-40"
           >
-            <Heart className="h-24 w-24 text-white fill-white drop-shadow-2xl" />
+            <Heart className="h-16 w-16 text-red-500 fill-red-500 drop-shadow-2xl" />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Right Actions Bar */}
-      <div
-        className={cn(
-          "absolute bottom-24 right-4 flex flex-col items-center gap-4 z-30 transition-all duration-300",
-          showControls ? "opacity-100 translate-x-0" : "opacity-0 translate-x-10",
-        )}
-      >
-        {/* Profile */}
-        <div className="relative group/avatar">
-          <Avatar 
-            className="h-12 w-12 border-2 border-white ring-2 ring-primary/30 shadow-2xl transition-transform active:scale-90 cursor-pointer"
-            onClick={(e) => { e.stopPropagation(); router.push(`/profile/${clip.author?.id}`); }}
+      {/* Right Action Bar */}
+      <div className="absolute bottom-16 right-3 flex flex-col items-center gap-3 z-30">
+        {/* Author Avatar */}
+        <div className="relative">
+          <Avatar
+            className="h-11 w-11 border-2 border-white shadow-lg cursor-pointer active:scale-95 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/profile/${clip.author?.id}`);
+            }}
           >
             <AvatarImage
               src={clip.author?.profileImage || "/icons/avatar-500.png"}
             />
-            <AvatarFallback className="bg-primary/20 text-primary">
-              {clip.author?.username?.[0]?.toUpperCase()}
+            <AvatarFallback className="bg-primary/20 text-primary text-sm">
+              {clip.author?.username?.[0]?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
           <button
-            onClick={(e) => { e.stopPropagation(); router.push("/game-clips/create"); }}
-            className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full hover:scale-110 transition-transform shadow-lg border border-white z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push("/game-clips/create");
+            }}
+            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-primary text-white p-1 rounded-full hover:scale-110 transition-transform shadow-lg border-2 border-black"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-2.5 w-2.5" />
           </button>
         </div>
 
-        {/* Like */}
-        <div className="flex flex-col items-center gap-1">
-          <InteractionButton
-            type="like"
-            entityType="GAMECLIP"
-            entityId={clip.id}
-            iconOnly
-            withCount={false}
-            variant="ghost"
-            className="bg-black/40 backdrop-blur-xl rounded-full p-3 text-white hover:bg-black/60 h-12 w-12 border border-white/10 shadow-xl hover:scale-110 active:scale-95 transition-all"
-          />
-          <span className="text-xs font-bold text-white drop-shadow-md">
-            {clip.stats?.likesCount || 0}
+        {/* Like Button */}
+        <div className="flex flex-col items-center gap-0.5">
+          <button
+            onClick={handleLike}
+            className={cn(
+              "p-2 rounded-full transition-all active:scale-90",
+              "bg-black/40 backdrop-blur-sm border border-white/10",
+              localLiked && "text-red-500",
+            )}
+          >
+            <Heart className={cn("h-4 w-4", localLiked && "fill-current")} />
+          </button>
+          <span className="text-xs font-semibold text-white drop-shadow-md">
+            {localLikesCount}
           </span>
         </div>
 
-        {/* Comments */}
-        <div className="flex flex-col items-center gap-1">
+        {/* Comments Button */}
+        <div className="flex flex-col items-center gap-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onCommentsToggle?.();
             }}
-            className="bg-black/40 backdrop-blur-xl rounded-full p-3 text-white hover:bg-black/60 transition-all h-12 w-12 border border-white/10 shadow-xl hover:scale-110 active:scale-95"
+            className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
           >
-            <MessageCircle className="h-5 w-5" />
+            <MessageCircle className="h-4 w-4 text-white" />
           </button>
-          <span className="text-xs font-bold text-white drop-shadow-md">
-            {clip.stats?.commentsCount || 0}
+          <span className="text-xs font-semibold text-white drop-shadow-md">
+            {clip.stats?.commentsCount ?? 0}
           </span>
         </div>
 
-        {/* Share */}
+        {/* Bookmark Button */}
+        <button
+          onClick={handleBookmark}
+          className={cn(
+            "p-2 rounded-full transition-all active:scale-90",
+            "bg-black/40 backdrop-blur-sm border border-white/10",
+            localBookmarked && "text-yellow-500",
+          )}
+        >
+          {localBookmarked ? (
+            <BookmarkCheck className="h-4 w-4 fill-current" />
+          ) : (
+            <Bookmark className="h-4 w-4 text-white" />
+          )}
+        </button>
+
+        {/* Share Button */}
         <button
           onClick={handleShare}
-          disabled={isSharing}
-          className="bg-black/40 backdrop-blur-xl rounded-full p-3 text-white hover:bg-black/60 transition-all h-12 w-12 border border-white/10 shadow-xl hover:scale-110 active:scale-95 disabled:opacity-50"
+          className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
         >
-          <Share2 className={cn("h-5 w-5", isSharing && "animate-spin")} />
+          <Share2 className="h-4 w-4 text-white" />
         </button>
 
-        {/* Bookmark */}
-        <InteractionButton
-          type="bookmark"
-          entityType="GAMECLIP"
-          entityId={clip.id}
-          iconOnly
-          variant="ghost"
-          className="bg-black/40 backdrop-blur-xl text-white rounded-full p-3 hover:bg-black/60 h-12 w-12 border border-white/10 shadow-xl hover:scale-110 active:scale-95 transition-all"
-        />
-
-        {/* Volume */}
+        {/* Download Button */}
         <button
-          onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-          className="bg-black/40 backdrop-blur-xl rounded-full p-3 text-white hover:bg-black/60 transition-all h-12 w-12 border border-white/10 shadow-xl hover:scale-110 active:scale-95"
+          onClick={handleDownload}
+          disabled={isDownloading}
+          className={cn(
+            "p-2 rounded-full transition-all active:scale-90",
+            "bg-black/40 backdrop-blur-sm border border-white/10",
+            isDownloading && "opacity-50",
+          )}
         >
-          {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          {isDownloading ? (
+            <Loader2 className="h-4 w-4 text-white animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 text-white" />
+          )}
+        </button>
+
+        {/* Volume Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMute();
+          }}
+          className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
+        >
+          {muted ? (
+            <VolumeX className="h-4 w-4 text-white" />
+          ) : (
+            <Volume2 className="h-4 w-4 text-white" />
+          )}
         </button>
       </div>
 
-      {/* Bottom Info Overlay */}
-      <div
-        className={cn(
-          "absolute bottom-0 left-0 right-0 p-6 pb-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white transition-opacity duration-500 pointer-events-none",
-          showControls ? "opacity-100" : "opacity-0",
-        )}
-      >
-        <div className="max-w-[80%] pointer-events-auto">
-          {/* Author */}
-          <div
-            className="flex items-center gap-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={(e) => { e.stopPropagation(); router.push(`/profile/${clip.author?.id}`); }}
-          >
-            <Typography variant="body-base" className="font-bold text-white flex items-center gap-2">
-              @{clip.author?.username}
-              {clip.authorId === user?.id && (
-                <span className="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full border border-primary/30 font-bold uppercase">
-                  Toi
-                </span>
-              )}
-            </Typography>
-          </div>
-
-          {/* Caption */}
-          {clip.caption && (
-            <Typography
-              variant="body-sm"
-              className="line-clamp-2 mb-3 text-white/90 leading-relaxed"
-            >
-              {clip.caption}
-            </Typography>
-          )}
-
-          {/* Game Tag */}
-          {clip.game && (
-            <div 
-              className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-              onClick={(e) => { e.stopPropagation(); router.push(`/games/${clip.game?.id}`); }}
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">
-                {clip.game.name}
-              </span>
-            </div>
+      {/* Bottom Info Overlay - Always visible */}
+      <div className="absolute bottom-0 left-0 right-16 p-4 pb-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none z-20">
+        {/* Author */}
+        <div
+          className="flex items-center gap-2 mb-2 pointer-events-auto cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            router.push(`/profile/${clip.author?.id}`);
+          }}
+        >
+          <span className="text-sm font-bold text-white">
+            @{clip.author?.username || "utilisateur"}
+          </span>
+          {clip.authorId === userId && (
+            <span className="bg-primary/20 text-primary text-[9px] px-1.5 py-0.5 rounded-full border border-primary/30 font-bold uppercase">
+              Toi
+            </span>
           )}
         </div>
-      </div>
 
-      {/* Tap micro-animation */}
-      <AnimatePresence>
-        {isGloballyPaused && isActive && (
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.2, opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-          >
-            <div className="p-4 rounded-full bg-black/20 backdrop-blur-sm border border-white/10">
-               <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
-                  <Play className="h-10 w-10 text-white/50 fill-white/20" />
-               </motion.div>
-            </div>
-          </motion.div>
+        {/* Caption */}
+        {clip.caption && (
+          <p className="text-sm text-white/90 line-clamp-2 mb-2 leading-relaxed">
+            {clip.caption}
+          </p>
         )}
-      </AnimatePresence>
+
+        {/* Game Tag */}
+        {clip.game && (
+          <div
+            className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 pointer-events-auto cursor-pointer hover:bg-white/20 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/games/${clip.game?.id}`);
+            }}
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-white">
+              {clip.game.name}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+});

@@ -21,6 +21,7 @@ import { Key, Mail, Lock, ChevronRight, Sparkles, FingerprintPattern } from "luc
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { ArrowRightIcon } from "@/components/icons/arrow-right";
 
 // Schéma de validation Zod
 const loginSchema = z.object({
@@ -141,6 +142,14 @@ export default function SignInPage() {
         transition={{ duration: 0.5 }}
         className="max-w-fit w-full"
       >
+        {/* skip button */}
+        <button
+          onClick={() => router.push("/")}
+          className="fixed bg-white/95 backdrop-blur-sm px-4 py-1 rounded-full top-4 right-4 text-slate-900 font-bold "
+        >
+          <ArrowRightIcon className="h-4 w-4" />
+          Ignorer
+        </button>
         {/* Logo/Brand */}
         <div className="text-center mb-6">
           <motion.div

@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 import type { UserWithAllRelations } from "@/actions/users";
 import { ProfileAvatar } from "./profile-avatar";
 import { ProfileStats } from "./profile-stats";
-import { ProfileInfo } from "./profile-info";
 import { ProfileActions } from "./profile-actions";
 import { ProfileCover } from "./profile-cover";
 import { useScreenSize } from "@/hooks/use-screen";
+import { Typography } from "@/components/ui/typography";
 
 interface ProfileHeaderProps {
   user: UserWithAllRelations;
@@ -21,7 +21,6 @@ interface ProfileHeaderProps {
   onTabChange?: (tab: string) => void;
   onUpdateCover?: (url: string) => Promise<void>;
   onUpdateAvatar?: (url: string) => Promise<void>;
-  onUpdateInfo?: (data: Partial<UserWithAllRelations>) => Promise<void>;
 }
 
 export function ProfileHeader({
@@ -35,9 +34,9 @@ export function ProfileHeader({
   onTabChange,
   onUpdateCover,
   onUpdateAvatar,
-  onUpdateInfo,
 }: ProfileHeaderProps) {
-    const { isMobile } = useScreenSize();
+  const { isMobile } = useScreenSize();
+
   return (
     <motion.div
       className={cn("space-y-4", className)}
@@ -53,13 +52,13 @@ export function ProfileHeader({
         height={isMobile ? 200 : 300}
       />
 
-      {/* Avatar and actions row */}
+      {/* Avatar, Name, Actions row */}
       <div className="relative px-4 sm:px-4 lg:px-6">
         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
           {/* Avatar */}
           <ProfileAvatar
             src={user.image}
-            username={user.username || user.fullName || 'utilisateur' }
+            username={user.username || user.fullName || "utilisateur"}
             isOwnProfile={isOwnProfile}
             profileCompletion={profileCompletion}
             onUpload={onUpdateAvatar}
@@ -67,30 +66,35 @@ export function ProfileHeader({
             size={isMobile ? "md" : "lg"}
           />
 
-          {/* Actions */}
-          <div className="flex-1 flex justify-end pb-2">
+          {/* Name + Username + Actions */}
+          <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex flex-col">
+              <Typography variant="h3" weight="bold">
+                {user.fullName || user.username || "Utilisateur"}
+              </Typography>
+              {user.username && (
+                <Typography variant="body-sm" theme="muted">
+                  @{user.username}
+                </Typography>
+              )}
+            </div>
+
+            {/* Actions */}
             <ProfileActions
               userId={user.id}
               isOwnProfile={isOwnProfile}
               profileCompletion={profileCompletion}
+              hasPasskey={user.hasPasskey ?? false}
             />
           </div>
         </div>
-
-        {/* Info section */}
-        <ProfileInfo
-          user={user}
-          isOwnProfile={isOwnProfile}
-          onUpdate={onUpdateInfo}
-          className="mt-4"
-        />
 
         {/* Stats */}
         <ProfileStats
           followersCount={followersCount}
           followingCount={followingCount}
           postsCount={postsCount}
-          className="mt-6"
+          className="mt-4"
           userId={user.id}
           isOwnProfile={isOwnProfile}
           onTabChange={onTabChange}

@@ -1,127 +1,195 @@
-Salut ! Tu es un expert en développement de systèmes de gestion de tournois complexes (multi-formats : élimination, round-robin, suisse, hybride).
+Tu es un expert en frontend React / Next.js spécialisé dans les interfaces type TikTok, Instagram Reels et WhatsApp Status.
 
-J’ai déjà implémenté la majorité de mon système (backend + frontend), mais je veux maintenant améliorer la logique globale, la cohérence métier et l’automatisation.
+J’ai déjà un système de lecture de clips (vidéo + images), mais il a plusieurs problèmes critiques de fluidité, UX et architecture.
 
-Ta mission est de :
-1. Analyser toute l’architecture existante (actions serveur, moteurs, composants frontend, structure des phases/groupes/brackets)
-2. Identifier les incohérences
-3. Proposer une refactorisation propre, unifiée et scalable
-4. Implémenter une logique centralisée de progression automatique
+Ta mission est de REFACTORISER complètement le système pour atteindre une expérience ULTRA FLUIDE, similaire à TikTok / WhatsApp.
 
 ---
 
-# 🎯 OBJECTIF PRINCIPAL
+# 🎯 OBJECTIFS PRINCIPAUX
 
-Automatiser entièrement la progression des tournois après validation des matchs, tout en respectant :
-- le type de phase (ELIMINATION, GROUP_STAGE, ROUND_ROBIN, SWISS)
-- le type d’édition (ex: CHAMPIONS / LDC / WORLD CUP (ici type ldc et world cup sont les memes, ils doivent avoir le meme comportement: une phase groupe et une phase elimination avec nombre de groupes et qualifiés fixes par défaut et peut renommer: groupe et élimination) / CUSTOM)
-- le mode (AUTO (on avance automatiquement sans intervention) / MANUAL (on avance manuellement))
-- la structure réelle (groups comme source unique)
-
----
-
-# ⚙️ 1. AUTOMATISATION APRÈS VALIDATION MATCH
-
-Dans la page :
-/tournaments/[tournamentId]/editions/[editionId]/matches/[matchId]
-
-👉 Après validation admin d’un match :
-
-Implémenter une logique globale qui :
-
-### ✅ Étapes
-1. Vérifie si le match est le dernier :
-   - du bracket node
-   - du group
-   - ou de la phase
-
-2. Si OUI :
-   - Calculer automatiquement les qualifiés / vainqueurs
-   - Selon :
-     - type de phase
-     - format (BO1, BO3, BO5, aller-retour)
-     - mode de compétition
-
-3. Déclencher un dialog intelligent qui :
-   - affiche les qualifiés / vainqueurs
-   - propose de :
-     → marquer comme terminé
-     → organiser le niveau suivant (tirage / génération)
-
-4. Enchaîner automatiquement :
-   - bracket → group → phase → edition (si applicable)
+1. Fluidité parfaite (zéro lag, zéro saut)
+2. Lecture vidéo fiable (autoplay fonctionne toujours)
+3. Navigation tactile intuitive (gauche / centre / droite)
+4. Support natif des clips multi-médias (vidéo + images type stories)
+5. Performance optimisée (préload intelligent + pas de re-render inutile)
+6. UX moderne (overlay, actions, animations smooth)
 
 ---
 
-# 🧩 2. LOGIQUE PAR TYPE DE PHASE
+# ❌ PROBLÈMES ACTUELS À CORRIGER
 
-## 🟡 ÉLIMINATION (KNOCKOUT)
-- Progression via GROUPS (rounds : 1/8, 1/4, demi, finale)
-- Chaque group = un round
-- Les qualifiés sont propagés vers le group suivant
-- Pas de metadata.participants → uniquement phaseGroupParticipants
-
----
-
-## 🔵 ROUND ROBIN / CHAMPIONNAT
-- Progression par journées (rounds)
-- Matchs :
-  - aller simple OU
-  - aller-retour (selon config)
-- Classement dynamique
-- Qualification basée sur :
-  - position
-  - points
-  - règles de tie-break
+* Chaque clip change l’URL (router.replace) → provoque des re-renders et des sauts
+* scrollIntoView + IntersectionObserver → conflit et manque de fluidité
+* Les vidéos ne se lancent pas correctement
+* Mauvaise gestion du cycle de vie des vidéos
+* Impossible de naviguer correctement entre les médias d’un clip
+* Les images et vidéos ne sont pas bien mélangées (pas comme stories)
+* UI pas stable (infos cachées au hover)
+* Mauvaise gestion du preload
+* Mauvaise gestion des gestures (tap / long press)
 
 ---
 
-## 🟣 SWISS
-- Génération dynamique des rounds
-- Pairing basé sur score (victoires/défaites)
-- Pas d’élimination directe
-- Qualification basée sur :
-  - score final
-  - nombre de rounds
+# ✅ ARCHITECTURE ATTENDUE
 
---- 
+## 1. CLIP ENGINE (centralisé avec Zustand)
 
-## ⚪ MODE (IMPORTANT)
-Chaque logique doit adapter son comportement selon :
-- AUTO → tout générer automatiquement
-- MANUAL → laisser contrôle admin
+* currentIndex
+* isPaused global
+* muted
+* isTransitioning
+* preloadIndex (next / prev)
+
+👉 Navigation SANS scrollIntoView
+👉 Le scroll utilisateur contrôle l’index via IntersectionObserver stable
 
 ---
 
-# 🔁 3. PROPAGATION AUTOMATIQUE
+## 2. PARAMS URL
 
-Après chaque validation :
+* Lire activeClipId UNIQUEMENT au chargement
+* NE JAMAIS modifier l’URL pendant le scroll
 
-👉 Implémenter un moteur central :
+---
 
-```ts
-progressTournamentAfterMatch(matchId)
+## 3. SCROLL SYSTEM
 
+* scroll-snap uniquement (pas de scrollIntoView auto)
+* IntersectionObserver avec threshold 0.8
+* Aucun setState inutile pendant scroll
 
-le plus important c'est la gestion des progression avec confirmation via dialog dans les pages matches: /tournaments/[tournamentId]/editions/[editionId]/matches/[matchId] et la page calendrier: /tournaments/[tournamentId]/editions/[editionId]/dashboard/matches.
+---
 
-dans la page dashboard: /tournaments/[tournamentId]/editions/[editionId]/matches/[matchId] quand c'est valider par l'admin , on ne peut pas modifier mais il faut enlever cette condition mais on desactive les champs jusqu'a ce que l'admin essaie de modifier. au niveau des champs score , il faut mettre les boutons + et - c'est mieux.
+## 4. MEDIA SYSTEM (TRÈS IMPORTANT)
 
-ref de fichiers: 
+Chaque clip doit supporter :
 
--@/database/schema.ts
-- @/actions/tournaments.ts, @/actions/editions.ts, @/actions/phases.ts, @/actions/participants.ts, 
-- @/lib/tournaments
-- @/hooks: use-phase-manager, use-match-manager, use-edition-manager, use-tournament, use-group-manager, use-bracket-manager etc..
-- @/components/pages/tournaments/edition-detail/edition-detail
+* 1 vidéo (optionnelle)
+* plusieurs images
 
-pages: 
-/tournaments/[tournamentId]/editions/[editionId]/matches/[matchId]
-/tournaments/[tournamentId]/editions/[editionId]/calendar
-/tournaments/[tournamentId]/editions/[editionId]
-/tournaments/[tournamentId]/editions/[editionId]/dashboard/ tous les pages dans le dashboard editions
+👉 Fusion en une timeline :
 
-@/utils
+* vidéo en premier
+* puis images
 
-etc...
+👉 comportement :
+
+* vidéo → durée réelle
+* image → 4s chacune
+* swipe droite/gauche → navigation
+* fin → next clip
+
+---
+
+## 5. GESTION VIDÉO (CRITIQUE)
+
+* autoplay fiable (muted fallback obligatoire)
+* key dynamique sur <video>
+* playsInline + preload="metadata"
+* retry automatique si play() échoue
+* pause automatique si clip non actif
+* préchargement de la vidéo suivante
+
+---
+
+## 6. NAVIGATION TACTILE (À IMPLÉMENTER PARFAITEMENT)
+
+Diviser l’écran en 3 zones :
+
+* 🟦 Gauche (25%) → PREV media ou PREV clip
+* 🟩 Centre (50%) → PLAY / PAUSE
+* 🟥 Droite (25%) → NEXT media ou NEXT clip
+
+👉 règles :
+
+* priorité au media interne
+* sinon navigation clip
+
+👉 support :
+
+* click (desktop)
+* tap (mobile)
+
+---
+
+## 7. LONG PRESS
+
+* appui long → pause
+* relâche → resume
+* ne pas casser le scroll
+
+---
+
+## 8. PRELOAD INTELLIGENT (TRÈS IMPORTANT)
+
+* preload clip actuel
+* preload clip suivant
+* preload partiel du précédent
+
+👉 éviter :
+
+* preload de toute la liste (mauvaise perf)
+
+---
+
+## 9. UI / DESIGN
+
+* media fullscreen (object-contain)
+* gradient overlay bas
+* infos toujours visibles (pas de hover)
+* actions à droite (like, share, etc.)
+* animation fluide (framer-motion)
+
+---
+
+## 10. PERFORMANCE
+
+* React.memo sur les clips
+* key stable
+* pas de re-render global
+* lazy loading images
+* pas de setState dans scroll
+🔥 cache offline clips
+🔥 algo feed personnalisé (comme TikTok)
+🔥 analytics (watch time, drop rate)
+
+---
+
+# 🔥 BONUS (IMPORTANT)
+
+* double tap → like animation
+* progress bar (video + images)
+* animation de pause (comme TikTok)
+* gestion visibility API (tab inactive)
+
+---
+
+# 📦 OUTPUT ATTENDU
+
+* code complet refactorisé :
+
+  * GameClipReel
+  * GameClipPlayer
+  * ClipMediaController
+  * useClipEngine
+* code propre, optimisé, production-ready
+* aucune régression UX
+* navigation ultra fluide
+
+---
+
+# ⚠️ CONTRAINTES
+
+* Next.js App Router
+* React + Zustand
+* Framer Motion autorisé
+* Typescript strict
+* aucun hack sale
+* architecture scalable
+
+---
+
+Objectif final : une expérience identique à TikTok / WhatsApp Status, fluide, rapide, intuitive.
+
 

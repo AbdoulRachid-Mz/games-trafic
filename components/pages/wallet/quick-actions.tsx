@@ -25,7 +25,8 @@ interface QuickActionsProps {
 }
 interface QuickAction {
   id: string;
-  icon: React.ComponentType<{ className?: string }>; label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
   path?: string;
   description: string;
   color: string;
@@ -104,8 +105,8 @@ export function QuickActions({ walletId }: QuickActionsProps) {
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-purple-500/5 rounded-3xl blur-3xl" />
       <Card className="relative bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/5 pointer-events-none" />
-        <CardContent className="p-8">
-          <div className="flex items-center justify-between mb-8">
+        <CardContent className="p-3 md:p-6">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-xl">
                 <Zap className="w-5 h-5 text-primary" />
@@ -140,14 +141,14 @@ export function QuickActions({ walletId }: QuickActionsProps) {
                 <div
                   className={cn(
                     "absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 bg-gradient-to-br",
-                    action.color
+                    action.color,
                   )}
                 />
 
                 <div
                   className={cn(
                     "relative mb-3 p-3 rounded-2xl bg-background/50 backdrop-blur-md shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:scale-110",
-                    "border border-white/5 group-hover:border-white/20"
+                    "border border-white/5 group-hover:border-white/20",
                   )}
                 >
                   {(() => {
@@ -155,7 +156,6 @@ export function QuickActions({ walletId }: QuickActionsProps) {
                     return <Icon className={cn("w-6 h-6", action.iconColor)} />;
                   })()}
                 </div>
-
 
                 <div className="relative text-center z-10">
                   <span className="block text-sm font-bold text-foreground/90 group-hover:text-foreground transition-colors">
@@ -169,10 +169,10 @@ export function QuickActions({ walletId }: QuickActionsProps) {
             ))}
           </div>
 
-          <div className="flex items-center justify-between pt-6 mt-6 border-t border-white/5">
+          <div className="flex items-center justify-between pt-3 mt-3 md:pt-4 md:mt-4 border-t border-white/5">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
               <Shield className="h-3.5 w-3.5 text-green-500" />
-              <span className="text-xs max-md:text-sm font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">
+              <span className="text-xs max-md:text-sm max-sm:text-[12px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider">
                 Sécurisé par GTC-Guard™
               </span>
             </div>
@@ -181,7 +181,7 @@ export function QuickActions({ walletId }: QuickActionsProps) {
               variant="ghost"
               size="sm"
               onClick={() => router.push("/wallet/settings")}
-              className="text-xs font-medium text-muted-foreground hover:text-primary gap-2"
+              className="text-xs max-md:text-sm max-sm:text-[12px] font-medium text-muted-foreground hover:text-primary gap-2"
             >
               <Settings className="h-3.5 w-3.5" />
               Paramètres avancés

@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Lock, Unlock, Eye, EyeOff, Shield, CreditCard, DollarSign, History, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { getCurrentUserWallet, updateUserWallet, verifyWalletPin, toggleWalletLock } from '@/actions/wallets'
+import { getCurrentUserWallet, updateUserWallet, verifyWalletPin, toggleWalletLock, updateWalletPinAction } from '@/actions/wallets'
 import { UserWallet } from '@/database/schema'
 import { AutoSyncField } from '@/components/shared/auto-sync-field'
 import { toast } from 'sonner'
@@ -63,19 +63,17 @@ const WalletSettingsPage = () => {
     try {
       setUpdatingPin(true)
 
-      // Verify current PIN first
-      const verification = await verifyWalletPin(wallet.id, currentPin)
-      if (!verification.success) {
-        toast.error(verification.error || 'PIN actuel incorrect')
+      const result = await updateWalletPinAction(wallet.id, currentPin, newPin)
+      
+      if (!result.success) {
+        toast.error(result.error || 'Erreur lors de la mise à jour du PIN')
         return
       }
 
-      // Update PIN (you'll need to implement this function)
-      const updatedWallet = await updateUserWallet(wallet.id, {
-        pinHash: newPin // In real app, hash this
-      })
+      if (result.wallet) {
+        setWallet(result.wallet)
+      }
 
-      setWallet(updatedWallet)
       toast.success('PIN mis à jour avec succès')
       setCurrentPin('')
       setNewPin('')

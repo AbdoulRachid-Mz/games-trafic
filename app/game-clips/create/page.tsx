@@ -1,48 +1,46 @@
 // app/game-clips/create/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { AdvancedVideoUpload } from "@/components/ui/advanced-video-upload";
-import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
-import { 
-  Loader2, 
-  ArrowLeft, 
-  Sparkles, 
-  Eye, 
+import {
+  Loader2,
+  ArrowLeft,
+  Sparkles,
+  Eye,
   CheckCircle,
-  AlertCircle,
   Film,
   Image as ImageIcon,
-  Music,
   Hash,
-  Users
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useGameClips } from "@/hooks/use-game-clips";
-import { useAuthContext } from "@/contexts/auth-context";
-import { Typography } from "@/components/ui/typography";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { useAuthContext } from "@/contexts/auth-context";
+import { useGameClips } from "@/hooks/use-game-clips";
+// import { AdvancedVideoUpload } from "@/components/advanced-video-upload";
+import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
+import { AdvancedVideoUpload } from "@/components/ui/advanced-video-upload";
 
 export default function GameClipCreatePage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthContext();
-  const { createClip, isCreating } = useGameClips();
-  
+
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"video" | "images">("video");
   const [isFocused, setIsFocused] = useState(false);
 
+  const { isAuthenticated } = useAuthContext();
+  const { createClip, isCreating } = useGameClips();
+
   // Redirect if not authenticated
   React.useEffect(() => {
     if (!isAuthenticated) {
-      router.push("/login?redirect=/game-clips/create");
+      router.push("/sign-in?redirect=/game-clips/create");
     }
   }, [isAuthenticated, router]);
 
@@ -53,32 +51,33 @@ export default function GameClipCreatePage() {
     }
 
     try {
+      const imageUrlsString = imageUrls.length > 0 ? imageUrls.join(",") : "";
+
       await createClip({
         caption,
-        videoUrl,
-        imageUrls: imageUrls.join(","),
+        videoUrl: videoUrl ?? "",
+        imageUrls: imageUrlsString ?? "",
         isPublic: true,
       });
-      toast.success("Clip créé avec succès !");
+
       router.push("/game-clips");
     } catch (error) {
-      // Error handled by hook toast
+      console.error("Erreur lors de la création du clip:", error);
     }
   };
 
   const hasContent = videoUrl || imageUrls.length > 0;
   const isFormValid = hasContent && !isCreating;
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0a0b] via-black to-[#0f0f12]">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}
+        />
       </div>
 
       {/* Header */}
@@ -90,13 +89,17 @@ export default function GameClipCreatePage() {
               className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300"
             >
               <ArrowLeft className="h-4 w-4 text-white/60 group-hover:text-white transition-colors" />
-              <span className="text-sm font-medium text-white/60 group-hover:text-white">Retour</span>
+              <span className="text-sm font-medium text-white/60 group-hover:text-white">
+                Retour
+              </span>
             </button>
 
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-white/60">Nouveau clip</span>
+                <span className="text-xs font-medium text-white/60">
+                  Nouveau clip
+                </span>
               </div>
               <Button
                 onClick={handleSubmit}
@@ -104,7 +107,7 @@ export default function GameClipCreatePage() {
                 className={cn(
                   "rounded-xl px-6 font-bold transition-all duration-300",
                   "bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg hover:shadow-primary/25",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
                 )}
               >
                 {isCreating ? (
@@ -115,7 +118,7 @@ export default function GameClipCreatePage() {
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Publier le clip
+                    Publier
                   </>
                 )}
               </Button>
@@ -135,14 +138,16 @@ export default function GameClipCreatePage() {
                 <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-primary" />
-                    <Typography variant="caption1" className="font-bold uppercase tracking-wider text-white/60">
+                    <span className="text-xs font-bold uppercase tracking-wider text-white/60">
                       Aperçu en direct
-                    </Typography>
+                    </span>
                   </div>
                   {hasContent && (
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20">
                       <CheckCircle className="h-3 w-3 text-green-400" />
-                      <span className="text-[10px] font-medium text-green-400 uppercase">Prêt</span>
+                      <span className="text-[10px] font-medium text-green-400 uppercase">
+                        Prêt
+                      </span>
                     </div>
                   )}
                 </div>
@@ -159,10 +164,10 @@ export default function GameClipCreatePage() {
                       >
                         <video
                           src={videoUrl}
-                          controls
-                          className="w-full h-full object-contain rounded-b-2xl"
-                          autoPlay={false}
+                          className="w-full h-full object-contain"
                           loop
+                          playsInline
+                          controls
                         />
                       </motion.div>
                     ) : imageUrls.length > 0 ? (
@@ -173,11 +178,11 @@ export default function GameClipCreatePage() {
                         exit={{ opacity: 0, scale: 0.95 }}
                         className="relative w-full h-full"
                       >
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={imageUrls[0]}
                           alt="Preview"
-                          fill
-                          className="object-contain"
+                          className="w-full h-full object-contain"
                         />
                         {imageUrls.length > 1 && (
                           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs">
@@ -196,9 +201,9 @@ export default function GameClipCreatePage() {
                         <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center">
                           <Film className="h-10 w-10 text-white/20" />
                         </div>
-                        <Typography variant="body-sm" className="text-white/30">
+                        <p className="text-sm text-white/30">
                           Aucun média sélectionné
-                        </Typography>
+                        </p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -207,9 +212,9 @@ export default function GameClipCreatePage() {
                 {/* Caption Preview */}
                 {caption && (
                   <div className="px-5 py-4 border-t border-white/10 bg-gradient-to-t from-black/50 to-transparent">
-                    <Typography variant="body-sm" className="text-white/80 line-clamp-2">
+                    <p className="text-sm text-white/80 line-clamp-2">
                       {caption}
-                    </Typography>
+                    </p>
                   </div>
                 )}
               </div>
@@ -221,21 +226,19 @@ export default function GameClipCreatePage() {
                     <Sparkles className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <Typography variant="caption1" className="font-bold text-white/80">
+                    <span className="text-xs font-bold text-white/80">
                       Conseils pour réussir ton clip
-                    </Typography>
+                    </span>
                     <div className="mt-2 space-y-1.5">
                       {[
-                        "Vidéos paysage/portrait acceptées",
-                        "Images de haute qualité recommandées",
+                        "Vidéo MP4 jusqu'à 50MB",
+                        "Images de haute qualité (max 5)",
                         "Ajoute une description accrocheuse",
-                        "Maximum 5 images par clip"
+                        "Les vidéos sont automatiquement optimisées",
                       ].map((tip, i) => (
                         <div key={i} className="flex items-center gap-2">
                           <div className="w-1 h-1 rounded-full bg-primary/40" />
-                          <Typography variant="caption2" className="text-white/40">
-                            {tip}
-                          </Typography>
+                          <span className="text-xs text-white/40">{tip}</span>
                         </div>
                       ))}
                     </div>
@@ -249,12 +252,12 @@ export default function GameClipCreatePage() {
           <div className="order-1 lg:order-2 space-y-6">
             {/* Header */}
             <div className="space-y-2">
-              <Typography variant="h3" className="font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
                 Créer un clip
-              </Typography>
-              <Typography variant="body-sm" className="text-white/40">
+              </h1>
+              <p className="text-sm text-white/40">
                 Partage tes meilleurs moments de jeu avec la communauté
-              </Typography>
+              </p>
             </div>
 
             {/* Media Type Toggle */}
@@ -265,7 +268,7 @@ export default function GameClipCreatePage() {
                   "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-300",
                   activeTab === "video"
                     ? "bg-primary text-white shadow-lg"
-                    : "text-white/40 hover:text-white/60"
+                    : "text-white/40 hover:text-white/60",
                 )}
               >
                 <Film className="h-4 w-4" />
@@ -277,7 +280,7 @@ export default function GameClipCreatePage() {
                   "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-300",
                   activeTab === "images"
                     ? "bg-primary text-white shadow-lg"
-                    : "text-white/40 hover:text-white/60"
+                    : "text-white/40 hover:text-white/60",
                 )}
               >
                 <ImageIcon className="h-4 w-4" />
@@ -288,51 +291,27 @@ export default function GameClipCreatePage() {
             {/* Upload Section */}
             <div className="space-y-4">
               {activeTab === "video" ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Typography variant="caption1" className="font-bold uppercase tracking-wider text-white/40">
-                      Vidéo
-                    </Typography>
-                    <Typography variant="caption2" className="text-white/30">
-                      Max 20MB
-                    </Typography>
-                  </div>
-                  <AdvancedVideoUpload
-                    value={videoUrl}
-                    onChange={(val) => {
-                      setVideoUrl(val);
-                      if (val) setImageUrls([]);
-                    }}
-                    maxSizeMB={20}
-                    uploadPath="game-clips"
-                    className="w-full"
-                    previewClassName="aspect-video"
-                  />
-                </div>
+                <AdvancedVideoUpload
+                  value={videoUrl}
+                  onChange={setVideoUrl}
+                  maxSizeMB={50}
+                  uploadPath="game-clips/videos"
+                  uploadPreset="games_trafics"
+                  isAutoUpload={true}
+                />
               ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Typography variant="caption1" className="font-bold uppercase tracking-wider text-white/40">
-                      Images
-                    </Typography>
-                    <Typography variant="caption2" className="text-white/30">
-                      Max 5 images • 2MB max
-                    </Typography>
-                  </div>
-                  <AdvancedMultiUpload
-                    value={imageUrls}
-                    onChange={(val) => {
-                      setImageUrls(val);
-                      if (val.length > 0) setVideoUrl("");
-                    }}
-                    maxImages={5}
-                    maxSizeMB={2}
-                    uploadPath="game-clips"
-                    internalImagesFolder="game-clips"
-                    showInternalSelection
-                    isRounded={false}
-                  />
-                </div>
+                <AdvancedMultiUpload
+                  value={imageUrls}
+                  onChange={setImageUrls}
+                  maxSizeMB={2}
+                  maxWidthOrHeight={1920}
+                  maxImages={5}
+                  uploadPath="game-clips/images"
+                  uploadPreset="games_trafics"
+                  isAutoUpload={true}
+                  showInternalSelection={true}
+                  internalImagesFolder="game-clips"
+                />
               )}
             </div>
 
@@ -341,23 +320,23 @@ export default function GameClipCreatePage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Hash className="h-4 w-4 text-white/40" />
-                  <Typography variant="caption1" className="font-bold uppercase tracking-wider text-white/40">
+                  <span className="text-xs font-bold uppercase tracking-wider text-white/40">
                     Description
-                  </Typography>
+                  </span>
                 </div>
-                <Typography variant="caption2" className="text-white/30">
+                <span className="text-xs text-white/30">
                   {caption.length}/500
-                </Typography>
+                </span>
               </div>
               <Textarea
-                placeholder="Raconte ton action 🔥 (optionnel)"
+                placeholder="Raconte ton action... (optionnel)"
                 value={caption}
                 onChange={(e) => setCaption(e.target.value.slice(0, 500))}
                 rows={4}
                 className={cn(
-                  "resize-none bg-white/5 border-white/10 rounded-xl focus-visible:ring-primary/50 text-base",
+                  "resize-none bg-white/5 border-white/10 rounded-xl focus-visible:ring-primary/50 text-base text-white",
                   "placeholder:text-white/20 transition-all duration-300",
-                  isFocused && "border-primary/50 ring-1 ring-primary/20"
+                  isFocused && "border-primary/50 ring-1 ring-primary/20",
                 )}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
@@ -370,12 +349,12 @@ export default function GameClipCreatePage() {
                 <Users className="h-4 w-4 text-green-400" />
               </div>
               <div>
-                <Typography variant="body-sm" className="font-medium text-white/80">
+                <p className="text-sm font-medium text-white/80">
                   Visible par tout le monde
-                </Typography>
-                <Typography variant="caption2" className="text-white/40">
+                </p>
+                <p className="text-xs text-white/40">
                   Les clips sont publics et peuvent être likés, commentés et partagés
-                </Typography>
+                </p>
               </div>
             </div>
 
@@ -394,7 +373,7 @@ export default function GameClipCreatePage() {
                 className={cn(
                   "flex-1 rounded-xl font-bold transition-all duration-300",
                   "bg-gradient-to-r from-primary to-primary/80 hover:shadow-lg hover:shadow-primary/25",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
                 )}
               >
                 {isCreating ? (

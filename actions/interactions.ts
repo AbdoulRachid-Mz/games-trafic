@@ -810,9 +810,9 @@ function buildInteractionWhereConditions(
     conditions.push(eq(interactions.entityId, filters.entityId));
   }
 
-  if (filters.entityType) {
+  if (filters.entityType && filters.entityType.length > 0) {
     // entityType est une enum, on doit caster en any pour satisfaire Drizzle
-    conditions.push(eq(interactions.entityType, filters.entityType as any));
+    conditions.push(inArray(interactions.entityType, filters.entityType as any));
   }
 
   if (filters.types && filters.types.length > 0) {
