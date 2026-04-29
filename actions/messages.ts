@@ -12,6 +12,7 @@ import {
   products,
   MessageWithRelations,
   EntityType,
+  conversations,
 } from "@/database/schema";
 import { type Conversation, type ChatId } from "@/types/chat";
 import {
@@ -93,90 +94,88 @@ export async function getConversationsForUser(
   userId: string,
 ): Promise<Conversation[]> {
   try {
-    // 1. Trouver les groupes de l'utilisateur
-    const userGroups = await db
-      .select({ groupId: groupMembers.groupId })
-      .from(groupMembers)
-      .where(eq(groupMembers.userId, userId));
-
-    const groupIds = userGroups.map((ug) => ug.groupId);
-
-    // 2. Trouver tous les messages récents liés à l'utilisateur (DM ou Groupes dont il est membre)
-    const recentMessages = await db.query.messages.findMany({
-      where: (m, { or, eq, inArray, and }) =>
-        and(
-          eq(m.isDeleted, false),
-          or(
-            eq(m.senderId, userId),
-            eq(m.recipientId, userId),
-            groupIds.length > 0 ? inArray(m.groupId, groupIds) : undefined,
-          ),
-        ),
-      orderBy: (m, { desc }) => [desc(m.createdAt)],
-      limit: 200,
+    // 1. Trouver toutes les conversations où l'utilisateur est participant
+    const userConversations = await db.query.conversations.findMany({
+      where: (c, { sql }) => sql`${c.participantIds} @> ARRAY[${userId}]::text[]`,
+      orderBy: (c, { desc }) => [desc(c.updatedAt)],
       with: {
-        sender: {
-          columns: {
-            id: true,
-            username: true,
-            fullName: true,
-            profileImage: true,
+        lastMessage: {
+          with: {
+            sender: {
+              columns: {
+                id: true,
+                username: true,
+                fullName: true,
+                profileImage: true,
+              },
+            },
           },
         },
-        recipient: {
-          columns: {
-            id: true,
-            username: true,
-            fullName: true,
-            profileImage: true,
-          },
-        },
-        group: true,
       },
     });
 
-    // 3. Organiser en conversations uniques
-    const conversationMap = new Map<string, Conversation>();
+    // 2. Enrichir chaque conversation avec les données de l'entité cible
+    const enrichedConversations = await Promise.all(
+      userConversations.map(async (conv) => {
+        let entityType = conv.entityType.toLowerCase() as any;
+        let entityId = conv.entityId;
+        let entityData: any = null;
 
-    for (const msg of recentMessages) {
-      let chatId: string;
-      let entityType: any;
-      let entityId: string;
-      let entityData: any;
+        // Pour un DM, l'entité cible est l'AUTRE participant
+        if (conv.entityType === "USER") {
+          const otherParticipantId = conv.participantIds.find((id) => id !== userId);
+          if (otherParticipantId) {
+            entityId = otherParticipantId;
+            entityData = await db.query.users.findFirst({
+              where: (u, { eq }) => eq(u.id, otherParticipantId),
+              columns: {
+                id: true,
+                username: true,
+                fullName: true,
+                profileImage: true,
+              },
+            });
+          }
+        } else if (conv.entityType === "GROUP") {
+          entityData = await db.query.groups.findFirst({
+            where: (g, { eq }) => eq(g.id, conv.entityId),
+          });
+        } else if (conv.entityType === "SHOP") {
+          entityData = await db.query.shops.findFirst({
+            where: (s, { eq }) => eq(s.id, conv.entityId),
+          });
+        } else if (conv.entityType === "PRODUCT") {
+          entityData = await db.query.products.findFirst({
+            where: (p, { eq }) => eq(p.id, conv.entityId),
+          });
+        }
 
-      if (msg.groupId) {
-        chatId = `group:${msg.groupId}`;
-        entityType = "group";
-        entityId = msg.groupId;
-        entityData = msg.group;
-      } else if (msg.recipientId && msg.recipientId !== userId) {
-        chatId = `user:${msg.recipientId}`;
-        entityType = "user";
-        entityId = msg.recipientId;
-        entityData = msg.recipient;
-      } else if (msg.senderId && msg.senderId !== userId) {
-        chatId = `user:${msg.senderId}`;
-        entityType = "user";
-        entityId = msg.senderId;
-        entityData = msg.sender;
-      } else {
-        continue;
-      }
+        // Si l'entité n'est plus trouvée, on utilise des placeholders
+        if (!entityData) {
+          entityData = { id: entityId, name: "Deleted Entity", fullName: "Deleted User" };
+        }
 
-      if (!conversationMap.has(chatId)) {
-        conversationMap.set(chatId, {
-          chatId: chatId as any,
-          entityType,
-          entityId,
-          entity: { type: entityType, data: entityData } as any,
-          lastMessage: msg as any,
-          lastMessageTime: msg.createdAt || undefined,
-          unreadCount: 0,
-        });
-      }
-    }
+        return {
+          id: conv.id,
+          chatId: `${entityType}:${entityId}` as any,
+          entityType: entityType,
+          entityId: entityId,
+          entity: {
+            type: entityType,
+            data: entityData,
+          },
+          lastMessage: conv.lastMessage as any,
+          lastMessageTime: conv.updatedAt ? conv.updatedAt.toISOString() : null,
+          unreadCount: conv.unreadCount || 0,
+          isPinned: conv.isPinned || false,
+          isMuted: conv.isMuted || false,
+          isArchived: conv.isArchived || false,
+          metadata: conv.metadata || {},
+        } as Conversation;
+      }),
+    );
 
-    return Array.from(conversationMap.values());
+    return enrichedConversations;
   } catch (error) {
     console.error("Error getting conversations:", error);
     return [];
@@ -440,7 +439,7 @@ export async function getUnreadMessages(userId: string): Promise<Message[]> {
       .where(
         and(
           eq(messages.recipientId, userId),
-          eq(messages.read, false),
+          sql`NOT (${userId} = ANY(${messages.readBy}))`,
           eq(messages.isDeleted, false),
         ),
       )
@@ -462,7 +461,7 @@ export async function countUnreadMessages(userId: string): Promise<number> {
       .where(
         and(
           eq(messages.recipientId, userId),
-          eq(messages.read, false),
+          sql`NOT (${userId} = ANY(${messages.readBy}))`,
           eq(messages.isDeleted, false),
         ),
       );
@@ -493,11 +492,11 @@ export async function getMessageStats(filters?: MessageFilters) {
       db
         .select({ count: count() })
         .from(messages)
-        .where(and(whereConditions, eq(messages.read, true))),
+        .where(and(whereConditions, sql`cardinality(${messages.readBy}) > 0`)),
       db
         .select({ count: count() })
         .from(messages)
-        .where(and(whereConditions, eq(messages.read, false))),
+        .where(and(whereConditions, or(isNull(messages.readBy), sql`cardinality(${messages.readBy}) = 0`))),
       db
         .select({ count: count() })
         .from(messages)
@@ -599,7 +598,58 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
       })
       .returning();
 
-    return result[0];
+    const newMessage = result[0];
+
+    // --- UPSERT CONVERSATION ---
+    let convChatId: string;
+    let convEntityType: any;
+    let convEntityId: string;
+    let participantIds: string[] = [newMessage.senderId];
+
+    if (newMessage.groupId) {
+      convChatId = `group:${newMessage.groupId}`;
+      convEntityType = "GROUP";
+      convEntityId = newMessage.groupId;
+      // For groups, we could fetch all members, but for now we'll rely on the logic that
+      // anyone in the group will find this conversation via entityId or participant check
+      const members = await db.query.groupMembers.findMany({
+        where: (gm, { eq }) => eq(gm.groupId, newMessage.groupId!),
+      });
+      participantIds = members.map((m) => m.userId);
+    } else if (newMessage.recipientId) {
+      const ids = [newMessage.senderId, newMessage.recipientId].sort();
+      convChatId = `dm:${ids.join("-")}`;
+      convEntityType = "USER";
+      convEntityId = newMessage.recipientId; // This is arbitrary for shared conv
+      participantIds = ids;
+    } else {
+      convEntityType = newMessage.entityType || "USER";
+      convEntityId = newMessage.entityId || newMessage.recipientId || "";
+      convChatId = `${convEntityType}:${convEntityId}`;
+      if (newMessage.recipientId) participantIds.push(newMessage.recipientId);
+    }
+
+    await db
+      .insert(conversations)
+      .values({
+        chatId: convChatId,
+        participantIds,
+        entityType: convEntityType,
+        entityId: convEntityId,
+        lastMessageId: newMessage.id,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: conversations.chatId,
+        set: {
+          lastMessageId: newMessage.id,
+          updatedAt: new Date(),
+          // Increment unread count logic could be added here
+          // For now, we'll just update the timestamp
+        },
+      });
+
+    return newMessage;
   } catch (error) {
     console.error("Error creating message:", error);
     if (error instanceof Error) {
@@ -700,12 +750,15 @@ export async function restoreMessage(id: string): Promise<Message> {
 /**
  * Marque un message comme lu
  */
-export async function markMessageAsRead(id: string): Promise<Message> {
+export async function markMessageAsRead(
+  id: string,
+  userId: string,
+): Promise<Message> {
   try {
     const result = await db
       .update(messages)
       .set({
-        read: true,
+        readBy: sql`CASE WHEN ${userId} = ANY(${messages.readBy}) THEN ${messages.readBy} ELSE array_append(${messages.readBy}, ${userId}) END`,
       })
       .where(eq(messages.id, id))
       .returning();
@@ -726,12 +779,13 @@ export async function markMessageAsRead(id: string): Promise<Message> {
  */
 export async function markMessagesAsRead(
   messageIds: string[],
+  userId: string,
 ): Promise<number> {
   try {
     const result = await db
       .update(messages)
       .set({
-        read: true,
+        readBy: sql`CASE WHEN ${userId} = ANY(${messages.readBy}) THEN ${messages.readBy} ELSE array_append(${messages.readBy}, ${userId}) END`,
       })
       .where(inArray(messages.id, messageIds))
       .returning();
@@ -740,6 +794,49 @@ export async function markMessagesAsRead(
   } catch (error) {
     console.error("Error marking messages as read:", error);
     throw new Error("Failed to mark messages as read");
+  }
+}
+
+/**
+ * Marque toute une conversation comme lue pour un utilisateur
+ */
+export async function markConversationAsRead(
+  chatId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    // 1. Trouver tous les messages de cette conversation (basé sur l'entité)
+    const [type, id] = chatId.split(":");
+    
+    let whereClause: any;
+    if (type === "group") {
+      whereClause = eq(messages.groupId, id);
+    } else if (type === "user") {
+      // Pour les DMs, on cherche les messages entre les deux participants
+      // C'est un peu complexe sans un ID de conversation sur le message, 
+      // mais on peut utiliser recipientId/senderId
+      whereClause = or(
+        and(eq(messages.senderId, userId), eq(messages.recipientId, id)),
+        and(eq(messages.senderId, id), eq(messages.recipientId, userId))
+      );
+    } else {
+      whereClause = and(
+        eq(messages.entityType, type.toUpperCase() as any),
+        eq(messages.entityId, id)
+      );
+    }
+
+    await db
+      .update(messages)
+      .set({
+        readBy: sql`CASE WHEN ${userId} = ANY(${messages.readBy}) THEN ${messages.readBy} ELSE array_append(${messages.readBy}, ${userId}) END`,
+      })
+      .where(and(whereClause, sql`NOT (${userId} = ANY(${messages.readBy}))`));
+
+    // 2. Mettre à jour le compteur de la conversation si nécessaire
+    // TODO: Si on stocke un unreadCount par utilisateur dans une table pivot, le mettre à 0 ici
+  } catch (error) {
+    console.error("Error marking conversation as read:", error);
   }
 }
 
@@ -835,7 +932,11 @@ function buildMessageWhereConditions(
   }
 
   if (typeof filters.isRead === "boolean") {
-    conditions.push(eq(messages.read, filters.isRead));
+    if (filters.isRead) {
+      conditions.push(sql`cardinality(${messages.readBy}) > 0`);
+    } else {
+      conditions.push(or(isNull(messages.readBy), sql`cardinality(${messages.readBy}) = 0`));
+    }
   }
 
   if (typeof filters.hasImages === "boolean") {

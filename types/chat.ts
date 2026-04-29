@@ -4,7 +4,7 @@ import type { User, Group, Message, Shop, Product } from '@/database/schema';
 /**
  * Chat entity types that can be used in conversations
  */
-export type ChatEntityType = 'user' | 'group' | 'shop' | 'product' | 'post';
+export type ChatEntityType = 'user' | 'group' | 'shop' | 'product' | 'post' | 'tournament';
 
 /**
  * Chat ID format: "{type}:{id}"
@@ -33,30 +33,30 @@ export interface ChatMessage extends Message {
   isOptimistic?: boolean;
   sender?: Pick<User, 'id' | 'username' | 'fullName' | 'profileImage'>;
   replyTo?: Pick<Message, 'id' | 'content' | 'senderId'>;
+  readBy: string[] | null; // Array of user IDs who have read the message
+  type: string | null;
+  audioUrl: string | null;
 }
 
 /**
  * Conversation metadata
  */
-export interface ConversationMetadata {
-  chatId: ChatId;
+export interface Conversation {
+  id: string; // Unique ID of the conversation
+  chatId: ChatId; // Format "entityType:entityId"
   entityType: ChatEntityType;
   entityId: string;
-  lastMessage?: ChatMessage;
-  lastMessageTime?: Date;
+  entity: {
+    type: ChatEntityType;
+    data: any; // User | Group | Shop | Product | Post | Tournament
+  };
+  lastMessage: ChatMessage | null;
+  lastMessageTime: string | null;
   unreadCount: number;
   isPinned?: boolean;
   isMuted?: boolean;
   isArchived?: boolean;
-  isBlocked?: boolean;
-}
-
-/**
- * Conversation with entity details
- */
-export interface Conversation extends ConversationMetadata {
-  entity: ConversationEntity;
-  participants?: User[];
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -66,8 +66,7 @@ export type ConversationEntity =
   | { type: 'user'; data: User }
   | { type: 'group'; data: Group & { memberCount?: number } }
   | { type: 'shop'; data: Shop }
-  | { type: 'product'; data: Product }
-  | { type: 'post'; data: any };
+  | { type: 'product'; data: Product };
 
 /**
  * Conversation filter options

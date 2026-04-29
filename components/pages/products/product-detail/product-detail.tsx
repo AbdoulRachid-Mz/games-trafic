@@ -160,6 +160,13 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
       onClick: handleBuy,
       condition: isAvailable && !isOwner,
       color: "bg-green-600 text-white",
+    },
+    {
+      icon: <MessageCircle className="h-5 w-5" />,
+      label: "Discuter",
+      onClick: () => router.push(`/chats/product/${currentProduct.id}`),
+      condition: !isOwner,
+      color: "bg-amber-600 text-white",
     }
   ];
 

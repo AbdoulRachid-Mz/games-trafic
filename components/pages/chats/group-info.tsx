@@ -74,7 +74,7 @@ export function GroupInfo({
               className="flex-1 bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)]"
             >
               <Edit className="h-4 w-4 mr-2" />
-              Edit Group
+              Modifier le groupe
             </Button>
           )}
           {!isOwner && onLeave && (
@@ -87,7 +87,7 @@ export function GroupInfo({
               )}
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Leave Group
+              Quitter le groupe
             </Button>
           )}
         </div>
@@ -97,7 +97,7 @@ export function GroupInfo({
       <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] overflow-hidden">
         <div className="p-4 space-y-4">
           <h3 className="font-semibold text-[var(--chat-text)]">
-            Group Details
+            Détails du groupe
           </h3>
 
           {/* Privacy */}
@@ -109,12 +109,12 @@ export function GroupInfo({
             )}
             <div className="flex-1">
               <p className="font-medium text-[var(--chat-text)]">
-                {group.isPrivate ? "Private Group" : "Public Group"}
+                {group.isPrivate ? "Groupe privé" : "Groupe public"}
               </p>
               <p className="text-sm text-[var(--chat-textMuted)]">
                 {group.isPrivate
-                  ? "Only invited members can join"
-                  : "Anyone can join this group"}
+                  ? "Seuls les membres invités peuvent rejoindre"
+                  : "Tout le monde peut rejoindre ce groupe"}
               </p>
             </div>
           </div>
@@ -129,10 +129,10 @@ export function GroupInfo({
             <Users className="h-5 w-5 text-[var(--chat-textMuted)]" />
             <div className="flex-1 text-left">
               <p className="font-medium text-[var(--chat-text)]">
-                {group.memberCount} Members
+                {group.memberCount} Membres
               </p>
               <p className="text-sm text-[var(--chat-textMuted)]">
-                View all members
+                Voir tous les membres
               </p>
             </div>
           </button>
@@ -143,9 +143,9 @@ export function GroupInfo({
           <div className="flex items-center gap-3">
             <Calendar className="h-5 w-5 text-[var(--chat-textMuted)]" />
             <div className="flex-1">
-              <p className="font-medium text-[var(--chat-text)]">Created</p>
+              <p className="font-medium text-[var(--chat-text)]">Créé le</p>
               <p className="text-sm text-[var(--chat-textMuted)]">
-                {format(new Date(group.createdAt), "MMMM d, yyyy")}
+                {format(new Date(group.createdAt), "d MMMM yyyy")}
               </p>
             </div>
           </div>

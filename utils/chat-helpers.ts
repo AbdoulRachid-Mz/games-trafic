@@ -33,7 +33,7 @@ export function getLastMessagePreview(conversation: Conversation): string {
   const lastMessage = conversation.lastMessage;
 
   if (!lastMessage) {
-    return 'No messages yet';
+    return 'Aucun message';
   }
 
   // Handle images
@@ -44,7 +44,7 @@ export function getLastMessagePreview(conversation: Conversation): string {
 
   // Handle audio
   if (lastMessage.audioUrl) {
-    return '🎤 Voice message';
+    return '🎤 Message vocal';
   }
 
   // Handle text
@@ -65,7 +65,7 @@ export function getLastMessagePreview(conversation: Conversation): string {
  */
 export function getUnreadCount(messages: Message[], userId: string): number {
   return messages.filter(
-    (msg) => msg.recipientId === userId && !msg.read && !msg.isDeleted
+    (msg) => msg.recipientId === userId && !(msg.readBy?.includes(userId)) && !msg.isDeleted
   ).length;
 }
 
@@ -126,17 +126,17 @@ export function getEntityName(conversation: Conversation): string {
 
   switch (entity.type) {
     case 'user':
-      return entity.data.fullName || entity.data.username || 'Unknown User';
+      return entity.data.fullName || entity.data.username || 'Utilisateur inconnu';
     case 'group':
-      return entity.data.name || 'Unnamed Group';
+      return entity.data.name || 'Groupe sans nom';
     case 'shop':
-      return entity.data.name || 'Unnamed Shop';
+      return entity.data.name || 'Boutique sans nom';
     case 'product':
-      return entity.data.name || 'Unnamed Product';
+      return entity.data.name || 'Produit sans nom';
     case 'post':
-      return 'Post';
+      return 'Publication';
     default:
-      return 'Unknown';
+      return 'Inconnu';
   }
 }
 
@@ -200,35 +200,35 @@ export function isUserOnline(lastSeen: Date | null | undefined): boolean {
  * @returns Formatted string
  */
 export function formatLastSeen(lastSeen: Date | null | undefined): string {
-  if (!lastSeen) return 'Offline';
+  if (!lastSeen) return 'Hors ligne';
 
   const now = new Date();
   const diff = now.getTime() - new Date(lastSeen).getTime();
 
   // Less than 5 minutes - online
   if (diff < 5 * 60 * 1000) {
-    return 'Online';
+    return 'En ligne';
   }
 
   // Less than 1 hour
   if (diff < 60 * 60 * 1000) {
     const minutes = Math.floor(diff / (60 * 1000));
-    return `Last seen ${minutes}m ago`;
+    return `En ligne il y a ${minutes}m`;
   }
 
   // Less than 24 hours
   if (diff < 24 * 60 * 60 * 1000) {
     const hours = Math.floor(diff / (60 * 60 * 1000));
-    return `Last seen ${hours}h ago`;
+    return `En ligne il y a ${hours}h`;
   }
 
   // Less than 7 days
   if (diff < 7 * 24 * 60 * 60 * 1000) {
     const days = Math.floor(diff / (24 * 60 * 60 * 1000));
-    return `Last seen ${days}d ago`;
+    return `En ligne il y a ${days}j`;
   }
 
-  return 'Last seen a while ago';
+  return 'En ligne il y a longtemps';
 }
 
 /**
@@ -314,11 +314,11 @@ export function shouldShowTimestamp(
  */
 export function getTypingIndicatorText(typingUsers: string[]): string {
   if (typingUsers.length === 0) return '';
-  if (typingUsers.length === 1) return `${typingUsers[0]} is typing...`;
+  if (typingUsers.length === 1) return `${typingUsers[0]} écrit...`;
   if (typingUsers.length === 2) {
-    return `${typingUsers[0]} and ${typingUsers[1]} are typing...`;
+    return `${typingUsers[0]} et ${typingUsers[1]} écrivent...`;
   }
-  return `${typingUsers[0]} and ${typingUsers.length - 1} others are typing...`;
+  return `${typingUsers[0]} et ${typingUsers.length - 1} autres écrivent...`;
 }
 
 /**

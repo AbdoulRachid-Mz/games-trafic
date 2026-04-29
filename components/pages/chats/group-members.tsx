@@ -74,7 +74,7 @@ export function GroupMembers({
       <Badge variant="outline" className={cn("text-xs", variants[role])}>
         {role === "OWNER" && <Crown className="h-3 w-3 mr-1" />}
         {role === "ADMIN" && <Shield className="h-3 w-3 mr-1" />}
-        {role}
+        {role === "OWNER" ? "PROPRIÉTAIRE" : role === "ADMIN" ? "ADMIN" : "MEMBRE"}
       </Badge>
     );
   };
@@ -123,7 +123,7 @@ export function GroupMembers({
                     {memberName}
                     {isCurrentUser && (
                       <span className="text-sm text-[var(--chat-textMuted)] ml-2">
-                        (You)
+                        (Vous)
                       </span>
                     )}
                   </p>
@@ -152,7 +152,7 @@ export function GroupMembers({
                           onClick={() => onPromoteToAdmin(member.id)}
                         >
                           <Shield className="h-4 w-4 mr-2" />
-                          Promote to Admin
+                          Promouvoir administrateur
                         </DropdownMenuItem>
                       )}
                       {member.role === "ADMIN" &&
@@ -161,7 +161,7 @@ export function GroupMembers({
                           <DropdownMenuItem
                             onClick={() => onDemoteToMember(member.id)}
                           >
-                            Demote to Member
+                            Rétrograder membre
                           </DropdownMenuItem>
                         )}
                       {onRemoveMember && (
@@ -172,7 +172,7 @@ export function GroupMembers({
                             className="text-[var(--chat-error)]"
                           >
                             <UserMinus className="h-4 w-4 mr-2" />
-                            Remove from Group
+                            Retirer du groupe
                           </DropdownMenuItem>
                         </>
                       )}

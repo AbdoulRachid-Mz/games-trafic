@@ -63,12 +63,12 @@ function EditGroupContent() {
 
   const handleSave = async () => {
     if (!groupName.trim()) {
-      toast.error("Please enter a group name");
+      toast.error("Veuillez entrer un nom de groupe");
       return;
     }
 
     if (!user) {
-      toast.error("You must be logged in");
+      toast.error("Vous devez être connecté");
       return;
     }
 
@@ -90,11 +90,11 @@ function EditGroupContent() {
         },
       });
 
-      toast.success("Group updated successfully");
+      toast.success("Groupe mis à jour avec succès");
       router.push(`/chats/groups/${groupId}`);
     } catch (error) {
       console.error("Failed to update group:", error);
-      toast.error("Failed to update group");
+      toast.error("Erreur lors de la mise à jour du groupe");
     }
   };
 
@@ -120,9 +120,9 @@ function EditGroupContent() {
       <div className="min-h-screen bg-[var(--chat-background)] flex items-center justify-center">
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-bold text-[var(--chat-text)]">
-            Group Not Found
+            Groupe non trouvé
           </h1>
-          <Button onClick={() => router.push("/chats")}>Back to Chats</Button>
+          <Button onClick={() => router.push("/chats")}>Retour aux discussions</Button>
         </div>
       </div>
     );
@@ -140,10 +140,10 @@ function EditGroupContent() {
           </Button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-[var(--chat-text)]">
-              Edit Group
+              Modifier le groupe
             </h1>
             <p className="text-sm text-[var(--chat-textMuted)]">
-              Update group information
+              Mettre à jour les informations du groupe
             </p>
           </div>
           <Button
@@ -151,7 +151,7 @@ function EditGroupContent() {
             disabled={!groupName.trim() || updateGroupMutation.isPending}
             className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)]"
           >
-            {updateGroupMutation.isPending ? "Saving..." : "Save Changes"}
+            {updateGroupMutation.isPending ? "Enregistrement..." : "Enregistrer les modifications"}
           </Button>
         </div>
       </div>
@@ -159,7 +159,7 @@ function EditGroupContent() {
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] p-6 space-y-6">
           <h2 className="text-lg font-semibold text-[var(--chat-text)]">
-            Group Information
+            Informations du groupe
           </h2>
 
           {/* Group Image */}
@@ -184,7 +184,7 @@ function EditGroupContent() {
               <Label htmlFor="group-image" className="cursor-pointer">
                 <div className="flex items-center gap-2 px-4 py-2 bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-lg hover:bg-[var(--chat-surfaceHover)] transition-colors">
                   <Upload className="h-4 w-4" />
-                  <span className="text-sm">Change Image</span>
+                  <span className="text-sm">Changer l'image</span>
                 </div>
               </Label>
               <input
@@ -199,43 +199,43 @@ function EditGroupContent() {
 
           {/* Group Name */}
           <div className="space-y-2">
-            <Label htmlFor="group-name">Group Name *</Label>
+            <Label htmlFor="group-name">Nom du groupe *</Label>
             <Input
               id="group-name"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Enter group name"
+              placeholder="Entrez le nom du groupe"
               maxLength={50}
               className="bg-[var(--chat-background)] border-[var(--chat-border)]"
             />
             <p className="text-xs text-[var(--chat-textMuted)]">
-              {groupName.length}/50 characters
+              {groupName.length}/50 caractères
             </p>
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description (Optional)</Label>
+            <Label htmlFor="description">Description (Optionnel)</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this group about?"
+              placeholder="De quoi parle ce groupe ?"
               maxLength={200}
               rows={3}
               className="bg-[var(--chat-background)] border-[var(--chat-border)]"
             />
             <p className="text-xs text-[var(--chat-textMuted)]">
-              {description.length}/200 characters
+              {description.length}/200 caractères
             </p>
           </div>
 
           {/* Private Group */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Private Group</Label>
+              <Label>Groupe privé</Label>
               <p className="text-sm text-[var(--chat-textMuted)]">
-                Only invited members can join
+                Seuls les membres invités peuvent rejoindre
               </p>
             </div>
             <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />

@@ -64,10 +64,10 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5" />
-            Chat Themes
+            Thèmes de discussion
           </SheetTitle>
           <SheetDescription>
-            Choose a theme to customize your chat experience
+            Choisissez un thème pour personnaliser votre expérience de discussion
           </SheetDescription>
         </SheetHeader>
 
@@ -76,7 +76,7 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
           <div className="md:col-span-1">
             <div className="sticky top-0 space-y-4">
               <div className="flex items-center justify-between">
-                <Label>Dark Mode</Label>
+                <Label>Mode Sombre</Label>
                 <Switch checked={isDark} onCheckedChange={toggleDarkMode} />
               </div>
 
@@ -117,7 +117,7 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
                         color: displayTheme.colors.messageSentText,
                       }}
                     >
-                      Sent message preview
+                      Aperçu message envoyé
                     </div>
                   </div>
                   <div className="flex justify-start">
@@ -128,7 +128,7 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
                         color: displayTheme.colors.messageReceivedText,
                       }}
                     >
-                      Received message preview
+                      Aperçu message reçu
                     </div>
                   </div>
                 </div>
@@ -265,7 +265,7 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
 
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Fermer
           </Button>
         </div>
       </SheetContent>

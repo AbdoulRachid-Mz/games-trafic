@@ -52,10 +52,10 @@ function CreateGroupContent() {
         <div className="text-center space-y-4">
           <Users className="h-16 w-16 mx-auto text-[var(--chat-textMuted)]" />
           <h1 className="text-2xl font-bold text-[var(--chat-text)]">
-            Cannot Create Group
+            Création de groupe impossible
           </h1>
           <p className="text-[var(--chat-textMuted)]">{validation.error}</p>
-          <Button onClick={() => router.push("/chats")}>Back to Chats</Button>
+          <Button onClick={() => router.push("/chats")}>Retour aux discussions</Button>
         </div>
       </div>
     );
@@ -90,17 +90,17 @@ function CreateGroupContent() {
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
-      toast.error("Please enter a group name");
+      toast.error("Veuillez entrer un nom de groupe");
       return;
     }
 
     if (selectedUsers.length === 0) {
-      toast.error("Please select at least one member");
+      toast.error("Veuillez sélectionner au moins un membre");
       return;
     }
 
     if (!user) {
-      toast.error("You must be logged in");
+      toast.error("Vous devez être connecté");
       return;
     }
 
@@ -120,11 +120,11 @@ function CreateGroupContent() {
         creatorId: user.id,
       });
 
-      toast.success("Group created successfully");
+      toast.success("Groupe créé avec succès");
       router.push("/chats");
     } catch (error) {
       console.error("Failed to create group:", error);
-      toast.error("Failed to create group");
+      toast.error("Erreur lors de la création du groupe");
     }
   };
 
@@ -151,12 +151,12 @@ function CreateGroupContent() {
           </Button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-[var(--chat-text)]">
-              Create New Group
+              Créer un nouveau groupe
             </h1>
             <p className="text-sm text-[var(--chat-textMuted)]">
               {limits.maxGroups === Infinity
-                ? "Unlimited groups"
-                : `You can create up to ${limits.maxGroups} group(s)`}
+                ? "Groupes illimités"
+                : `Vous pouvez créer jusqu'à ${limits.maxGroups} groupe(s)`}
             </p>
           </div>
           <Button
@@ -168,7 +168,7 @@ function CreateGroupContent() {
             }
             className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)]"
           >
-            {createGroupMutation.isPending ? "Creating..." : "Create Group"}
+            {createGroupMutation.isPending ? "Création..." : "Créer le groupe"}
           </Button>
         </div>
       </div>
@@ -177,7 +177,7 @@ function CreateGroupContent() {
         {/* Group Info */}
         <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] p-6 space-y-6">
           <h2 className="text-lg font-semibold text-[var(--chat-text)]">
-            Group Information
+            Informations du groupe
           </h2>
 
           {/* Group Image */}
@@ -202,7 +202,7 @@ function CreateGroupContent() {
               <Label htmlFor="group-image" className="cursor-pointer">
                 <div className="flex items-center gap-2 px-4 py-2 bg-[var(--chat-surface)] border border-[var(--chat-border)] rounded-lg hover:bg-[var(--chat-surfaceHover)] transition-colors">
                   <Upload className="h-4 w-4" />
-                  <span className="text-sm">Upload Image</span>
+                  <span className="text-sm">Charger une image</span>
                 </div>
               </Label>
               <input
@@ -217,34 +217,34 @@ function CreateGroupContent() {
 
           {/* Group Name */}
           <div className="space-y-2">
-            <Label htmlFor="group-name">Group Name *</Label>
+            <Label htmlFor="group-name">Nom du groupe *</Label>
             <Input
               id="group-name"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Enter group name"
+              placeholder="Entrez le nom du groupe"
               maxLength={50}
               className="bg-[var(--chat-background)] border-[var(--chat-border)]"
             />
             <p className="text-xs text-[var(--chat-textMuted)]">
-              {groupName.length}/50 characters
+              {groupName.length}/50 caractères
             </p>
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description (Optional)</Label>
+            <Label htmlFor="description">Description (Optionnel)</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this group about?"
+              placeholder="De quoi parle ce groupe ?"
               maxLength={200}
               rows={3}
               className="bg-[var(--chat-background)] border-[var(--chat-border)]"
             />
             <p className="text-xs text-[var(--chat-textMuted)]">
-              {description.length}/200 characters
+              {description.length}/200 caractères
             </p>
           </div>
 
@@ -252,9 +252,9 @@ function CreateGroupContent() {
           {limits.canCreatePrivateGroups && (
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label>Private Group</Label>
+                <Label>Groupe privé</Label>
                 <p className="text-sm text-[var(--chat-textMuted)]">
-                  Only invited members can join
+                  Seuls les membres invités peuvent rejoindre
                 </p>
               </div>
               <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
@@ -266,10 +266,10 @@ function CreateGroupContent() {
         <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[var(--chat-text)]">
-              Add Members
+              Ajouter des membres
             </h2>
             <span className="text-sm text-[var(--chat-textMuted)]">
-              {selectedUsers.length} selected (max {limits.maxMembersPerGroup})
+              {selectedUsers.length} sélectionnés (max {limits.maxMembersPerGroup})
             </span>
           </div>
 
@@ -277,7 +277,7 @@ function CreateGroupContent() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search users..."
+            placeholder="Rechercher des utilisateurs..."
             className="bg-[var(--chat-background)] border-[var(--chat-border)]"
           />
 

@@ -105,11 +105,13 @@ export function ChatHeader({
           <p className="text-xs text-[var(--chat-textMuted)] truncate">
             {isGroup
               ? memberCount
-                ? `${memberCount} members`
-                : "Group"
-              : onlineStatus
+                ? `${memberCount} membres`
+                : "Groupe"
+              : onlineStatus?.isOnline
+              ? "En ligne"
+              : onlineStatus?.lastSeen
               ? formatLastSeen(onlineStatus.lastSeen)
-              : "Offline"}
+              : "Hors ligne"}
           </p>
         </div>
       </div>
@@ -148,10 +150,10 @@ export function ChatHeader({
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={onViewDetails}>
               <Info className="h-4 w-4 mr-2" />
-              View Details
+              Voir les détails
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onMute}>
-              {conversation.isMuted ? "Unmute" : "Mute"} Notifications
+              {conversation.isMuted ? "Réactiver" : "Couper"} les notifications
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {!isGroup && (
@@ -159,14 +161,14 @@ export function ChatHeader({
                 onClick={onBlock}
                 className="text-[var(--chat-warning)]"
               >
-                Block User
+                Bloquer l'utilisateur
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
               onClick={onDelete}
               className="text-[var(--chat-error)]"
             >
-              Delete Conversation
+              Supprimer la conversation
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

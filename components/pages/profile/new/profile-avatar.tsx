@@ -32,15 +32,15 @@ export function ProfileAvatar({
   const [showViewer, setShowViewer] = useState(false);
 
   const sizeClasses = {
-    sm: "w-20 h-20 border-4",
-    md: "w-32 h-32 border-4",
-    lg: "w-40 h-40 border-4",
+    sm: "w-16 h-16 border-4",
+    md: "w-20 h-20 border-4",
+    lg: "w-32 h-32 border-4",
   };
 
   const avatarSize = {
-    sm: 80,
-    md: 128,
-    lg: 160,
+    sm: 60,
+    md: 110,
+    lg: 130,
   };
 
   return (
@@ -65,12 +65,15 @@ export function ProfileAvatar({
       <div
         className={cn(
           "relative rounded-full overflow-hidden cursor-pointer",
-          sizeClasses[size]
+          sizeClasses[size],
         )}
         onClick={() => !isOwnProfile && setShowViewer(true)}
       >
         <Avatar className="w-full h-full">
-          <AvatarImage src={src || "/images/icons/avatar/man.png"} alt={username} />
+          <AvatarImage
+            src={src || "/images/icons/avatar/man.png"}
+            alt={username}
+          />
           <AvatarFallback className="text-2xl">
             <User className="w-1/2 h-1/2" />
           </AvatarFallback>
@@ -90,7 +93,7 @@ export function ProfileAvatar({
         {/* Upload overlay */}
         {isOwnProfile && (
           <AdvancedUpload
-            value={src || "/images/default-avatar.jpg"}
+            value={src || "/icons/gt-man.png"}
             onChange={onUpload || (() => {})}
             className="absolute inset-0 opacity-0"
             isRounded
@@ -104,8 +107,8 @@ export function ProfileAvatar({
         <ImageViewer
           images={[src]}
           trigger={<div className="hidden" />}
-        //   open={showViewer}
-        //   onOpenChange={setShowViewer}
+          //   open={showViewer}
+          //   onOpenChange={setShowViewer}
         />
       )}
     </motion.div>

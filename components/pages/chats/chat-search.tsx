@@ -52,7 +52,7 @@ export function ChatSearch({
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--chat-textMuted)]" />
         <Input
           type="text"
-          placeholder="Search conversations..."
+          placeholder="Rechercher des conversations..."
           value={localQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           className={cn(
@@ -86,25 +86,25 @@ export function ChatSearch({
             value="all"
             className="flex-1 data-[state=active]:bg-[var(--chat-primary)] data-[state=active]:text-[var(--chat-messageSentText)]"
           >
-            All
+            Tout
           </TabsTrigger>
           <TabsTrigger
             value="unread"
             className="flex-1 data-[state=active]:bg-[var(--chat-primary)] data-[state=active]:text-[var(--chat-messageSentText)]"
           >
-            Unread
+            Non lus
           </TabsTrigger>
           <TabsTrigger
             value="groups"
             className="flex-1 data-[state=active]:bg-[var(--chat-primary)] data-[state=active]:text-[var(--chat-messageSentText)]"
           >
-            Groups
+            Groupes
           </TabsTrigger>
           <TabsTrigger
             value="users"
             className="flex-1 data-[state=active]:bg-[var(--chat-primary)] data-[state=active]:text-[var(--chat-messageSentText)]"
           >
-            Users
+            Utilisateurs
           </TabsTrigger>
         </TabsList>
       </Tabs>

@@ -1,10 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Typography } from "@/components/ui/typography";
-import { Button } from "@/components/ui/button";
 import { Users, UserPlus, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {StatsCarousel} from "@/components/shared/stats-carousel";
 
 interface ProfileStatsProps {
   followersCount: number;
@@ -54,33 +53,25 @@ export function ProfileStats({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            whileHover={stat.onClick ? { scale: 1.05 } : {}}
-            whileTap={stat.onClick ? { scale: 0.95 } : {}}
-          >
-            <Button
-              variant="ghost"
-              className={cn(
-                "h-auto p-3 flex-col items-center gap-1",
-                !stat.onClick && "cursor-default hover:bg-transparent"
-              )}
-              onClick={stat.onClick}
-              disabled={!stat.onClick}
-            >
-              <div className="flex items-center gap-2">
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-                <Typography variant="h5" weight="bold" gradient>
-                  {stat.value.toLocaleString()}
-                </Typography>
-              </div>
-              <Typography variant="caption2" theme="muted">
-                {stat.label}
-              </Typography>
-            </Button>
-          </motion.div>
-        ))}
+        <StatsCarousel
+          data={stats.map((stat) => ({
+            title: stat.label,
+            value: stat.value.toLocaleString(),
+            icon: <stat.icon className="w-5 h-5" />,
+            onClick: stat.onClick,
+            className: cn(
+              "h-auto p-2 flex-col items-center gap-1",
+              !stat.onClick && "cursor-default hover:bg-transparent"
+            ),
+          }))}
+          mode="auto"
+          itemsPerView={{ mobile: 1, md: 2, lg: 3, xl: 3 }}
+          gap={12}
+          withNavButtons={false}
+          dragFree={true}
+          loop={false}
+          showScrollbar={false}
+        />
       </motion.div>
     </>
   );

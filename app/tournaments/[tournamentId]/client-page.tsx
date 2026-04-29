@@ -563,7 +563,7 @@ export function TournamentPageContent({
                         // InteractionButton logic is handled via custom render below
                         break;
                       case "message":
-                        router.push(`/chats?tournament=${tournamentId}`);
+                        router.push(`/chats/tournament/${tournamentId}`);
                         break;
                       case "share":
                         shareTournament(tournamentId, tournament.name, {
@@ -684,9 +684,13 @@ export function TournamentPageContent({
                       </Typography>
                     </div>
                   </div>
-                  <Button variant="outline" className="w-full mt-4 gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-4 gap-2"
+                    onClick={() => router.push(`/chats/tournament/${tournamentId}`)}
+                  >
                     <MessageCircle className="h-4 w-4" />
-                    Contacter
+                    Discuter
                   </Button>
                 </CardContent>
               </Card>

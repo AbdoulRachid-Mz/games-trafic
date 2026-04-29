@@ -1,4 +1,4 @@
-// app/chats/[chatId]/page.tsx
+// app/chats/[entityType]/[entityId]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -16,16 +16,16 @@ import {
   useCreateMessage,
   useMarkMessageAsRead,
 } from "@/hooks/use-messages";
-import type { ChatId, ChatMessage, Conversation } from "@/types/chat";
-import { parseChatId, validateChatId } from "@/lib/chat-utils";
+import type { ChatId, ChatMessage, Conversation, ChatEntityType } from "@/types/chat";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChatThemeProvider } from "@/contexts/chat-theme-context";
 import { JoinGroupDialog } from "@/components/pages/chats/join-group-dialog";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
 
-function ChatConversationContent() {
+const VALID_ENTITY_TYPES: ChatEntityType[] = ["user", "group", "shop", "product", "post", "tournament"];
+
+export default function ChatConversationPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuthContext();
@@ -40,30 +40,30 @@ function ChatConversationContent() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
 
-  const chatId = params.chatId as string;
-  const validation = validateChatId(chatId);
-  const parsed = parseChatId(chatId);
+  const entityType = params.entityType as ChatEntityType;
+  const entityId = params.entityId as string;
+  const chatId = `${entityType}:${entityId}` as ChatId;
 
+  // Validation des paramètres
   useEffect(() => {
-    if (!validation.valid || !parsed) {
-      toast.error(validation.error || "Invalid chat");
+    if (!entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
+      toast.error("Type de discussion invalide");
       router.push("/chats");
     }
-  }, [validation.valid, validation.error, parsed, router]);
+  }, [entityType, entityId, router]);
 
-  if (!validation.valid || !parsed) {
+  if (!entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
     return null;
   }
 
   // Fetch entity details
-  const isGroup = parsed.type === "group";
-  const entityId = parsed.id;
+  const isGroup = entityType === "group";
 
   const { data: groupData, isLoading: isLoadingGroup } = useGroupById(
     isGroup ? entityId : undefined
   );
   const { data: userData, isLoading: isLoadingUser } = useUserById(
-    !isGroup && parsed.type === "user" ? entityId : undefined
+    !isGroup && entityType === "user" ? entityId : undefined
   );
 
   // Check group membership for private groups
@@ -91,9 +91,9 @@ function ChatConversationContent() {
     refetch: refetchDmMessages,
   } = useConversation(
     user?.id || "",
-    !isGroup && parsed.type === "user" ? entityId : "",
+    !isGroup && entityType === "user" ? entityId : "",
     undefined,
-    Boolean(!isGroup && parsed.type === "user" && !!user)
+    Boolean(!isGroup && entityType === "user" && !!user)
   );
 
   const isLoading =
@@ -114,27 +114,26 @@ function ChatConversationContent() {
 
   // Get typing indicators for this chat
   useEffect(() => {
-    const indicators = typingIndicators.get(chatId as ChatId) || [];
+    const indicators = typingIndicators.get(chatId) || [];
     const usernames = indicators.map((ind) => ind.username);
     setTypingUsers(usernames);
   }, [typingIndicators, chatId]);
 
   // Get online status for user chats
   const onlineStatus =
-    parsed.type === "user" ? onlineStatuses.get(parsed.id) : undefined;
+    entityType === "user" ? onlineStatuses.get(entityId) : undefined;
 
   // Mark messages as read when viewing
   useEffect(() => {
     if (messages.length > 0 && user) {
       const unreadMessages = messages.filter(
-        (msg) => msg.recipientId === user.id && !msg.read
+        (msg) => msg.recipientId === user.id && !(msg.readBy || []).includes(user.id)
       );
 
       if (unreadMessages.length > 0) {
-        // Mark as read after a short delay
         const timer = setTimeout(() => {
           unreadMessages.forEach((msg) => {
-            markAsReadMutation.mutate(msg.id);
+            markAsReadMutation.mutate({ id: msg.id, userId: user.id });
           });
         }, 1000);
 
@@ -143,25 +142,25 @@ function ChatConversationContent() {
     }
   }, [messages, user, markAsReadMutation]);
 
-  // Refetch messages periodically for real-time feel
+  // Refetch messages periodically
   useEffect(() => {
     const interval = setInterval(() => {
       refetch();
-    }, 10000); // Every 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [refetch]);
 
   // Handle send message
   const handleSendMessage = useCallback(
-    async (content: string, images?: string[]) => {
+    async (content: string, images?: string[], audioUrl?: string) => {
       if (!user) {
-        toast.error("You must be logged in to send messages");
+        toast.error("Vous devez être connecté pour envoyer des messages");
         return;
       }
 
       if (isGroup && !membership) {
-        toast.error("You must be a member to send messages");
+        toast.error("Vous devez être membre pour envoyer des messages");
         return;
       }
 
@@ -170,40 +169,34 @@ function ChatConversationContent() {
           senderId: user.id,
           content,
           images: images || [],
+          audioUrl: audioUrl,
+          type: audioUrl ? "AUDIO" : images?.length ? "IMAGE" : "TEXT",
         };
 
-        // Set recipient based on entity type
-        if (parsed.type === "group") {
-          messageData.groupId = parsed.id;
-        } else if (parsed.type === "user") {
-          messageData.recipientId = parsed.id;
+        if (entityType === "group") {
+          messageData.groupId = entityId;
+        } else if (entityType === "user") {
+          messageData.recipientId = entityId;
         } else {
-          // For other entity types (shop, product, etc.)
-          messageData.entityType = parsed.type.toUpperCase();
-          messageData.entityId = parsed.id;
+          messageData.entityType = entityType.toUpperCase();
+          messageData.entityId = entityId;
         }
 
-        // Add reply reference if replying
         if (replyTo) {
           messageData.parentMessageId = replyTo.id;
         }
 
         await createMessageMutation.mutateAsync(messageData);
-
-        // Clear reply
         setReplyTo(null);
-
-        // Refetch messages
         refetch();
       } catch (error) {
         console.error("Failed to send message:", error);
-        toast.error("Failed to send message");
+        toast.error("Erreur lors de l'envoi du message");
       }
     },
-    [user, parsed, replyTo, createMessageMutation, refetch, isGroup, membership]
+    [user, entityType, entityId, replyTo, createMessageMutation, refetch, isGroup, membership]
   );
 
-  // Handle reply
   const handleReply = useCallback((message: ChatMessage) => {
     setReplyTo(message);
   }, []);
@@ -212,26 +205,31 @@ function ChatConversationContent() {
     setReplyTo(null);
   }, []);
 
-  // Handle view details
   const handleViewDetails = useCallback(() => {
-    router.push(`/chats/${chatId}/detail`);
-  }, [router, chatId]);
+    if (isGroup) {
+      router.push(`/chats/groups/${entityId}`);
+    } else {
+      router.push(`/profile/${entityId}`);
+    }
+  }, [router, isGroup, entityId]);
 
-  // Conversation data with actual entity details
   const conversation: Conversation = activeConversation || {
-    chatId: chatId as Conversation["chatId"],
-    entityType: parsed.type,
-    entityId: parsed.id,
+    id: chatId,
+    chatId: chatId,
+    entityType: entityType,
+    entityId: entityId,
     unreadCount: 0,
     entity: {
-      type: parsed.type as any,
+      type: entityType,
       data: (isGroup ? groupData : userData) as any,
     },
+    lastMessage: null,
+    lastMessageTime: null,
   };
 
   if (isLoading && messages.length === 0) {
     return (
-      <div className="flex flex-col h-screen bg-[var(--chat-background)]">
+      <div className="flex flex-col h-full bg-[var(--chat-background)]">
         <div className="flex-shrink-0 p-4 border-b border-[var(--chat-border)]">
           <div className="flex items-center gap-3">
             <Skeleton className="h-10 w-10 rounded-full" />
@@ -247,18 +245,16 @@ function ChatConversationContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--chat-background)]">
-      {/* Header */}
+    <div className="flex flex-col h-full bg-[var(--chat-background)] relative">
       <ChatHeader
         conversation={conversation}
         onlineStatus={onlineStatus}
         onViewDetails={handleViewDetails}
-        onMute={() => toast.info("Mute feature coming soon")}
-        onBlock={() => toast.info("Block feature coming soon")}
-        onDelete={() => toast.info("Delete feature coming soon")}
+        onMute={() => toast.info("Le mode silencieux arrive bientôt")}
+        onBlock={() => toast.info("Le blocage arrive bientôt")}
+        onDelete={() => toast.info("La suppression arrive bientôt")}
       />
 
-      {/* Messages */}
       {isGroup && groupData?.isPrivate && !membership ? (
         <div className="flex-1 flex items-center justify-center p-6 text-center">
           <div className="space-y-4 max-w-sm">
@@ -284,7 +280,6 @@ function ChatConversationContent() {
         />
       )}
 
-      {/* Input */}
       <MessageInput
         user={user}
         onSendMessage={handleSendMessage}
@@ -293,7 +288,6 @@ function ChatConversationContent() {
         disabled={!user || (isGroup && (groupData?.isPrivate ?? false) && !membership)}
       />
 
-      {/* Join Dialog */}
       {isGroup && groupData && user && (
         <JoinGroupDialog
           group={groupData}
@@ -306,13 +300,5 @@ function ChatConversationContent() {
         />
       )}
     </div>
-  );
-}
-
-export default function ChatConversationPage() {
-  return (
-    <ChatThemeProvider>
-      <ChatConversationContent />
-    </ChatThemeProvider>
   );
 }

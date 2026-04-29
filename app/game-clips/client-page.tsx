@@ -13,6 +13,8 @@ function ClientGameClipsContentInner() {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
+    reshuffleClips,
+    isReshuffling,
   } = useGameClips({
     sortBy: "createdAt",
     sortOrder: "desc",
@@ -25,6 +27,10 @@ function ClientGameClipsContentInner() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const handleReshuffle = useCallback(async () => {
+    await reshuffleClips();
+  }, [reshuffleClips]);
+
   return (
     <div className="fixed inset-0 bg-[#0a0a0b] overflow-hidden max-h-screen">
       <GameClipReel
@@ -33,6 +39,8 @@ function ClientGameClipsContentInner() {
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         onFetchNextPage={handleFetchNext}
+        onReshuffle={handleReshuffle}
+        isReshuffling={isReshuffling}
       />
     </div>
   );

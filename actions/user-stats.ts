@@ -1113,7 +1113,7 @@ async function getMessagesStats(userId: string) {
     .select({
       total_sent: sql<number>`COUNT(CASE WHEN ${messages.senderId} = ${userId} THEN 1 END)`,
       total_received: sql<number>`COUNT(CASE WHEN ${messages.recipientId} = ${userId} THEN 1 END)`,
-      unread: sql<number>`COUNT(CASE WHEN ${messages.recipientId} = ${userId} AND ${messages.read} = false THEN 1 END)`,
+      unread: sql<number>`COUNT(CASE WHEN ${messages.recipientId} = ${userId} AND NOT (${userId} = ANY(${messages.readBy})) THEN 1 END)`,
     })
     .from(messages)
     .where(
@@ -1133,7 +1133,7 @@ async function getMessagesStats(userId: string) {
           ELSE sender_id
         END AS other_user_id,
         MAX(content) AS last_message,
-        COUNT(CASE WHEN recipient_id = ${userId} AND read = false THEN 1 END) AS unread_count,
+        COUNT(CASE WHEN recipient_id = ${userId} AND NOT (${userId} = ANY(read_by)) THEN 1 END) AS unread_count,
         MAX(created_at) AS last_message_at
       FROM ${messages}
       WHERE (sender_id = ${userId} OR recipient_id = ${userId})

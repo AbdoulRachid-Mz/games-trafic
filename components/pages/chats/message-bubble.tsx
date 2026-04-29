@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/chat";
 import { formatMessageTime } from "@/lib/chat-utils";
 import { getInitials } from "@/utils/chat-helpers";
-import { Check, CheckCheck, Reply } from "lucide-react";
+import { Check, CheckCheck, Reply, Play, Pause, Mic } from "lucide-react";
 import Image from "next/image";
 
 interface MessageBubbleProps {
@@ -74,7 +74,7 @@ export function MessageBubble({
             )}
           >
             <p className="font-semibold text-[var(--chat-primary)]">
-              Replying to
+              En réponse à
             </p>
             <p className="text-[var(--chat-textMuted)] truncate">
               {message.replyTo.content}
@@ -85,18 +85,17 @@ export function MessageBubble({
         {/* Message bubble */}
         <div
           className={cn(
-            "px-3 py-2 rounded-2xl relative",
+            "px-3 py-1.5 rounded-2xl relative shadow-sm",
             isSent
-              ? "bg-[var(--chat-messageSent)] text-[var(--chat-messageSentText)] rounded-tr-sm"
-              : "bg-[var(--chat-messageReceived)] text-[var(--chat-messageReceivedText)] rounded-tl-sm",
-            "shadow-sm"
+              ? "bg-[var(--chat-primary)] text-white rounded-tr-none"
+              : "bg-[var(--chat-surface)] text-[var(--chat-text)] rounded-tl-none border border-[var(--chat-border)]"
           )}
         >
           {/* Images */}
           {message.images && message.images.length > 0 && (
             <div
               className={cn(
-                "grid gap-1 mb-2",
+                "grid gap-1 mb-1.5",
                 message.images.length === 1 && "grid-cols-1",
                 message.images.length === 2 && "grid-cols-2",
                 message.images.length >= 3 && "grid-cols-2"
@@ -123,9 +122,27 @@ export function MessageBubble({
             </div>
           )}
 
+          {/* Audio Message */}
+          {message.type === "AUDIO" && message.audioUrl && (
+            <div className="flex items-center gap-3 py-2 min-w-[200px]">
+              <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors">
+                <Play className="h-5 w-5 fill-current" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className="h-1 w-full bg-white/30 rounded-full overflow-hidden">
+                  <div className="h-full w-1/3 bg-white" />
+                </div>
+                <div className="flex justify-between text-[10px] opacity-70">
+                  <span>0:12</span>
+                  <Mic className="h-3 w-3" />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Text content */}
           {message.content && (
-            <p className="text-sm whitespace-pre-wrap break-words">
+            <p className="text-[15px] whitespace-pre-wrap break-words leading-relaxed mb-1">
               {message.content}
             </p>
           )}
@@ -133,36 +150,21 @@ export function MessageBubble({
           {/* Timestamp and status */}
           <div
             className={cn(
-              "flex items-center gap-1 mt-1",
-              isSent ? "justify-end" : "justify-start"
+              "flex items-center gap-1 justify-end",
+              "opacity-70"
             )}
           >
-            <span
-              className={cn(
-                "text-[10px]",
-                isSent
-                  ? "text-[var(--chat-messageSentText)]/70"
-                  : "text-[var(--chat-textMuted)]"
-              )}
-            >
+            <span className="text-[10px]">
               {message.createdAt ? formatMessageTime(message.createdAt) : ""}
             </span>
 
             {/* Read receipts (for sent messages) */}
             {isSent && (
               <span className="flex-shrink-0">
-                {message.status === "read" || message.read ? (
-                  <CheckCheck className="h-3 w-3 text-[var(--chat-messageSentText)]" />
-                ) : message.status === "delivered" ? (
-                  <CheckCheck className="h-3 w-3 text-[var(--chat-messageSentText)]/50" />
-                ) : message.status === "sent" ? (
-                  <Check className="h-3 w-3 text-[var(--chat-messageSentText)]/50" />
-                ) : message.status === "sending" ? (
-                  <div className="h-3 w-3 rounded-full border-2 border-[var(--chat-messageSentText)]/50 border-t-transparent animate-spin" />
-                ) : message.status === "failed" ? (
-                  <span className="text-[var(--chat-error)]">!</span>
+                {(message.readBy && message.readBy.length > 1) ? (
+                  <CheckCheck className="h-4 w-4 text-[#53bdeb]" />
                 ) : (
-                  <Check className="h-3 w-3 text-[var(--chat-messageSentText)]/50" />
+                  <CheckCheck className="h-4 w-4" />
                 )}
               </span>
             )}
@@ -181,7 +183,7 @@ export function MessageBubble({
             )}
           >
             <Reply className="h-3 w-3" />
-            Reply
+            Répondre
           </button>
         )}
       </div>

@@ -1,16 +1,19 @@
+// hooks/use-game-clips.ts
 "use client";
 
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { getGameClips, getGameClipById, createGameClip, shareGameClip } from "@/actions/game-clips";
 import { useAuthContext } from "@/contexts/auth-context";
 import { toast } from "sonner";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { type GameClipFilters, type PaginationResponse } from "@/types/api";
 import { type GameClipCard } from "@/types/view-models";
 
 export function useGameClips(filters: GameClipFilters = {}) {
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
+  const [isReshuffling, setIsReshuffling] = useState(false);
+  const [reshuffleVersion, setReshuffleVersion] = useState(0);
 
   const {
     data,
@@ -26,7 +29,7 @@ export function useGameClips(filters: GameClipFilters = {}) {
     readonly unknown[],
     number
   >({
-    queryKey: ["game-clips", filters, user?.id],
+    queryKey: ["game-clips", filters, user?.id, reshuffleVersion],
     queryFn: async ({ pageParam = 1 }) => {
       const result = await getGameClips({
         filters,
@@ -45,6 +48,28 @@ export function useGameClips(filters: GameClipFilters = {}) {
   });
 
   const clips = data?.pages.flatMap((page) => page.data) || [];
+
+  // Fonction pour remélanger et recharger
+  const reshuffleClips = useCallback(async () => {
+    if (isReshuffling) return;
+    
+    setIsReshuffling(true);
+    
+    try {
+      // Incrémenter la version pour forcer un rechargement complet
+      setReshuffleVersion(prev => prev + 1);
+      
+      // Attendre que les nouvelles données soient chargées
+      await refetch();
+      
+      toast.success("Nouveaux clips chargés !");
+    } catch (error) {
+      console.error("Erreur lors du reshuffle:", error);
+      toast.error("Erreur lors du chargement des clips");
+    } finally {
+      setIsReshuffling(false);
+    }
+  }, [refetch, isReshuffling]);
 
   const createMutation = useMutation({
     mutationFn: async (data: {
@@ -103,6 +128,8 @@ export function useGameClips(filters: GameClipFilters = {}) {
     hasNextPage,
     fetchNextPage,
     refresh: refetch,
+    reshuffleClips,
+    isReshuffling,
     createClip: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     shareClip: shareMutation.mutateAsync,

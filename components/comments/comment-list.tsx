@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommentItem } from "./comment-item";
 import { deleteMessage, markMessageAsRead } from "@/actions/messages";
 import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
 import type { Message, EntityType } from "@/database/schema";
 
 interface CommentListProps {
@@ -22,6 +23,8 @@ export function CommentList({
   onCommentAdded 
 }: CommentListProps) {
   const queryClient = useQueryClient();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id;
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   // Mutation pour supprimer un commentaire
@@ -39,7 +42,8 @@ export function CommentList({
 
   // Mutation pour marquer comme lu
   const readMutation = useMutation({
-    mutationFn: markMessageAsRead,
+    mutationFn: ({ messageId, userId }: { messageId: string, userId: string }) => 
+      markMessageAsRead(messageId, userId),
     onError: (error) => {
       console.error("Failed to mark as read:", error);
     },
@@ -56,7 +60,8 @@ export function CommentList({
   };
 
   const handleMarkAsRead = (commentId: string) => {
-    readMutation.mutate(commentId);
+    if (!userId) return;
+    readMutation.mutate({ messageId: commentId, userId });
   };
 
   // Grouper les commentaires par parent

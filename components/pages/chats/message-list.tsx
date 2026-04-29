@@ -104,8 +104,8 @@ export function MessageList({
             <EmptyMedia variant="icon">
               <MessageSquare className="size-4" />
             </EmptyMedia>
-            <EmptyTitle>No messages yet</EmptyTitle>
-            <EmptyDescription>Start the conversation by sending a message</EmptyDescription>
+            <EmptyTitle>Aucun message</EmptyTitle>
+            <EmptyDescription>Commencez la conversation en envoyant un message</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </div>
@@ -119,7 +119,7 @@ export function MessageList({
         {hasMore && (
           <div className="text-center py-2">
             <span className="text-xs text-[var(--chat-textMuted)]">
-              {isLoading ? "Loading..." : "Scroll up to load more"}
+              {isLoading ? "Chargement..." : "Défilez vers le haut pour charger plus"}
             </span>
           </div>
         )}

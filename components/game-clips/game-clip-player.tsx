@@ -358,7 +358,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
         {/* Author Avatar */}
         <div className="relative">
           <Avatar
-            className="h-11 w-11 border-2 border-white shadow-lg cursor-pointer active:scale-95 transition-transform"
+            className="h-12 w-12 border-2 border-white shadow-lg cursor-pointer active:scale-95 transition-transform"
             onClick={(e) => {
               e.stopPropagation();
               router.push(`/profile/${clip.author?.id}`);
@@ -378,7 +378,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
             }}
             className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-primary text-white p-1 rounded-full hover:scale-110 transition-transform shadow-lg border-2 border-black"
           >
-            <Plus className="h-2.5 w-2.5" />
+            <Plus className="h-3 w-3" />
           </button>
         </div>
 
@@ -392,7 +392,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
               localLiked && "text-red-500",
             )}
           >
-            <Heart className={cn("h-4 w-4", localLiked && "fill-current")} />
+            <Heart className={cn("h-6 w-6", localLiked && "fill-current")} />
           </button>
           <span className="text-xs font-semibold text-white drop-shadow-md">
             {localLikesCount}
@@ -408,7 +408,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
             }}
             className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
           >
-            <MessageCircle className="h-4 w-4 text-white" />
+            <MessageCircle className="h-6 w-6 text-white" />
           </button>
           <span className="text-xs font-semibold text-white drop-shadow-md">
             {clip.stats?.commentsCount ?? 0}
@@ -425,9 +425,9 @@ export const GameClipPlayer = memo(function GameClipPlayer({
           )}
         >
           {localBookmarked ? (
-            <BookmarkCheck className="h-4 w-4 fill-current" />
+            <BookmarkCheck className="h-6 w-6 fill-current" />
           ) : (
-            <Bookmark className="h-4 w-4 text-white" />
+            <Bookmark className="h-6 w-6 text-white" />
           )}
         </button>
 
@@ -436,7 +436,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
           onClick={handleShare}
           className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
         >
-          <Share2 className="h-4 w-4 text-white" />
+          <Share2 className="h-6 w-6 text-white" />
         </button>
 
         {/* Download Button */}
@@ -450,9 +450,9 @@ export const GameClipPlayer = memo(function GameClipPlayer({
           )}
         >
           {isDownloading ? (
-            <Loader2 className="h-4 w-4 text-white animate-spin" />
+            <Loader2 className="h-6 w-6 text-white animate-spin" />
           ) : (
-            <Download className="h-4 w-4 text-white" />
+            <Download className="h-6 w-6 text-white" />
           )}
         </button>
 
@@ -465,9 +465,9 @@ export const GameClipPlayer = memo(function GameClipPlayer({
           className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
         >
           {muted ? (
-            <VolumeX className="h-4 w-4 text-white" />
+            <VolumeX className="h-6 w-6 text-white" />
           ) : (
-            <Volume2 className="h-4 w-4 text-white" />
+            <Volume2 className="h-6 w-6 text-white" />
           )}
         </button>
       </div>

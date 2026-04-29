@@ -26,9 +26,10 @@ export function formatChatId(type: ChatEntityType, id: string): ChatId {
 /**
  * Parse a chat ID into its components
  * @param chatId - Chat ID to parse
+ * @param userId - Current user ID for DM resolution
  * @returns Parsed chat ID or null if invalid
  */
-export function parseChatId(chatId: string): ParsedChatId | null {
+export function parseChatId(chatId: string, userId?: string): ParsedChatId | null {
   if (!chatId || typeof chatId !== 'string') {
     return null;
   }
@@ -39,25 +40,42 @@ export function parseChatId(chatId: string): ParsedChatId | null {
   }
 
   const [type, id] = parts;
-  const validTypes: ChatEntityType[] = ['user', 'group', 'shop', 'product', 'post'];
+  // Support dm:user1-user2 format
+  let mappedType: ChatEntityType = type as ChatEntityType;
+  let mappedId = id;
   
-  if (!validTypes.includes(type as ChatEntityType)) {
+  if (type === 'dm') {
+    // Pour les DMs, on considère que c'est une conversation user
+    mappedType = 'user';
+    const ids = id.split('-');
+
+    if (userId) {
+      mappedId = ids.find(pid => pid !== userId) || ids[0];
+    } else {
+      mappedId = ids[0];
+    }
+  }
+  
+  const validTypes: ChatEntityType[] = ['user', 'group', 'shop', 'product', 'post', 'tournament'];
+  
+  if (!validTypes.includes(mappedType)) {
     return null;
   }
 
   return {
-    type: type as ChatEntityType,
-    id,
+    type: mappedType,
+    id: mappedId,
   };
 }
 
 /**
  * Validate a chat ID
  * @param chatId - Chat ID to validate
+ * @param userId - Current user ID for DM resolution
  * @returns Validation result
  */
-export function validateChatId(chatId: string): ValidationResult {
-  const parsed = parseChatId(chatId);
+export function validateChatId(chatId: string, userId?: string): ValidationResult {
+  const parsed = parseChatId(chatId, userId);
   
   if (!parsed) {
     return {
@@ -130,12 +148,12 @@ export function getGroupLimits(user: User | null): GroupLimits {
 
   const limits: Record<ChatUserRole, GroupLimits> = {
     regular: {
-      maxGroups: 1,
+      maxGroups: 2,
       maxMembersPerGroup: 50,
       canCreatePrivateGroups: false,
     },
     vip: {
-      maxGroups: Infinity,
+      maxGroups: 5,
       maxMembersPerGroup: 200,
       canCreatePrivateGroups: true,
     },
@@ -204,12 +222,12 @@ export function canCreateGroup(
     if (role === 'regular') {
       return {
         valid: false,
-        error: 'You have reached the maximum number of groups. Upgrade to VIP for unlimited groups.',
+        error: 'Vous avez atteint la limite maximale de groupes. Passez au statut VIP pour créer jusqu\'à 5 groupes.',
       };
     }
     return {
       valid: false,
-      error: `You have reached the maximum number of groups (${limits.maxGroups})`,
+      error: `Vous avez atteint la limite maximale de groupes (${limits.maxGroups})`,
     };
   }
 
@@ -246,18 +264,18 @@ export function formatMessageTime(timestamp: Date | string | number): string {
 
   // Less than 1 minute
   if (diff < 60 * 1000) {
-    return 'Just now';
+    return 'À l\'instant';
   }
 
   // Less than 1 hour
   if (diff < 60 * 60 * 1000) {
     const minutes = Math.floor(diff / (60 * 1000));
-    return `${minutes}m ago`;
+    return `Il y a ${minutes}m`;
   }
 
   // Today
   if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString('en-US', {
+    return date.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
@@ -268,17 +286,17 @@ export function formatMessageTime(timestamp: Date | string | number): string {
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday';
+    return 'Hier';
   }
 
   // This week
   if (diff < 7 * 24 * 60 * 60 * 1000) {
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
+    return date.toLocaleDateString('fr-FR', { weekday: 'short' });
   }
 
   // This year
   if (date.getFullYear() === now.getFullYear()) {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('fr-FR', {
       month: 'short',
       day: 'numeric',
     });
@@ -303,26 +321,26 @@ export function formatMessageDate(timestamp: Date | string | number): string {
 
   // Today
   if (date.toDateString() === now.toDateString()) {
-    return 'Today';
+    return 'Aujourd\'hui';
   }
 
   // Yesterday
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday';
+    return 'Hier';
   }
 
   // This year
   if (date.getFullYear() === now.getFullYear()) {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('fr-FR', {
       month: 'long',
       day: 'numeric',
     });
   }
 
   // Older
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('fr-FR', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

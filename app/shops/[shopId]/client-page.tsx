@@ -392,10 +392,10 @@ export function ShopPageContent() {
                   <Button
                     variant="outline"
                     className="gap-2"
-                    onClick={() => router.push(`/chats?shop=${shopId}`)}
+                    onClick={() => router.push(`/chats/shop/${shopId}`)}
                   >
                     <MessageCircle className="h-4 w-4" />
-                    {!isSmallScreen && "Message"}
+                    {!isSmallScreen && "Discuter"}
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

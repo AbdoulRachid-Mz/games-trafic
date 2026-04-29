@@ -73,7 +73,7 @@ function GroupDetailContent() {
   };
 
   const handleLeave = () => {
-    toast.info("Leave group feature coming soon");
+    toast.info("La fonctionnalité pour quitter le groupe arrive bientôt");
   };
 
   const handleViewMembers = () => {
@@ -81,12 +81,12 @@ function GroupDetailContent() {
   };
 
   const handleStartChat = () => {
-    router.push(`/chats/group:${groupId}`);
+    router.push(`/chats/group/${groupId}`);
   };
 
   const handleRequestAccess = async () => {
     if (!user) {
-      toast.error("You must be logged in to request access");
+      toast.error("Vous devez être connecté pour demander l'accès");
       return;
     }
 
@@ -95,10 +95,10 @@ function GroupDetailContent() {
         groupId,
         userId: user.id,
       });
-      toast.success("Join request sent to group admins.");
+      toast.success("Demande d'adhésion envoyée aux administrateurs.");
     } catch (error) {
       console.error("Failed to send join request:", error);
-      toast.error("Failed to send join request");
+      toast.error("Erreur lors de l'envoi de la demande");
     }
   };
 
@@ -119,24 +119,24 @@ function GroupDetailContent() {
         userId: user.id,
       });
 
-      toast.success("User added to the group!");
+      toast.success("Utilisateur ajouté au groupe !");
       refetchRequests();
     } catch (error) {
       console.error("Failed to accept request:", error);
-      toast.error("Failed to accept request");
+      toast.error("Erreur lors de l'acceptation de la demande");
     }
   };
 
   const handlePromoteToAdmin = (memberId: string) => {
-    toast.info("Promote member feature coming soon");
+    toast.info("La promotion de membre arrive bientôt");
   };
 
   const handleDemoteToMember = (memberId: string) => {
-    toast.info("Demote member feature coming soon");
+    toast.info("La rétrogradation de membre arrive bientôt");
   };
 
   const handleRemoveMember = (memberId: string) => {
-    toast.info("Remove member feature coming soon");
+    toast.info("La suppression de membre arrive bientôt");
   };
 
   if (groupLoading) {
@@ -161,12 +161,12 @@ function GroupDetailContent() {
       <div className="min-h-screen bg-[var(--chat-background)] flex items-center justify-center">
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-bold text-[var(--chat-text)]">
-            Group Not Found
+            Groupe non trouvé
           </h1>
           <p className="text-[var(--chat-textMuted)]">
-            This group doesn't exist or you don't have access to it.
+            Ce groupe n'existe pas ou vous n'avez pas accès à celui-ci.
           </p>
-          <Button onClick={() => router.push("/chats")}>Back to Chats</Button>
+          <Button onClick={() => router.push("/chats")}>Retour aux discussions</Button>
         </div>
       </div>
     );
@@ -186,11 +186,10 @@ function GroupDetailContent() {
               <Lock className="h-8 w-8 text-[var(--chat-primary)]" />
             </div>
             <CardTitle className="text-xl font-bold text-[var(--chat-text)]">
-              Private Group
+              Groupe privé
             </CardTitle>
             <CardDescription className="text-[var(--chat-textMuted)]">
-              This group is private. You need to be a member to view its content
-              and participate in discussions.
+              Ce groupe est privé. Vous devez être membre pour voir son contenu et participer aux discussions.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -199,14 +198,14 @@ function GroupDetailContent() {
               onClick={handleRequestAccess}
               disabled={requestJoinMutation.isPending}
             >
-              {requestJoinMutation.isPending ? "Sending..." : "Request Access"}
+              {requestJoinMutation.isPending ? "Envoi..." : "Demander l'accès"}
             </Button>
             <Button
               variant="ghost"
               className="w-full text-[var(--chat-text)]"
               onClick={() => router.push("/chats")}
             >
-              Back to Chats
+              Retour aux discussions
             </Button>
           </CardContent>
         </Card>
@@ -239,7 +238,7 @@ function GroupDetailContent() {
                 {group.name}
               </h1>
               <p className="text-sm text-[var(--chat-textMuted)]">
-                {members.length} {members.length > 1 ? "members" : "member"}
+                {members.length} {members.length > 1 ? "membres" : "membre"}
               </p>
             </div>
           </div>
@@ -249,7 +248,7 @@ function GroupDetailContent() {
             className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)]"
           >
             <MessageSquare className="h-4 w-4 mr-2" />
-            Open Chat
+            Ouvrir la discussion
           </Button>
         </div>
       </div>
@@ -262,14 +261,14 @@ function GroupDetailContent() {
             isOwner ? "grid grid-cols-3" : "grid grid-cols-2"
           )}>
             <TabsTrigger value="info">
-              Group Info
+              Infos du groupe
             </TabsTrigger>
             <TabsTrigger value="members">
-              Members ({members.length})
+              Membres ({members.length})
             </TabsTrigger>
             {isOwner && (
               <TabsTrigger value="requests" className="relative">
-                Requests
+                Demandes
                 {joinRequests.length > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--chat-error)] text-[10px] text-white">
                     {joinRequests.length}
@@ -293,7 +292,7 @@ function GroupDetailContent() {
           <TabsContent value="members" className="mt-6">
             <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] p-4">
               <h3 className="font-semibold text-[var(--chat-text)] mb-4">
-                Group Members
+                Membres du groupe
               </h3>
               <GroupMembers
                 members={members.map((m: any) => ({
@@ -319,7 +318,7 @@ function GroupDetailContent() {
             <TabsContent value="requests" className="mt-6">
               <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] p-4">
                 <h3 className="font-semibold text-[var(--chat-text)] mb-4">
-                  Pending Join Requests
+                  Demandes d'adhésion en attente
                 </h3>
                 {requestsLoading ? (
                   <div className="space-y-4">
@@ -328,7 +327,7 @@ function GroupDetailContent() {
                   </div>
                 ) : joinRequests.length === 0 ? (
                   <div className="text-center py-8 text-[var(--chat-textMuted)]">
-                    No pending join requests.
+                    Aucune demande d'adhésion en attente.
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -347,7 +346,7 @@ function GroupDetailContent() {
                               onClick={() => handleAcceptRequest(req.id, requesterId)}
                               disabled={addMemberMutation.isPending}
                             >
-                              Accept
+                              Accepter
                             </Button>
                             <Button
                               size="sm"
@@ -355,7 +354,7 @@ function GroupDetailContent() {
                               className="text-[var(--chat-error)]"
                               onClick={() => deleteNotificationMutation.mutate({ notificationId: req.id, userId: user?.id || "" })}
                             >
-                              Ignore
+                              Ignorer
                             </Button>
                           </div>
                         </div>

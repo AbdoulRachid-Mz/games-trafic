@@ -4,6 +4,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useCallback, useMemo } from "react";
 import { getConversationsForUser } from "@/actions/messages";
+import { useMarkConversationAsRead } from "@/hooks/use-messages";
 import type { Conversation, ConversationFilter, ChatId } from "@/types/chat";
 import {
   sortConversationsByTime,
@@ -121,14 +122,15 @@ export function useConversations(userId: string | undefined) {
   /**
    * Mark conversation as read
    */
+  const markAsReadMutation = useMarkConversationAsRead();
   const markAsRead = useCallback(
     (chatId: ChatId) => {
+      if (!userId) return;
+      
       updateConversation(chatId, { unreadCount: 0 });
-
-      // TODO: Call API to mark messages as read
-      // await markConversationAsRead(userId, chatId);
+      markAsReadMutation.mutate({ chatId, userId });
     },
-    [updateConversation],
+    [updateConversation, userId, markAsReadMutation],
   );
 
   /**

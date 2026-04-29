@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { authClient } from '@/lib/auth-client';
 import { toast } from 'sonner';
 import type { 
   MessageFilters, 
   ListQuery, 
   PaginationResponse 
 } from '@/types/api';
-import { getMessageById, getMessages, getConversation, getGroupMessages, getUnreadMessages, countUnreadMessages, getMessageStats, createMessage, updateMessage, deleteMessage, restoreMessage, markMessageAsRead, markMessagesAsRead, replyToMessage } from '@/actions/messages';
+import { getMessageById, getMessages, getConversation, getGroupMessages, getUnreadMessages, countUnreadMessages, getMessageStats, createMessage, updateMessage, deleteMessage, restoreMessage, markMessageAsRead, markMessagesAsRead, markConversationAsRead, replyToMessage } from '@/actions/messages';
 import React from 'react';
 import { MessageWithRelations, NewMessage } from '@/database/schema';
 
@@ -334,27 +335,14 @@ export function useMarkMessageAsRead() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: markMessageAsRead,
+    mutationFn: ({ id, userId }: { id: string; userId: string }) => 
+      markMessageAsRead(id, userId),
     onSuccess: (updatedMessage) => {
       // Update the message in cache
       queryClient.setQueryData(messageKeys.detail(updatedMessage.id), updatedMessage);
       
-      // Invalidate unread counts for the recipient
-      if (updatedMessage.recipientId) {
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.unreadCount(updatedMessage.recipientId) 
-        });
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.unread(updatedMessage.recipientId) 
-        });
-      }
-      
-      // Invalidate conversation
-      if (updatedMessage.recipientId && updatedMessage.senderId) {
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.conversation(updatedMessage.senderId, updatedMessage.recipientId) 
-        });
-      }
+      // Invalidate all related queries to update unread counts and status
+      queryClient.invalidateQueries({ queryKey: messageKeys.all });
     },
     onError: (error) => {
       console.error('Failed to mark message as read:', error);
@@ -369,21 +357,36 @@ export function useMarkMessagesAsRead() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: markMessagesAsRead,
-    onSuccess: (count, messageIds) => {
+    mutationFn: ({ messageIds, userId }: { messageIds: string[]; userId: string }) => 
+      markMessagesAsRead(messageIds, userId),
+    onSuccess: (count) => {
       if (count > 0) {
         // Invalidate all related queries
-        queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
-        
-        // We need to invalidate unread counts for all affected users
-        // This is a bit tricky without knowing the recipients, so we invalidate all
         queryClient.invalidateQueries({ queryKey: messageKeys.all });
-        
-        toast.success(`${count} messages marked as read`);
       }
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Failed to mark messages as read');
+    },
+  });
+}
+
+/**
+ * Hook to mark an entire conversation as read
+ */
+export function useMarkConversationAsRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ chatId, userId }: { chatId: string; userId: string }) => 
+      markConversationAsRead(chatId, userId),
+    onSuccess: () => {
+      // Invalidate all related queries to update conversation list and messages
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: messageKeys.all });
+    },
+    onError: (error) => {
+      console.error('Failed to mark conversation as read:', error);
     },
   });
 }
@@ -500,32 +503,42 @@ export function useOptimisticSendMessage() {
  */
 export function useOptimisticMarkAsRead() {
   const queryClient = useQueryClient();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id;
 
   return useMutation({
-    mutationFn: markMessageAsRead,
+    mutationFn: (messageId: string) => {
+      if (!userId) throw new Error("User not logged in");
+      return markMessageAsRead(messageId, userId);
+    },
     onMutate: async (messageId) => {
       // Cancel related queries
       await queryClient.cancelQueries({ queryKey: messageKeys.detail(messageId) });
-      await queryClient.cancelQueries({ queryKey: messageKeys.unreadCount(messageId) });
-
+      
       // Snapshot previous states
-      const previousMessage = queryClient.getQueryData(messageKeys.detail(messageId));
-      const previousUnreadCount = queryClient.getQueryData(
-        messageKeys.unreadCount(messageId)
+      const previousMessage = queryClient.getQueryData<MessageWithRelations>(messageKeys.detail(messageId));
+      const previousUnreadCount = queryClient.getQueryData<number>(
+        messageKeys.unreadCount(userId || '')
       );
 
       // Optimistically update the message
-      queryClient.setQueryData(messageKeys.detail(messageId), (old: any) => {
-        if (!old) return old;
-        return { ...old, read: true };
-      });
+      if (userId) {
+        queryClient.setQueryData(messageKeys.detail(messageId), (old: any) => {
+          if (!old) return old;
+          const currentReadBy = old.readBy || [];
+          if (!currentReadBy.includes(userId)) {
+            return { ...old, readBy: [...currentReadBy, userId] };
+          }
+          return old;
+        });
 
-      // Optimistically decrement unread count
-      if (previousUnreadCount && typeof previousUnreadCount === 'number') {
-        queryClient.setQueryData(
-          messageKeys.unreadCount(messageId),
-          Math.max(0, previousUnreadCount - 1)
-        );
+        // Optimistically decrement unread count
+        if (typeof previousUnreadCount === 'number') {
+          queryClient.setQueryData(
+            messageKeys.unreadCount(userId),
+            Math.max(0, previousUnreadCount - 1)
+          );
+        }
       }
 
       return { previousMessage, previousUnreadCount };
@@ -535,9 +548,9 @@ export function useOptimisticMarkAsRead() {
       if (context?.previousMessage) {
         queryClient.setQueryData(messageKeys.detail(_variables), context.previousMessage);
       }
-      if (context?.previousUnreadCount !== undefined) {
+      if (userId && context?.previousUnreadCount !== undefined) {
         queryClient.setQueryData(
-          messageKeys.unreadCount(_variables),
+          messageKeys.unreadCount(userId),
           context.previousUnreadCount
         );
       }
@@ -546,7 +559,9 @@ export function useOptimisticMarkAsRead() {
       // Always refetch to ensure consistency
       if (messageId && typeof messageId === 'string') {
         queryClient.invalidateQueries({ queryKey: messageKeys.detail(messageId) });
-        queryClient.invalidateQueries({ queryKey: messageKeys.unreadCount(messageId) });
+        if (userId) {
+          queryClient.invalidateQueries({ queryKey: messageKeys.unreadCount(userId) });
+        }
       }
     },
   });
@@ -845,8 +860,8 @@ export function useMemoizedMessages(messages: MessageWithRelations[] = []) {
       // Get unique senders
       uniqueSenders: Array.from(new Set(messages.map(m => m.senderId))),
 
-      // Filter unread messages
-      unread: messages.filter(m => !m.read && m.recipientId),
+      // Filter unread messages (generic: not read by anyone)
+      unread: messages.filter(m => (!m.readBy || m.readBy.length === 0) && m.recipientId),
 
       // Sort by creation date (newest first)
       sorted: [...messages].sort((a, b) => 

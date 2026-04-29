@@ -53,6 +53,8 @@ interface GameClipReelProps {
   onBookmark?: (clipId: string) => void;
   onShare?: (clipId: string) => void;
   className?: string;
+  onReshuffle?: () => void;  // NOUVEAU: callback pour reshuffle
+  isReshuffling?: boolean;    // NOUVEAU: état de reshuffle
 }
 
 // Individual clip wrapper component for intersection observer
@@ -148,6 +150,8 @@ export function GameClipReel({
   onLike,
   onBookmark,
   onShare,
+  onReshuffle,      // NOUVEAU
+  isReshuffling = false, // NOUVEAU
   className,
 }: GameClipReelProps) {
   const router = useRouter();
@@ -155,7 +159,12 @@ export function GameClipReel({
   const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isReshuffling, setIsReshuffling] = useState(false);
+  const autoReshuffleTriggeredRef = useRef(false); // NOUVEAU: pour éviter les doubles déclenchements
+  
+  // Refs pour la détection de swipe
+  const touchStartRef = useRef<{ y: number; x: number } | null>(null);
+  const touchEndRef = useRef<{ y: number; x: number } | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
   
   // Sheet states
   const [commentsSheetOpen, setCommentsSheetOpen] = useState(false);
@@ -163,7 +172,7 @@ export function GameClipReel({
   const [bookmarksSheetOpen, setBookmarksSheetOpen] = useState(false);
   const [activeSheetClipId, setActiveSheetClipId] = useState<string | null>(null);
   
-  // Find initial index from initialClipId
+  // Find initial index
   const initialIndex = initialClipId
     ? clips.findIndex((c) => c.id === initialClipId)
     : 0;
@@ -190,13 +199,110 @@ export function GameClipReel({
       }
     },
     onEndReached: () => {
+      // Si on a plus de pages à charger, on charge
       if (hasNextPage && !isFetchingNextPage) {
         onFetchNextPage?.();
       }
     },
   });
   
-  // Scroll to current index when it changes (only from store, not from user scroll)
+  // NOUVEAU: Logique de rechargement automatique quand on approche de la fin
+  useEffect(() => {
+    // Ne pas déclencher si on est en train de reshuffle ou si on charge déjà
+    if (isReshuffling || isFetchingNextPage) {
+      autoReshuffleTriggeredRef.current = false;
+      return;
+    }
+    
+    // Déclencher le reshuffle quand on est à l'avant-dernier clip
+    // et qu'on a déjà essayé de charger plus mais qu'il n'y en a pas
+    const isNearEnd = currentIndex >= clips.length - 2;
+    const noMorePages = !hasNextPage;
+    const hasClips = clips.length > 0;
+    
+    if (isNearEnd && noMorePages && hasClips && !autoReshuffleTriggeredRef.current && onReshuffle) {
+      autoReshuffleTriggeredRef.current = true;
+      
+      // Petit délai pour éviter les déclenchements trop rapides
+      const timer = setTimeout(() => {
+        console.log("[Auto-reshuffle] Déclenchement automatique - fin des clips approchée");
+        onReshuffle();
+        autoReshuffleTriggeredRef.current = false;
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Réinitialiser le flag si on n'est plus proche de la fin
+    if (!isNearEnd) {
+      autoReshuffleTriggeredRef.current = false;
+    }
+  }, [currentIndex, clips.length, hasNextPage, isFetchingNextPage, isReshuffling, onReshuffle]);
+  
+  // Réinitialiser le flag de reshuffle automatique quand les clips changent
+  useEffect(() => {
+    autoReshuffleTriggeredRef.current = false;
+  }, [clips.length]);
+  
+  // Gestion des swipes tactiles
+  const SWIPE_THRESHOLD = 50;
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch) {
+      touchStartRef.current = {
+        y: touch.clientY,
+        x: touch.clientX,
+      };
+      touchEndRef.current = null;
+      setIsSwiping(false);
+    }
+  }, []);
+  
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.touches[0];
+    if (touch) {
+      const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+      const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+      
+      if (deltaY > 10 && deltaY > deltaX) {
+        setIsSwiping(true);
+      } else {
+        setIsSwiping(false);
+      }
+    }
+  }, []);
+  
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    if (touch) {
+      touchEndRef.current = {
+        y: touch.clientY,
+        x: touch.clientX,
+      };
+      
+      const deltaY = touchEndRef.current.y - touchStartRef.current.y;
+      const deltaX = Math.abs(touchEndRef.current.x - touchStartRef.current.x);
+      
+      if (Math.abs(deltaY) > SWIPE_THRESHOLD && Math.abs(deltaY) > deltaX) {
+        if (deltaY > 0) {
+          goPrev();
+        } else {
+          goNext();
+        }
+      }
+    }
+    
+    touchStartRef.current = null;
+    touchEndRef.current = null;
+    setIsSwiping(false);
+  }, [goPrev, goNext]);
+  
+  // Scroll to current index
   useEffect(() => {
     if (!containerRef.current || isScrollingRef.current || clips.length === 0) return;
     
@@ -209,7 +315,6 @@ export function GameClipReel({
       const targetTop = targetElement.offsetTop;
       const currentScroll = container.scrollTop;
       
-      // Only scroll if we're not already at the right position
       if (Math.abs(targetTop - currentScroll) > 10) {
         isScrollingRef.current = true;
         container.scrollTo({
@@ -217,7 +322,6 @@ export function GameClipReel({
           behavior: "smooth",
         });
         
-        // Clear scrolling flag after animation
         if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
           isScrollingRef.current = false;
@@ -226,7 +330,7 @@ export function GameClipReel({
     }
   }, [currentIndex, clips.length]);
   
-  // Handle visible clip from intersection observer
+  // Handle visible clip
   const handleClipVisible = useCallback(
     (index: number, isVisible: boolean) => {
       if (isVisible && !isScrollingRef.current) {
@@ -239,12 +343,11 @@ export function GameClipReel({
     [goToIndex]
   );
   
-  // Handle clip complete (end of media)
+  // Handle clip complete
   const handleComplete = useCallback(() => {
     if (playbackMode === "once") {
       goNext();
     }
-    // In manual and loop modes, the media controller handles it
   }, [playbackMode, goNext]);
   
   // Page visibility API
@@ -258,14 +361,14 @@ export function GameClipReel({
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [setGlobalPause]);
   
-  // Pause all clips when navigating away from /game-clips
+  // Pause on navigate away
   useEffect(() => {
     if (pathname && !pathname.startsWith("/game-clips")) {
       setGlobalPause(true);
     }
   }, [pathname, setGlobalPause]);
   
-  // Cleanup: pause on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       setGlobalPause(true);
@@ -275,7 +378,6 @@ export function GameClipReel({
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if focus is in an input
       if (
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "TEXTAREA"
@@ -324,36 +426,28 @@ export function GameClipReel({
     setActiveSheetClipId(clipId);
     setBookmarksSheetOpen(true);
   }, []);
-
-  // Shuffle function
-  const handleReshuffle = useCallback(() => {
-    setIsReshuffling(true);
-    reset();
-    
-    setTimeout(() => {
-      setIsReshuffling(false);
-      if (containerRef.current) {
-        containerRef.current.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    }, 600);
-  }, [reset]);
   
-  // Cleanup
+  // Cleanup scroll timeout
   useEffect(() => {
     return () => {
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, []);
   
-  const isAtEnd = currentIndex === clips.length - 1 && clips.length > 0;
-  const showReshuffle = !hasNextPage && isAtEnd && !isFetchingNextPage && !loading;
-  const activeClip = clips[currentIndex];
+  // NOUVEAU: Vérifier si on doit montrer le bouton de reshuffle
+  const showReshuffleButton = !hasNextPage && clips.length > 0 && !isFetchingNextPage && !loading;
+  // NOUVEAU: Vérifier si on est en train de reshuffle
+  const isCurrentlyReshuffling = isReshuffling || (onReshuffle && loading && clips.length === 0);
   
   return (
-    <div className={cn("relative h-screen w-full bg-black overflow-hidden", className)}>
+    <div 
+      className={cn("relative h-screen w-full bg-black overflow-hidden", className)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header Controls */}
       <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
-        {/* Back Button */}
         <button
           onClick={() => router.back()}
           className="bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
@@ -361,7 +455,6 @@ export function GameClipReel({
           <ArrowLeft className="h-5 w-5" />
         </button>
         
-        {/* Playback Mode Toggle */}
         <div className="flex gap-0.5 bg-black/40 backdrop-blur-md rounded-full p-0.5 border border-white/10">
           {(["manual", "once", "loop"] as const).map((mode) => (
             <button
@@ -388,8 +481,8 @@ export function GameClipReel({
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
       
-      {/* Clip Counter with Circular Progress */}
-      {clips.length > 0 && (
+      {/* Clip Counter */}
+      {clips.length > 0 && !isCurrentlyReshuffling && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50">
           <CircularProgress
             value={((currentIndex + 1) / clips.length) * 100}
@@ -444,11 +537,11 @@ export function GameClipReel({
           </div>
         )}
         
-        {/* End of Feed / Reshuffle */}
-        {showReshuffle && !isReshuffling && clips.length > 0 && (
+        {/* End of Feed - Bouton de reshuffle (apparaît quand plus de clips) */}
+        {showReshuffleButton && !isCurrentlyReshuffling && clips.length > 0 && (
           <div className="h-screen w-full flex items-center justify-center snap-start bg-gradient-to-b from-black to-zinc-900">
             <motion.button
-              onClick={handleReshuffle}
+              onClick={onReshuffle}
               className="group flex flex-col items-center gap-4 p-8 rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 transition-all"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -467,26 +560,34 @@ export function GameClipReel({
           </div>
         )}
         
-        {/* Reshuffling State */}
-        {isReshuffling && (
+        {/* État de reshuffle en cours */}
+        {isCurrentlyReshuffling && clips.length === 0 && (
           <div className="h-screen w-full flex items-center justify-center snap-start bg-black">
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-4">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
               >
-                <RefreshCw className="h-8 w-8 text-white/60" />
+                <RefreshCw className="h-10 w-10 text-white/60" />
               </motion.div>
-              <span className="text-xs text-white/40 uppercase tracking-wider font-bold">
-                Rechargement...
-              </span>
+              <div className="text-center">
+                <p className="text-sm font-medium text-white/60">Rechargement des clips...</p>
+                <p className="text-xs text-white/30 mt-1">Nouveaux contenus bientôt</p>
+              </div>
+              <div className="w-32 h-[2px] bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-primary to-purple-500"
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
+              </div>
             </div>
           </div>
         )}
       </div>
       
       {/* Empty State */}
-      {!loading && clips.length === 0 && (
+      {!loading && !isCurrentlyReshuffling && clips.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black p-6 text-center z-50">
           <div className="text-6xl mb-4 opacity-20">🎬</div>
           <h2 className="text-xl font-bold mb-2">Pas encore de clips</h2>
@@ -503,7 +604,7 @@ export function GameClipReel({
       )}
       
       {/* Initial Loading State */}
-      {loading && clips.length === 0 && (
+      {loading && clips.length === 0 && !isCurrentlyReshuffling && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-50">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-white/40" />
@@ -519,38 +620,32 @@ export function GameClipReel({
         </div>
       )}
       
-      {/* Comments Sheet */}
+      {/* Sheets */}
       {activeSheetClipId && (
-        <CommentsSheet
-          open={commentsSheetOpen}
-          onOpenChange={setCommentsSheetOpen}
-          entityId={activeSheetClipId}
-          entityType="GAMECLIP"
-        />
-      )}
-      
-      {/* Likes Sheet */}
-      {activeSheetClipId && (
-        <InteractionSheet
-          open={likesSheetOpen}
-          onOpenChange={setLikesSheetOpen}
-          entityId={activeSheetClipId}
-          entityType="GAMECLIP"
-          interactionType="LIKE"
-          title="Likes"
-        />
-      )}
-      
-      {/* Bookmarks Sheet */}
-      {activeSheetClipId && (
-        <InteractionSheet
-          open={bookmarksSheetOpen}
-          onOpenChange={setBookmarksSheetOpen}
-          entityId={activeSheetClipId}
-          entityType="GAMECLIP"
-          interactionType="BOOKMARK"
-          title="Sauvegardes"
-        />
+        <>
+          <CommentsSheet
+            open={commentsSheetOpen}
+            onOpenChange={setCommentsSheetOpen}
+            entityId={activeSheetClipId}
+            entityType="GAMECLIP"
+          />
+          <InteractionSheet
+            open={likesSheetOpen}
+            onOpenChange={setLikesSheetOpen}
+            entityId={activeSheetClipId}
+            entityType="GAMECLIP"
+            interactionType="LIKE"
+            title="Likes"
+          />
+          <InteractionSheet
+            open={bookmarksSheetOpen}
+            onOpenChange={setBookmarksSheetOpen}
+            entityId={activeSheetClipId}
+            entityType="GAMECLIP"
+            interactionType="BOOKMARK"
+            title="Sauvegardes"
+          />
+        </>
       )}
     </div>
   );

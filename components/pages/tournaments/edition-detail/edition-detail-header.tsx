@@ -19,6 +19,7 @@ import {
   Edit,
   Trash2,
   ChevronLeft,
+  MessageCircle,
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -114,6 +115,13 @@ export function EditionDetailHeader({
         ),
       disabled: false,
       requireOrganizer: true,
+    },
+    {
+      label: "Discuter",
+      icon: MessageCircle,
+      onClick: () => router.push(`/chats/tournament/${tournament.id}`),
+      disabled: false,
+      requireOrganizer: false,
     },
     {
       label: "Matchs",

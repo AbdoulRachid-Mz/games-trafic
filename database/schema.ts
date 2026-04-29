@@ -1727,7 +1727,7 @@ export const messages = pgTable('messages', {
   tournamentId: text('tournament_id').references(() => tournaments.id), // Ajouté pour la cohérence des relations
   productId: text('product_id').references(() => products.id), // Ajouté pour la cohérence des relations
   userId: text('user_id').references(() => users.id), // Ajouté pour la cohérence des relations
-
+  type: text('type').default('TEXT'), // TEXT, IMAGE, VIDEO, AUDIO, FILE
   content: text('content'),
   images: text('images').array().default([]),
   audioUrl: text('audio_url'),
@@ -1739,7 +1739,7 @@ export const messages = pgTable('messages', {
   entityType: entityTypeEnum('entity_type'),
   entityId: text('entity_id'),
 
-  read: boolean('read').default(false),
+  readBy: text('read_by').array().default([]),
   isActive: boolean('is_active').default(true),
   isDeleted: boolean('is_deleted').default(false),
   isOpenToPublic: boolean('is_open_to_public').default(false),
@@ -1749,7 +1749,8 @@ export const messages = pgTable('messages', {
 }, (table) => [
   index('messages_sender_idx').on(table.senderId),
   index('messages_recipient_idx').on(table.recipientId),
-  index('messages_entity_idx').on(table.entityId, table.entityType)
+  index('messages_entity_idx').on(table.entityId, table.entityType),
+  index('messages_created_at_idx').on(table.createdAt)
 ]);
 
 export const groups = pgTable('groups', {
@@ -1764,6 +1765,27 @@ export const groups = pgTable('groups', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+export const conversations = pgTable('conversations', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  chatId: text('chat_id').unique().notNull(), // Format "type:id"
+  participantIds: text('participant_ids').array().notNull().default([]),
+  entityType: entityTypeEnum('entity_type').notNull().default('USER'),
+  entityId: text('entity_id').notNull(),
+  lastMessageId: text('last_message_id').references(() => messages.id),
+  unreadCount: integer('unread_count').default(0), // Default, managed in code or via participation table
+  isPinned: boolean('is_pinned').default(false),
+  isMuted: boolean('is_muted').default(false),
+  isArchived: boolean('is_archived').default(false),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => [
+  index('conversations_participants_idx').on(table.participantIds),
+  index('conversations_entity_idx').on(table.entityId, table.entityType),
+  index('conversations_chat_id_idx').on(table.chatId),
+  index('conversations_updated_at_idx').on(table.updatedAt)
+]);
 
 export const groupMembers = pgTable('group_members', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -2293,6 +2315,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdThemes: many(themes, { relationName: 'created_themes' }),
   createdGroups: many(groups, { relationName: 'group_creator' }),
   groupMemberships: many(groupMembers),
+  conversations: many(conversations),
   sentTransactions: many(walletTransactions, { relationName: 'sent_transactions' }),
   receivedTransactions: many(walletTransactions, { relationName: 'received_transactions' }),
   tournamentMemberships: many(tournamentMembers),
@@ -2661,6 +2684,13 @@ export const groupsRelations = relations(groups, ({ one, many }) => ({
   }),
   members: many(groupMembers),
   messages: many(messages),
+}));
+
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  lastMessage: one(messages, {
+    fields: [conversations.lastMessageId],
+    references: [messages.id],
+  }),
 }));
 
 export const groupMembersRelations = relations(groupMembers, ({ one }) => ({
