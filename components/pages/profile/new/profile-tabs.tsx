@@ -15,7 +15,6 @@ import {
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CommentsSection } from "@/components/comments/comments-section";
 import { ProfileInfo } from "./profile-info";
 import type { UserWithAllRelations } from "@/actions/users";
 import { useInteractionsWithRelations } from "@/hooks/use-interactions";

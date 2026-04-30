@@ -6,6 +6,7 @@ import { type ProductFilters, type ListQuery, type PaginationResponse, type Quer
 import { db } from '@/lib/db';
 import { encryptData, decryptData } from '@/lib/encryption';
 import { getCurrentUser } from '@/lib/auth/session';
+import { createNotification } from '@/actions/notifications';
 import { cacheTag, cacheLife } from 'next/cache';
 import { revalidateTag } from 'next/cache';
 import {
@@ -315,6 +316,42 @@ export async function createProduct(productData: NewProduct): Promise<Product> {
 
     // Mise à jour du compteur de produits de la boutique
     await updateShopProductCount(productData.shopId);
+
+    // Notifier les followers de la boutique
+    try {
+      const followers = await db
+        .select({ userId: interactions.userId })
+        .from(interactions)
+        .where(and(
+          eq(interactions.entityId, productData.shopId),
+          eq(interactions.entityType, 'SHOP'),
+          eq(interactions.type, 'FOLLOW'),
+          eq(interactions.isDeleted, false)
+        ));
+
+      if (followers.length > 0) {
+        // Obtenir le nom de la boutique pour le message
+        const shop = await db.query.shops.findFirst({
+          where: (shops, { eq }) => eq(shops.id, productData.shopId),
+          columns: { name: true }
+        });
+
+        const shopName = shop?.name || "Une boutique que vous suivez";
+
+        await Promise.all(followers.map(follower => 
+          createNotification({
+            userId: follower.userId,
+            title: "Nouveau produit !",
+            message: `${shopName} a ajouté un nouveau produit : ${productData.name}`,
+            type: "SYSTEM",
+            linkUrl: `/marketplace/${result[0].id}`,
+            shopId: productData.shopId,
+          })
+        ));
+      }
+    } catch (notifError) {
+      console.error("Error sending notifications to followers:", notifError);
+    }
 
     revalidateTag('products', 'max');
     return result[0];

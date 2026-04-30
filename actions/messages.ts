@@ -95,24 +95,49 @@ export async function getConversationsForUser(
 ): Promise<Conversation[]> {
   try {
     // 1. Trouver toutes les conversations où l'utilisateur est participant
-    const userConversations = await db.query.conversations.findMany({
+    const userConversationsRaw = await db.query.conversations.findMany({
       where: (c, { sql }) => sql`${c.participantIds} @> ARRAY[${userId}]::text[]`,
       orderBy: (c, { desc }) => [desc(c.updatedAt)],
-      with: {
-        lastMessage: {
-          with: {
-            sender: {
-              columns: {
-                id: true,
-                username: true,
-                fullName: true,
-                profileImage: true,
-              },
-            },
-          },
-        },
-      },
     });
+
+    // Optimisation: récupérer les messages et utilisateurs séparément pour éviter les JOIN LATERAL massifs
+    const lastMessageIds = userConversationsRaw
+      .map(c => c.lastMessageId)
+      .filter(Boolean) as string[];
+
+    let lastMessagesMap = new Map<string, any>();
+    if (lastMessageIds.length > 0) {
+      const messagesData = await db.query.messages.findMany({
+        where: (m, { inArray }) => inArray(m.id, lastMessageIds),
+      });
+
+      const senderIds = messagesData.map(m => m.senderId).filter(Boolean) as string[];
+      let sendersMap = new Map<string, any>();
+      if (senderIds.length > 0) {
+        const sendersData = await db.query.users.findMany({
+          where: (u, { inArray }) => inArray(u.id, senderIds),
+          columns: {
+            id: true,
+            username: true,
+            fullName: true,
+            profileImage: true,
+          },
+        });
+        sendersData.forEach(s => sendersMap.set(s.id, s));
+      }
+
+      messagesData.forEach(m => {
+        lastMessagesMap.set(m.id, {
+          ...m,
+          sender: m.senderId ? sendersMap.get(m.senderId) : null,
+        });
+      });
+    }
+
+    const userConversations = userConversationsRaw.map(conv => ({
+      ...conv,
+      lastMessage: conv.lastMessageId ? lastMessagesMap.get(conv.lastMessageId) : null,
+    }));
 
     // 2. Enrichir chaque conversation avec les données de l'entité cible
     const enrichedConversations = await Promise.all(
@@ -144,9 +169,9 @@ export async function getConversationsForUser(
           entityData = await db.query.shops.findFirst({
             where: (s, { eq }) => eq(s.id, conv.entityId),
           });
-        } else if (conv.entityType === "PRODUCT") {
-          entityData = await db.query.products.findFirst({
-            where: (p, { eq }) => eq(p.id, conv.entityId),
+        } else if (conv.entityType === "TOURNAMENT") {
+          entityData = await db.query.tournaments.findFirst({
+            where: (t, { eq }) => eq(t.id, conv.entityId),
           });
         }
 

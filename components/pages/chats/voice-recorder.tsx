@@ -7,14 +7,60 @@ import { Trash2, Send, Mic, Pause, Play, StopCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoiceRecorderProps {
-  onSend: (audioUrl: string) => void;
+  onSend: (audioFile: File) => void;
   onCancel: () => void;
 }
 
 export function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
-  const [isRecording, setIsRecording] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Démarrer l'enregistrement à l'ouverture
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    const startRecording = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        chunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            chunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          const file = new File([blob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+          setAudioFile(file);
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error("Erreur d'accès au micro:", err);
+        onCancel();
+      }
+    };
+
+    startRecording();
+
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isRecording) {
@@ -24,10 +70,6 @@ export function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
   }, [isRecording]);
 
   const formatDuration = (seconds: number) => {
@@ -37,12 +79,17 @@ export function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
   };
 
   const handleStop = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+    }
     setIsRecording(false);
   };
 
   const handleSend = () => {
-    // Simulate audio URL
-    onSend("https://example.com/audio-placeholder.mp3");
+    if (audioFile) {
+      onSend(audioFile);
+    }
   };
 
   return (
@@ -95,6 +142,7 @@ export function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
       ) : (
         <Button
           onClick={handleSend}
+          disabled={!audioFile}
           className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] rounded-full h-10 w-10 p-0"
         >
           <Send className="h-5 w-5 ml-0.5 text-white" />

@@ -89,6 +89,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { cacheTag, cacheLife } from "next/cache";
 import { revalidateTag } from "next/cache";
+import { createNotification } from "@/actions/notifications";
 import {
   type TournamentCard,
   type TournamentStats,
@@ -731,7 +732,7 @@ export async function createTournamentEdition(
       throw new Error("tournamentId, editionNumber and startDate are required");
     }
 
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // 1. Create Financial Account for Edition (Prize Pool)
       const [account] = await tx
         .insert(financialAccounts)
@@ -763,6 +764,48 @@ export async function createTournamentEdition(
 
       return newEdition;
     });
+
+    // Notifier les followers du tournoi
+    try {
+      const followers = await db
+        .select({ userId: interactions.userId })
+        .from(interactions)
+        .where(
+          and(
+            eq(interactions.entityId, editionData.tournamentId),
+            eq(interactions.entityType, "TOURNAMENT"),
+            eq(interactions.type, "FOLLOW"),
+            eq(interactions.isDeleted, false),
+          ),
+        );
+
+      if (followers.length > 0) {
+        const tournament = await db.query.tournaments.findFirst({
+          where: (tournaments, { eq }) =>
+            eq(tournaments.id, editionData.tournamentId),
+          columns: { name: true },
+        });
+
+        const tournamentName = tournament?.name || "Un tournoi que vous suivez";
+
+        await Promise.all(
+          followers.map((follower) =>
+            createNotification({
+              userId: follower.userId,
+              title: "Nouvelle édition !",
+              message: `${tournamentName} a lancé une nouvelle édition : ${editionData.name || `Édition #${editionData.editionNumber}`}`,
+              type: "SYSTEM",
+              linkUrl: `/tournaments/${editionData.tournamentId}/editions/${result.id}`,
+              tournamentId: editionData.tournamentId,
+            }),
+          ),
+        );
+      }
+    } catch (notifError) {
+      console.error("Error sending notifications to followers:", notifError);
+    }
+
+    return result;
   } catch (error) {
     console.error("Error creating tournament edition:", error);
     if (error instanceof Error) {

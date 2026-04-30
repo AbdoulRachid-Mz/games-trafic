@@ -27,7 +27,7 @@ interface ThemeSelectorProps {
 }
 
 export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
-  const { settings, currentTheme, setTheme, isDark, toggleDarkMode } =
+  const { settings, currentTheme, setTheme, isDark, toggleDarkMode, updateSetting } =
     useChatThemeContext();
   const [previewTheme, setPreviewTheme] = useState<ChatThemePreset | null>(
     null
@@ -60,7 +60,7 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="max-md:w-[95%]  h-full overflow-y-auto">
+      <SheetContent side="right" className="max-md:w-[95%] md:max-w-[60%] h-full overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5" />
@@ -78,6 +78,17 @@ export function ThemeSelector({ open, onOpenChange }: ThemeSelectorProps) {
               <div className="flex items-center justify-between">
                 <Label>Mode Sombre</Label>
                 <Switch checked={isDark} onCheckedChange={toggleDarkMode} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <Label>Téléchargement Auto</Label>
+                  <span className="text-[10px] text-[var(--chat-textMuted)]">Médias (Images, Audios)</span>
+                </div>
+                <Switch 
+                  checked={settings.autoDownloadMedia ?? true} 
+                  onCheckedChange={(checked) => updateSetting("autoDownloadMedia", checked)} 
+                />
               </div>
 
               <div

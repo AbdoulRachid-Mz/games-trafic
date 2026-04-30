@@ -22,6 +22,12 @@ export const shopOverviewItems = [
     icon: LayoutDashboard,
     description: "Vue d'ensemble de la boutique",
   },
+  {
+    title: "Clients",
+    url: "/shops/[shopId]/dashboard/clients",
+    icon: Users,
+    description: "Gérer vos clients",
+  },
 ];
 
 export const shopProductItems = [

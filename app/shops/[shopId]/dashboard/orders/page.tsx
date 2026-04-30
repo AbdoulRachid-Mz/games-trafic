@@ -236,8 +236,13 @@ export default function ShopOrdersPage() {
                       <StatusBadge status={o.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => setSelectedOrder(o)}>
-                        Approuver/Rejeter
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setSelectedOrder(o)}
+                        disabled={['COMPLETED', 'REJECTED_BY_ADMIN', 'REJECTED_BY_SHOP', 'CANCELLED'].includes(o.status)}
+                      >
+                        {['COMPLETED', 'REJECTED_BY_ADMIN', 'REJECTED_BY_SHOP', 'CANCELLED'].includes(o.status) ? "Traité" : "Gérer"}
                       </Button>
                     </TableCell>
                   </TableRow>

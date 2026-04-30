@@ -139,7 +139,7 @@ const TopMiddle = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full hover:bg-primary/10"
+                className="rounded-full flex items-center justify-center hover:bg-primary/10"
                 onClick={onToggleSidebar}
               >
                 <AlignLeftIcon size={24} className="h-5 w-5" />

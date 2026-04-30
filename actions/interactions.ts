@@ -13,6 +13,7 @@ import {
   messages,
   themes,
   PaginationParams,
+  viewers,
 } from "@/database/schema";
 import {
   eq,
@@ -852,4 +853,61 @@ function buildInteractionWhereConditions(
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+/**
+ * Enregistre une vue sur une entité (insère dans viewers et incrémente le viewCount si nécessaire)
+ */
+export async function recordEntityView(
+  entityId: string,
+  entityType: any,
+  userId?: string | null,
+  sessionId?: string | null,
+  ipAddress?: string | null,
+  userAgent?: string | null
+): Promise<void> {
+  try {
+    // 1. Enregistrer la vue dans la table viewers
+    await db.insert(viewers).values({
+      entityId,
+      entityType,
+      userId: userId || null,
+      sessionId: sessionId || null,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+      viewedAt: new Date(),
+    });
+
+    // 2. Incrémenter le viewCount sur l'entité correspondante
+    switch (entityType) {
+      case "SHOP":
+        await db
+          .update(shops)
+          .set({ viewCount: sql`${shops.viewCount} + 1` })
+          .where(eq(shops.id, entityId));
+        break;
+      case "PRODUCT":
+        await db
+          .update(products)
+          .set({ viewCount: sql`${products.viewCount} + 1` })
+          .where(eq(products.id, entityId));
+        break;
+      case "TOURNAMENT":
+        await db
+          .update(tournaments)
+          .set({ viewCount: sql`${tournaments.viewCount} + 1` })
+          .where(eq(tournaments.id, entityId));
+        break;
+      // case "POST":
+      //   await db
+      //     .update(posts)
+      //     .set({ viewCount: sql`${posts.viewCount} + 1` })
+      //     .where(eq(posts.id, entityId));
+      //   break;
+      // Add other entities here if they have viewCount
+    }
+  } catch (error) {
+    console.error("Error recording entity view:", error);
+    // On ne jette pas l'erreur pour ne pas bloquer le chargement principal
+  }
 }

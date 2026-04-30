@@ -181,6 +181,7 @@ export interface ChatSettings {
   showTypingIndicators: boolean;
   showReadReceipts: boolean;
   compressImages: boolean;
+  autoDownloadMedia: boolean;
 }
 
 /**

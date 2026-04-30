@@ -9,6 +9,7 @@ import {
   getThemeVariant,
   DEFAULT_CHAT_SETTINGS 
 } from '@/config/chat-themes';
+import { useTheme } from 'next-themes';
 
 const STORAGE_KEY = 'chat-settings';
 
@@ -35,6 +36,18 @@ export function useChatTheme() {
 
     return DEFAULT_CHAT_SETTINGS;
   });
+
+  const { resolvedTheme } = useTheme();
+
+  // Sync with global theme
+  useEffect(() => {
+    if (resolvedTheme === 'dark' || resolvedTheme === 'light') {
+      const isDark = resolvedTheme === 'dark';
+      if (settings.darkMode !== isDark) {
+        setSettings((prev) => ({ ...prev, darkMode: isDark }));
+      }
+    }
+  }, [resolvedTheme]);
 
   // Get current theme based on settings
   const currentTheme = useMemo<ChatTheme>(() => {

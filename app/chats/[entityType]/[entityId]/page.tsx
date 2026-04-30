@@ -10,12 +10,17 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { useChatContext } from "@/contexts/chat-context";
 import { useGroupById, useGroupMemberByUserAndGroup } from "@/hooks/use-groupes";
 import { useUserById } from "@/hooks/use-users";
+import { useShopById } from "@/hooks/use-shops";
+import { useTournamentById } from "@/hooks/use-tournaments";
 import {
   useGroupMessages,
   useConversation,
+  useEntityMessages,
   useCreateMessage,
   useMarkMessageAsRead,
+  useDeleteMessage,
 } from "@/hooks/use-messages";
+import { useToggleInteraction } from "@/hooks/use-interactions";
 import type { ChatId, ChatMessage, Conversation, ChatEntityType } from "@/types/chat";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +28,7 @@ import { JoinGroupDialog } from "@/components/pages/chats/join-group-dialog";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
 
-const VALID_ENTITY_TYPES: ChatEntityType[] = ["user", "group", "shop", "product", "post", "tournament"];
+const VALID_ENTITY_TYPES: ChatEntityType[] = ["user", "group", "shop", "tournament"];
 
 export default function ChatConversationPage() {
   const params = useParams();
@@ -39,6 +44,8 @@ export default function ChatConversationPage() {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
   const entityType = params.entityType as ChatEntityType;
   const entityId = params.entityId as string;
@@ -64,6 +71,12 @@ export default function ChatConversationPage() {
   );
   const { data: userData, isLoading: isLoadingUser } = useUserById(
     !isGroup && entityType === "user" ? entityId : undefined
+  );
+  const { data: shopData, isLoading: isLoadingShop } = useShopById(
+    entityType === "shop" ? entityId : undefined
+  );
+  const { data: tournamentData, isLoading: isLoadingTournament } = useTournamentById(
+    entityType === "tournament" ? entityId : ""
   );
 
   // Check group membership for private groups
@@ -96,21 +109,43 @@ export default function ChatConversationPage() {
     Boolean(!isGroup && entityType === "user" && !!user)
   );
 
+  const {
+    data: entityMessagesData,
+    isLoading: isLoadingEntityMessages,
+    refetch: refetchEntityMessages,
+  } = useEntityMessages(
+    entityType,
+    entityId,
+    undefined,
+    Boolean(entityType === "shop" || entityType === "tournament")
+  );
+
   const isLoading =
     isLoadingGroup ||
     isLoadingUser ||
+    isLoadingShop ||
+    isLoadingTournament ||
     isLoadingGroupMessages ||
     isLoadingDmMessages ||
+    isLoadingEntityMessages ||
     Boolean(isGroup && isLoadingMembership);
-  
+
   const messages = isGroup
     ? groupMessagesData?.data || []
-    : dmMessagesData?.data || [];
+    : entityType === "user"
+      ? dmMessagesData?.data || []
+      : entityMessagesData?.data || [];
 
-  const refetch = isGroup ? refetchGroupMessages : refetchDmMessages;
+  const refetch = isGroup
+    ? refetchGroupMessages
+    : entityType === "user"
+      ? refetchDmMessages
+      : refetchEntityMessages;
 
   const createMessageMutation = useCreateMessage();
   const markAsReadMutation = useMarkMessageAsRead();
+  const deleteMessageMutation = useDeleteMessage();
+  const toggleInteractionMutation = useToggleInteraction();
 
   // Get typing indicators for this chat
   useEffect(() => {
@@ -205,6 +240,51 @@ export default function ChatConversationPage() {
     setReplyTo(null);
   }, []);
 
+  const handleDeleteMessage = useCallback(
+    (messageId: string) => {
+      deleteMessageMutation.mutate(messageId);
+    },
+    [deleteMessageMutation]
+  );
+
+  const handleLikeMessage = useCallback(
+    (messageId: string) => {
+      if (!user) {
+        toast.error("Vous devez être connecté pour aimer un message");
+        return;
+      }
+      // Optimistic update
+      setLikedMessageIds((prev) => {
+        const next = new Set(prev);
+        const isLiked = next.has(messageId);
+        if (isLiked) {
+          next.delete(messageId);
+        } else {
+          next.add(messageId);
+        }
+        
+        // Update local counts
+        setLikeCounts((prevCounts) => {
+          const currentCount = prevCounts[messageId] || 0;
+          return {
+            ...prevCounts,
+            [messageId]: isLiked ? Math.max(0, currentCount - 1) : currentCount + 1,
+          };
+        });
+        
+        return next;
+      });
+
+      toggleInteractionMutation.mutate({
+        userId: user.id,
+        entityId: messageId,
+        entityType: "MESSAGE",
+        type: "LIKE",
+      });
+    },
+    [user, toggleInteractionMutation]
+  );
+
   const handleViewDetails = useCallback(() => {
     if (isGroup) {
       router.push(`/chats/groups/${entityId}`);
@@ -212,6 +292,16 @@ export default function ChatConversationPage() {
       router.push(`/profile/${entityId}`);
     }
   }, [router, isGroup, entityId]);
+
+  const getEntityData = () => {
+    switch (entityType) {
+      case "group": return groupData;
+      case "user": return userData;
+      case "shop": return shopData;
+      case "tournament": return tournamentData;
+      default: return null;
+    }
+  };
 
   const conversation: Conversation = activeConversation || {
     id: chatId,
@@ -221,7 +311,7 @@ export default function ChatConversationPage() {
     unreadCount: 0,
     entity: {
       type: entityType,
-      data: (isGroup ? groupData : userData) as any,
+      data: getEntityData() as any,
     },
     lastMessage: null,
     lastMessageTime: null,
@@ -245,15 +335,17 @@ export default function ChatConversationPage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--chat-background)] relative">
-      <ChatHeader
-        conversation={conversation}
-        onlineStatus={onlineStatus}
-        onViewDetails={handleViewDetails}
-        onMute={() => toast.info("Le mode silencieux arrive bientôt")}
-        onBlock={() => toast.info("Le blocage arrive bientôt")}
-        onDelete={() => toast.info("La suppression arrive bientôt")}
-      />
+    <div className="absolute inset-0 flex flex-col bg-[var(--chat-background)] overflow-hidden z-10">
+      <div className="flex-none z-10 bg-[var(--chat-background)] border-b border-[var(--chat-border)] shadow-sm">
+        <ChatHeader
+          conversation={conversation}
+          onlineStatus={onlineStatus}
+          onViewDetails={handleViewDetails}
+          onMute={() => toast.info("Le mode silencieux arrive bientôt")}
+          onBlock={() => toast.info("Le blocage arrive bientôt")}
+          onDelete={() => toast.info("La suppression arrive bientôt")}
+        />
+      </div>
 
       {isGroup && groupData?.isPrivate && !membership ? (
         <div className="flex-1 flex items-center justify-center p-6 text-center">
@@ -276,17 +368,23 @@ export default function ChatConversationPage() {
           isLoading={isLoading}
           typingUsers={typingUsers}
           onReply={handleReply}
-          className="flex-1"
+          onDelete={handleDeleteMessage}
+          onLike={handleLikeMessage}
+          likedMessageIds={likedMessageIds}
+          likeCounts={likeCounts}
+          className="flex-1 relative z-0"
         />
       )}
 
-      <MessageInput
-        user={user}
-        onSendMessage={handleSendMessage}
-        replyTo={replyTo}
-        onCancelReply={handleCancelReply}
-        disabled={!user || (isGroup && (groupData?.isPrivate ?? false) && !membership)}
-      />
+      <div className="flex-none z-10 bg-[var(--chat-background)] border-t border-[var(--chat-border)] pb-safe">
+        <MessageInput
+          user={user}
+          onSendMessage={handleSendMessage}
+          replyTo={replyTo}
+          onCancelReply={handleCancelReply}
+          disabled={!user || (isGroup && (groupData?.isPrivate ?? false) && !membership)}
+        />
+      </div>
 
       {isGroup && groupData && user && (
         <JoinGroupDialog

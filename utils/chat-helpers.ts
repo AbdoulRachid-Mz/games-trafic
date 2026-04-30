@@ -1,13 +1,15 @@
 // utils/chat-helpers.ts
-import type { ChatMessage, Conversation } from '@/types/chat';
-import type { Message } from '@/database/schema';
+import type { ChatMessage, Conversation } from "@/types/chat";
+import type { Message } from "@/database/schema";
 
 /**
  * Group messages by date for display
  * @param messages - Array of messages
  * @returns Messages grouped by date
  */
-export function groupMessagesByDate(messages: ChatMessage[]): Map<string, ChatMessage[]> {
+export function groupMessagesByDate(
+  messages: ChatMessage[],
+): Map<string, ChatMessage[]> {
   const grouped = new Map<string, ChatMessage[]>();
 
   messages.forEach((message) => {
@@ -33,18 +35,18 @@ export function getLastMessagePreview(conversation: Conversation): string {
   const lastMessage = conversation.lastMessage;
 
   if (!lastMessage) {
-    return 'Aucun message';
+    return "Aucun message";
   }
 
   // Handle images
   if (lastMessage.images && lastMessage.images.length > 0) {
     const count = lastMessage.images.length;
-    return count === 1 ? '📷 Photo' : `📷 ${count} Photos`;
+    return count === 1 ? "📷 Photo" : `📷 ${count} Photos`;
   }
 
   // Handle audio
   if (lastMessage.audioUrl) {
-    return '🎤 Message vocal';
+    return "🎤 Message vocal";
   }
 
   // Handle text
@@ -54,7 +56,7 @@ export function getLastMessagePreview(conversation: Conversation): string {
       : lastMessage.content;
   }
 
-  return 'Message';
+  return "Message";
 }
 
 /**
@@ -65,7 +67,10 @@ export function getLastMessagePreview(conversation: Conversation): string {
  */
 export function getUnreadCount(messages: Message[], userId: string): number {
   return messages.filter(
-    (msg) => msg.recipientId === userId && !(msg.readBy?.includes(userId)) && !msg.isDeleted
+    (msg) =>
+      msg.recipientId === userId &&
+      !msg.readBy?.includes(userId) &&
+      !msg.isDeleted,
   ).length;
 }
 
@@ -74,7 +79,9 @@ export function getUnreadCount(messages: Message[], userId: string): number {
  * @param conversations - Array of conversations
  * @returns Sorted conversations
  */
-export function sortConversationsByTime(conversations: Conversation[]): Conversation[] {
+export function sortConversationsByTime(
+  conversations: Conversation[],
+): Conversation[] {
   return [...conversations].sort((a, b) => {
     const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
     const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
@@ -90,9 +97,9 @@ export function sortConversationsByTime(conversations: Conversation[]): Conversa
  */
 export function filterConversations(
   conversations: Conversation[],
-  query: string
+  query: string,
 ): Conversation[] {
-  if (!query || query.trim() === '') {
+  if (!query || query.trim() === "") {
     return conversations;
   }
 
@@ -125,18 +132,22 @@ export function getEntityName(conversation: Conversation): string {
   const { entity } = conversation;
 
   switch (entity.type) {
-    case 'user':
-      return entity.data.fullName || entity.data.username || 'Utilisateur inconnu';
-    case 'group':
-      return entity.data.name || 'Groupe sans nom';
-    case 'shop':
-      return entity.data.name || 'Boutique sans nom';
-    case 'product':
-      return entity.data.name || 'Produit sans nom';
-    case 'post':
-      return 'Publication';
+    case "user":
+      return (
+        entity.data?.fullName || entity.data?.username || "Utilisateur inconnu"
+      );
+    case "group":
+      return entity.data?.name || "Groupe sans nom";
+    case "shop":
+      return entity.data?.name || "Boutique sans nom";
+    case "product":
+      return entity.data?.name || "Produit sans nom";
+    case "tournament":
+      return entity.data?.name || "Tournoi sans nom";
+    case "post":
+      return "Publication";
     default:
-      return 'Inconnu';
+      return "Inconnu";
   }
 }
 
@@ -149,14 +160,16 @@ export function getEntityAvatar(conversation: Conversation): string | null {
   const { entity } = conversation;
 
   switch (entity.type) {
-    case 'user':
-      return entity.data.profileImage || null;
-    case 'group':
-      return entity.data.image || null;
-    case 'shop':
-      return entity.data.profileImage || null;
-    case 'product':
-      return entity.data.featuredImage || null;
+    case "user":
+      return entity.data?.profileImage || null;
+    case "group":
+      return entity.data?.image || null;
+    case "shop":
+      return entity.data?.profileImage || null;
+    case "product":
+      return entity.data?.featuredImage || null;
+    case "tournament":
+      return entity.data?.logo || null; // Adding tournament logo support
     default:
       return null;
   }
@@ -168,10 +181,10 @@ export function getEntityAvatar(conversation: Conversation): string | null {
  * @returns Initials (max 2 characters)
  */
 export function getInitials(name: string): string {
-  if (!name) return '?';
+  if (!name) return "?";
 
   const parts = name.trim().split(/\s+/);
-  
+
   if (parts.length === 1) {
     return parts[0].substring(0, 2).toUpperCase();
   }
@@ -200,14 +213,14 @@ export function isUserOnline(lastSeen: Date | null | undefined): boolean {
  * @returns Formatted string
  */
 export function formatLastSeen(lastSeen: Date | null | undefined): string {
-  if (!lastSeen) return 'Hors ligne';
+  if (!lastSeen) return "Hors ligne";
 
   const now = new Date();
   const diff = now.getTime() - new Date(lastSeen).getTime();
 
   // Less than 5 minutes - online
   if (diff < 5 * 60 * 1000) {
-    return 'En ligne';
+    return "En ligne";
   }
 
   // Less than 1 hour
@@ -228,7 +241,7 @@ export function formatLastSeen(lastSeen: Date | null | undefined): string {
     return `En ligne il y a ${days}j`;
   }
 
-  return 'En ligne il y a longtemps';
+  return "En ligne il y a longtemps";
 }
 
 /**
@@ -239,7 +252,7 @@ export function formatLastSeen(lastSeen: Date | null | undefined): string {
  */
 export function mergeMessages(
   existing: ChatMessage[],
-  newMessages: ChatMessage[]
+  newMessages: ChatMessage[],
 ): ChatMessage[] {
   const messageMap = new Map<string, ChatMessage>();
 
@@ -255,7 +268,9 @@ export function mergeMessages(
 
   // Convert back to array and sort by creation time
   return Array.from(messageMap.values()).sort(
-    (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    (a, b) =>
+      new Date(a.createdAt || 0).getTime() -
+      new Date(b.createdAt || 0).getTime(),
   );
 }
 
@@ -269,7 +284,7 @@ export function mergeMessages(
 export function shouldShowSenderName(
   message: ChatMessage,
   previousMessage: ChatMessage | null,
-  isGroup: boolean
+  isGroup: boolean,
 ): boolean {
   if (!isGroup) return false;
   if (!previousMessage) return true;
@@ -283,7 +298,7 @@ export function shouldShowSenderName(
   const timeDiff =
     new Date(message.createdAt || 0).getTime() -
     new Date(previousMessage.createdAt || 0).getTime();
-  
+
   return timeDiff > 5 * 60 * 1000;
 }
 
@@ -295,7 +310,7 @@ export function shouldShowSenderName(
  */
 export function shouldShowTimestamp(
   message: ChatMessage,
-  previousMessage: ChatMessage | null
+  previousMessage: ChatMessage | null,
 ): boolean {
   if (!previousMessage) return true;
 
@@ -313,7 +328,7 @@ export function shouldShowTimestamp(
  * @returns Formatted typing text
  */
 export function getTypingIndicatorText(typingUsers: string[]): string {
-  if (typingUsers.length === 0) return '';
+  if (typingUsers.length === 0) return "";
   if (typingUsers.length === 1) return `${typingUsers[0]} écrit...`;
   if (typingUsers.length === 2) {
     return `${typingUsers[0]} et ${typingUsers[1]} écrivent...`;
@@ -346,10 +361,10 @@ export function extractMentions(content: string): string[] {
  * @returns Content with highlighted mentions
  */
 export function highlightMentions(content: string): string {
-  if (!content) return '';
+  if (!content) return "";
 
   return content.replace(
     /@(\w+)/g,
-    '<span class="text-primary font-semibold">@$1</span>'
+    '<span class="text-primary font-semibold">@$1</span>',
   );
 }

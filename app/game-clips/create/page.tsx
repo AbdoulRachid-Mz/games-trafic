@@ -24,6 +24,7 @@ import { useGameClips } from "@/hooks/use-game-clips";
 // import { AdvancedVideoUpload } from "@/components/advanced-video-upload";
 import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
 import { AdvancedVideoUpload } from "@/components/ui/advanced-video-upload";
+import { GameVideoController } from "@/components/game-clips/game-video-controller";
 
 export default function GameClipCreatePage() {
   const router = useRouter();
@@ -33,6 +34,39 @@ export default function GameClipCreatePage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"video" | "images">("video");
   const [isFocused, setIsFocused] = useState(false);
+
+  // Video controller state
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      const current = videoRef.current.currentTime;
+      const total = videoRef.current.duration;
+      setProgress((current / total) * 100);
+    }
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+    }
+  }, []);
 
   const { isAuthenticated } = useAuthContext();
   const { createClip, isCreating } = useGameClips();
@@ -70,7 +104,7 @@ export default function GameClipCreatePage() {
   const isFormValid = hasContent && !isCreating;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0b] via-black to-[#0f0f12]">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
@@ -81,23 +115,23 @@ export default function GameClipCreatePage() {
       </div>
 
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-black/40 backdrop-blur-2xl border-b border-white/5">
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-2xl border-b border-border">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <button
               onClick={() => router.back()}
-              className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all duration-300"
+              className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-muted hover:bg-muted/80 transition-all duration-300"
             >
-              <ArrowLeft className="h-4 w-4 text-white/60 group-hover:text-white transition-colors" />
-              <span className="text-sm font-medium text-white/60 group-hover:text-white">
+              <ArrowLeft className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">
                 Retour
               </span>
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-medium text-white/60">
+                <span className="text-xs font-medium text-primary">
                   Nouveau clip
                 </span>
               </div>
@@ -134,11 +168,11 @@ export default function GameClipCreatePage() {
           <div className="order-2 lg:order-1">
             <div className="sticky top-24">
               {/* Preview Card */}
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-                <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+              <div className="bg-card backdrop-blur-xl rounded-2xl border border-border overflow-hidden shadow-2xl">
+                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-white/60">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Aperçu en direct
                     </span>
                   </div>
@@ -152,7 +186,7 @@ export default function GameClipCreatePage() {
                   )}
                 </div>
 
-                <div className="aspect-[9/16] bg-black/40 flex items-center justify-center relative">
+                <div className="aspect-[9/16] bg-black/90 flex items-center justify-center relative overflow-hidden group">
                   <AnimatePresence mode="wait">
                     {videoUrl ? (
                       <motion.div
@@ -160,14 +194,30 @@ export default function GameClipCreatePage() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="w-full h-full"
+                        className="w-full h-full relative cursor-pointer"
+                        onClick={togglePlay}
                       >
                         <video
+                          ref={videoRef}
                           src={videoUrl}
                           className="w-full h-full object-contain"
                           loop
                           playsInline
-                          controls
+                          muted={isMuted}
+                          onTimeUpdate={handleTimeUpdate}
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
+                        />
+                        <GameVideoController
+                          isPlaying={isPlaying}
+                          isMuted={isMuted}
+                          progress={progress}
+                          onTogglePlay={() => {
+                            togglePlay();
+                          }}
+                          onToggleMute={() => {
+                            toggleMute();
+                          }}
                         />
                       </motion.div>
                     ) : imageUrls.length > 0 ? (
@@ -198,10 +248,10 @@ export default function GameClipCreatePage() {
                         exit={{ opacity: 0 }}
                         className="text-center space-y-3"
                       >
-                        <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 flex items-center justify-center">
-                          <Film className="h-10 w-10 text-white/20" />
+                        <div className="w-20 h-20 mx-auto rounded-2xl bg-white/10 flex items-center justify-center">
+                          <Film className="h-10 w-10 text-white/50" />
                         </div>
-                        <p className="text-sm text-white/30">
+                        <p className="text-sm text-white/50">
                           Aucun média sélectionné
                         </p>
                       </motion.div>
@@ -211,8 +261,8 @@ export default function GameClipCreatePage() {
 
                 {/* Caption Preview */}
                 {caption && (
-                  <div className="px-5 py-4 border-t border-white/10 bg-gradient-to-t from-black/50 to-transparent">
-                    <p className="text-sm text-white/80 line-clamp-2">
+                  <div className="px-5 py-4 border-t border-border bg-muted">
+                    <p className="text-sm text-foreground line-clamp-2">
                       {caption}
                     </p>
                   </div>
@@ -226,7 +276,7 @@ export default function GameClipCreatePage() {
                     <Sparkles className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-white/80">
+                    <span className="text-xs font-bold text-foreground">
                       Conseils pour réussir ton clip
                     </span>
                     <div className="mt-2 space-y-1.5">
@@ -237,8 +287,8 @@ export default function GameClipCreatePage() {
                         "Les vidéos sont automatiquement optimisées",
                       ].map((tip, i) => (
                         <div key={i} className="flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-primary/40" />
-                          <span className="text-xs text-white/40">{tip}</span>
+                          <div className="w-1 h-1 rounded-full bg-primary/60" />
+                          <span className="text-xs text-muted-foreground">{tip}</span>
                         </div>
                       ))}
                     </div>
@@ -252,23 +302,23 @@ export default function GameClipCreatePage() {
           <div className="order-1 lg:order-2 space-y-6">
             {/* Header */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-black tracking-tight text-foreground">
                 Créer un clip
               </h1>
-              <p className="text-sm text-white/40">
+              <p className="text-sm text-muted-foreground">
                 Partage tes meilleurs moments de jeu avec la communauté
               </p>
             </div>
 
             {/* Media Type Toggle */}
-            <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
+            <div className="flex gap-2 p-1 bg-muted rounded-xl border border-border">
               <button
                 onClick={() => setActiveTab("video")}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-300",
                   activeTab === "video"
-                    ? "bg-primary text-white shadow-lg"
-                    : "text-white/40 hover:text-white/60",
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Film className="h-4 w-4" />
@@ -279,8 +329,8 @@ export default function GameClipCreatePage() {
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-300",
                   activeTab === "images"
-                    ? "bg-primary text-white shadow-lg"
-                    : "text-white/40 hover:text-white/60",
+                    ? "bg-primary text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <ImageIcon className="h-4 w-4" />
@@ -319,12 +369,12 @@ export default function GameClipCreatePage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Hash className="h-4 w-4 text-white/40" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-white/40">
+                  <Hash className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Description
                   </span>
                 </div>
-                <span className="text-xs text-white/30">
+                <span className="text-xs text-muted-foreground">
                   {caption.length}/500
                 </span>
               </div>
@@ -334,8 +384,8 @@ export default function GameClipCreatePage() {
                 onChange={(e) => setCaption(e.target.value.slice(0, 500))}
                 rows={4}
                 className={cn(
-                  "resize-none bg-white/5 border-white/10 rounded-xl focus-visible:ring-primary/50 text-base text-white",
-                  "placeholder:text-white/20 transition-all duration-300",
+                  "resize-none bg-muted border-border rounded-xl focus-visible:ring-primary/50 text-base text-foreground",
+                  "placeholder:text-muted-foreground transition-all duration-300",
                   isFocused && "border-primary/50 ring-1 ring-primary/20",
                 )}
                 onFocus={() => setIsFocused(true)}
@@ -344,15 +394,15 @@ export default function GameClipCreatePage() {
             </div>
 
             {/* Visibility Info */}
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/5">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-card border border-border shadow-sm">
               <div className="p-2 rounded-lg bg-green-500/10">
-                <Users className="h-4 w-4 text-green-400" />
+                <Users className="h-4 w-4 text-green-500" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white/80">
+                <p className="text-sm font-medium text-foreground">
                   Visible par tout le monde
                 </p>
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-muted-foreground">
                   Les clips sont publics et peuvent être likés, commentés et partagés
                 </p>
               </div>
@@ -363,7 +413,7 @@ export default function GameClipCreatePage() {
               <Button
                 variant="outline"
                 onClick={() => router.back()}
-                className="flex-1 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 text-white/80"
+                className="flex-1 rounded-xl"
               >
                 Annuler
               </Button>

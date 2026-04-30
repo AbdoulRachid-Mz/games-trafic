@@ -37,7 +37,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
           {/* Content */}
           {showContent && (
-            <div className="flex-1 h-full overflow-hidden relative">
+            <div className="flex-1 h-full overflow-y-auto no-scrollbar relative">
               {children}
             </div>
           )}

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Users, UserPlus, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {StatsCarousel} from "@/components/shared/stats-carousel";
+import { StatsCarousel } from "@/components/shared/stats-carousel";
 
 interface ProfileStatsProps {
   followersCount: number;
@@ -61,11 +61,11 @@ export function ProfileStats({
             onClick: stat.onClick,
             className: cn(
               "h-auto p-2 flex-col items-center gap-1",
-              !stat.onClick && "cursor-default hover:bg-transparent"
+              !stat.onClick && "cursor-default hover:bg-transparent",
             ),
           }))}
           mode="auto"
-          itemsPerView={{ mobile: 1, md: 2, lg: 3, xl: 3 }}
+          itemsPerView={{ mobile: 2, md: 3, lg: 4, xl: 5 }}
           gap={12}
           withNavButtons={false}
           dragFree={true}

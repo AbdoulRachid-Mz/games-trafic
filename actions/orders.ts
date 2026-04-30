@@ -287,7 +287,10 @@ export async function rejectOrder(orderId: string, reason: string): Promise<{ su
             amount: parseFloat(order.price),
             type: 'REFUND',
             description: `Remboursement de la commande #${order.id.slice(0, 8)}: ${reason}`,
-            metadata: { orderId: order.id, refundReason: reason }
+            metadata: { orderId: order.id, refundReason: reason },
+            walletId: buyerWallet.id,
+            userId: order.buyerId,
+            tx,
           });
         }
       }

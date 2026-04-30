@@ -1,5 +1,6 @@
 // @/actions/shops.ts
 'use server';
+import { getAccountBalance } from '@/lib/ledger/ledger-utils';
 
 import {
   shops, users, themes, products, entityCategories, categories,
@@ -401,11 +402,15 @@ export async function getShopStatsById(
         ),
     ]);
 
+    const balance = shop.financialAccountId 
+      ? await getAccountBalance(shop.financialAccountId)
+      : 0;
+
     return {
       productCount: productCountResult[0]?.count || 0,
       viewCount: shop.viewCount || 0,
       followerCount: followerCountResult[0]?.count || 0,
-      balance: '0', // Managed via ledger
+      balance: balance.toString(),
       totalSales: totalSalesResult[0]?.count || 0,
     };
   } catch (error) {
@@ -1060,4 +1065,38 @@ function buildShopWhereConditions(
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+/**
+ * Récupère les clients d'une boutique (utilisateurs ayant passé des commandes complétées)
+ */
+export async function getShopClients(shopId: string) {
+  try {
+    const results = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        fullName: users.fullName,
+        email: users.email,
+        image: users.image,
+        totalSpent: sql<number>`COALESCE(SUM(${orders.price}::numeric), 0)`,
+        orderCount: sql<number>`COUNT(${orders.id})::int`,
+        lastOrderDate: sql<Date>`MAX(${orders.createdAt})`,
+      })
+      .from(users)
+      .innerJoin(orders, eq(orders.buyerId, users.id))
+      .where(
+        and(
+          eq(orders.shopId, shopId),
+          eq(orders.status, 'COMPLETED')
+        )
+      )
+      .groupBy(users.id)
+      .orderBy(desc(sql`MAX(${orders.createdAt})`));
+
+    return results;
+  } catch (error) {
+    console.error('Error getting shop clients:', error);
+    throw new Error('Failed to fetch shop clients');
+  }
 }

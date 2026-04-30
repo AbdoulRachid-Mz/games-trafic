@@ -26,6 +26,7 @@ const messageKeys = {
   unread: (userId: string) => [...messageKeys.all, 'unread', userId] as const,
   unreadCount: (userId: string) => [...messageKeys.all, 'unread-count', userId] as const,
   stats: (filters?: MessageFilters) => [...messageKeys.all, 'stats', filters] as const,
+  entity: (entityType: string, entityId: string) => [...messageKeys.all, 'entity', entityType, entityId] as const,
 };
 
 // ============================================================================
@@ -146,6 +147,35 @@ export function useGroupMessages(
     enabled: enabled && !!groupId,
     staleTime: 10 * 1000, // 10 seconds
     gcTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+/**
+ * Hook to fetch messages for a specific entity (Shop, Tournament, etc.)
+ * @param entityType - Entity type (SHOP, TOURNAMENT, EDITION, etc.)
+ * @param entityId - Entity ID
+ * @param pagination - Pagination options
+ * @param enabled - Whether to enable the query
+ */
+export function useEntityMessages(
+  entityType: string,
+  entityId: string,
+  pagination?: { page: number; limit: number },
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: messageKeys.entity(entityType, entityId),
+    queryFn: () => getMessages({
+      filters: {
+        entityType: entityType.toUpperCase() as any,
+        entityId: entityId,
+      },
+      pagination: pagination,
+      options: { sortBy: 'createdAt', sortOrder: 'asc' } // Messages are usually ascending in chat
+    }),
+    enabled: enabled && !!entityType && !!entityId,
+    staleTime: 10 * 1000,
+    gcTime: 2 * 60 * 1000,
   });
 }
 

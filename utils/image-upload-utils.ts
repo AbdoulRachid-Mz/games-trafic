@@ -7,6 +7,7 @@ export interface UploadOptions {
   uploadPath?: string;
   uploadPreset?: string;
   cloudName?: string;
+  resourceType?: "image" | "video" | "auto" | "raw";
 }
 
 export interface UploadResult {
@@ -78,6 +79,7 @@ export const uploadToCloudinary = async (
     uploadPath = "images",
     uploadPreset = "games_trafics",
     cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "duathyzaj",
+    resourceType = "image",
   } = options;
 
   try {
@@ -87,7 +89,7 @@ export const uploadToCloudinary = async (
     formData.append("folder", uploadPath);
 
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
       {
         method: "POST",
         body: formData,

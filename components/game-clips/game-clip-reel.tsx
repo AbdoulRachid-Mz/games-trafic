@@ -227,7 +227,7 @@ export function GameClipReel({
       const timer = setTimeout(() => {
         console.log("[Auto-reshuffle] Déclenchement automatique - fin des clips approchée");
         onReshuffle();
-        autoReshuffleTriggeredRef.current = false;
+        // Do NOT reset the ref here! It should only reset when clips change or we are no longer near end.
       }, 500);
       
       return () => clearTimeout(timer);

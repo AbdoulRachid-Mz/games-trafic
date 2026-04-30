@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback, ReactNode, MouseEventHandler, UIEvent } from 'react';
 import { motion, useInView } from 'motion/react';
 
-interface AnimatedItemProps {
+export interface AnimatedItemProps {
   children: ReactNode;
   delay?: number;
   index: number;
@@ -9,7 +9,7 @@ interface AnimatedItemProps {
   onClick?: MouseEventHandler<HTMLDivElement>;
 }
 
-const AnimatedItem: React.FC<AnimatedItemProps> = ({ children, delay = 0, index, onMouseEnter, onClick }) => {
+export const AnimatedItem: React.FC<AnimatedItemProps> = ({ children, delay = 0, index, onMouseEnter, onClick }) => {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { amount: 0.5, once: false });
   return (
@@ -55,7 +55,17 @@ const AnimatedList: React.FC<AnimatedListProps> = ({
     'Item 12',
     'Item 13',
     'Item 14',
-    'Item 15'
+    'Item 15',
+    'Item 16',
+    'Item 17',
+    'Item 18',
+    'Item 19',
+    'Item 20',
+    'Item 21',
+    'Item 22',
+    'Item 23',
+    'Item 24',
+    'Item 25',
   ],
   onItemSelect,
   showGradients = true,

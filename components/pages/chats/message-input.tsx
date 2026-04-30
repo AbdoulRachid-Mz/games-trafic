@@ -13,6 +13,8 @@ import type { User } from "@/database/schema";
 import type { ChatMessage } from "@/types/chat";
 import { toast } from "sonner";
 import { VoiceRecorder } from "./voice-recorder";
+import Image from "next/image";
+import { uploadToCloudinary } from "@/utils/image-upload-utils";
 
 interface MessageInputProps {
   user: User | null;
@@ -36,11 +38,14 @@ export function MessageInput({
   const [message, setMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { settings } = useChatThemeContext();
-  const { uploadFiles, validateFile, limits, isUploading } = useChatMedia(user);
+  const { uploadFiles, validateFile, limits, isUploading: isUploadingMedia } = useChatMedia(user);
+  const isUploading = isUploadingMedia || isUploadingAudio || isUploadingImages;
 
   // Auto-resize textarea
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -106,11 +111,23 @@ export function MessageInput({
     }
 
     try {
+      setIsUploadingImages(true);
       let imageUrls: string[] = [];
 
       // Upload images if any
       if (selectedFiles.length > 0) {
-        imageUrls = await uploadFiles(selectedFiles);
+        const uploadPromises = selectedFiles.map(file => 
+          uploadToCloudinary(file, {
+            uploadPath: "chat_images",
+            resourceType: "image"
+          })
+        );
+        const results = await Promise.all(uploadPromises);
+        imageUrls = results.filter(r => r.success && r.url).map(r => r.url as string);
+        
+        if (imageUrls.length !== selectedFiles.length) {
+          toast.warning("Certaines images n'ont pas pu être envoyées");
+        }
       }
 
       // Send message
@@ -125,8 +142,10 @@ export function MessageInput({
         textareaRef.current.style.height = "auto";
       }
     } catch (error) {
-      console.error("Failed to send message:", error);
-      toast.error("Erreur lors de l'envoi du message");
+      console.error("erreur lors de l'envoi du message:", error);
+      toast.error("erreur lors de l'envoi du message");
+    } finally {
+      setIsUploadingImages(false);
     }
   };
 
@@ -143,9 +162,26 @@ export function MessageInput({
     setIsRecording(true);
   };
 
-  const handleSendAudio = (audioUrl: string) => {
-    onSendMessage("", [], audioUrl);
-    setIsRecording(false);
+  const handleSendAudio = async (audioFile: File) => {
+    setIsUploadingAudio(true);
+    try {
+      const result = await uploadToCloudinary(audioFile, {
+        uploadPath: "chat_audio",
+        resourceType: "auto",
+      });
+
+      if (result.success && result.url) {
+        onSendMessage("", [], result.url);
+        setIsRecording(false);
+      } else {
+        toast.error("Échec de l'envoi de l'audio");
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'envoi audio:", error);
+      toast.error("Erreur lors de l'envoi audio");
+    } finally {
+      setIsUploadingAudio(false);
+    }
   };
 
   if (isRecording) {
@@ -193,9 +229,11 @@ export function MessageInput({
         <div className="mb-2 flex gap-2 overflow-x-auto">
           {selectedFiles.map((file, index) => (
             <div key={index} className="relative flex-shrink-0">
-              <img
+              <Image
                 src={URL.createObjectURL(file)}
                 alt={`Preview ${index + 1}`}
+                width={80}
+                height={80}
                 className="h-20 w-20 object-cover rounded-lg"
               />
               <Button

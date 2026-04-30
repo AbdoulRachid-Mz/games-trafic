@@ -61,6 +61,7 @@ import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
+import { recordEntityView } from "@/actions/interactions";
 
 interface ProductDetailProps {
   productId: string;
@@ -80,6 +81,13 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
 
 
   const currentProduct = product || initialProduct;
+  
+  React.useEffect(() => {
+    if (currentProduct) {
+      recordEntityView(currentProduct.id, "PRODUCT", user?.id);
+    }
+  }, [currentProduct?.id, user?.id]);
+
   const [activeTab, setActiveTab] = useState("description");
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 

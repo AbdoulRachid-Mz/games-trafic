@@ -1015,6 +1015,9 @@ export async function transferBetweenIdentities(params: {
       if (!fromAccount || !toAccount) throw new Error("Comptes introuvables");
 
       // 3. Execute Transaction
+      const userWallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, user.id) });
+      if (!userWallet) throw new Error("Wallet utilisateur introuvable");
+
       await executeTransaction({
         fromAccountId: fromAccount.id,
         toAccountId: toAccount.id,
@@ -1022,6 +1025,8 @@ export async function transferBetweenIdentities(params: {
         type: 'TRANSFER',
         description: params.description || `Transfert interne entre ${params.fromType} et ${params.toType}`,
         userId: user.id,
+        walletId: userWallet.id,
+        tx,
         metadata: { transferType: 'internal_identity_transfer' }
       });
 

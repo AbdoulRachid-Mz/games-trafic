@@ -54,6 +54,7 @@ import {
   addTournamentMember, getTournamentMembers,
   getTournaments
 } from "@/actions/tournaments";
+import { recordEntityView } from "@/actions/interactions";
 import {
   useTournamentById
 } from "@/hooks/use-tournaments";
@@ -94,6 +95,7 @@ export function TournamentPageContent({
     if (tournament) {
       loadSimilarTournaments();
       checkMembership();
+      recordEntityView(tournamentId, "TOURNAMENT", user?.id);
     }
   }, [tournament?.id, user?.id]);
 

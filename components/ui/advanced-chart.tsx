@@ -407,27 +407,29 @@ export function AdvancedChart<T extends Record<string, any>>({
     if (kind === "pie") {
       const totalKey = series[0]?.label || String(series[0]?.key || "value");
       return (
-        <ResponsiveContainer width="100%" height={height}>
-          <PieChart>
-            {showTooltip && <Tooltip content={<ChartTooltipContent />} />}
-            {showLegend && <Legend content={<ChartLegendContent />} />}
-            <Pie
-              data={merged}
-              dataKey={totalKey}
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={80}
-            >
-              {merged.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={series[index % series.length]?.color}
-                />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+        <ChartContainer config={chartConfig} className="w-full">
+          <ResponsiveContainer width="100%" height={height}>
+            <PieChart>
+              {showTooltip && <Tooltip content={<ChartTooltipContent />} />}
+              {showLegend && <Legend content={<ChartLegendContent />} />}
+              <Pie
+                data={merged}
+                dataKey={totalKey}
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+              >
+                {merged.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={series[index % series.length]?.color}
+                  />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartContainer>
       );
     }
 

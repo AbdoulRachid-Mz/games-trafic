@@ -80,6 +80,7 @@ export const defaultDockLinks: DockLinkConfig[] = [
     icon: "tournaments",
     requireAuth: false,
   },
+  { href: "/chats", label: "Chats", icon: "messages", requireAuth: true },
   { href: "/wallet", label: "Wallet", icon: "wallet", requireAuth: true },
 ];
 
@@ -323,8 +324,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         requireAuth: true,
       },
     ],
-    floatingActions: true,
-    fabActions: defaultFABActions,
+    floatingActions: false,
+    fabActions: [],
   },
 
   // =============================================

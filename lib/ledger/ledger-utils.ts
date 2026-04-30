@@ -196,7 +196,7 @@ export interface ExecuteTransactionParams {
     description?: string;
     metadata?: Record<string, any>;
     userId?: string;
-    walletId?: string;
+    walletId: string; // Required: wallet_id is NOT NULL in DB
     tx?: any; // Optional transaction context
 }
 
@@ -297,6 +297,7 @@ export async function executeTransaction(
 
         // 💾 Créer la transaction wallet (pour l'historique utilisateur)
         const transactionData: any = {
+            walletId, // Required: NOT NULL in DB
             financialAccountId: fromAccountId,
             amount: amount.toFixed(2),
             fees: fees.toFixed(2),
@@ -315,8 +316,7 @@ export async function executeTransaction(
             createdAt: new Date(),
         };
 
-        // Ajouter les champs optionnels seulement s'ils sont définis
-        if (walletId) transactionData.walletId = walletId;
+        // Ajouter le fromUserId seulement s'il est défini
         if (userId) transactionData.fromUserId = userId;
 
         const [transaction] = await tx

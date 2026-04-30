@@ -41,6 +41,7 @@ import { Typography } from "@/components/ui/typography";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthContext } from "@/contexts/auth-context";
 import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
 
 interface MenuItem {
   id: string;
@@ -101,11 +102,12 @@ const defaultMenuItems: MenuItem[] = [
     group: "main",
   },
   {
-    id: "themes",
-    label: "Thèmes",
-    link: "/themes",
-    icon: Palette,
+    id: "chats",
+    label: "Chats",
+    link: "/chats",
+    icon: MessageSquare,
     group: "main",
+    requiresAuth: true,
   },
 
   // Games & Clips
@@ -127,7 +129,7 @@ const defaultMenuItems: MenuItem[] = [
   // Application Features
   {
     id: "blog",
-    label: "Blog",
+    label: "Blogs",
     link: "/blogs",
     icon: MessageSquare,
     group: "application",
@@ -295,7 +297,12 @@ export function LeftBar({
                 whileHover={{ rotate: 5 }}
                 className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg"
               >
-                <Gamepad2 className="h-5 w-5 text-white" />
+                <Image
+                  src="/icons/icon-128.png"
+                  alt="Logo"
+                  width={20}
+                  height={20}
+                />
               </motion.div>
               {isOpen && (
                 <div className="flex-1 min-w-0">

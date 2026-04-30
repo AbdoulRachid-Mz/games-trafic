@@ -3,9 +3,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Games-Trafics",
-    short_name: "GT",
-    description:
-      "Acheter, vendre, échanger et jouer. La marketplace gaming complète.",
+    short_name: "Games-Trafics",
+    description: "Acheter, vendre, échanger et jouer. La marketplace gaming complète.",
 
     start_url: "/",
     scope: "/",
@@ -85,11 +84,11 @@ export default function manifest(): MetadataRoute.Manifest {
 
     shortcuts: [
       {
-        name: "Marketplace",
-        short_name: "Market",
-        description: "Acheter et vendre des comptes gaming",
-        url: "/marketplace",
-        icons: [{ src: "/icons/marketplace-500.png", sizes: "500x536", type: "image/png" }],
+        name: "Games-Trafics",
+        short_name: "Games-Trafics",
+        description: "Acheter, vendre, échanger et jouer. La marketplace gaming complète.",
+        url: "/",
+        icons: [{ src: "/icons/gt-primary.png", sizes: "500x536", type: "image/png" }],
       },
       {
         name: "Tournois",

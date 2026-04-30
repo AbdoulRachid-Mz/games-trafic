@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GroupInfo, GroupInfoData } from "@/components/pages/chats/group-info";
 import { GroupMembers } from "@/components/pages/chats/group-members";
+import { AddMemberDialog } from "@/components/pages/chats/add-member-dialog";
 import type {
-  // GroupInfoData,
   GroupMember,
 } from "@/components/pages/chats/group-members";
 import { useAuthContext } from "@/contexts/auth-context";
 import { ChatThemeProvider } from "@/contexts/chat-theme-context";
 import { useGroupById, useGroupMembers } from "@/hooks/use-groupes";
 import { toast } from "sonner";
-import { ArrowLeft, MessageSquare, Lock } from "lucide-react";
+import { ArrowLeft, MessageSquare, Lock, Share2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -24,7 +24,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAddGroupMember, useRequestJoinGroup } from "@/hooks/use-groupes";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TransactionQRCode } from "@/components/shared/qr-code";
+import { shareContent } from "@/utils/share";
+import {
+  useAddGroupMember,
+  useRequestJoinGroup,
+  useUpdateGroupMemberRole,
+  useRemoveGroupMember,
+} from "@/hooks/use-groupes";
 import { useInfiniteNotifications, useDeleteNotification } from "@/hooks/use-notifications";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +48,7 @@ function GroupDetailContent() {
   const groupId = params.groupId as string;
 
   const [activeTab, setActiveTab] = useState("info");
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   // Fetch group data
   const { data: group, isLoading: groupLoading } = useGroupById(groupId);
@@ -43,6 +57,8 @@ function GroupDetailContent() {
   const requestJoinMutation = useRequestJoinGroup();
   const addMemberMutation = useAddGroupMember();
   const deleteNotificationMutation = useDeleteNotification();
+  const updateRoleMutation = useUpdateGroupMemberRole();
+  const removeMemberMutation = useRemoveGroupMember();
 
   const members = membersData?.data || [];
   const currentMember = members.find((m: any) => m.userId === user?.id);
@@ -127,16 +143,48 @@ function GroupDetailContent() {
     }
   };
 
-  const handlePromoteToAdmin = (memberId: string) => {
-    toast.info("La promotion de membre arrive bientôt");
+  const handlePromoteToAdmin = async (memberId: string) => {
+    try {
+      await updateRoleMutation.mutateAsync({ memberId, role: "ADMIN" });
+      toast.success("Membre promu au rang d'administrateur");
+    } catch (error) {
+      toast.error("Erreur lors de la promotion");
+    }
   };
 
-  const handleDemoteToMember = (memberId: string) => {
-    toast.info("La rétrogradation de membre arrive bientôt");
+  const handleDemoteToMember = async (memberId: string) => {
+    try {
+      await updateRoleMutation.mutateAsync({ memberId, role: "MEMBER" });
+      toast.success("Membre rétrogradé au rang de membre");
+    } catch (error) {
+      toast.error("Erreur lors de la rétrogradation");
+    }
   };
 
-  const handleRemoveMember = (memberId: string) => {
-    toast.info("La suppression de membre arrive bientôt");
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      await removeMemberMutation.mutateAsync(memberId);
+      toast.success("Membre retiré du groupe");
+    } catch (error) {
+      toast.error("Erreur lors du retrait du membre");
+    }
+  };
+
+  const handleShareLink = () => {
+    setIsShareDialogOpen(true);
+  };
+
+  const executeShare = async () => {
+    try {
+      const url = `${window.location.origin}/chats/groups/${groupId}`;
+      await shareContent({
+        title: group?.name || "Rejoindre le groupe",
+        text: `Rejoignez le groupe ${group?.name} !`,
+        url: url,
+      });
+    } catch (error) {
+      // Erreur gérée par l'utilitaire
+    }
   };
 
   if (groupLoading) {
@@ -243,13 +291,30 @@ function GroupDetailContent() {
             </div>
           </div>
 
-          <Button
-            onClick={handleStartChat}
-            className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)]"
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Ouvrir la discussion
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleShareLink}
+              title="Partager le lien du groupe"
+            >
+              <Share2 className="h-4 w-4 text-[var(--chat-text)]" />
+            </Button>
+            <Button
+              onClick={handleStartChat}
+              className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)] hidden sm:flex"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Ouvrir la discussion
+            </Button>
+            <Button
+              onClick={handleStartChat}
+              size="icon"
+              className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-[var(--chat-messageSentText)] sm:hidden"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -291,9 +356,12 @@ function GroupDetailContent() {
 
           <TabsContent value="members" className="mt-6">
             <div className="bg-[var(--chat-surface)] rounded-lg border border-[var(--chat-border)] p-4">
-              <h3 className="font-semibold text-[var(--chat-text)] mb-4">
-                Membres du groupe
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-[var(--chat-text)]">
+                  Membres du groupe
+                </h3>
+                {isOwner && <AddMemberDialog groupId={groupId} />}
+              </div>
               <GroupMembers
                 members={members.map((m: any) => ({
                   id: m.id,
@@ -367,6 +435,25 @@ function GroupDetailContent() {
           )}
         </Tabs>
       </div>
+
+      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Partager le groupe</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center space-y-6 py-4">
+            <TransactionQRCode 
+              data={`${window.location.origin}/chats/groups/${groupId}`}
+              label={group.name}
+              withLogo={false}
+            />
+            <Button className="w-full gap-2" onClick={executeShare}>
+              <Share2 className="h-4 w-4" />
+              Partager le lien
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

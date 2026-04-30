@@ -1,7 +1,7 @@
 'use server';
 
-import { groups, groupMembers, type Group, type NewGroup, type GroupMember, type NewGroupMember } from '@/database/schema';
-import { eq, and, or, like, ilike, inArray, desc, asc, sql, count, isNull, gte, lte } from 'drizzle-orm';
+import { groups, groupMembers, users, type Group, type NewGroup, type GroupMember, type NewGroupMember, type User } from '@/database/schema';
+import { eq, and, or, like, ilike, inArray, desc, asc, sql, count, isNull, gte, lte, notInArray } from 'drizzle-orm';
 import { type GroupFilters, type GroupMemberFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
 import { createNotification } from '@/actions/notifications';
@@ -233,6 +233,35 @@ export async function getGroupStats(filters?: GroupFilters) {
 // ============================================================================
 // GROUP MEMBERS - Gestion des membres
 // ============================================================================
+
+/**
+ * Recherche des utilisateurs pour les ajouter à un groupe
+ */
+export async function searchUsersForGroup(query: string, limit = 10): Promise<User[]> {
+  try {
+    if (!query || query.length < 2) return [];
+    
+    const searchTerm = `%${query}%`;
+    
+    const result = await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          ilike(users.username, searchTerm),
+          ilike(users.fullName, searchTerm),
+          ilike(users.email, searchTerm),
+          ilike(users.phoneNumber, searchTerm)
+        )
+      )
+      .limit(limit);
+
+    return result;
+  } catch (error) {
+    console.error('Error searching users for group:', error);
+    return [];
+  }
+}
 
 /**
  * Récupère un membre de groupe par ID
@@ -557,6 +586,8 @@ export async function addGroupMember(
       })
       .returning();
 
+    revalidatePath(`/chats/groups/${groupId}`);
+    
     return result[0];
   } catch (error) {
     console.error('Error adding group member:', error);

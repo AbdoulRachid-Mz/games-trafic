@@ -61,6 +61,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import { InteractionButton } from "@/components/shared/interaction-button";
 import { getShopById, getPopularShops } from "@/actions/shops";
+import { recordEntityView } from "@/actions/interactions";
+import { useShopById, usePopularShops } from "@/hooks/use-shops";
+import { useProducts } from "@/hooks/use-products";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useScreenSize } from "@/hooks/use-screen";
 import { cn } from "@/lib/utils";
@@ -75,46 +79,40 @@ export function ShopPageContent() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthContext();
   const { isSmallScreen, isLargeScreen } = useScreenSize();
+  const shopId = params.shopId as string;
 
-  const [shop, setShop] = useState<any>(null);
-  const [similarShops, setSimilarShops] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("products");
   const [productViewMode, setProductViewMode] = useState<"grid" | "list">(
     "grid"
   );
   const [isFollowing, setIsFollowing] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const { data: similarShopsData } = usePopularShops(6);
+  const similarShops = similarShopsData?.slice(0, 4) || [];
 
-  const shopId = params.shopId as string;
+  const { data: shop, isLoading, error } = useShopById(shopId, { populate: ["owner", "stats"] });
 
   useEffect(() => {
-    loadShop();
-    loadSimilarShops();
-  }, [shopId]);
-
-  const loadShop = async () => {
-    setIsLoading(true);
-    try {
-      const data = await getShopById(shopId, {
-        populate: ["owner", "theme", "products"],
-      });
-      setShop(data);
-    } catch (error) {
-      console.error("Erreur chargement boutique:", error);
-    } finally {
-      setIsLoading(false);
+    if (shop) {
+      recordEntityView(shopId, "SHOP", user?.id);
     }
-  };
+  }, [shop, shopId, user?.id]);
 
-  const loadSimilarShops = async () => {
-    try {
-      const shops = await getPopularShops(6);
-      setSimilarShops(shops.slice(0, 4));
-    } catch (error) {
-      console.error("Erreur chargement boutiques similaires:", error);
-    }
-  };
+  const {
+    data: productsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isLoadingProducts
+  } = useProducts({ 
+    filters: { 
+      shopId, 
+      status: ['NON_VENDU', 'RESERVE', 'EN_ECHANGE'] // Only show available/active products
+    }, 
+    pagination: { limit: 20, page: 1 } 
+  });
+
+  const products = productsData?.pages.flatMap((page) => page.products) || [];
 
   const isOwner = user && shop && user.id === shop.ownerId;
 
@@ -157,41 +155,12 @@ export function ShopPageContent() {
     },
   ];
 
-  const products =
-    shop?.products ||
-    Array.from({ length: 12 }, (_, i) => ({
-      id: `prod-${i + 1}`,
-      name: `Produit Gaming Premium ${i + 1}`,
-      description: "Compte ou items premium pour jeux mobiles et PC",
-      price: (49.99 + i * 10).toFixed(2),
-      currency: "GTC",
-      featuredImage: `/images/icons/app/gt-primary.png`,
-      status: i % 6 === 0 ? "VENDU" : "NON_VENDU",
-      game: ["Clash Royale", "Fortnite", "COD Mobile", "Free Fire", "Valorant"][
-        i % 5
-      ],
-      platform: ["MOBILE", "PC", "PLAYSTATION", "XBOX", "NINTENDO_SWITCH"][
-        i % 5
-      ],
-      category: ["Compte", "Skin", "Item", "Service", "Boost"][i % 5],
-      tags: ["Premium", "Rare", "Vendu rapidement", "Garanti"][i % 4],
-      rating: 4.5 + (i % 5) * 0.1,
-      totalSales: 42 + i * 3,
-      views: 1250 + i * 100,
-      stock: 5 + (i % 3),
-      isFeatured: i % 3 === 0,
-      isHot: i % 4 === 0,
-      discount: i % 5 === 0 ? 15 : i % 7 === 0 ? 25 : 0,
-    }));
-
-  const displayedProducts = showAllProducts ? products : products?.slice(0, 9);
-
   const handleProductClick = (productId: string) => {
     router.push(`/marketplace/${productId}`);
   };
 
   const handleBuyClick = (productId: string) => {
-    router.push(`/checkout?productId=${productId}`);
+    router.push(`/wallet/transactions/create?productId=${productId}&type=PRODUCT`);
   };
 
   if (isLoading) {
@@ -200,18 +169,21 @@ export function ShopPageContent() {
 
   if (!shop) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-8 text-center">
-            <Store className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <Typography variant="h4" weight="bold" className="mb-2">
-              Boutique non trouvée
-            </Typography>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Store className="h-6 w-6" />
+            </EmptyMedia>
+            <EmptyTitle>Boutique introuvable</EmptyTitle>
+            <EmptyDescription>La boutique que vous recherchez n'existe pas ou a été supprimée.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
             <Button onClick={() => router.push("/shops")}>
               Explorer les boutiques
             </Button>
-          </CardContent>
-        </Card>
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }
@@ -427,7 +399,7 @@ export function ShopPageContent() {
 
       {/* Stats Section with Carousel */}
       <div className="container mx-auto p-3">
-        <StatsCarousel mode="auto">
+        <StatsCarousel mode="auto" itemsPerView={{mobile: 2, md: 3, lg: 4, xl: 5}}>
           {stats.map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -478,7 +450,7 @@ export function ShopPageContent() {
                     {shop.owner.profileImage ? (
                       <Image
                         src={shop.owner.profileImage}
-                        alt={shop.owner.fullName || shop.owner.username}
+                        alt={shop.owner.fullName || shop.owner.username || 'utilisateur'}
                         width={48}
                         height={48}
                         className="rounded-full"
@@ -492,13 +464,12 @@ export function ShopPageContent() {
                       <Typography
                         variant="body-base"
                         weight="semibold"
-                        className="truncate"
+                        className="truncate cursor-pointer"
+                        onClick={() =>
+                          router.push(`/profile/${shop.owner?.id}`)
+                        }
                       >
                         {shop.owner.fullName || shop.owner.username}
-                      </Typography>
-                      <Typography variant="caption2" theme="muted">
-                        Membre depuis{" "}
-                        {new Date(shop.owner.createdAt).getFullYear()}
                       </Typography>
                     </div>
                   </div>
@@ -681,7 +652,7 @@ export function ShopPageContent() {
                         : "flex flex-col gap-4"
                     )}
                   >
-                    {displayedProducts?.map((product: ProductWithRelations, index: number) => (
+                    {products?.map((product: any, index: number) => (
                       <ProductCard
                         key={product.id}
                         product={product}
@@ -698,23 +669,41 @@ export function ShopPageContent() {
                     ))}
                   </div>
 
+                  {isLoadingProducts && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <Skeleton key={i} className="h-80 w-full rounded-xl" />
+                      ))}
+                    </div>
+                  )}
+
+                  {!isLoadingProducts && products.length === 0 && (
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Package />
+                        </EmptyMedia>
+                        <EmptyTitle>Aucun produit</EmptyTitle>
+                        <EmptyDescription>Cette boutique n'a pas encore de produits.</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  )}
+
                   {/* Load More */}
-                  {products && products.length > 9 && (
+                  {hasNextPage && (
                     <div className="text-center pt-6">
                       <Button
                         variant="outline"
-                        onClick={() => setShowAllProducts(!showAllProducts)}
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
                         className="gap-2"
                       >
-                        {showAllProducts
-                          ? "Voir moins"
-                          : "Voir tous les produits"}
-                        <ChevronRight
-                          className={cn(
-                            "h-4 w-4 transition-transform",
-                            showAllProducts && "rotate-90"
-                          )}
-                        />
+                        {isFetchingNextPage
+                          ? "Chargement..."
+                          : "Voir plus de produits"}
+                        {!isFetchingNextPage && (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   )}
@@ -959,7 +948,7 @@ export function ShopPageContent() {
                       Produits recommandés
                     </Typography>
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {products?.slice(0, 4).map((product: ProductWithRelations) => (
+                      {products?.slice(0, 4).map((product: any) => (
                         <ProductCard
                           key={product.id}
                           product={product}
