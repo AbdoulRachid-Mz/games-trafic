@@ -56,7 +56,7 @@ export function parseChatId(chatId: string, userId?: string): ParsedChatId | nul
     }
   }
   
-  const validTypes: ChatEntityType[] = ['user', 'group', 'shop', 'product', 'post', 'tournament'];
+  const validTypes: ChatEntityType[] = ['user', 'group', 'shop', 'tournament'];
   
   if (!validTypes.includes(mappedType)) {
     return null;

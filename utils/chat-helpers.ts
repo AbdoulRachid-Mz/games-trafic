@@ -140,12 +140,8 @@ export function getEntityName(conversation: Conversation): string {
       return entity.data?.name || "Groupe sans nom";
     case "shop":
       return entity.data?.name || "Boutique sans nom";
-    case "product":
-      return entity.data?.name || "Produit sans nom";
     case "tournament":
       return entity.data?.name || "Tournoi sans nom";
-    case "post":
-      return "Publication";
     default:
       return "Inconnu";
   }
@@ -166,10 +162,8 @@ export function getEntityAvatar(conversation: Conversation): string | null {
       return entity.data?.image || null;
     case "shop":
       return entity.data?.profileImage || null;
-    case "product":
-      return entity.data?.featuredImage || null;
     case "tournament":
-      return entity.data?.logo || null; // Adding tournament logo support
+      return entity.data?.logo || null;
     default:
       return null;
   }
