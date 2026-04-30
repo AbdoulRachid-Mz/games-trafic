@@ -182,6 +182,11 @@ export function ShopPageContent() {
             <Button onClick={() => router.push("/shops")}>
               Explorer les boutiques
             </Button>
+
+            {/* relaod */}
+            <Button onClick={() => router.refresh()}>
+              Recharger
+            </Button>
           </EmptyContent>
         </Empty>
       </div>
@@ -341,6 +346,14 @@ export function ShopPageContent() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
+                          router.push(`/chats/shop/${shopId}`)
+                        }
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Discuter en chat
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
                           router.push(`/shops/${shopId}/dashabord/settings`)
                         }
                       >
@@ -383,7 +396,7 @@ export function ShopPageContent() {
                         Partager
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => console.log("Report shop")}
+                        onClick={() => router.push(`/signals?type=shop&entityId=${shopId}`)}
                       >
                         <Shield className="h-4 w-4 mr-2" />
                         Signaler

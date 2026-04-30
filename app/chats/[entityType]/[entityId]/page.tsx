@@ -47,19 +47,24 @@ export default function ChatConversationPage() {
   const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
-  const entityType = params.entityType as ChatEntityType;
-  const entityId = params.entityId as string;
+  const entityTypeRaw = params?.entityType as string;
+  const entityType = entityTypeRaw?.trim().toLowerCase() as ChatEntityType;
+  const entityId = params?.entityId as string;
   const chatId = `${entityType}:${entityId}` as ChatId;
 
   // Validation des paramètres
   useEffect(() => {
+    // Attendre que les paramètres soient disponibles (Next.js useParams peut être vide au premier rendu)
+    if (!params || Object.keys(params).length === 0) return;
+
     if (!entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
+      console.error("Invalid chat params:", { entityType, entityId });
       toast.error("Type de discussion invalide");
       router.push("/chats");
     }
-  }, [entityType, entityId, router]);
+  }, [entityType, entityId, router, params]);
 
-  if (!entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
+  if (!params || Object.keys(params).length === 0 || !entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
     return null;
   }
 

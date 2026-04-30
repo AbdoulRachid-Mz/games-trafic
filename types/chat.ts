@@ -4,7 +4,7 @@ import type { User, Group, Message, Shop, Product } from '@/database/schema';
 /**
  * Chat entity types that can be used in conversations
  */
-export type ChatEntityType = 'user' | 'group' | 'shop' | 'product' | 'post' | 'tournament';
+export type ChatEntityType = 'user' | 'group' | 'shop' | 'tournament';
 
 /**
  * Chat ID format: "{type}:{id}"

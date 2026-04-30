@@ -8,7 +8,7 @@ import Link from "next/link";
 export default function ChatsPage() {
   return (
     <div className="h-full flex flex-col items-center justify-center bg-[var(--chat-background)] p-8 text-center">
-      <div className="max-w-md space-y-6">
+      <div className="max-w-md space-y-3">
         <div className="flex justify-center">
           <div className="h-24 w-24 bg-[var(--chat-surface)] rounded-full flex items-center justify-center shadow-lg border border-[var(--chat-border)]">
             <MessageSquare className="h-12 w-12 text-[var(--chat-primary)]" />
