@@ -213,7 +213,7 @@ export function MessageList({
         onScroll={handleScroll}
         ref={scrollRef}
       >
-        <div className="p-4 flex flex-col-reverse gap-4">
+        <div className="p-4 flex flex-col gap-4">
           <div ref={bottomRef} />
 
           {/* Typing indicator */}

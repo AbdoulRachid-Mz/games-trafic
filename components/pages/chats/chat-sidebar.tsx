@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getChatFromParams } from "@/lib/get-chat-from-params";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConversationList } from "./conversation-list";
@@ -26,7 +27,7 @@ import { ThemeSelector } from "./theme-selector";
 
 export function ChatSidebar() {
   const router = useRouter();
-  const params = useParams();
+  const searchParams = useSearchParams();
   const { user } = useAuthContext();
   const {
     conversations,
@@ -38,8 +39,8 @@ export function ChatSidebar() {
     setFilter,
   } = useConversations(user?.id);
 
-  const { entityType, entityId } = params;
-  const activeConversationId = entityType && entityId ? `${entityType}:${entityId}` : null;
+  const chat = getChatFromParams(searchParams);
+  const activeConversationId = chat?.chatId || null;
   const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -80,8 +81,7 @@ export function ChatSidebar() {
   }, [conversations, activeTab, searchQuery]);
 
   const handleConversationClick = (conversation: Conversation) => {
-    // Redirection vers le nouveau format de route /chats/[type]/[id]
-    router.push(`/chats/${conversation.entityType}/${conversation.entityId}`);
+    router.push(`/chats?entityType=${conversation.entityType}&entityId=${conversation.entityId}`);
   };
 
   const handleCreateGroup = () => {

@@ -346,7 +346,7 @@ export function ShopPageContent() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/chats/shop/${shopId}`)
+                          router.push(`/chats?entityType=shop&entityId=${shopId}`)
                         }
                       >
                         <MessageCircle className="h-4 w-4 mr-2" />
@@ -377,7 +377,7 @@ export function ShopPageContent() {
                   <Button
                     variant="outline"
                     className="gap-2"
-                    onClick={() => router.push(`/chats/shop/${shopId}`)}
+                    onClick={() => router.push(`/chats?entityType=shop&entityId=${shopId}`)}
                   >
                     <MessageCircle className="h-4 w-4" />
                     {!isSmallScreen && "Discuter"}

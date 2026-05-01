@@ -1,11 +1,30 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { MessageSquare, Shield, Smartphone, Laptop, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { getChatFromParams } from "@/lib/get-chat-from-params";
+import { ChatConversationView } from "@/components/pages/chats/chat-conversation-view";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function ChatsPage() {
+function ChatPageContent() {
+  const searchParams = useSearchParams();
+  const chat = getChatFromParams(searchParams);
+
+  // If we have valid chat params, render conversation view
+  if (chat) {
+    return (
+      <ChatConversationView
+        key={chat.chatId}
+        entityType={chat.entityType}
+        entityId={chat.entityId}
+      />
+    );
+  }
+
+  // Otherwise, show welcome screen
   return (
     <div className="h-full flex flex-col items-center justify-center bg-[var(--chat-background)] p-8 text-center">
       <div className="max-w-md space-y-3">
@@ -14,7 +33,7 @@ export default function ChatsPage() {
             <MessageSquare className="h-12 w-12 text-[var(--chat-primary)]" />
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-[var(--chat-text)]">
             GT Messenger
@@ -26,7 +45,7 @@ export default function ChatsPage() {
         </div>
 
         <div className="pt-4">
-          <Button 
+          <Button
             className="bg-[var(--chat-primary)] hover:bg-[var(--chat-accentHover)] text-white px-6"
             asChild
           >
@@ -43,7 +62,7 @@ export default function ChatsPage() {
             <span>Chiffré de bout en bout</span>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-center gap-6 pt-2 text-[var(--chat-textMuted)]">
           <div className="flex flex-col items-center gap-1">
             <Smartphone className="h-5 w-5" />
@@ -56,5 +75,28 @@ export default function ChatsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col h-full bg-[var(--chat-background)]">
+          <div className="flex-shrink-0 p-4 border-b border-[var(--chat-border)]">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          </div>
+          <div className="flex-1" />
+        </div>
+      }
+    >
+      <ChatPageContent />
+    </Suspense>
   );
 }

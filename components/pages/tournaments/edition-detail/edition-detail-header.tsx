@@ -119,7 +119,7 @@ export function EditionDetailHeader({
     {
       label: "Discuter",
       icon: MessageCircle,
-      onClick: () => router.push(`/chats/tournament/${tournament.id}`),
+      onClick: () => router.push(`/chats?entityType=tournament&entityId=${tournament.id}`),
       disabled: false,
       requireOrganizer: false,
     },

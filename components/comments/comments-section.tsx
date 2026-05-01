@@ -15,12 +15,14 @@ import { EntityType } from "@/database/schema";
 import { getEntityComments } from "@/actions/messages";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface CommentsSectionProps {
   entityId: string;
   entityType: EntityType;
   title?: string;
   className?: string;
+  hideTitle?: boolean;
 }
 
 export function CommentsSection({
@@ -28,6 +30,7 @@ export function CommentsSection({
   entityType,
   title = "Commentaires",
   className,
+  hideTitle = false,
 }: CommentsSectionProps) {
   const queryClient = useQueryClient();
 
@@ -66,20 +69,22 @@ export function CommentsSection({
   const allComments = data?.pages.flatMap((page) => page.comments) || [];
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5 text-primary" />
-          <Typography variant="h3" className="text-lg font-bold">
-            {title}
-            {allComments.length > 0 && (
-              <span className="ml-2 text-muted-foreground font-normal">
-                ({allComments.length})
-              </span>
-            )}
-          </Typography>
+    <div className={cn("space-y-6", className)}>
+      {!hideTitle && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-primary" />
+            <Typography variant="h3" className="text-lg font-bold">
+              {title}
+              {allComments.length > 0 && (
+                <span className="ml-2 text-muted-foreground font-normal">
+                  ({allComments.length})
+                </span>
+              )}
+            </Typography>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Formulaire de commentaire */}
       <div className="bg-secondary/20 rounded-xl p-4 border border-border/50">

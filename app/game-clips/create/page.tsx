@@ -359,7 +359,7 @@ export default function GameClipCreatePage() {
                   uploadPath="game-clips/images"
                   uploadPreset="games_trafics"
                   isAutoUpload={true}
-                  showInternalSelection={true}
+                  showInternalSelection={false}
                   internalImagesFolder="game-clips"
                 />
               )}

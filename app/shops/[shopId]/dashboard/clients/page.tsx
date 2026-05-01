@@ -192,7 +192,7 @@ export default function ShopClientsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push(`/chats/user/${client.id}`)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push(`/chats?entityType=user&entityId=${client.id}`)}>
                         <MessageCircle className="h-4 w-4" />
                       </Button>
                       <DropdownMenu>

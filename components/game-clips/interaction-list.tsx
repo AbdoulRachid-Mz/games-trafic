@@ -1,18 +1,11 @@
 // components/game-clips/interaction-list.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useClipEngineStore } from "@/hooks/use-clip-engine";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { getEntityInteractionsWithRelations } from "@/actions/interactions";
 import { Typography } from "../ui/typography";
 
@@ -39,40 +32,32 @@ type EntityType =
   | "PARTNER"
   | "EDITION";
 
-interface Interaction {
-  id: string;
-  type: string;
-  createdAt: Date;
-  user: {
-    id: string;
-    username: string;
-    fullName?: string;
-    profileImage?: string;
-  };
-}
-
+// components/game-clips/interaction-list.tsx
 interface InteractionListProps {
   entityId: string;
   entityType: EntityType;
-  interactionType: "LIKE" | "SHARE" | "FOLLOW" | "BOOKMARK";
+  interactionType: "LIKE" | "FOLLOW" | "BOOKMARK" | "VIEW";
   className?: string;
+  limit?: number;
 }
 
-function InteractionListContent({
+export function InteractionList({
   entityId,
   entityType,
   interactionType,
   className,
+  limit = 20,
 }: InteractionListProps) {
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       queryKey: ["interactions", entityId, entityType, interactionType],
       queryFn: async ({ pageParam = 1 }) => {
+        const types: ("LIKE" | "FOLLOW" | "BOOKMARK" | "VIEW")[] = [interactionType];
         const res = await getEntityInteractionsWithRelations(
           entityId,
           entityType,
-          { types: interactionType === "SHARE" ? ["VIEW"] : [interactionType] },
-          { page: pageParam, limit: 20 },
+          { types },
+          { page: pageParam, limit },
           { sortBy: "createdAt", sortOrder: "desc" },
         );
         return {
@@ -106,8 +91,27 @@ function InteractionListContent({
     );
   }
 
+  const getTitle = () => {
+    switch (interactionType) {
+      case "LIKE":
+        return "J'aime";
+      case "BOOKMARK":
+        return "Sauvegardes";
+      case "FOLLOW":
+        return "Abonnés";
+      default:
+        return "Interactions";
+    }
+  };
+
   return (
     <div className={cn("space-y-2", className)}>
+      <div className="flex items-center gap-2 mb-4">
+        <Typography variant="body-sm" className="text-white/40 uppercase text-xs font-bold tracking-wider">
+          {getTitle()} · {interactions.length}
+        </Typography>
+      </div>
+      
       {interactions.map((interaction) => (
         <div
           key={interaction.id}
@@ -126,22 +130,16 @@ function InteractionListContent({
               </span>
               <span className="text-[10px] text-white/30">
                 {interaction.createdAt
-                  ? new Date(interaction.createdAt).toLocaleDateString(
-                      "fr-FR",
-                      {
-                        day: "numeric",
-                        month: "short",
-                      },
-                    )
+                  ? new Date(interaction.createdAt).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "short",
+                    })
                   : null}
               </span>
             </div>
             <span className="text-xs text-white/40">
               {interaction.user?.fullName || "Utilisateur"}
             </span>
-          </div>
-          <div className="text-xs text-white/20 uppercase font-bold">
-            {interactionType.toLowerCase()}
           </div>
         </div>
       ))}
@@ -162,92 +160,3 @@ function InteractionListContent({
     </div>
   );
 }
-
-// Sheet wrapper that pauses playback when open
-interface InteractionSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  entityId: string;
-  entityType: EntityType;
-  interactionType: "LIKE" | "SHARE" | "FOLLOW" | "BOOKMARK";
-  title?: string;
-}
-
-export function InteractionSheet({
-  open,
-  onOpenChange,
-  entityId,
-  entityType,
-  interactionType,
-  title,
-}: InteractionSheetProps) {
-  const setGlobalPause = useClipEngineStore((s) => s.setGlobalPause);
-
-  // Pause playback when sheet is open
-  useEffect(() => {
-    if (open) {
-      setGlobalPause(true);
-    } else {
-      setGlobalPause(false);
-    }
-  }, [open, setGlobalPause]);
-
-  const getTitle = () => {
-    if (title) return title;
-    switch (interactionType) {
-      case "LIKE":
-        return "Likes";
-      case "BOOKMARK":
-        return "Sauvegardes";
-      case "SHARE":
-        return "Partages";
-      case "FOLLOW":
-        return "Abonnes";
-      default:
-        return "Interactions";
-    }
-  };
-
-  const getIcon = () => {
-    switch (interactionType) {
-      case "LIKE":
-        return "❤️";
-      case "BOOKMARK":
-        return "🔖";
-      case "SHARE":
-        return "🔗";
-      case "FOLLOW":
-        return "👥";
-      default:
-        return "✨";
-    }
-  };
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="h-[70vh] rounded-t-[2.5rem] border-t border-white/10 bg-[#0a0a0b] p-0 overflow-hidden"
-      >
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-4 mb-2" />
-        <SheetHeader className="px-6 pb-4 border-b border-white/5">
-          <SheetTitle className="text-white flex items-center gap-3">
-            <span className="text-lg">{getIcon()}</span>
-            <span className="font-black tracking-tight text-xl">
-              {getTitle()}
-            </span>
-          </SheetTitle>
-        </SheetHeader>
-        <div className="h-full overflow-y-auto pt-4 pb-32 px-4">
-          <InteractionListContent
-            entityId={entityId}
-            entityType={entityType}
-            interactionType={interactionType}
-          />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-export { InteractionListContent as InteractionList };

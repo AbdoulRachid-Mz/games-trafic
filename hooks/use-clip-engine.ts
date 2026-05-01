@@ -44,8 +44,8 @@ interface ClipEngineState {
   setMediaState: (clipIndex: number, state: Partial<MediaState>) => void;
   resetMediaState: (clipIndex: number) => void;
   
-  // Navigation
-  goNext: (total: number) => void;
+  // Navigation - NO LOOP TO 0
+  goNext: (total: number, onEndReached?: () => void) => void;
   goPrev: () => void;
   goToIndex: (index: number, total: number) => void;
   
@@ -106,25 +106,22 @@ export const useClipEngineStore = create<ClipEngineState>()(
         },
       })),
       
-      // Navigation - NO scrollIntoView, just state change
-      goNext: (total) => {
+      // Navigation - NO LOOP TO 0
+      goNext: (total, onEndReached) => {
         const state = get();
         if (state.isTransitioning || total === 0) return;
         
         const nextIndex = state.currentIndex + 1;
+        
         if (nextIndex < total) {
           set({ isTransitioning: true });
-          // Small delay for transition animation
           setTimeout(() => {
             set({ currentIndex: nextIndex, isTransitioning: false });
           }, 50);
-        } else if (state.playbackMode === "loop") {
-          set({ isTransitioning: true });
-          setTimeout(() => {
-            set({ currentIndex: 0, isTransitioning: false });
-          }, 50);
+        } else {
+          // Only trigger end reached callback, NEVER loop to 0
+          onEndReached?.();
         }
-        // In "once" mode at end, do nothing (or trigger end callback)
       },
       
       goPrev: () => {
@@ -162,7 +159,6 @@ export const useClipEngineStore = create<ClipEngineState>()(
         isLongPressing: false,
         mediaStates: {},
         preloadedIndices: new Set(),
-        // Keep muted preference
       }),
     }),
     {
@@ -209,17 +205,10 @@ export function useClipEngine({
     }
   }, [store.currentIndex, onIndexChange]);
   
-  // Check for end reached
-  useEffect(() => {
-    if (store.currentIndex >= totalClips - 1 && totalClips > 0) {
-      onEndReached?.();
-    }
-  }, [store.currentIndex, totalClips, onEndReached]);
-  
-  // Navigation helpers
+  // Navigation helpers - pass onEndReached to goNext
   const goNext = useCallback(() => {
-    store.goNext(totalClips);
-  }, [totalClips, store]);
+    store.goNext(totalClips, onEndReached);
+  }, [totalClips, store, onEndReached]);
   
   const goPrev = useCallback(() => {
     store.goPrev();

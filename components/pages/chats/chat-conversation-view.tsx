@@ -1,8 +1,8 @@
-// app/chats/[entityType]/[entityId]/page.tsx
+// components/pages/chats/chat-conversation-view.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ChatHeader } from "@/components/pages/chats/chat-header";
 import { MessageList } from "@/components/pages/chats/message-list";
 import { MessageInput } from "@/components/pages/chats/message-input";
@@ -27,11 +27,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { JoinGroupDialog } from "@/components/pages/chats/join-group-dialog";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
+import { useChatAudioStore } from "@/stores/chat-audio-store";
 
-const VALID_ENTITY_TYPES: ChatEntityType[] = ["user", "group", "shop", "tournament"];
+interface ChatConversationViewProps {
+  entityType: ChatEntityType;
+  entityId: string;
+}
 
-export default function ChatConversationPage() {
-  const params = useParams();
+export function ChatConversationView({ entityType, entityId }: ChatConversationViewProps) {
   const router = useRouter();
   const { user } = useAuthContext();
   const {
@@ -40,6 +43,7 @@ export default function ChatConversationPage() {
     typingIndicators,
     onlineStatuses,
   } = useChatContext();
+  const { pause: pauseAudio } = useChatAudioStore();
 
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
@@ -47,26 +51,12 @@ export default function ChatConversationPage() {
   const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
 
-  const entityTypeRaw = params?.entityType as string;
-  const entityType = entityTypeRaw?.trim().toLowerCase() as ChatEntityType;
-  const entityId = params?.entityId as string;
   const chatId = `${entityType}:${entityId}` as ChatId;
 
-  // Validation des paramètres
+  // Pause audio when conversation changes
   useEffect(() => {
-    // Attendre que les paramètres soient disponibles (Next.js useParams peut être vide au premier rendu)
-    if (!params || Object.keys(params).length === 0) return;
-
-    if (!entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
-      console.error("Invalid chat params:", { entityType, entityId });
-      toast.error("Type de discussion invalide");
-      router.push("/chats");
-    }
-  }, [entityType, entityId, router, params]);
-
-  if (!params || Object.keys(params).length === 0 || !entityType || !entityId || !VALID_ENTITY_TYPES.includes(entityType)) {
-    return null;
-  }
+    pauseAudio();
+  }, [chatId]);
 
   // Fetch entity details
   const isGroup = entityType === "group";
@@ -267,7 +257,7 @@ export default function ChatConversationPage() {
         } else {
           next.add(messageId);
         }
-        
+
         // Update local counts
         setLikeCounts((prevCounts) => {
           const currentCount = prevCounts[messageId] || 0;
@@ -276,7 +266,7 @@ export default function ChatConversationPage() {
             [messageId]: isLiked ? Math.max(0, currentCount - 1) : currentCount + 1,
           };
         });
-        
+
         return next;
       });
 

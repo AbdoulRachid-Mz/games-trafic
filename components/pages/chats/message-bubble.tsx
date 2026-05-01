@@ -1,142 +1,24 @@
 // components/pages/chats/message-bubble.tsx
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/chat";
 import { formatMessageTime } from "@/lib/chat-utils";
 import { getInitials } from "@/utils/chat-helpers";
-import { Check, CheckCheck, Reply, Play, Pause, Mic, Download } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  Download,
+} from "lucide-react";
 import Image from "next/image";
 import { MessageActionsDropdown } from "./message-actions-dropdown";
 import { toast } from "sonner";
 import { useChatThemeContext } from "@/contexts/chat-theme-context";
+import { ChatAudioPlayer } from "./chat-audio-player";
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s < 10 ? "0" : ""}${s}`;
-}
-
-function AudioPlayer({ url, messageId, autoDownload = true }: { url: string; messageId: string; autoDownload?: boolean }) {
-  const [isDownloaded, setIsDownloaded] = useState(autoDownload);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    if (!isDownloaded) return;
-
-    const handleOtherAudioPlay = (e: CustomEvent) => {
-      if (e.detail.id !== messageId && isPlaying) {
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        setIsPlaying(false);
-      }
-    };
-    window.addEventListener("chat-audio-play", handleOtherAudioPlay as EventListener);
-    return () => window.removeEventListener("chat-audio-play", handleOtherAudioPlay as EventListener);
-  }, [isPlaying, messageId, isDownloaded]);
-
-  useEffect(() => {
-    if (!isDownloaded) return;
-    const audio = new Audio(url);
-    audioRef.current = audio;
-
-    const setAudioData = () => setDuration(audio.duration);
-    const setAudioTime = () =>
-      setProgress((audio.currentTime / audio.duration) * 100);
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setProgress(0);
-      audio.currentTime = 0;
-    };
-
-    audio.addEventListener("loadedmetadata", setAudioData);
-    audio.addEventListener("timeupdate", setAudioTime);
-    audio.addEventListener("ended", handleEnded);
-
-    return () => {
-      audio.pause();
-      audio.removeEventListener("loadedmetadata", setAudioData);
-      audio.removeEventListener("timeupdate", setAudioTime);
-      audio.removeEventListener("ended", handleEnded);
-    };
-  }, [url, isDownloaded]);
-
-  const handleDownload = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDownloaded(true);
-  };
-
-  const togglePlay = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        window.dispatchEvent(new CustomEvent("chat-audio-play", { detail: { id: messageId } }));
-        audioRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  if (!isDownloaded) {
-    return (
-      <div className="flex items-center gap-3 py-2 min-w-[200px]">
-        <div
-          onClick={handleDownload}
-          className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors"
-        >
-          <Download className="h-5 w-5 fill-current" />
-        </div>
-        <div className="flex-1 space-y-1">
-          <div className="h-1 w-full bg-white/30 rounded-full overflow-hidden" />
-          <div className="flex justify-between text-[10px] opacity-70">
-            <span>Télécharger l'audio</span>
-            <div className="flex items-center gap-1">
-              <Mic className="h-3 w-3" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-3 py-2 min-w-[200px]">
-      <div
-        onClick={togglePlay}
-        className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors"
-      >
-        {isPlaying ? (
-          <Pause className="h-5 w-5 fill-current" />
-        ) : (
-          <Play className="h-5 w-5 fill-current ml-1" />
-        )}
-      </div>
-      <div className="flex-1 space-y-1">
-        <div className="h-1 w-full bg-white/30 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-white transition-all duration-100"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <div className="flex justify-between text-[10px] opacity-70">
-          <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
-          <div className="flex items-center gap-1">
-            <span>{duration ? formatTime(duration) : "..."}</span>
-            <Mic className="h-3 w-3" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -213,7 +95,7 @@ export function MessageBubble({
         "flex gap-2 group relative",
         isSent ? "flex-row-reverse" : "flex-row",
         isSelectionMode && "cursor-pointer",
-        className
+        className,
       )}
       onClick={handleBubbleClick}
     >
@@ -222,7 +104,7 @@ export function MessageBubble({
         <div
           className={cn(
             "flex-shrink-0 flex items-center",
-            isSent ? "order-last ml-2" : "order-first mr-2"
+            isSent ? "order-last ml-2" : "order-first mr-2",
           )}
         >
           <div
@@ -230,12 +112,10 @@ export function MessageBubble({
               "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
               isSelected
                 ? "bg-[var(--chat-primary)] border-[var(--chat-primary)]"
-                : "border-[var(--chat-textMuted)] bg-transparent"
+                : "border-[var(--chat-textMuted)] bg-transparent",
             )}
           >
-            {isSelected && (
-              <Check className="h-3 w-3 text-white" />
-            )}
+            {isSelected && <Check className="h-3 w-3 text-white" />}
           </div>
         </div>
       )}
@@ -251,7 +131,9 @@ export function MessageBubble({
       )}
 
       {/* Message content column */}
-      <div className={cn("flex flex-col gap-1 max-w-[70%]", isSent && "items-end")}>
+      <div
+        className={cn("flex flex-col gap-1 max-w-[70%]", isSent && "items-end")}
+      >
         {/* Sender name (for group chats) */}
         {showSender && !isSent && (
           <span className="text-xs text-[var(--chat-textMuted)] px-3">
@@ -266,7 +148,7 @@ export function MessageBubble({
               "px-3 py-2 rounded-lg text-xs border-l-2",
               isSent
                 ? "bg-[var(--chat-messageSent)]/20 border-[var(--chat-messageSentText)]"
-                : "bg-[var(--chat-messageReceived)]/50 border-[var(--chat-primary)]"
+                : "bg-[var(--chat-messageReceived)]/50 border-[var(--chat-primary)]",
             )}
           >
             <p className="font-semibold text-[var(--chat-primary)]">
@@ -282,7 +164,7 @@ export function MessageBubble({
         <div
           className={cn(
             "flex items-end gap-1.5",
-            isSent ? "flex-row-reverse" : "flex-row"
+            isSent ? "flex-row-reverse" : "flex-row",
           )}
         >
           {/* Message bubble */}
@@ -292,7 +174,7 @@ export function MessageBubble({
               isSent
                 ? "bg-[var(--chat-primary)] text-white rounded-tr-none"
                 : "bg-[var(--chat-surface)] text-[var(--chat-text)] rounded-tl-none border border-[var(--chat-border)]",
-              message.isDeleted && "opacity-60 italic"
+              message.isDeleted && "opacity-60 italic",
             )}
           >
             {message.isDeleted ? (
@@ -308,7 +190,7 @@ export function MessageBubble({
                       "grid gap-1 mb-1.5",
                       message.images.length === 1 && "grid-cols-1",
                       message.images.length === 2 && "grid-cols-2",
-                      message.images.length >= 3 && "grid-cols-2"
+                      message.images.length >= 3 && "grid-cols-2",
                     )}
                   >
                     {message.images.slice(0, 4).map((image, index) => (
@@ -353,7 +235,12 @@ export function MessageBubble({
 
                 {/* Audio */}
                 {message.type === "AUDIO" && message.audioUrl && (
-                  <AudioPlayer url={message.audioUrl} messageId={message.id} autoDownload={autoDownload} />
+                  <ChatAudioPlayer
+                    src={message.audioUrl}
+                    messageId={message.id}
+                    isSent={isSent}
+                    autoDownload={autoDownload}
+                  />
                 )}
 
                 {/* Text */}
@@ -396,10 +283,7 @@ export function MessageBubble({
               onDelete={() => onDelete?.(message.id)}
               onPin={onPin ? () => onPin(message.id) : undefined}
               onSelect={onSelect ? () => onSelect(message.id) : undefined}
-              className={cn(
-                "mb-1 flex-shrink-0",
-                isSent ? "mr-0.5" : "ml-0.5"
-              )}
+              className={cn("mb-1 flex-shrink-0", isSent ? "mr-0.5" : "ml-0.5")}
             />
           )}
         </div>
@@ -416,7 +300,7 @@ export function MessageBubble({
               "bg-[var(--chat-surface)] border border-[var(--chat-border)] shadow-sm",
               "hover:scale-105 transition-transform cursor-pointer",
               isSent ? "self-end" : "self-start",
-              "-mt-1 mb-0.5"
+              "-mt-1 mb-0.5",
             )}
           >
             <span className="text-[13px]">❤️</span>

@@ -172,7 +172,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     {
       icon: <MessageCircle className="h-5 w-5" />,
       label: "Discuter",
-      onClick: () => router.push(`/chats/product/${currentProduct.id}`),
+      onClick: () => router.push(`/chats?entityType=user&entityId=${currentProduct.userId || currentProduct.shop?.ownerId}`),
       condition: !isOwner,
       color: "bg-amber-600 text-white",
     }

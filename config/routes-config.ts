@@ -296,8 +296,8 @@ export const ROUTE_CONFIG: RouteConfig[] = [
   {
     path: ["/chats", "/chats/**"],
     name: "Messagerie",
-    excludeLayout: false,
-    topMiddle: true,
+    excludeLayout: true,
+    topMiddle: false,
     footer: false,
     leftBar: false,
     rightBar: false,

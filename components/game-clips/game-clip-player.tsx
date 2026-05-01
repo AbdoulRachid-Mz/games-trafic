@@ -21,6 +21,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { ClipMediaController, type MediaItem } from "./clip-media-controller";
 import { useClipEngineStore } from "@/hooks/use-clip-engine";
+import {
+  useToggleInteraction,
+  useInteractionExists,
+  useEntityInteractionCounts,
+} from "@/hooks/use-interactions";
 
 // Minimal type for what we need
 interface ClipData {
@@ -103,12 +108,48 @@ export const GameClipPlayer = memo(function GameClipPlayer({
   const setGlobalPause = useClipEngineStore((s) => s.setGlobalPause);
   const setIsLongPressing = useClipEngineStore((s) => s.setIsLongPressing);
 
-  // Sync local state with props
+  // Fetch interaction states
+  const { data: isLiked } = useInteractionExists(
+    userId || "",
+    clip.id,
+    "GAMECLIP",
+    "LIKE",
+  );
+  const { data: isBookmarked } = useInteractionExists(
+    userId || "",
+    clip.id,
+    "GAMECLIP",
+    "BOOKMARK",
+  );
+  const { data: counts } = useEntityInteractionCounts(clip.id, "GAMECLIP");
+
+  // Mutations
+  const toggleLike = useToggleInteraction();
+  const toggleBookmark = useToggleInteraction();
+
+  // Local optimistic states
+  const [optimisticLiked, setOptimisticLiked] = useState<boolean | undefined>(
+    undefined,
+  );
+  const [optimisticBookmarked, setOptimisticBookmarked] = useState<
+    boolean | undefined
+  >(undefined);
+  const [optimisticLikesCount, setOptimisticLikesCount] = useState<
+    number | undefined
+  >(undefined);
+
+  // Sync local optimistic state with server state
   useEffect(() => {
-    setLocalLiked(clip.stats?.liked ?? false);
-    setLocalBookmarked(clip.stats?.bookmarked ?? false);
-    setLocalLikesCount(clip.stats?.likesCount ?? 0);
-  }, [clip.stats?.liked, clip.stats?.bookmarked, clip.stats?.likesCount]);
+    if (optimisticLiked === undefined) setOptimisticLiked(isLiked);
+  }, [isLiked]);
+  useEffect(() => {
+    if (optimisticBookmarked === undefined)
+      setOptimisticBookmarked(isBookmarked);
+  }, [isBookmarked]);
+  useEffect(() => {
+    if (optimisticLikesCount === undefined)
+      setOptimisticLikesCount(counts?.like ?? clip.stats?.likesCount ?? 0);
+  }, [counts?.like, clip.stats?.likesCount]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -139,12 +180,15 @@ export const GameClipPlayer = memo(function GameClipPlayer({
     );
 
     // Like if not already liked
-    if (!localLiked) {
-      setLocalLiked(true);
-      setLocalLikesCount((prev) => prev + 1);
-      onLike?.();
+    if (!optimisticLiked) {
+      setOptimisticLiked(true);
+      setOptimisticLikesCount((prev) => (prev ?? 0) + 1);
+      toggleLike.mutate(
+        { userId, entityId: clip.id, entityType: "GAMECLIP", type: "LIKE" },
+        { onSuccess: () => onLike?.() },
+      );
     }
-  }, [userId, localLiked, onLike]);
+  }, [userId, optimisticLiked, toggleLike, clip.id, onLike]);
 
   // Tap center to toggle pause
   const handleTapCenter = useCallback(() => {
@@ -184,11 +228,17 @@ export const GameClipPlayer = memo(function GameClipPlayer({
       e.stopPropagation();
       if (!userId) return;
 
-      setLocalLiked((prev) => !prev);
-      setLocalLikesCount((prev) => (localLiked ? prev - 1 : prev + 1));
-      onLike?.();
+      const newLiked = !optimisticLiked;
+      setOptimisticLiked(newLiked);
+      setOptimisticLikesCount((prev) =>
+        newLiked ? (prev ?? 0) + 1 : Math.max(0, (prev ?? 1) - 1),
+      );
+      toggleLike.mutate(
+        { userId, entityId: clip.id, entityType: "GAMECLIP", type: "LIKE" },
+        { onSuccess: () => onLike?.() },
+      );
     },
-    [userId, localLiked, onLike],
+    [userId, optimisticLiked, toggleLike, clip.id, onLike],
   );
 
   // Bookmark handler
@@ -197,12 +247,14 @@ export const GameClipPlayer = memo(function GameClipPlayer({
       e.stopPropagation();
       if (!userId) return;
 
-      setLocalBookmarked((prev) => !prev);
-      onBookmark?.();
+      setOptimisticBookmarked((prev) => !prev);
+      toggleBookmark.mutate(
+        { userId, entityId: clip.id, entityType: "GAMECLIP", type: "BOOKMARK" },
+        { onSuccess: () => onBookmark?.() },
+      );
     },
-    [userId, onBookmark],
+    [userId, optimisticBookmarked, toggleBookmark, clip.id, onBookmark],
   );
-
   // Share handler
   const handleShare = useCallback(
     async (e: React.MouseEvent) => {
@@ -389,7 +441,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
             className={cn(
               "p-2 rounded-full transition-all active:scale-90",
               "bg-black/40 backdrop-blur-sm border border-white/10",
-              localLiked && "text-red-500",
+              localLiked ? "text-red-500" : "text-white",
             )}
           >
             <Heart className={cn("h-6 w-6", localLiked && "fill-current")} />

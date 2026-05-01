@@ -97,7 +97,7 @@ function GroupDetailContent() {
   };
 
   const handleStartChat = () => {
-    router.push(`/chats/group/${groupId}`);
+    router.push(`/chats?entityType=group&entityId=${groupId}`);
   };
 
   const handleRequestAccess = async () => {

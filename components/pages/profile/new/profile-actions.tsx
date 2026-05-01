@@ -131,7 +131,7 @@ export function ProfileActions({
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          router.push(`/chats/user/${userId}`);
+          router.push(`/chats?entityType=user&entityId=${userId}`);
         }}
       >
         <MessageSquare className="h-4 w-4 mr-2" />

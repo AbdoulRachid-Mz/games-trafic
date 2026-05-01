@@ -500,14 +500,14 @@ export const ClipMediaController = memo(function ClipMediaController({
       </AnimatePresence>
 
       {/* Pause Overlay */}
-      <AnimatePresence>
+      {/* <AnimatePresence>
         {showPauseIcon && (
           <motion.div
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
           >
             <motion.div
               className="bg-black/50 backdrop-blur-sm rounded-full p-6 border border-white/10"
@@ -522,7 +522,7 @@ export const ClipMediaController = memo(function ClipMediaController({
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence> */}
 
       {/* Video Error Fallback */}
       {videoError && isVideo && (

@@ -1,16 +1,21 @@
 // components/game-clips/game-clip-reel.tsx
 "use client";
 
-import React, { useEffect, useRef, useCallback, useState, memo } from "react";
-import { Loader2, Volume2, VolumeX, ArrowLeft, RefreshCw } from "lucide-react";
+import React, { useEffect, useRef, useCallback, useState, memo, useMemo } from "react";
+import { Loader2, Volume2, VolumeX, ArrowLeft, MessageCircle, Heart, Bookmark, Share2, X } from "lucide-react";
 import { GameClipPlayer } from "./game-clip-player";
 import { cn } from "@/lib/utils";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useClipEngineStore, useClipEngine } from "@/hooks/use-clip-engine";
 import { motion, AnimatePresence } from "framer-motion";
-import { CommentsSheet } from "@/components/comments/comments-sheet";
-import { InteractionSheet } from "./interaction-list";
+import { CommentsSection } from "@/components/comments/comments-section";
+import { InteractionList } from "./interaction-list";
 import { CircularProgress } from "@/components/shared/circular-progress";
+import { useScreenSize } from "@/hooks/use-screen";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 // Minimal type for clip data
 interface ClipData {
@@ -48,13 +53,10 @@ interface GameClipReelProps {
   isFetchingNextPage?: boolean;
   onFetchNextPage?: () => void;
   onClipChange?: (clipId: string, index: number) => void;
-  onCommentsToggle?: (clipId: string) => void;
   onLike?: (clipId: string) => void;
   onBookmark?: (clipId: string) => void;
   onShare?: (clipId: string) => void;
   className?: string;
-  onReshuffle?: () => void;  // NOUVEAU: callback pour reshuffle
-  isReshuffling?: boolean;    // NOUVEAU: état de reshuffle
 }
 
 // Individual clip wrapper component for intersection observer
@@ -72,6 +74,7 @@ const ClipItem = memo(function ClipItem({
   onNext,
   onPrev,
   onVisible,
+  isDesktopLayoutCompact = false,
 }: {
   clip: ClipData;
   index: number;
@@ -86,10 +89,12 @@ const ClipItem = memo(function ClipItem({
   onNext?: () => void;
   onPrev?: () => void;
   onVisible: (index: number, isVisible: boolean) => void;
+  isDesktopLayoutCompact?: boolean;
 }) {
   const itemRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Intersection observer for this item
+  // Intersection observer for this item - with debounce
   useEffect(() => {
     const element = itemRef.current;
     if (!element) return;
@@ -97,19 +102,25 @@ const ClipItem = memo(function ClipItem({
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            onVisible(index, true);
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.8) {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            timeoutRef.current = setTimeout(() => {
+              onVisible(index, true);
+            }, 100);
           }
         });
       },
       {
-        threshold: [0.6],
+        threshold: [0.8],
         rootMargin: "0px",
       }
     );
     
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
   }, [index, onVisible]);
   
   return (
@@ -117,7 +128,10 @@ const ClipItem = memo(function ClipItem({
       ref={itemRef}
       data-index={index}
       data-clip-id={clip.id}
-      className="h-screen w-full shrink-0 snap-start snap-always relative"
+      className={cn(
+        "h-screen shrink-0 snap-start snap-always relative transition-all duration-300 ease-out",
+        isDesktopLayoutCompact ? "w-[70%]" : "w-full"
+      )}
     >
       <GameClipPlayer
         clip={clip}
@@ -137,8 +151,180 @@ const ClipItem = memo(function ClipItem({
   );
 });
 
+// Local feed buffer hook - with continuous duplication
+function useFeedBuffer(clips: ClipData[], hasNextPage: boolean) {
+  const [feedClips, setFeedClips] = useState<ClipData[]>([]);
+  const [duplicationCount, setDuplicationCount] = useState(0);
+  const MAX_DUPLICATIONS = 5;
+
+  // Accumulate clips without duplicates
+  useEffect(() => {
+    if (clips.length > 0) {
+      setFeedClips((prev) => {
+        const existingIds = new Set(prev.map(c => c.id));
+        const newClips = clips.filter(c => !existingIds.has(c.id));
+        
+        if (newClips.length === 0) return prev;
+        
+        return [...prev, ...newClips];
+      });
+    }
+  }, [clips]);
+
+  // Continuous duplication when no more data
+  useEffect(() => {
+    if (!hasNextPage && feedClips.length > 0 && duplicationCount < MAX_DUPLICATIONS) {
+      const shuffledBatch = [...feedClips]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 12);
+      
+      setFeedClips((prev) => [...prev, ...shuffledBatch]);
+      setDuplicationCount(prev => prev + 1);
+    }
+  }, [hasNextPage, feedClips.length, duplicationCount]);
+
+  // Reset duplication count when we get new real data
+  useEffect(() => {
+    if (clips.length > 0 && hasNextPage) {
+      setDuplicationCount(0);
+    }
+  }, [clips.length, hasNextPage]);
+
+  return { feedClips, duplicationCount };
+}
+
+// Desktop side panel with clip resizing
+function DesktopSidePanel({ 
+  clip, 
+  userId, 
+  isOpen,
+  onClose,
+  onLike,
+  onBookmark,
+  onShare,
+}: {
+  clip: ClipData | null;
+  userId?: string;
+  isOpen: boolean;
+  onClose: () => void;
+  onLike?: (clipId: string) => void;
+  onBookmark?: (clipId: string) => void;
+  onShare?: (clipId: string) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"comments" | "likes" | "bookmarks">("comments");
+  const setGlobalPause = useClipEngineStore((s) => s.setGlobalPause);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGlobalPause(true);
+    } else {
+      setGlobalPause(false);
+    }
+    return () => {
+      setGlobalPause(false);
+    };
+  }, [isOpen, setGlobalPause]);
+
+  if (!clip) return null;
+
+  return (
+    <motion.div
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: isOpen ? "30%" : 0, opacity: isOpen ? 1 : 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={cn(
+        "h-full bg-background border-l border-white/10 z-40 overflow-hidden",
+        !isOpen && "border-l-0"
+      )}
+    >
+      <div className="h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 relative rounded-full bg-primary/20 flex items-center justify-center">
+              {clip.game?.profileImage ? (
+                <Image src={clip.game.profileImage} alt={`image-${clip.id}`} className="w-6 h-6 rounded-full" />
+              ) : (
+                <span className="text-primary text-xs font-bold">{clip.game?.name?.[0] || "G"}</span>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white line-clamp-1">{clip.game?.name || "Game Clip"}</p>
+              <p className="text-xs text-white/40">@{clip.author?.username}</p>
+            </div>
+          </div>
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-white/10"
+          >
+            <X className="h-5 w-5 text-white/60" />
+          </Button>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="w-full rounded-none border-b border-white/10 bg-transparent p-0 h-auto">
+            <TabsTrigger
+              value="comments"
+              className="flex-1 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-white text-white/50"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Commentaires
+              <span className="ml-1 text-xs">({clip.stats?.commentsCount || 0})</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="likes"
+              className="flex-1 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-white text-white/50"
+            >
+              <Heart className="h-4 w-4 mr-2" />
+              Likes
+              <span className="ml-1 text-xs">({clip.stats?.likesCount || 0})</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="bookmarks"
+              className="flex-1 py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-white text-white/50"
+            >
+              <Bookmark className="h-4 w-4 mr-2" />
+              Sauvegardes
+            </TabsTrigger>
+          </TabsList>
+
+          <ScrollArea className="flex-1">
+            <TabsContent value="comments" className="m-0 p-4">
+              <CommentsSection
+                entityId={clip.id}
+                entityType="GAMECLIP"
+                title=""
+                className="mt-0"
+              />
+            </TabsContent>
+            <TabsContent value="likes" className="m-0 p-4">
+              <InteractionList
+                entityId={clip.id}
+                entityType="GAMECLIP"
+                interactionType="LIKE"
+                className="mt-0"
+              />
+            </TabsContent>
+            <TabsContent value="bookmarks" className="m-0 p-4">
+              <InteractionList
+                entityId={clip.id}
+                entityType="GAMECLIP"
+                interactionType="BOOKMARK"
+                className="mt-0"
+              />
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
+      </div>
+    </motion.div>
+  );
+}
+
 export function GameClipReel({
-  clips,
+  clips: rawClips,
   initialClipId,
   userId,
   loading = false,
@@ -146,36 +332,41 @@ export function GameClipReel({
   isFetchingNextPage = false,
   onFetchNextPage,
   onClipChange,
-  onCommentsToggle,
   onLike,
   onBookmark,
   onShare,
-  onReshuffle,      // NOUVEAU
-  isReshuffling = false, // NOUVEAU
   className,
 }: GameClipReelProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const autoReshuffleTriggeredRef = useRef(false); // NOUVEAU: pour éviter les doubles déclenchements
+  const isNearEndTriggeredRef = useRef(false);
+  const { isDesktop } = useScreenSize();
   
   // Refs pour la détection de swipe
   const touchStartRef = useRef<{ y: number; x: number } | null>(null);
-  const touchEndRef = useRef<{ y: number; x: number } | null>(null);
-  const [isSwiping, setIsSwiping] = useState(false);
   
-  // Sheet states
-  const [commentsSheetOpen, setCommentsSheetOpen] = useState(false);
-  const [likesSheetOpen, setLikesSheetOpen] = useState(false);
-  const [bookmarksSheetOpen, setBookmarksSheetOpen] = useState(false);
-  const [activeSheetClipId, setActiveSheetClipId] = useState<string | null>(null);
+  // Sheet state for mobile
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [mobileSheetType, setMobileSheetType] = useState<"comments" | "likes" | "bookmarks">("comments");
+  
+  // Desktop side panel state
+  const [desktopPanelOpen, setDesktopPanelOpen] = useState(false);
+  
+  // Local feed buffer
+  const { feedClips, duplicationCount } = useFeedBuffer(rawClips, hasNextPage);
   
   // Find initial index
-  const initialIndex = initialClipId
-    ? clips.findIndex((c) => c.id === initialClipId)
-    : 0;
+  const initialIndex = useMemo(() => {
+    if (initialClipId && feedClips.length > 0) {
+      const idx = feedClips.findIndex((c) => c.id === initialClipId);
+      return idx >= 0 ? idx : 0;
+    }
+    return 0;
+  }, [initialClipId, feedClips]);
   
   // Use clip engine
   const {
@@ -188,64 +379,58 @@ export function GameClipReel({
     setPlaybackMode,
     toggleMute,
     setGlobalPause,
-    reset,
   } = useClipEngine({
-    totalClips: clips.length,
-    initialIndex: initialIndex >= 0 ? initialIndex : 0,
+    totalClips: feedClips.length,
+    initialIndex,
     onIndexChange: (index) => {
-      const clip = clips[index];
+      const clip = feedClips[index];
       if (clip) {
         onClipChange?.(clip.id, index);
+        // Close panel when clip changes on desktop
+        if (isDesktop) {
+          setDesktopPanelOpen(false);
+        } else {
+          setMobileSheetOpen(false);
+        }
       }
     },
     onEndReached: () => {
-      // Si on a plus de pages à charger, on charge
-      if (hasNextPage && !isFetchingNextPage) {
+      if (hasNextPage && !isFetchingNextPage && !isNearEndTriggeredRef.current) {
+        isNearEndTriggeredRef.current = true;
         onFetchNextPage?.();
+        setTimeout(() => {
+          isNearEndTriggeredRef.current = false;
+        }, 2000);
       }
     },
   });
+
+  // Get current clip
+  const currentClip = feedClips[currentIndex];
   
-  // NOUVEAU: Logique de rechargement automatique quand on approche de la fin
+  // Reset near end trigger when clips change
   useEffect(() => {
-    // Ne pas déclencher si on est en train de reshuffle ou si on charge déjà
-    if (isReshuffling || isFetchingNextPage) {
-      autoReshuffleTriggeredRef.current = false;
-      return;
-    }
-    
-    // Déclencher le reshuffle quand on est à l'avant-dernier clip
-    // et qu'on a déjà essayé de charger plus mais qu'il n'y en a pas
-    const isNearEnd = currentIndex >= clips.length - 2;
-    const noMorePages = !hasNextPage;
-    const hasClips = clips.length > 0;
-    
-    if (isNearEnd && noMorePages && hasClips && !autoReshuffleTriggeredRef.current && onReshuffle) {
-      autoReshuffleTriggeredRef.current = true;
-      
-      // Petit délai pour éviter les déclenchements trop rapides
-      const timer = setTimeout(() => {
-        console.log("[Auto-reshuffle] Déclenchement automatique - fin des clips approchée");
-        onReshuffle();
-        // Do NOT reset the ref here! It should only reset when clips change or we are no longer near end.
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-    
-    // Réinitialiser le flag si on n'est plus proche de la fin
-    if (!isNearEnd) {
-      autoReshuffleTriggeredRef.current = false;
-    }
-  }, [currentIndex, clips.length, hasNextPage, isFetchingNextPage, isReshuffling, onReshuffle]);
+    isNearEndTriggeredRef.current = false;
+  }, [feedClips.length]);
   
-  // Réinitialiser le flag de reshuffle automatique quand les clips changent
+  // Auto-load when near end
   useEffect(() => {
-    autoReshuffleTriggeredRef.current = false;
-  }, [clips.length]);
+    if (feedClips.length === 0) return;
+    
+    const isNearEnd = currentIndex >= feedClips.length - 3;
+    
+    if (isNearEnd && hasNextPage && !isFetchingNextPage && !isNearEndTriggeredRef.current) {
+      isNearEndTriggeredRef.current = true;
+      onFetchNextPage?.();
+      setTimeout(() => {
+        isNearEndTriggeredRef.current = false;
+      }, 2000);
+    }
+  }, [currentIndex, feedClips.length, hasNextPage, isFetchingNextPage, onFetchNextPage]);
   
   // Gestion des swipes tactiles
   const SWIPE_THRESHOLD = 50;
+  const MIN_SWIPE_DELTA = 30;
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -254,24 +439,6 @@ export function GameClipReel({
         y: touch.clientY,
         x: touch.clientX,
       };
-      touchEndRef.current = null;
-      setIsSwiping(false);
-    }
-  }, []);
-  
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    
-    const touch = e.touches[0];
-    if (touch) {
-      const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-      const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-      
-      if (deltaY > 10 && deltaY > deltaX) {
-        setIsSwiping(true);
-      } else {
-        setIsSwiping(false);
-      }
     }
   }, []);
   
@@ -280,15 +447,10 @@ export function GameClipReel({
     
     const touch = e.changedTouches[0];
     if (touch) {
-      touchEndRef.current = {
-        y: touch.clientY,
-        x: touch.clientX,
-      };
+      const deltaY = touch.clientY - touchStartRef.current.y;
+      const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
       
-      const deltaY = touchEndRef.current.y - touchStartRef.current.y;
-      const deltaX = Math.abs(touchEndRef.current.x - touchStartRef.current.x);
-      
-      if (Math.abs(deltaY) > SWIPE_THRESHOLD && Math.abs(deltaY) > deltaX) {
+      if (Math.abs(deltaY) > SWIPE_THRESHOLD && Math.abs(deltaY) > deltaX + MIN_SWIPE_DELTA) {
         if (deltaY > 0) {
           goPrev();
         } else {
@@ -298,13 +460,11 @@ export function GameClipReel({
     }
     
     touchStartRef.current = null;
-    touchEndRef.current = null;
-    setIsSwiping(false);
   }, [goPrev, goNext]);
   
-  // Scroll to current index
+  // Scroll to current index with guard
   useEffect(() => {
-    if (!containerRef.current || isScrollingRef.current || clips.length === 0) return;
+    if (!containerRef.current || isScrollingRef.current || feedClips.length === 0) return;
     
     const targetElement = containerRef.current.querySelector(
       `[data-index="${currentIndex}"]`
@@ -314,21 +474,22 @@ export function GameClipReel({
       const container = containerRef.current;
       const targetTop = targetElement.offsetTop;
       const currentScroll = container.scrollTop;
+      const diff = Math.abs(targetTop - currentScroll);
       
-      if (Math.abs(targetTop - currentScroll) > 10) {
-        isScrollingRef.current = true;
-        container.scrollTo({
-          top: targetTop,
-          behavior: "smooth",
-        });
-        
-        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = setTimeout(() => {
-          isScrollingRef.current = false;
-        }, 500);
-      }
+      if (diff < 5) return;
+      
+      isScrollingRef.current = true;
+      container.scrollTo({
+        top: targetTop,
+        behavior: "smooth",
+      });
+      
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 800);
     }
-  }, [currentIndex, clips.length]);
+  }, [currentIndex, feedClips.length]);
   
   // Handle visible clip
   const handleClipVisible = useCallback(
@@ -345,10 +506,8 @@ export function GameClipReel({
   
   // Handle clip complete
   const handleComplete = useCallback(() => {
-    if (playbackMode === "once") {
-      goNext();
-    }
-  }, [playbackMode, goNext]);
+    goNext();
+  }, [goNext]);
   
   // Page visibility API
   useEffect(() => {
@@ -411,20 +570,21 @@ export function GameClipReel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [goNext, goPrev, toggleMute, setGlobalPause]);
   
-  // Sheet handlers
-  const handleOpenComments = useCallback((clipId: string) => {
-    setActiveSheetClipId(clipId);
-    setCommentsSheetOpen(true);
-  }, []);
+  // Mobile sheet handlers
+  const handleOpenMobileSheet = useCallback((type: "comments" | "likes" | "bookmarks") => {
+    setMobileSheetType(type);
+    setMobileSheetOpen(true);
+    setGlobalPause(true);
+  }, [setGlobalPause]);
   
-  const handleOpenLikes = useCallback((clipId: string) => {
-    setActiveSheetClipId(clipId);
-    setLikesSheetOpen(true);
-  }, []);
+  const handleCloseMobileSheet = useCallback(() => {
+    setMobileSheetOpen(false);
+    setGlobalPause(false);
+  }, [setGlobalPause]);
   
-  const handleOpenBookmarks = useCallback((clipId: string) => {
-    setActiveSheetClipId(clipId);
-    setBookmarksSheetOpen(true);
+  // Desktop panel handlers
+  const handleToggleDesktopPanel = useCallback(() => {
+    setDesktopPanelOpen(prev => !prev);
   }, []);
   
   // Cleanup scroll timeout
@@ -434,16 +594,153 @@ export function GameClipReel({
     };
   }, []);
   
-  // NOUVEAU: Vérifier si on doit montrer le bouton de reshuffle
-  const showReshuffleButton = !hasNextPage && clips.length > 0 && !isFetchingNextPage && !loading;
-  // NOUVEAU: Vérifier si on est en train de reshuffle
-  const isCurrentlyReshuffling = isReshuffling || (onReshuffle && loading && clips.length === 0);
+  const isCurrentlyEmpty = !loading && feedClips.length === 0;
   
+  // Desktop layout: video with dynamic width + panel on right
+  if (isDesktop) {
+    return (
+      <div 
+        className={cn("relative h-screen w-full bg-black overflow-hidden flex", className)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Left side - Scroll Container with dynamic width */}
+        <div className={cn(
+          "h-full transition-all duration-300 ease-out",
+          desktopPanelOpen ? "w-[65%]" : "w-full"
+        )}>
+          {/* Header Controls */}
+          <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            
+            <div className="flex gap-0.5 bg-black/40 backdrop-blur-md rounded-full p-0.5 border border-white/10">
+              {(["manual", "once", "loop"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setPlaybackMode(mode)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all",
+                    playbackMode === mode
+                      ? "bg-white text-black"
+                      : "text-white/50 hover:text-white/80"
+                  )}
+                >
+                  {mode === "manual" ? "Manuel" : mode === "once" ? "Auto" : "Boucle"}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Mute Button */}
+          <button
+            onClick={toggleMute}
+            className="absolute top-4 right-4 z-50 bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
+            style={{ right: desktopPanelOpen ? "calc(30% + 1rem)" : "1rem" }}
+          >
+            {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
+          
+          {/* Main Scroll Container */}
+          <div
+            ref={containerRef}
+            className="h-full w-full overflow-y-scroll snap-y snap-mandatory overscroll-none scrollbar-none flex flex-col items-center"
+            style={{ scrollSnapType: "y mandatory" }}
+          >
+            {feedClips.map((clip, index) => {
+              const isActive = index === currentIndex;
+              const isPreload = Math.abs(index - currentIndex) <= 2;
+              
+              return (
+                <ClipItem
+                  key={`${clip.id}-${index}`}
+                  clip={clip}
+                  index={index}
+                  isActive={isActive}
+                  isPreload={isPreload}
+                  userId={userId}
+                  onComplete={handleComplete}
+                  onCommentsToggle={handleToggleDesktopPanel}
+                  onLike={() => onLike?.(clip.id)}
+                  onBookmark={() => onBookmark?.(clip.id)}
+                  onShare={() => onShare?.(clip.id)}
+                  onNext={goNext}
+                  onPrev={goPrev}
+                  onVisible={handleClipVisible}
+                  isDesktopLayoutCompact={desktopPanelOpen}
+                />
+              );
+            })}
+            
+            {/* Loading More */}
+            {isFetchingNextPage && (
+              <div className="h-screen w-full flex items-center justify-center snap-start bg-black">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+                  <span className="text-xs text-white/30 font-medium">Chargement...</span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Empty State */}
+          {isCurrentlyEmpty && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black p-6 text-center z-50">
+              <div className="text-6xl mb-4 opacity-20">🎬</div>
+              <h2 className="text-xl font-bold mb-2">Pas encore de clips</h2>
+              <p className="text-white/50 mb-6 max-w-xs">
+                Soyez le premier à partager un moment épique !
+              </p>
+              <button
+                onClick={() => router.push("/game-clips/create")}
+                className="bg-white text-black px-6 py-3 rounded-full font-bold hover:bg-white/90 transition-colors active:scale-95"
+              >
+                Créer un clip
+              </button>
+            </div>
+          )}
+          
+          {/* Initial Loading State */}
+          {loading && feedClips.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black z-50">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-10 w-10 animate-spin text-white/40" />
+                <div className="h-1 w-20 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-white/40"
+                    initial={{ x: "-100%" }}
+                    animate={{ x: "100%" }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Desktop Side Panel */}
+        <DesktopSidePanel
+          clip={currentClip}
+          userId={userId}
+          isOpen={desktopPanelOpen}
+          onClose={() => setDesktopPanelOpen(false)}
+          onLike={onLike}
+          onBookmark={onBookmark}
+          onShare={onShare}
+        />
+      </div>
+    );
+  }
+  
+  // Mobile layout (original)
   return (
     <div 
       className={cn("relative h-screen w-full bg-black overflow-hidden", className)}
       onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Header Controls */}
@@ -474,28 +771,12 @@ export function GameClipReel({
       </div>
       
       {/* Mute Button */}
-      <button
+      {/* <button
         onClick={toggleMute}
         className="absolute top-4 right-4 z-50 bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
       >
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-      </button>
-      
-      {/* Clip Counter */}
-      {clips.length > 0 && !isCurrentlyReshuffling && (
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50">
-          <CircularProgress
-            value={((currentIndex + 1) / clips.length) * 100}
-            size={44}
-            strokeWidth={2.5}
-            gradient={{ from: "#ffffff", to: "#a78bfa" }}
-          >
-            <span className="text-[10px] font-bold text-white/90">
-              {currentIndex + 1}/{clips.length}
-            </span>
-          </CircularProgress>
-        </div>
-      )}
+      </button> */}
       
       {/* Main Scroll Container */}
       <div
@@ -503,20 +784,20 @@ export function GameClipReel({
         className="h-full w-full overflow-y-scroll snap-y snap-mandatory overscroll-none scrollbar-none"
         style={{ scrollSnapType: "y mandatory" }}
       >
-        {clips.map((clip, index) => {
+        {feedClips.map((clip, index) => {
           const isActive = index === currentIndex;
-          const isPreload = Math.abs(index - currentIndex) <= 1;
+          const isPreload = Math.abs(index - currentIndex) <= 2;
           
           return (
             <ClipItem
-              key={clip.id}
+              key={`${clip.id}-${index}`}
               clip={clip}
               index={index}
               isActive={isActive}
               isPreload={isPreload}
               userId={userId}
               onComplete={handleComplete}
-              onCommentsToggle={() => handleOpenComments(clip.id)}
+              onCommentsToggle={() => handleOpenMobileSheet("comments")}
               onLike={() => onLike?.(clip.id)}
               onBookmark={() => onBookmark?.(clip.id)}
               onShare={() => onShare?.(clip.id)}
@@ -536,58 +817,10 @@ export function GameClipReel({
             </div>
           </div>
         )}
-        
-        {/* End of Feed - Bouton de reshuffle (apparaît quand plus de clips) */}
-        {showReshuffleButton && !isCurrentlyReshuffling && clips.length > 0 && (
-          <div className="h-screen w-full flex items-center justify-center snap-start bg-gradient-to-b from-black to-zinc-900">
-            <motion.button
-              onClick={onReshuffle}
-              className="group flex flex-col items-center gap-4 p-8 rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 transition-all"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              >
-                <RefreshCw className="h-12 w-12 text-white/60 group-hover:text-white transition-colors" />
-              </motion.div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-white mb-1">Fin du fil</p>
-                <p className="text-sm text-white/40">Appuyez pour recharger</p>
-              </div>
-            </motion.button>
-          </div>
-        )}
-        
-        {/* État de reshuffle en cours */}
-        {isCurrentlyReshuffling && clips.length === 0 && (
-          <div className="h-screen w-full flex items-center justify-center snap-start bg-black">
-            <div className="flex flex-col items-center gap-4">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-              >
-                <RefreshCw className="h-10 w-10 text-white/60" />
-              </motion.div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-white/60">Rechargement des clips...</p>
-                <p className="text-xs text-white/30 mt-1">Nouveaux contenus bientôt</p>
-              </div>
-              <div className="w-32 h-[2px] bg-white/10 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-primary to-purple-500"
-                  animate={{ x: ["-100%", "100%"] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       
       {/* Empty State */}
-      {!loading && !isCurrentlyReshuffling && clips.length === 0 && (
+      {isCurrentlyEmpty && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black p-6 text-center z-50">
           <div className="text-6xl mb-4 opacity-20">🎬</div>
           <h2 className="text-xl font-bold mb-2">Pas encore de clips</h2>
@@ -604,7 +837,7 @@ export function GameClipReel({
       )}
       
       {/* Initial Loading State */}
-      {loading && clips.length === 0 && !isCurrentlyReshuffling && (
+      {loading && feedClips.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-50">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-white/40" />
@@ -620,33 +853,101 @@ export function GameClipReel({
         </div>
       )}
       
-      {/* Sheets */}
-      {activeSheetClipId && (
-        <>
-          <CommentsSheet
-            open={commentsSheetOpen}
-            onOpenChange={setCommentsSheetOpen}
-            entityId={activeSheetClipId}
-            entityType="GAMECLIP"
-          />
-          <InteractionSheet
-            open={likesSheetOpen}
-            onOpenChange={setLikesSheetOpen}
-            entityId={activeSheetClipId}
-            entityType="GAMECLIP"
-            interactionType="LIKE"
-            title="Likes"
-          />
-          <InteractionSheet
-            open={bookmarksSheetOpen}
-            onOpenChange={setBookmarksSheetOpen}
-            entityId={activeSheetClipId}
-            entityType="GAMECLIP"
-            interactionType="BOOKMARK"
-            title="Sauvegardes"
-          />
-        </>
-      )}
+      {/* Mobile Sheets */}
+      <>
+        {/* Comments Sheet */}
+        <div
+          className={cn(
+            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70vh]",
+            mobileSheetOpen && mobileSheetType === "comments" ? "translate-y-0" : "translate-y-full"
+          )}
+        >
+          <div className="sticky top-0 bg-[#0a0a0b] pt-3 pb-2">
+            <div 
+              className="w-12 h-1.5 bg-white/20 rounded-full mx-auto cursor-pointer"
+              onClick={handleCloseMobileSheet}
+            />
+            <div className="flex items-center justify-between px-4 pt-2">
+              <h3 className="text-white font-bold">Commentaires</h3>
+              <button onClick={handleCloseMobileSheet} className="p-1">
+                <X className="h-5 w-5 text-white/60" />
+              </button>
+            </div>
+          </div>
+          <div className="h-[calc(70vh-60px)] overflow-y-auto px-4 pb-20">
+            {currentClip && (
+              <CommentsSection
+                entityId={currentClip.id}
+                entityType="GAMECLIP"
+                title=""
+                className="mt-0"
+              />
+            )}
+          </div>
+        </div>
+        
+        {/* Likes Sheet */}
+        <div
+          className={cn(
+            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70vh]",
+            mobileSheetOpen && mobileSheetType === "likes" ? "translate-y-0" : "translate-y-full"
+          )}
+        >
+          <div className="sticky top-0 bg-[#0a0a0b] pt-3 pb-2">
+            <div 
+              className="w-12 h-1.5 bg-white/20 rounded-full mx-auto cursor-pointer"
+              onClick={handleCloseMobileSheet}
+            />
+            <div className="flex items-center justify-between px-4 pt-2">
+              <h3 className="text-white font-bold">Likes</h3>
+              <button onClick={handleCloseMobileSheet} className="p-1">
+                <X className="h-5 w-5 text-white/60" />
+              </button>
+            </div>
+          </div>
+          <div className="h-[calc(70vh-60px)] overflow-y-auto px-4 pb-20">
+            {currentClip && (
+              <InteractionList
+                entityId={currentClip.id}
+                entityType="GAMECLIP"
+                interactionType="LIKE"
+                className="mt-0"
+              />
+            )}
+          </div>
+        </div>
+        
+        {/* Bookmarks Sheet */}
+        <div
+          className={cn(
+            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70vh]",
+            mobileSheetOpen && mobileSheetType === "bookmarks" ? "translate-y-0" : "translate-y-full"
+          )}
+        >
+          <div className="sticky top-0 bg-[#0a0a0b] pt-3 pb-2">
+            <div 
+              className="w-12 h-1.5 bg-white/20 rounded-full mx-auto cursor-pointer"
+              onClick={handleCloseMobileSheet}
+            />
+            <div className="flex items-center justify-between px-4 pt-2">
+              <h3 className="text-white font-bold">Sauvegardes</h3>
+              <button onClick={handleCloseMobileSheet} className="p-1">
+                <X className="h-5 w-5 text-white/60" />
+              </button>
+            </div>
+          </div>
+          <div className="h-[calc(70vh-60px)] overflow-y-auto px-4 pb-20">
+            {currentClip && (
+              <InteractionList
+                entityId={currentClip.id}
+                entityType="GAMECLIP"
+                interactionType="BOOKMARK"
+                className="mt-0"
+              />
+            )}
+          </div>
+        </div>
+      </>
     </div>
   );
 }
