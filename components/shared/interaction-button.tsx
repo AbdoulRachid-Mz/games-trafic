@@ -58,7 +58,7 @@ export function InteractionButton({
   size = "md",
   withConfetti = true,
   withCount = true,
-}: InteractionButtonProps) {
+}: InteractionButtonProps): React.JSX.Element {
   const { user, isAuthenticated } = useAuthContext();
   const { mutate: toggle } = useToggleInteraction();
   const { data: counts } = useEntityInteractionCounts(entityId, entityType);

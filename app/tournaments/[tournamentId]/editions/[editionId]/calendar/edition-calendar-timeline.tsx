@@ -1,8 +1,8 @@
 // components/pages/tournaments/editions/calendar/edition-calendar-timeline.tsx
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useMemo } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,13 +16,11 @@ import {
   CheckCircle2,
   AlertCircle,
   CalendarDays,
-  ShieldCheck,
   ShieldAlert,
   ArrowRight,
+  Swords,
   Search,
-  Filter,
-  LayoutGrid,
-  ArrowLeft,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -30,15 +28,9 @@ import {
   addDays,
   subDays,
   isSameDay,
-  startOfWeek,
-  endOfWeek,
 } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-  useMatchesByPhase,
-  useMatchesByGroup,
-  useMatchList,
-} from "@/hooks/use-match-manager";
+import { useMatchList } from "@/hooks/use-match-manager";
 import { usePhases } from "@/hooks/use-phase-manager";
 import { useGroups } from "@/hooks/use-group-manager";
 import {
@@ -48,13 +40,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Typography } from "@/components/ui/typography";
-import Link from "next/link";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { updateMatchResult } from "@/actions/tournaments";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
+import Image from "next/image";
 
 interface EditionCalendarTimelineProps {
   editionId: string;
@@ -130,7 +121,7 @@ export function EditionCalendarTimeline({
     (m: any) => m.status === "COMPLETED",
   ).length;
   const inProgressMatches = matches.filter(
-    (m: any) => m.status === "IN_PROGRESS",
+    (m: any) => m.status === "IN_PROGRESS" || m.status === "LIVE",
   ).length;
   const myMatches = matches.filter(
     (m: any) =>
@@ -140,11 +131,14 @@ export function EditionCalendarTimeline({
 
   return (
     <div className="space-y-6">
-      {/* Filtres */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex flex-wrap gap-3">
-          <Select value={selectedPhaseId} onValueChange={setSelectedPhaseId}>
-            <SelectTrigger className="w-fit">
+      {/* Barre de Filtres Esports */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-start sm:items-center bg-card/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 shadow-xl">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={selectedPhaseId} onValueChange={(val) => {
+            setSelectedPhaseId(val);
+            setSelectedGroupId("all");
+          }}>
+            <SelectTrigger className="w-fit min-w-[160px] bg-background/50 border-white/10 font-bold text-xs">
               <SelectValue placeholder="Toutes les phases" />
             </SelectTrigger>
             <SelectContent>
@@ -159,7 +153,7 @@ export function EditionCalendarTimeline({
 
           {groups.length > 0 && selectedPhaseId !== "all" && (
             <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-              <SelectTrigger className="w-[180px] max-md:w-full">
+              <SelectTrigger className="w-fit min-w-[150px] bg-background/50 border-white/10 font-bold text-xs">
                 <SelectValue placeholder="Tous les groupes" />
               </SelectTrigger>
               <SelectContent>
@@ -174,89 +168,84 @@ export function EditionCalendarTimeline({
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowUnplanned(!showUnplanned)}
             className={cn(
-              "gap-2 max-md:flex-1",
-              showUnplanned && "bg-amber-500/10 text-amber-600 border-amber-500/20"
+              "gap-2 font-bold text-xs border-white/10",
+              showUnplanned && "bg-amber-500/20 text-amber-300 border-amber-500/40"
             )}
           >
             <AlertCircle className="h-4 w-4" />
             Non planifiés ({unplannedMatches.length})
           </Button>
-          <div className="h-8 w-px bg-border mx-1" />
+
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={() => setCurrentDate(new Date())}
-            className="max-md:flex-1"
+            className="font-bold text-xs shadow-[0_0_15px_rgba(var(--primary),0.3)]"
           >
-            Aujourd'hui
+            Aujourd&apos;hui
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats rapides du calendrier */}
       <StatsCarousel
         data={[
           {
-            title: "Total matchs",
+            title: "Total Matchs",
             value: totalMatches,
-            icon: <CalendarDays className="h-4 w-4" />,
-            // bgType: "blue",
-            className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+            icon: <CalendarDays className="h-5 w-5" />,
+            className: "bg-blue-500/10 text-blue-500 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]",
           },
           {
             title: "Terminés",
             value: completedMatches,
-            icon: <CheckCircle2 className="h-4 w-4" />,
-            // bgType: "green",
-            className: "bg-green-500/10 text-green-600 border-green-500/20",
+            icon: <CheckCircle2 className="h-5 w-5" />,
+            className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]",
           },
           {
-            title: "En cours",
+            title: "En direct",
             value: inProgressMatches,
-            icon: <Clock className="h-4 w-4" />,
-            // bgType: "yellow",
-            className: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+            icon: <Zap className="h-5 w-5" />,
+            className: "bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]",
           },
           {
-            title: "Mes matchs",
+            title: "Mes Matchs",
             value: myMatches,
-            icon: <Users className="h-4 w-4" />,
-            // bgType: "purple",
-            className: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+            icon: <Users className="h-5 w-5" />,
+            className: "bg-purple-500/10 text-purple-500 border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]",
           },
           {
             title: "Phases",
             value: phases.length,
-            icon: <GitBranch className="h-4 w-4" />,
-            // bgType: "indigo",
-            className: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+            icon: <GitBranch className="h-5 w-5" />,
+            className: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]",
           },
         ]}
-        mode="auto"
-        withNavButtons
-        itemsPerView={{
-          mobile: 2,
-          md: 3,
-          lg: 4,
-          xl: 5,
-        }}
-        gap={12}
+        itemsPerView={{ mobile: 2, lg: 5 }}
       />
 
       {showUnplanned ? (
-        <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center gap-3 px-2">
-            <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600">
-              <AlertCircle className="h-4 w-4" />
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20">
+              <AlertCircle className="h-5 w-5" />
             </div>
-            <h3 className="font-bold text-lg">Matchs en attente de planification</h3>
+            <div>
+              <h3 className="font-black italic text-lg tracking-tight">
+                Matchs en attente de programmation
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Ces rencontres n&apos;ont pas encore d&apos;horaire fixé.
+              </p>
+            </div>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {unplannedMatches.map((match: any) => (
               <MatchTimelineCard
@@ -267,87 +256,104 @@ export function EditionCalendarTimeline({
               />
             ))}
           </div>
+
           {unplannedMatches.length === 0 && (
-            <Card className="border-dashed py-12 text-center text-muted-foreground">
-              <CardContent>Tous les matchs sont planifiés !</CardContent>
+            <Card className="border-dashed border-white/10 bg-card/30 py-12 text-center text-muted-foreground">
+              <CardContent>Tous les matchs sont planifiés sur le calendrier !</CardContent>
             </Card>
           )}
         </div>
       ) : (
         <>
-          {/* Timeline Navigation */}
-          <div className="flex items-center justify-between bg-card border rounded-xl p-4">
-            <Button variant="ghost" size="icon" onClick={goPrevDay}>
+          {/* Timeline Navigation Card */}
+          <div className="flex items-center justify-between bg-card/70 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-xl">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goPrevDay}
+              className="border-white/10 bg-background/50 hover:bg-background/90"
+            >
               <ChevronLeft className="h-5 w-5" />
             </Button>
 
             <div className="text-center">
-              <div className="text-2xl font-bold">
+              <div className="text-xl md:text-2xl font-black italic tracking-tight capitalize text-foreground">
                 {format(currentDateObj, "EEEE d MMMM yyyy", { locale: fr })}
               </div>
-              <div className="text-sm text-muted-foreground">
-                {todayMatches.length} match(s) ce jour
+              <div className="text-xs text-muted-foreground font-semibold mt-0.5">
+                {todayMatches.length} {todayMatches.length > 1 ? "matchs programmés" : "match programmé"} ce jour
               </div>
             </div>
 
-            <Button variant="ghost" size="icon" onClick={goNextDay}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goNextDay}
+              className="border-white/10 bg-background/50 hover:bg-background/90"
+            >
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
 
-          {/* Mini-calendar / Date selector */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {dates.slice(0, 14).map((dateKey) => {
-              const date = new Date(dateKey);
-              const matchCount = matchesByDate.get(dateKey)?.length || 0;
-              const isToday = isSameDay(date, new Date());
-              const isSelected = currentDateKey === dateKey;
+          {/* Sélecteur horizontal de dates (Corrigé pour afficher TOUTES les dates disponibles) */}
+          {dates.length > 0 && (
+            <div className="flex gap-2.5 overflow-x-auto pb-2 no-scrollbar">
+              {dates.map((dateKey) => {
+                const date = new Date(dateKey);
+                const matchCount = matchesByDate.get(dateKey)?.length || 0;
+                const isToday = isSameDay(date, new Date());
+                const isSelected = currentDateKey === dateKey;
 
-              return (currentDateKey === dateKey && (
-                <button
-                  key={dateKey}
-                  onClick={() => setCurrentDate(date)}
-                  className={cn(
-                    "flex flex-col items-center p-2 rounded-lg min-w-[70px] transition-all",
-                    isSelected && "bg-primary text-primary-foreground",
-                    !isSelected && isToday && "border border-primary bg-primary/5",
-                    !isSelected && !isToday && "hover:bg-muted",
-                  )}
-                >
-                  <span className="text-xs font-medium">
-                    {format(date, "EEE", { locale: fr })}
-                  </span>
-                  <span className="text-lg font-bold">{format(date, "d")}</span>
-                  <span className="text-[10px] opacity-70">
-                    {matchCount} match{matchCount > 1 ? "s" : ""}
-                  </span>
-                </button>
-              ));
-            })}
-          </div>
+                return (
+                  <button
+                    key={dateKey}
+                    onClick={() => setCurrentDate(date)}
+                    className={cn(
+                      "flex flex-col items-center px-4 py-2.5 rounded-2xl min-w-[85px] transition-all border shrink-0",
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary shadow-[0_0_15px_rgba(var(--primary),0.35)] scale-105"
+                        : isToday
+                        ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                        : "border-white/5 bg-card/60 hover:bg-card hover:border-white/15 text-muted-foreground"
+                    )}
+                  >
+                    <span className="text-[11px] font-black uppercase tracking-wider">
+                      {format(date, "EEE", { locale: fr })}
+                    </span>
+                    <span className="text-lg font-black">{format(date, "d")}</span>
+                    <span className="text-[10px] font-bold opacity-80">
+                      {matchCount} m.
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Matchs du jour */}
           <div className="space-y-4">
-            <h3 className="font-bold text-lg flex items-center gap-2">
+            <h3 className="font-black italic text-lg tracking-tight flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
-              Matchs du {format(currentDateObj, "dd MMMM yyyy", { locale: fr })}
+              Rencontres du {format(currentDateObj, "dd MMMM yyyy", { locale: fr })}
             </h3>
 
             {isLoading ? (
               <div className="animate-pulse space-y-3">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-24 bg-muted rounded-xl" />
+                  <div key={i} className="h-24 bg-card/40 border border-white/5 rounded-2xl" />
                 ))}
               </div>
             ) : todayMatches.length === 0 ? (
-              <Card className="border-dashed">
+              <Card className="border-dashed border-white/10 bg-card/30">
                 <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-4">
-                  <span>Aucun match programmé pour cette date.</span>
+                  <Clock className="w-10 h-10 opacity-30 text-primary" />
+                  <span className="text-sm">Aucun match programmé pour cette date.</span>
                   {unplannedMatches.length > 0 && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setShowUnplanned(true)}
+                      className="border-white/10 font-bold"
                     >
                       Voir les {unplannedMatches.length} matchs non planifiés
                     </Button>
@@ -355,51 +361,20 @@ export function EditionCalendarTimeline({
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {todayMatches
-                  .sort((a: any, b: any) => {
-                    const timeA = a.scheduledTime
-                      ? new Date(a.scheduledTime).getTime()
-                      : 0;
-                    const timeB = b.scheduledTime
-                      ? new Date(b.scheduledTime).getTime()
-                      : 0;
-                    return timeA - timeB;
-                  })
-                  .map((match: any) => (
-                    <MatchTimelineCard
-                      key={match.id}
-                      match={match}
-                      currentUserId={currentUserId}
-                      isAdmin={isAdmin}
-                    />
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {todayMatches.map((match: any) => (
+                  <MatchTimelineCard
+                    key={match.id}
+                    match={match}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
+                  />
+                ))}
               </div>
             )}
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-// Composant helper
-function StatCard({ label, value, icon, color }: any) {
-  const colors: any = {
-    blue: "bg-blue-50 border-blue-100 dark:bg-blue-900/20",
-    green: "bg-green-50 border-green-100 dark:bg-green-900/20",
-    yellow: "bg-yellow-50 border-yellow-100 dark:bg-yellow-900/20",
-    purple: "bg-purple-50 border-purple-100 dark:bg-purple-900/20",
-    indigo: "bg-indigo-50 border-indigo-100 dark:bg-indigo-900/20",
-  };
-
-  return (
-    <div className={cn("p-3 rounded-xl border", colors[color])}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="text-muted-foreground">{icon}</span>
-      </div>
-      <div className="text-2xl font-bold mt-1">{value}</div>
     </div>
   );
 }
@@ -410,10 +385,10 @@ function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
     match.participant2?.member?.userId === currentUserId;
 
   const router = useRouter();
-
   const canAdminValidate = isAdmin && match.status !== "COMPLETED";
 
-  const handleAdminValidate = async () => {
+  const handleAdminValidate = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const s1 = match.score1 ?? 0;
       const s2 = match.score2 ?? 0;
@@ -426,106 +401,126 @@ function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
     }
   };
 
+  const p1Name = match.participant1?.member?.displayName || match.participant1?.member?.user?.username || "TBD";
+  const p2Name = match.participant2?.member?.displayName || match.participant2?.member?.user?.username || "TBD";
+
+  const isLive = match.status === "IN_PROGRESS" || match.status === "LIVE";
+  const isCompleted = match.status === "COMPLETED";
+
   return (
-      <Card
-        className={cn(
-          "hover:shadow-lg transition-all group cursor-pointer border-2 hover:border-primary/50",
-          isMyMatch && "border-l-4 border-l-primary bg-primary/5",
+    <div
+      onClick={() => router.push(`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`)}
+      className={cn(
+        "group relative overflow-hidden bg-card/80 backdrop-blur-xl border border-white/10 hover:border-primary/50 rounded-2xl p-4 transition-all duration-300 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] cursor-pointer flex flex-col justify-between gap-3",
+        isMyMatch && "border-primary/40 bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]",
+        isLive && "border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.15)]"
+      )}
+    >
+      {/* Top Meta Bar */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-white/5">
+        <div className="flex items-center gap-2">
+          {/* Horodatage */}
+          <span className="font-mono font-bold text-foreground flex items-center gap-1 bg-background/60 px-2 py-0.5 rounded-md border border-white/5">
+            <Clock className="w-3 h-3 text-primary" />
+            {match.scheduledTime ? format(new Date(match.scheduledTime), "HH:mm") : "TBD"}
+          </span>
+
+          {match.phase?.name && (
+            <Badge variant="outline" className="text-[10px] font-bold border-white/10">
+              {match.phase.name}
+            </Badge>
+          )}
+
+          {match.group?.name && (
+            <Badge variant="secondary" className="text-[10px] font-bold">
+              {match.group.name}
+            </Badge>
+          )}
+        </div>
+
+        {/* Statut Badge */}
+        {isLive ? (
+          <Badge className="bg-red-500 text-white animate-pulse text-[10px] font-black uppercase">
+            EN DIRECT
+          </Badge>
+        ) : isCompleted ? (
+          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] font-black uppercase">
+            TERMINÉ
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="border-white/10 text-muted-foreground text-[10px] uppercase font-bold">
+            PROGRAMMÉ
+          </Badge>
         )}
-        onClick={() => router.push(`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`)}
-      >
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-4 flex-wrap flex-1">
-              {/* Heure */}
-              <div className="flex items-center gap-1 text-sm font-mono bg-muted px-2 py-1 rounded">
-                <Clock className="h-3 w-3" />
-                {match.scheduledTime
-                  ? format(new Date(match.scheduledTime), "HH:mm", { locale: fr })
-                  : "Horaire TBD"}
-              </div>
+      </div>
 
-              {/* Participants */}
-              <div className="flex items-center gap-3">
-                <span className="font-bold">
-                  {match.participant1?.member?.displayName || "TBD"}
-                </span>
-                <span className="text-muted-foreground text-xs font-black">
-                  VS
-                </span>
-                <span className="font-bold">
-                  {match.participant2?.member?.displayName || "TBD"}
-                </span>
-              </div>
-
-              {/* Badges */}
-              <div className="flex gap-2">
-                <Badge variant="outline" className="text-[10px]">
-                  {match.phase?.name || "Phase"}
-                </Badge>
-                {match.group?.name && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    {match.group.name}
-                  </Badge>
-                )}
-                {isMyMatch && (
-                  <Badge variant="default" className="text-[10px]">
-                    VOUS
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Score */}
-              {match.status === "COMPLETED" &&
-                match.score1 !== null &&
-                match.score2 !== null && (
-                  <div className="flex items-center gap-2 font-bold px-3 py-1 bg-primary/5 rounded-lg border border-primary/10">
-                    <span
-                      className={cn(
-                        match.winnerRegistrationId ===
-                          match.participant1RegistrationId && "text-primary",
-                      )}
-                    >
-                      {match.score1}
-                    </span>
-                    <span className="opacity-30">-</span>
-                    <span
-                      className={cn(
-                        match.winnerRegistrationId ===
-                          match.participant2RegistrationId && "text-primary",
-                      )}
-                    >
-                      {match.score2}
-                    </span>
-                  </div>
-                )}
-
-              <div className="flex items-center gap-2">
-                {canAdminValidate && (
-                  <ConfirmationDialog
-                    title="Validation Administrateur"
-                    description="Valider officiellement le score actuel ?"
-                    onConfirm={handleAdminValidate}
-                    confirmLabel="Valider"
-                    variant="default"
-                  >
-                    <div onClick={(e) => e.preventDefault()}>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10">
-                        <ShieldAlert className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </ConfirmationDialog>
-                )}
-                
-                <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+      {/* Participants & Scores */}
+      <div className="flex items-center justify-between gap-4 py-1">
+        {/* Joueur 1 */}
+        <div className="flex-1 flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-background/80 border border-white/10 flex items-center justify-center font-black text-xs text-primary shrink-0 overflow-hidden relative">
+            {match.participant1?.member?.user?.profileImage ? (
+              <Image
+                src={match.participant1.member.user.profileImage}
+                alt={p1Name}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              p1Name.charAt(0).toUpperCase()
+            )}
           </div>
-        </CardContent>
-      </Card>
+          <span className={cn("font-bold text-sm truncate", match.winnerRegistrationId === match.participant1RegistrationId && "text-primary font-black")}>
+            {p1Name}
+          </span>
+        </div>
+
+        {/* Score Box */}
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1 bg-background/60 rounded-xl border border-white/5">
+          <span className={cn("text-base font-black", match.winnerRegistrationId === match.participant1RegistrationId ? "text-primary" : "text-foreground")}>
+            {match.score1 ?? "-"}
+          </span>
+          <span className="text-xs text-muted-foreground font-black">:</span>
+          <span className={cn("text-base font-black", match.winnerRegistrationId === match.participant2RegistrationId ? "text-primary" : "text-foreground")}>
+            {match.score2 ?? "-"}
+          </span>
+        </div>
+
+        {/* Joueur 2 */}
+        <div className="flex-1 flex items-center justify-end gap-2.5 min-w-0 text-right">
+          <span className={cn("font-bold text-sm truncate", match.winnerRegistrationId === match.participant2RegistrationId && "text-primary font-black")}>
+            {p2Name}
+          </span>
+          <div className="w-8 h-8 rounded-full bg-background/80 border border-white/10 flex items-center justify-center font-black text-xs text-primary shrink-0 overflow-hidden relative">
+            {match.participant2?.member?.user?.profileImage ? (
+              <Image
+                src={match.participant2.member.user.profileImage}
+                alt={p2Name}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              p2Name.charAt(0).toUpperCase()
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer / Actions */}
+      <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] text-muted-foreground">
+        <div>
+          {isMyMatch && (
+            <Badge className="bg-primary/20 text-primary border-primary/30 text-[9px] font-black uppercase">
+              Votre Match
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 text-primary font-bold group-hover:translate-x-1 transition-transform">
+          <span>Détails & Score</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </div>
+      </div>
+    </div>
   );
 }

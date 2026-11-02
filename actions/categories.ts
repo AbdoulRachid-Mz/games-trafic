@@ -620,7 +620,7 @@ export async function detachCategoryFromEntity(
         )
       );
 
-    if (result.count > 0) {
+    if ((result.rowCount ?? 0) > 0) {
       // Mettre à jour le compteur d'éléments
       await updateCategoryItemCount(categoryId, -1);
       revalidateTag('categories', 'max');

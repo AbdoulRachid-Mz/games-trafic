@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -7,6 +7,7 @@ import { useApp } from "@/contexts/app-context";
 import { Typography } from "@/components/ui/typography";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import { fireConfettiPreset } from "@/utils/confetti";
 import { generateEnhancedReceipt } from "@/utils/receipt-templates";
 import { TransactionStepper } from "@/components/pages/transactions/create/transaction-stepper";
@@ -84,6 +85,7 @@ function CreateTransactionContent({
     metadata: {},
   });
   const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [verifiedPin, setVerifiedPin] = useState<string | null>(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [prefilledRecipientWalletId, setPrefilledRecipientWalletId] = useState<
     string | null
@@ -561,6 +563,7 @@ function CreateTransactionContent({
       });
 
       if (!response.ok) throw new Error("PIN incorrect");
+      setVerifiedPin(pin);
       await refreshProfile();
       nextStep();
     } catch {
@@ -655,7 +658,6 @@ function CreateTransactionContent({
       const order = await createProductOrder(
         {
           productId: transactionData.targetId,
-          totalAmount: transactionData.amount,
           buyerInstructions: transactionData.metadata?.buyerInstructions as
             | string
             | undefined,
@@ -689,6 +691,7 @@ function CreateTransactionContent({
           feesPercentage: feesObj.percentage,
           totalCalculated: feesObj.totalAmount,
         },
+        pin: verifiedPin || undefined,
       },
       { allowDuplicate },
     );
@@ -890,6 +893,12 @@ function CreateTransactionContent({
         return (
           <PinVerification
             onVerify={handlePinVerify}
+            onVerifyPasskey={async () => {
+              // Si le passkey est validé avec succès
+              await refreshProfile();
+              nextStep();
+            }}
+            hasPasskey={!!completeData?.hasPasskey}
             onBack={handleBack}
             isLoading={isLoading}
             transactionDetails={{
@@ -984,9 +993,18 @@ function CreateTransactionContent({
             />
           )}
 
-          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-            {renderStep()}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStepType || (showScanner ? "scanner" : "type")}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="mt-6"
+            >
+              {renderStep()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
       <AlertDialog

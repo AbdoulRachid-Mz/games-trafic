@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
@@ -31,6 +37,8 @@ interface ResponsiveTabsProps {
   children?: (tab: ResponsiveTab) => React.ReactNode;
   swipeable?: boolean;
   showNavButtons?: boolean;
+  shortLabel?: boolean;
+  labelCharacters?: number;
 }
 
 export function ResponsiveTabs({
@@ -44,6 +52,8 @@ export function ResponsiveTabs({
   children,
   swipeable = false,
   showNavButtons = false,
+  shortLabel = false,
+  labelCharacters = 10,
 }: ResponsiveTabsProps) {
   const { screenSize, isMobile } = useScreenSize();
   const [activeTab, setActiveTab] = useState(defaultValue || tabs[0]?.value);
@@ -101,14 +111,17 @@ export function ResponsiveTabs({
     const container = scrollContainerRef.current;
     if (container && swipeable) {
       container.addEventListener("scroll", updateScrollPosition);
-      return () => container.removeEventListener("scroll", updateScrollPosition);
+      return () =>
+        container.removeEventListener("scroll", updateScrollPosition);
     }
   }, [swipeable, updateScrollPosition]);
 
   const canScrollLeft = scrollPosition > 20;
   const canScrollRight = scrollContainerRef.current
     ? scrollPosition <
-      scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth - 20
+      scrollContainerRef.current.scrollWidth -
+        scrollContainerRef.current.clientWidth -
+        20
     : false;
 
   // Variante mobile avec swiping natif
@@ -189,7 +202,15 @@ export function ResponsiveTabs({
             >
               {tab.icon}
               <span className="hidden xs:inline text-sm">{tab.label}</span>
-              <span className="xs:hidden text-xs">{tab.label.slice(0, 3)}</span>
+              {shortLabel &&
+              labelCharacters > 0 &&
+              tab.label.length > labelCharacters ? (
+                <span className="xs:hidden text-xs">
+                  {tab.label.slice(0, labelCharacters || 7)}
+                </span>
+              ) : (
+                <span className="xs:hidden text-xs">{tab.label}</span>
+              )}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -235,22 +256,20 @@ export function ResponsiveTabs({
         )}
       </div>
 
-      {children ? (
-        tabs.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value}>
-            {children(tab)}
-          </TabsContent>
-        ))
-      ) : (
-        tabs.map(
-          (tab) =>
-            tab.content && (
-              <TabsContent key={tab.value} value={tab.value}>
-                {tab.content}
-              </TabsContent>
-            ),
-        )
-      )}
+      {children
+        ? tabs.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value}>
+              {children(tab)}
+            </TabsContent>
+          ))
+        : tabs.map(
+            (tab) =>
+              tab.content && (
+                <TabsContent key={tab.value} value={tab.value}>
+                  {tab.content}
+                </TabsContent>
+              ),
+          )}
     </Tabs>
   );
 }

@@ -102,6 +102,12 @@ export function TransactionAmountInput({
     isDeposit ||
     (walletBalance !== undefined && fees.totalAmount <= walletBalance);
 
+  const MIN_AMOUNT = process.env.NEXT_PUBLIC_MIN_TRANSACTION_AMOUNT 
+    ? parseFloat(process.env.NEXT_PUBLIC_MIN_TRANSACTION_AMOUNT) 
+    : 100;
+  
+  const isMinAmountRestricted = (isTransfer || isWithdrawal) && amount > 0 && amount < MIN_AMOUNT;
+
   const quickAmounts = isDeposit
     ? [500, 1000, 5000, 10000]
     : transactionType === "TRANSFER"
@@ -263,6 +269,15 @@ export function TransactionAmountInput({
                   ))}
                 </div>
               )}
+
+              {isMinAmountRestricted && (
+                <div className="flex items-center gap-2 justify-center text-red-500 bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                  <AlertTriangle className="w-5 h-5" />
+                  <Typography variant="body-sm" weight="bold">
+                    Le montant minimum pour cette transaction est de {MIN_AMOUNT} GTC
+                  </Typography>
+                </div>
+              )}
             </div>
           )}
 
@@ -383,6 +398,7 @@ export function TransactionAmountInput({
           disabled={
             (!amount && !entity?.price) ||
             (amount <= 0 && !entity?.price) ||
+            isMinAmountRestricted ||
             !hasSufficientBalance ||
             (isVip && !!alreadyVip) ||
             isUnavailable

@@ -19,7 +19,7 @@ import {
   isNull,
   isNotNull,
 } from "drizzle-orm";
-import { PaginationResponse, EntityQueryParams, TableName, entityFetchers } from "@/types/api";
+import { PaginationResponse, EntityQueryParams, TableName } from "@/types/api";
 
 /**
  * Fonction utilitaire pour vérifier si un export est une table Drizzle
@@ -864,6 +864,17 @@ export async function getGameItems(params: EntityQueryParams = {}) {
   };
 }
 
+
+const entityFetchers: Record<string, Function> = {
+  users: getUsers,
+  shops: getShops,
+  products: getProducts,
+  tournaments: getTournaments,
+  gameClips: getGameClips,
+  orders: getOrders,
+  themes: getThemes,
+  gameItems: getGameItems,
+};
 
 /**
  * Fonction principale pour récupérer des entités

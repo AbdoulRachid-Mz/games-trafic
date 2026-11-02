@@ -1,12 +1,12 @@
+// @/components/cards/member-card.tsx
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  MoreHorizontal,
   Shield,
   User,
   Trophy,
@@ -17,18 +17,7 @@ import {
   Eye,
   MessageSquare,
   Phone,
-  X,
-  Check,
-  ExternalLink,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -38,32 +27,34 @@ import {
 import { TournamentMemberWithRelations } from "@/database/schema";
 import { cn } from "@/lib/utils";
 import { useScreenSize } from "@/hooks/use-screen";
-import { useRouter } from "next/navigation";
-import { ActiveLink } from "../shared/active-link";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
 import Link from "next/link";
 
-interface MemberCardProps {
-  member: TournamentMemberWithRelations;
-  viewMode?: "grid" | "list";
+export interface MemberCardProps extends BaseCardProps<TournamentMemberWithRelations> {
   userDisplay?: "admin" | "organizer" | "member";
   showDetail?: boolean;
-  actions?: {
-    onEdit?: (id: string) => void;
-    onManage?: () => void;
-    onDelete?: (id: string) => void;
-    onViewProfile?: (id: string) => void;
-    onToggleCoOrganizer?: (id: string) => void;
-  };
+  onManage?: (item: TournamentMemberWithRelations) => void;
+  onViewProfile?: (item: TournamentMemberWithRelations) => void;
+  onToggleCoOrganizer?: (item: TournamentMemberWithRelations) => void;
 }
 
 export function MemberCard({
-  member,
+  item: member,
   viewMode = "grid",
+  status,
+  isCliquable = true,
+  isMini = false,
+  activeAction = "view",
+  onEdit,
+  onView,
+  onDelete,
+  onManage,
+  onViewProfile,
+  onToggleCoOrganizer,
   userDisplay = "member",
   showDetail,
-  actions,
+  className,
 }: MemberCardProps) {
-  const router = useRouter();
   const { isMobile, isTablet } = useScreenSize();
   const user = member?.user;
   const role = member.role || "PARTICIPANT";
@@ -71,8 +62,8 @@ export function MemberCard({
   const isBanned = member.isBanned ?? false;
   const isMe = member.userId === user?.id;
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
+  const getRoleBadge = (roleStr: string) => {
+    switch (roleStr) {
       case "ORGANIZER":
         return (
           <Badge className="bg-amber-500 hover:bg-amber-600 text-[9px] md:text-[10px] px-1.5 py-0">
@@ -121,6 +112,56 @@ export function MemberCard({
     }
   };
 
+  const handleMainAction = () => {
+    if (!isCliquable) return;
+    if (activeAction === "view" && onView) onView(member);
+    else if (activeAction === "edit" && onEdit) onEdit(member);
+    else if (activeAction === "delete" && onDelete) onDelete(member);
+    else if (onViewProfile) onViewProfile(member);
+  };
+
+  const extraActions: extraActionsProps[] = [];
+  if (member.contactEmail) {
+    extraActions.push({
+      id: "email",
+      label: "Envoyer un email",
+      icon: Mail,
+      onClick: handleEmail,
+    });
+  }
+  if (member.contactPhone || user?.phoneNumber) {
+    extraActions.push({
+      id: "whatsapp",
+      label: "WhatsApp",
+      icon: MessageSquare,
+      onClick: handleWhatsApp,
+    });
+    extraActions.push({
+      id: "call",
+      label: "Appeler",
+      icon: Phone,
+      onClick: handleCall,
+    });
+  }
+  if (userDisplay === "organizer" && member.userId && !isMe && onToggleCoOrganizer) {
+    extraActions.push({
+      id: "co-organizer",
+      label: role === "CO_ORGANIZER" ? "Retirer co-organisateur" : "Nommer co-organisateur",
+      icon: role === "CO_ORGANIZER" ? ShieldAlert : ShieldCheck,
+      onClick: () => onToggleCoOrganizer(member),
+    });
+  }
+  if (onManage) {
+    extraActions.push({
+      id: "manage",
+      label: "Gérer",
+      icon: PenSquare,
+      onClick: () => onManage(member),
+    });
+  }
+
+  const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
+
   // ============================================================
   // MODE LISTE
   // ============================================================
@@ -128,7 +169,14 @@ export function MemberCard({
     const isCompact = isMobile;
     
     return (
-      <div className="flex items-center justify-between p-3 md:p-4 rounded-xl border bg-card hover:bg-accent/5 transition-colors group">
+      <div 
+        className={cn(
+          "flex items-center justify-between p-3 md:p-4 rounded-xl border bg-card hover:bg-accent/5 transition-colors group relative overflow-hidden",
+          isCliquable && "cursor-pointer active:scale-[0.99]",
+          className
+        )}
+        onClick={handleMainAction}
+      >
         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
           <Avatar className="h-8 w-8 md:h-10 md:w-10 border shrink-0">
             <AvatarImage
@@ -170,7 +218,7 @@ export function MemberCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 md:gap-2">
+        <div className="flex items-center gap-1 md:gap-2" onClick={(e) => e.stopPropagation()}>
           {/* Actions rapides sur desktop */}
           {!isMobile && (
             <>
@@ -228,172 +276,49 @@ export function MemberCard({
             </>
           )}
 
-          {/* Dropdown menu pour toutes les actions */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
-                <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              
-              <DropdownMenuItem asChild>
-                <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
-                  <Eye className="h-3.5 w-3.5 mr-2" />
-                  Voir le profil
-                </Link>
-              </DropdownMenuItem>
-              
-              {(member.contactEmail) && (
-                <DropdownMenuItem onClick={handleEmail}>
-                  <Mail className="h-3.5 w-3.5 mr-2" />
-                  Envoyer un email
-                </DropdownMenuItem>
-              )}
-              
-              {(member.contactPhone || user?.phoneNumber) && (
-                <>
-                  <DropdownMenuItem onClick={handleWhatsApp}>
-                    <MessageSquare className="h-3.5 w-3.5 mr-2" />
-                    WhatsApp
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleCall}>
-                    <Phone className="h-3.5 w-3.5 mr-2" />
-                    Appeler
-                  </DropdownMenuItem>
-                </>
-              )}
-              
-              {userDisplay === "organizer" && member.userId && !isMe && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
-                  >
-                    {role === "CO_ORGANIZER" ? (
-                      <>
-                        <ShieldAlert className="h-3.5 w-3.5 mr-2" />
-                        Retirer co-organisateur
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="h-3.5 w-3.5 mr-2" />
-                        Nommer co-organisateur
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                </>
-              )}
-              
-              {actions?.onDelete && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => actions.onDelete!(member.id)}
-                  >
-                    <X className="h-3.5 w-3.5 mr-2" />
-                    Retirer du tournoi
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Dropdown menu centralisé */}
+          {hasActions && (
+            <CardActionMenu
+              onEdit={onEdit ? () => onEdit(member) : undefined}
+              onView={onView ? () => onView(member) : undefined}
+              onDelete={onDelete ? () => onDelete(member) : undefined}
+              entityName={`le membre ${member.displayName || user?.username}`}
+              extraActions={extraActions}
+            />
+          )}
         </div>
       </div>
     );
   }
 
   // ============================================================
-  // MODE GRILLE
+  // MODE GRILLE (DEFAULT)
   // ============================================================
-  const isCompactGrid = isMobile;
+  const isCompactGrid = isMobile || isMini;
   const avatarSize = isCompactGrid ? "h-16 w-16" : "h-20 w-20 md:h-24 md:w-24";
   const avatarFallbackSize = isCompactGrid ? "text-lg" : "text-xl md:text-2xl";
 
   return (
-    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300 border border-border/50 bg-gradient-to-br from-card to-card/80">
+    <Card 
+      className={cn(
+        "relative overflow-hidden group hover:shadow-xl transition-all duration-300 border border-border/50 bg-gradient-to-br from-card to-card/80",
+        isCliquable && "cursor-pointer active:scale-[0.99]",
+        className
+      )}
+      onClick={handleMainAction}
+    >
       {/* Actions en absolute top-right */}
-      <div className="absolute top-2 right-2 z-10">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 md:h-8 md:w-8 bg-background/50 backdrop-blur-sm rounded-full hover:bg-background/80"
-            >
-              <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            
-            <DropdownMenuItem asChild>
-              <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
-                <Eye className="h-3.5 w-3.5 mr-2" />
-                Voir le profil
-              </Link>
-            </DropdownMenuItem>
-            
-            {(member.contactEmail) && (
-              <DropdownMenuItem onClick={handleEmail}>
-                <Mail className="h-3.5 w-3.5 mr-2" />
-                Envoyer un email
-              </DropdownMenuItem>
-            )}
-            
-            {(member.contactPhone || user?.phoneNumber) && (
-              <>
-                <DropdownMenuItem onClick={handleWhatsApp}>
-                  <MessageSquare className="h-3.5 w-3.5 mr-2" />
-                  WhatsApp
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCall}>
-                  <Phone className="h-3.5 w-3.5 mr-2" />
-                  Appeler
-                </DropdownMenuItem>
-              </>
-            )}
-            
-            {userDisplay === "organizer" && member.userId && !isMe && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
-                >
-                  {role === "CO_ORGANIZER" ? (
-                    <>
-                      <ShieldAlert className="h-3.5 w-3.5 mr-2" />
-                      Retirer co-organisateur
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="h-3.5 w-3.5 mr-2" />
-                      Nommer co-organisateur
-                    </>
-                  )}
-                </DropdownMenuItem>
-              </>
-            )}
-            
-            {actions?.onDelete && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => actions.onDelete!(member.id)}
-                >
-                  <X className="h-3.5 w-3.5 mr-2" />
-                  Retirer du tournoi
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {hasActions && (
+        <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+          <CardActionMenu
+            onEdit={onEdit ? () => onEdit(member) : undefined}
+            onView={onView ? () => onView(member) : undefined}
+            onDelete={onDelete ? () => onDelete(member) : undefined}
+            entityName={`le membre ${member.displayName || user?.username}`}
+            extraActions={extraActions}
+          />
+        </div>
+      )}
 
       <CardContent className={cn(
         "flex flex-col items-center text-center",
@@ -463,20 +388,18 @@ export function MemberCard({
 
         {/* Boutons d'action rapides (uniquement sur desktop) */}
         {!isCompactGrid && (
-          <div className="grid grid-cols-2 gap-2 w-full mt-3 md:mt-4 pt-3 md:pt-4 border-t border-border/50">
+          <div className="grid grid-cols-2 gap-2 w-full mt-3 md:mt-4 pt-3 md:pt-4 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="secondary"
               size="sm"
               className="w-full text-[10px] md:text-xs h-8 md:h-9 gap-1"
-              asChild
+              onClick={handleMainAction}
             >
-              <Link href={`/tournaments/${member.tournamentId}/members/${member.id}`}>
-                <Eye className="w-3 h-3" />
-                Profil
-              </Link>
+              <Eye className="w-3 h-3" />
+              Profil
             </Button>
 
-            {userDisplay === "organizer" && member.userId && !isMe && (
+            {userDisplay === "organizer" && member.userId && !isMe && onToggleCoOrganizer && (
               <Button
                 variant={role === "CO_ORGANIZER" ? "secondary" : "outline"}
                 size="sm"
@@ -484,7 +407,7 @@ export function MemberCard({
                   "w-full text-[10px] md:text-xs h-8 md:h-9 gap-1",
                   role === "CO_ORGANIZER" && "bg-amber-500/10 text-amber-600"
                 )}
-                onClick={() => actions?.onToggleCoOrganizer?.(member.id)}
+                onClick={() => onToggleCoOrganizer(member)}
               >
                 {role === "CO_ORGANIZER" ? (
                   <ShieldAlert className="w-3 h-3" />

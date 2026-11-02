@@ -35,7 +35,7 @@ import { fr } from "date-fns/locale";
 import { SuccessDialog, ErrorDialog } from "@/components/shared/result-dialog";
 import { updateTournament, deleteTournament } from "@/actions/tournaments"; // Maintien du typo du fichier existant
 import { toast } from "sonner";
-import { TournamentCard, ViewMode } from "@/components/cards/tournament-card";
+import { TournamentCard } from "@/components/cards/tournament-card";
 
 
 export default function TournamentsAdminPage() {
@@ -290,8 +290,8 @@ export default function TournamentsAdminPage() {
         ]}
         renderCard={(tournament, viewMode) => (
           <TournamentCard
-            tournament={tournament as Tournament}
-            viewMode={viewMode as ViewMode | undefined}
+            item={tournament as Tournament}
+            viewMode={viewMode as any}
             onView={() => handleViewTournament(tournament as Tournament)}
             showDetails={false}
           />

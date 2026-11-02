@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 const PWAManager = dynamic(() => import('@/components/pwa/PWAManager'), {
@@ -17,7 +17,10 @@ export default function PWAProvider({
   children,
   showManager = true,
 }: PWAProviderProps) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     if (typeof window === 'undefined') return;
 
     // 🔴 IMPORTANT : jamais de SW en dev
@@ -52,7 +55,7 @@ export default function PWAProvider({
   return (
     <>
       {children}
-      {showManager && <PWAManager visibility="installable" />}
+      {mounted && showManager && <PWAManager visibility="installable" />}
     </>
   );
 }

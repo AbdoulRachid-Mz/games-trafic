@@ -8,6 +8,8 @@ import {
 } from "@/actions/shops";
 import { z } from "zod";
 
+import { getCurrentUser } from "@/lib/auth/session";
+
 // GET /api/shop – list shops (with optional query filters)
 export async function GET(req: NextRequest) {
   try {
@@ -112,11 +114,16 @@ export async function GET(req: NextRequest) {
 // POST /api/shop – create a new shop
 export async function POST(req: NextRequest) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
     const body = await req.json();
 
     // Basic Zod schema for required fields
     const ShopBodySchema = z.object({
-      ownerId: z.string().uuid(),
+      ownerId: z.string().optional(),
       name: z.string().min(1),
       description: z.string().optional(),
       profileImage: z.string().optional(),

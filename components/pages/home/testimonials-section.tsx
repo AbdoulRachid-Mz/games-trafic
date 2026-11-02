@@ -17,7 +17,7 @@ export default function TestimonialsSection() {
     {
       name: "Sarah 'Nova' Meyer",
       role: "Vendeuse Pro Streamer",
-      text: "Ma boutique sur Gamers Trafics génère plus de revenus que n'importe quel autre marketplace. La sécurité de l'escrow est un game-changer.",
+      text: "Ma boutique sur Games-Trafics génère plus de revenus que n'importe quel autre marketplace. La sécurité de l'escrow est un game-changer.",
       avatar: "/icons/avatar-240.png",
       fallback: "SM",
     },

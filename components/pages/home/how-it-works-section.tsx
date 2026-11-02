@@ -68,7 +68,7 @@ export default function HowItWorksSection() {
           </h2>
           <p className="text-lg text-muted-foreground">
             Suivez ces étapes simples pour tirer le meilleur parti de
-            l'infrastructure Gamers Trafics.
+            l'infrastructure Games-Trafics.
           </p>
         </div>
 

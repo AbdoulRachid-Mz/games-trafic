@@ -321,7 +321,7 @@ export function TournamentsList({ initialTournaments }: TournamentsListProps) {
                 >
                   <TournamentCard
                     showDetails={viewMode !== "grid"}
-                    tournament={tournamentData as any}
+                    item={tournamentData as any}
                     viewMode={viewMode}
                     onView={() => window.location.href = `/tournaments/${edition.tournamentId}/editions/${edition.id}`}
                   />

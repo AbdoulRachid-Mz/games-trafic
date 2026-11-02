@@ -62,7 +62,7 @@ export default function Footer() {
               <div className="p-2 relative rounded-lg group-hover:scale-110 transition-transform">
                 <Image
                   src="/icons/icon-128.png"
-                  alt="Gamers Trafics"
+                  alt="Games-Trafics"
                   width={100}
                   height={100}
                   className="w-24 h-24 aspect-square"
@@ -71,8 +71,8 @@ export default function Footer() {
             </ActiveLink>
 
             <p className="text-sm text-white/80 leading-relaxed">
-              L'infrastructure gaming complète pour connecter, compétiter et
-              monétiser votre passion. Rejoignez l'élite du gaming francophone.
+              L&apos;infrastructure gaming complète pour connecter, compétiter et
+              monétiser votre passion. Rejoignez l&apos;élite du gaming francophone.
             </p>
 
             {/* Social */}
@@ -130,7 +130,7 @@ export default function Footer() {
             </Badge>
 
             <span className="text-sm text-secondary/80 font-medium">
-              © {currentYear} Gamers Trafics. Tous droits réservés.
+              © {currentYear} Games-Trafics. Tous droits réservés.
             </span>
           </div>
         </div>

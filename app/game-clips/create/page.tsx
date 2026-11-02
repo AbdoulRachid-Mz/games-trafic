@@ -24,7 +24,7 @@ import { useGameClips } from "@/hooks/use-game-clips";
 // import { AdvancedVideoUpload } from "@/components/advanced-video-upload";
 import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
 import { AdvancedVideoUpload } from "@/components/ui/advanced-video-upload";
-import { GameVideoController } from "@/components/game-clips/game-video-controller";
+import { GameVideoController } from "@/components/pages/game-clips/game-video-controller";
 
 export default function GameClipCreatePage() {
   const router = useRouter();

@@ -1,5 +1,6 @@
 'use server';
 
+import { getCurrentUser } from '@/lib/auth/session';
 import { 
   vipSubscriptions, 
   type VipSubscription, 
@@ -260,6 +261,13 @@ export async function createVipSubscription(
   subscriptionData: NewVipSubscription
 ): Promise<VipSubscription> {
   try {
+    // SEC-09 FIX: Only admins can directly create VIP subscriptions.
+    // User-initiated VIP purchases go through the wallet/payment flow instead.
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+    if (!isAdmin) throw new Error('Accès réservé aux administrateurs — utilisez le flux d\'achat VIP');
+
     // Validation des données requises
     if (!subscriptionData.userId || !subscriptionData.endDate) {
       throw new Error('userId and endDate are required');
@@ -333,6 +341,12 @@ export async function updateVipSubscription(
   subscriptionData: Partial<NewVipSubscription>
 ): Promise<VipSubscription> {
   try {
+    // SEC-09 FIX: Admin-only
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+    if (!isAdmin) throw new Error('Accès réservé aux administrateurs');
+
     // Vérifier que l'abonnement existe
     const existingSubscription = await getVipSubscriptionById(id);
     if (!existingSubscription) {
@@ -371,12 +385,22 @@ export async function updateVipSubscription(
 
 /**
  * Annule un abonnement VIP
+ * SEC-09 FIX: Owner (self-cancellation) or admin
  */
 export async function cancelVipSubscription(id: string): Promise<VipSubscription> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     const subscription = await getVipSubscriptionById(id);
     if (!subscription) {
       throw new Error('VIP subscription not found');
+    }
+
+    // Only admin or the subscription owner can cancel
+    if (!isAdmin && subscription.userId !== currentUser.id) {
+      throw new Error('Accès refusé');
     }
 
     if (subscription.status === 'CANCELLED') {

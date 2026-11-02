@@ -702,7 +702,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                 initialRelated.map((product) => (
                   <ProductCard
                     key={product.id}
-                    product={product}
+                    item={product}
                     showActions
                   />
                 ))

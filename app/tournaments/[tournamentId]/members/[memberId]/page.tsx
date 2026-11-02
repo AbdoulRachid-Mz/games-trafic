@@ -604,7 +604,7 @@ export default function MemberDetailPage() {
                   {matchesList.map((match) => (
                     <MatchCard
                       key={match.id}
-                      match={match}
+                      item={match}
                       currentUserId={user?.id}
                       viewMode="list"
                     />

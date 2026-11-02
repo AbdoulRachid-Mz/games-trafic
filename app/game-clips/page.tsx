@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ClientGameClipsContent } from "./client-page";
-import { GameTraficsLoader } from "@/components/game-clips/game-trafics-loader";
+import { GameTraficsLoader } from "@/components/pages/game-clips/game-trafics-loader";
 
 // mise en cache
 

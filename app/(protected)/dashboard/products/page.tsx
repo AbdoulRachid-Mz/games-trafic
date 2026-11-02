@@ -50,7 +50,7 @@ export default function ProductsDashboardPage() {
       className="h-full"
     >
       <ProductCard
-        product={p}
+        item={p}
         viewMode={viewMode === "grid" ? "grid" : "list"}
         showDetails={false}
         onView={() => router.push(`/products/${p.id}`)}

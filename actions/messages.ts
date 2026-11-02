@@ -1,5 +1,6 @@
 "use server";
 
+import { getCurrentUser } from '@/lib/auth/session';
 import {
   messages,
   type Message,
@@ -572,10 +573,10 @@ export async function getMessageStats(filters?: MessageFilters) {
  */
 export async function createMessage(messageData: NewMessage): Promise<Message> {
   try {
-    // Validation des données requises
-    if (!messageData.senderId) {
-      throw new Error("senderId is required");
-    }
+    // SEC-08 FIX: senderId is always sourced from the authenticated session,
+    // never from client-supplied input — prevents message sender identity spoofing.
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
 
     // --- CORRECTION DU BLOC DE VALIDATION CI-DESSOUS ---
 
@@ -598,9 +599,12 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
     }
 
     // ---------------------------------------------------
+
+    // senderId is always the authenticated user — strip any client-provided value
+    const { senderId: _ignoredSenderId, ...restMessageData } = messageData;
     
     // Auto-populate specific ID columns based on entityType/entityId
-    const finalData = { ...messageData };
+    const finalData = { ...restMessageData, senderId: currentUser.id };
     if (messageData.entityType && messageData.entityId) {
       const type = messageData.entityType.toUpperCase();
       const id = messageData.entityId;
@@ -692,17 +696,27 @@ export async function updateMessage(
   messageData: Partial<NewMessage>,
 ): Promise<Message> {
   try {
+    // SEC-08 FIX: Only the message sender or an admin can edit a message
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     // Vérification que le message existe
     const existingMessage = await getMessageById(id);
     if (!existingMessage) {
       throw new Error("Message not found");
     }
 
+    if (!isAdmin && existingMessage.senderId !== currentUser.id) {
+      throw new Error('Accès refusé — vous ne pouvez modifier que vos propres messages');
+    }
+
+    // Strip sender/recipient fields from editable data
+    const { senderId: _s, recipientId: _r, ...safeMessageData } = messageData as any;
+
     const result = await db
       .update(messages)
-      .set({
-        ...messageData,
-      })
+      .set({ ...safeMessageData })
       .where(eq(messages.id, id))
       .returning();
 
@@ -718,9 +732,20 @@ export async function updateMessage(
 
 /**
  * Supprime un message (soft delete)
+ * SEC-08 FIX: Sender or admin only
  */
 export async function deleteMessage(id: string): Promise<Message> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
+    const existing = await getMessageById(id);
+    if (!existing) throw new Error('Message not found');
+    if (!isAdmin && existing.senderId !== currentUser.id) {
+      throw new Error('Accès refusé — vous ne pouvez supprimer que vos propres messages');
+    }
+
     const result = await db
       .update(messages)
       .set({

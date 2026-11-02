@@ -3,7 +3,6 @@
 // Basé sur le schéma Drizzle actuel
 // ============================================================================
 
-import { getGameClips, getGameItems, getOrders, getProducts, getShops, getThemes, getTournaments, getUsers } from "@/actions/entities";
 import {
   BracketNodeWithRelations,
   EditionRegistrationWithRelations,
@@ -22,7 +21,6 @@ import {
   TournamentWithRelations,
   User,
 } from "@/database/schema";
-import { schema } from "better-auth/client/plugins";
 
 // Types de base pour la pagination
 export interface PaginationParams {
@@ -70,20 +68,7 @@ export interface EntityQueryParams extends BaseFilters, SortOptions {
 }
 
 // Type pour les noms de tables
-export type TableName = keyof typeof schema;
-
-// Export d'une map pour faciliter l'accès aux fonctions spécifiques
-export const entityFetchers = {
-  users: getUsers,
-  shops: getShops,
-  products: getProducts,
-  tournaments: getTournaments,
-  gameClips: getGameClips,
-  orders: getOrders,
-  themes: getThemes,
-  gameItems: getGameItems,
-  // Ajouter d'autres fonctions spécifiques ici au besoin
-} as const;
+export type TableName = string;
 
 
 

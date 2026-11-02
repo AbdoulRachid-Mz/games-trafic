@@ -47,7 +47,7 @@ export function QuickActions() {
         Actions Rapides
       </Typography>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {actions.map((action, index) => (
           <motion.div
             key={action.label}

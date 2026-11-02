@@ -8,14 +8,10 @@ import { RefreshCw, Wifi, WifiOff, Home, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function OfflinePage() {
-  const [isOnline, setIsOnline] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : false));
   const [lastUpdate, setLastUpdate] = useState<string>("");
 
   useEffect(() => {
-    // Vérifier la connexion
-    setIsOnline(navigator.onLine);
-    setLastUpdate(new Date().toLocaleTimeString());
-
     const handleOnline = () => {
       setIsOnline(true);
       setLastUpdate(new Date().toLocaleTimeString());
@@ -26,12 +22,12 @@ export default function OfflinePage() {
       setLastUpdate(new Date().toLocaleTimeString());
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
@@ -79,9 +75,11 @@ export default function OfflinePage() {
                 📦 Certains contenus sont disponibles en mode hors ligne
               </p>
               
-              <div className="text-xs text-muted-foreground bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                <p>⏰ Dernière vérification : {lastUpdate}</p>
-              </div>
+              {lastUpdate && (
+                <div className="text-xs text-muted-foreground bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                  <p>⏰ Dernière vérification : {lastUpdate}</p>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
@@ -129,7 +127,7 @@ export default function OfflinePage() {
 
         {/* App Info */}
         <div className="text-center">
-          <h2 className="text-lg font-bold text-primary mb-2">Games Trafics</h2>
+          <h2 className="text-lg font-bold text-primary mb-2">Games-Trafics</h2>
           <p className="text-sm text-muted-foreground">
             Marketplace & Tournois Gaming 🎮
           </p>

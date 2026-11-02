@@ -1,5 +1,7 @@
 "use client";
 
+// export const instant = false;
+
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -17,11 +19,20 @@ import { authClient } from "@/lib/auth-client";
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Key, Mail, Lock, ChevronRight, Sparkles, FingerprintPattern } from "lucide-react";
+import {
+  Key,
+  Mail,
+  Lock,
+  ChevronRight,
+  Sparkles,
+  FingerprintPattern,
+} from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRightIcon } from "@/components/icons/arrow-right";
+import MixBorder from "@/components/shared/mix-border";
+import { getSafeRedirectUrl } from "@/lib/routes/safe-redirect";
 
 // Schéma de validation Zod
 const loginSchema = z.object({
@@ -42,6 +53,8 @@ export default function SignInPage() {
   }>({});
   const [lastMethod, setLastMethod] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetUrl = getSafeRedirectUrl(searchParams?.get("redirect") || searchParams?.get("returnTo") || searchParams?.get("callbackUrl"), "/profile");
 
   useEffect(() => {
     const method = authClient.getLastUsedLoginMethod?.() || null;
@@ -49,14 +62,16 @@ export default function SignInPage() {
 
     // Auto-fill passkey si disponible
     if (typeof window !== "undefined" && window.PublicKeyCredential) {
-      void PublicKeyCredential.isConditionalMediationAvailable?.().then((available) => {
-        if (available) {
-          // Ne pas afficher d'erreur pour l'auto-fill
-          void authClient.signIn.passkey({ autoFill: true }).catch(() => {
-            // Ignorer silencieusement les erreurs d'auto-fill
-          });
-        }
-      });
+      void PublicKeyCredential.isConditionalMediationAvailable?.().then(
+        (available) => {
+          if (available) {
+            // Ne pas afficher d'erreur pour l'auto-fill
+            void authClient.signIn.passkey({ autoFill: true }).catch(() => {
+              // Ignorer silencieusement les erreurs d'auto-fill
+            });
+          }
+        },
+      );
     }
   }, []);
 
@@ -82,20 +97,20 @@ export default function SignInPage() {
       {
         email,
         password,
-        callbackURL: "/profile",
+        callbackURL: targetUrl,
         rememberMe: true,
       },
       {
         onRequest: () => setLoading(true),
         onSuccess: () => {
           toast.success("Connexion réussie !");
-          router.push("/profile");
+          router.push(targetUrl);
         },
         onError: (ctx) => {
           setError(ctx.error.message || "Erreur lors de la connexion");
           setLoading(false);
         },
-      }
+      },
     );
   };
 
@@ -103,7 +118,7 @@ export default function SignInPage() {
     await authClient.signIn.social(
       {
         provider: "google",
-        callbackURL: "/profile",
+        callbackURL: targetUrl,
         errorCallbackURL: "/auth/error",
       },
       {
@@ -112,7 +127,7 @@ export default function SignInPage() {
           setError(ctx.error.message || "Erreur avec Google");
           setLoading(false);
         },
-      }
+      },
     );
   };
 
@@ -123,19 +138,19 @@ export default function SignInPage() {
 
     if (error) {
       // Ne pas afficher d'erreur si l'utilisateur a simplement annulé
-      if (error.message?.includes('abort')) {
-        console.log('Authentification annulée par l\'utilisateur');
+      if (error.message?.includes("abort")) {
+        console.log("Authentification annulée par l'utilisateur");
         return;
       }
       toast.error("Échec de l'authentification : " + error.message);
     } else {
       toast.success("Connexion réussie avec Passkey !");
-      router.push("/profile");
+      router.push(targetUrl);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-8 px-2 sm:px-4 lg:px-6">
+    <div className="min-h-screen flex items-center justify-center py-8 px-2 sm:px-4 lg:px-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -145,7 +160,7 @@ export default function SignInPage() {
         {/* skip button */}
         <button
           onClick={() => router.push("/")}
-          className="fixed bg-white/95 backdrop-blur-sm px-4 py-1 rounded-full top-4 right-4 text-slate-900 font-bold "
+          className="fixed z-10 bg-primary/20 flex gap-4 backdrop-blur-sm px-4 py-1 text-primary rounded-full hover:shadow-md top-4 right-4 font-bold "
         >
           <ArrowRightIcon className="h-4 w-4" />
           Ignorer
@@ -159,14 +174,68 @@ export default function SignInPage() {
             className="inline-flex items-center justify-center gap-2"
           >
             <Sparkles className="h-8 w-8 text-primary" />
-            <span className="text-3xl font-black text-white tracking-tight">
+            <span className="text-3xl font-black text-secondary tracking-tight">
               Games<span className="text-primary">Trafics</span>
             </span>
           </motion.div>
         </div>
 
-        <Card className="overflow-hidden border-0 py-0 shadow-2xl bg-white/10 backdrop-blur-xl">
-          <CardContent className="p-0">
+        <Card className="overflow-hidden border-0 py-0 relative shadow-2xl bg-white/10 backdrop-blur-xl">
+          <CardContent className="relative z-10 p-0">
+            <MixBorder
+              radius={20}
+              className="absolute z-10 inset-0"
+              top={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  first: {
+                    color: "--primary",
+                    size: "50%",
+                    order: 1,
+                  },
+                  second: {
+                    color: "--secondary",
+                    size: "50%",
+                    order: 2,
+                  },
+                },
+              }}
+              bottom={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  first: {
+                    color: "--primary",
+                    size: "50%",
+                    order: 1,
+                  },
+                  second: {
+                    color: "--secondary",
+                    size: "50%",
+                    order: 2,
+                  },
+                },
+              }}
+              left={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  one: {
+                    color: "--primary",
+                  },
+                },
+              }}
+              right={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  one: {
+                    color: "--secondary",
+                  },
+                },
+              }}
+            />
             <div className="grid md:grid-cols-2">
               {/* Form Section */}
               <div className="p-4 md:p-6 bg-white/95 backdrop-blur-sm">
@@ -258,12 +327,16 @@ export default function SignInPage() {
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg shadow-primary/25"
+                      className="w-full h-12 text-base font-semibold bg-primary text-white shadow-lg shadow-primary/25"
                     >
                       {loading ? (
                         <motion.div
                           animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
                           className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                         />
                       ) : (
@@ -293,10 +366,7 @@ export default function SignInPage() {
                       disabled={loading}
                       className="w-full h-12 border-slate-200 hover:bg-slate-50 relative overflow-hidden group"
                     >
-                      <svg
-                        className="h-5 w-5 mr-2"
-                        viewBox="0 0 24 24"
-                      >
+                      <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
                         <path
                           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                           fill="#4285F4"
@@ -316,7 +386,10 @@ export default function SignInPage() {
                       </svg>
                       <span className="text-slate-700">Google</span>
                       {lastMethod === "google" && (
-                        <Badge variant="secondary" className="absolute -top-1 -right-1 scale-75">
+                        <Badge
+                          variant="secondary"
+                          className="absolute -top-1 -right-1 scale-75"
+                        >
                           Dernier
                         </Badge>
                       )}
@@ -331,8 +404,13 @@ export default function SignInPage() {
                     >
                       {/* <Key className="h-5 w-5 mr-2 text-primary" /> */}
                       <FingerprintPattern className="h-5 w-5 mr-2 text-primary" />
-                      <span className="text-slate-700">Se connecter avec une Passkey</span>
-                      <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-0">
+                      <span className="text-slate-700">
+                        Se connecter avec une Passkey
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className="ml-2 bg-primary/10 text-primary border-0"
+                      >
                         Nouveau
                       </Badge>
                     </Button>
@@ -352,14 +430,21 @@ export default function SignInPage() {
               </div>
 
               {/* Image Section */}
-              <div className="hidden md:block relative bg-gradient-to-br from-primary to-purple-600 p-10">
+              <div className="hidden md:block relative bg-primary p-10">
                 <div className="absolute inset-0 bg-black/20" />
                 <div className="relative h-full flex flex-col justify-end text-white">
                   {/* logo */}
                   <div className="w-full h-full flex items-center justify-center relative">
-                    <Image src="/images/icons/app/gt-primary.png" alt="logo" fill className="object-contain" />
+                    <Image
+                      src="/images/icons/app/gt-primary.png"
+                      alt="logo"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
-                  <h2 className="text-2xl font-bold mb-2">Bienvenue sur GamesTrafics</h2>
+                  <h2 className="text-2xl font-bold mb-2">
+                    Bienvenue sur GamesTrafics
+                  </h2>
                   <p className="text-white/80 text-sm">
                     La plateforme de gaming qui connecte les passionnés
                   </p>
@@ -388,13 +473,19 @@ export default function SignInPage() {
         </Card>
 
         {/* Terms */}
-        <p className="text-center text-xs text-white/40 mt-6">
+        <p className="text-center text-xs mt-6">
           En continuant, vous acceptez nos{" "}
-          <Link href="/docs/legal/terms" className="text-white/60 hover:text-white underline underline-offset-2">
+          <Link
+            href="/docs/legal/terms"
+            className="text-primary hover:text-primary underline underline-offset-2"
+          >
             conditions d'utilisation
           </Link>{" "}
           et notre{" "}
-          <Link href="/docs/legal/privacy" className="text-white/60 hover:text-white underline underline-offset-2">
+          <Link
+            href="/docs/legal/privacy"
+            className="text-primary hover:text-primary underline underline-offset-2"
+          >
             politique de confidentialité
           </Link>
         </p>

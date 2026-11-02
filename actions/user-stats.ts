@@ -1143,7 +1143,7 @@ async function getMessagesStats(userId: string) {
   `;
 
   // Final query joining the CTE with users to get usernames
-  const recentConversations = (await db.execute(sql`
+  const queryResult = await db.execute(sql`
     ${conversationCTE}
     SELECT
       c.other_user_id AS user_id,
@@ -1155,13 +1155,14 @@ async function getMessagesStats(userId: string) {
     JOIN ${users} u ON u.id = c.other_user_id
     ORDER BY c.last_message_at DESC
     LIMIT 10
-  `)) as {
+  `);
+  const recentConversations = (((queryResult as any)?.rows ?? queryResult) as unknown as {
     user_id: string;
     username: string | null;
     last_message: string;
     unread_count: string;
     last_message_at: string;
-  }[];
+  }[]);
 
   return {
     total_sent: Number(stats.total_sent || 0),

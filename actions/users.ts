@@ -60,8 +60,9 @@ import {
 } from "@/types/api";
 
 import { db } from "@/lib/db";
-import { AuthService } from "@/lib/auth/service";
+// NOTE: AuthService (lib/auth/service.ts) was removed — canonical helpers are in lib/auth/session.ts
 import { PAGINATION_DEFAULTS, USER_MINI_COLUMNS } from "@/types/view-models";
+import { getCurrentUser, getServerSession } from "@/lib/auth/session";
 // ============================================================================
 // QUERIES - Lecture des données
 // ============================================================================
@@ -137,7 +138,7 @@ export async function getProfile(
 
     // Si c'est "me", on récupère l'utilisateur courant depuis la session
     if (userIdOrMe === "me") {
-      const session = await AuthService.getSession();
+      const session = await getServerSession();
       if (!session?.user?.id) return null;
       userId = session.user.id;
     }
@@ -214,7 +215,7 @@ export async function getProfile(
     }
 
     // Liste des relations à inclure pour PARTIAL ou FULL
-    let relationsToInclude =
+    const relationsToInclude =
       mode === "full"
         ? [
           "wallet",
@@ -664,6 +665,79 @@ export async function getUserProfile(userId: string, options?: ProfileOptions) {
 }
 
 /**
+ * Récupère les contacts récents de l'utilisateur courant
+ */
+export async function getRecentRecipients(limitSize = 10) {
+  try {
+    const sessionUser = await getServerSession();
+    if (!sessionUser?.user?.id) return [];
+
+    const transactions = await db
+      .select({
+        toUserId: walletTransactions.toUserId,
+      })
+      .from(walletTransactions)
+      .where(
+        and(
+          eq(walletTransactions.fromUserId, sessionUser.user.id),
+          eq(walletTransactions.type, "TRANSFER"),
+          isNotNull(walletTransactions.toUserId)
+        )
+      )
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(limitSize * 5); // Fetch more to get unique
+
+    if (!transactions.length) return [];
+
+    // Extract unique user ids
+    const uniqueUserIds = Array.from(
+      new Set(transactions.map((t) => t.toUserId).filter(Boolean) as string[])
+    ).slice(0, limitSize);
+
+    if (!uniqueUserIds.length) return [];
+
+    const recentUsers = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, uniqueUserIds));
+
+    // Get their wallets
+    const wallets = await Promise.all(
+      recentUsers.map((u) =>
+        db
+          .select()
+          .from(userWallets)
+          .where(eq(userWallets.userId, u.id))
+          .limit(1)
+          .then((res) => res[0])
+      )
+    );
+
+    return recentUsers.map((u, idx) => {
+      const wallet = wallets[idx];
+      return {
+        id: u.id,
+        walletId: wallet?.id || "",
+        user: {
+          id: u.id,
+          name: (u as any).fullName || (u as any).username || "Utilisateur",
+          email: u.email,
+          avatar: u.profileImage,
+          walletNumber: wallet?.cardNumberHash || wallet?.id || "",
+        },
+        wallet: {
+          isActive: !!wallet?.isActive,
+          isLocked: !!wallet?.isLocked,
+        },
+      };
+    }).filter(r => r.walletId !== "");
+  } catch (error) {
+    console.error("Error fetching recent recipients:", error);
+    return [];
+  }
+}
+
+/**
  * Met à jour getCompleteUserData pour utiliser getProfile
  */
 export async function getCompleteUserData(userId: string) {
@@ -993,6 +1067,31 @@ export async function updateUser(
   userData: Partial<NewUser>,
 ): Promise<User> {
   try {
+    // 🛡️ SEC-002: Contrôle de session et d'autorisation
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("Non authentifié");
+    }
+
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+    if (currentUser.id !== id && !isAdmin) {
+      throw new Error("Action non autorisée: vous ne pouvez modifier que votre propre compte");
+    }
+
+    // Filtrer les champs privilégiés pour les non-admins (Anti Privilege-Escalation)
+    const safeData: Record<string, any> = { ...userData };
+    if (!isAdmin) {
+      delete safeData.role;
+      delete safeData.isAdmin;
+      delete safeData.isVip;
+      delete safeData.banned;
+      delete safeData.banReason;
+      delete safeData.banExpires;
+      delete safeData.accountTypes;
+      delete safeData.level;
+      delete safeData.isDeleted;
+    }
+
     // Vérification que l'utilisateur existe
     const existingUser = await getUserById(id);
     if (!existingUser) {
@@ -1000,16 +1099,16 @@ export async function updateUser(
     }
 
     // Vérification des doublons d'email si l'email est modifié
-    if (userData.email && userData.email !== existingUser.email) {
-      const userWithEmail = await getUserByEmail(userData.email);
+    if (safeData.email && safeData.email !== existingUser.email) {
+      const userWithEmail = await getUserByEmail(safeData.email);
       if (userWithEmail) {
         throw new Error("Email already exists");
       }
     }
 
     // Vérification des doublons d'username si l'username est modifié
-    if (userData.username && userData.username !== existingUser.username) {
-      const userWithUsername = await getUserByUsername(userData.username);
+    if (safeData.username && safeData.username !== existingUser.username) {
+      const userWithUsername = await getUserByUsername(safeData.username);
       if (userWithUsername) {
         throw new Error("Username already exists");
       }
@@ -1018,7 +1117,7 @@ export async function updateUser(
     const result = await db
       .update(users)
       .set({
-        ...userData,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(users.id, id))
@@ -1039,6 +1138,15 @@ export async function updateUser(
  */
 export async function deleteUser(id: string): Promise<User> {
   try {
+    // 🛡️ SEC-002: Contrôle de session et d'autorisation
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+    if (currentUser.id !== id && !isAdmin) {
+      throw new Error("Action non autorisée: vous ne pouvez supprimer que votre propre compte");
+    }
+
     const result = await db
       .update(users)
       .set({
@@ -1068,6 +1176,15 @@ export async function deleteUser(id: string): Promise<User> {
  */
 export async function restoreUser(id: string): Promise<User> {
   try {
+    // 🛡️ SEC-002: Seul un administrateur peut restaurer un compte
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+    if (!isAdmin) {
+      throw new Error("Seul un administrateur peut restaurer un compte supprimé");
+    }
+
     const result = await db
       .update(users)
       .set({

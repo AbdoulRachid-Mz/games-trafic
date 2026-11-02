@@ -48,7 +48,7 @@ import type {
 } from "@/database/schema";
 import { toast } from "sonner";
 import { EditionCard } from "@/components/pages/tournaments/editions/edition-card";
-import { MemberCard } from "@/components/pages/tournaments/members/member-card";
+import { MemberCard } from "@/components/cards/member-card";
 import { MembershipRequestDialog } from "@/components/pages/tournaments/tournament-detail/membership-request-dialog";
 import {
   addTournamentMember, getTournamentMembers,
@@ -90,14 +90,6 @@ export function TournamentPageContent({
   const [pendingRequest, setPendingRequest] = useState(false);
   const [showMembershipDialog, setShowMembershipDialog] = useState(false);
   const [memberViewMode, setMemberViewMode] = useState<"grid" | "list">("grid");
-
-  useEffect(() => {
-    if (tournament) {
-      loadSimilarTournaments();
-      checkMembership();
-      recordEntityView(tournamentId, "TOURNAMENT", user?.id);
-    }
-  }, [tournament?.id, user?.id]);
 
   const loadSimilarTournaments = async () => {
     if (!tournament) return;
@@ -141,6 +133,15 @@ export function TournamentPageContent({
       console.error("Erreur vérification adhésion:", error);
     }
   };
+
+  useEffect(() => {
+    if (tournament) {
+      loadSimilarTournaments();
+      checkMembership();
+      recordEntityView(tournamentId, "TOURNAMENT", user?.id);
+    }
+  }, [tournament?.id, user?.id]);
+
 
   const isOrganizer = user && tournament && user.id === tournament.organizerId;
 
@@ -1221,10 +1222,10 @@ export function TournamentPageContent({
                     {displayedMembers.map((member) => (
                       <MemberCard
                         key={member.id}
-                        member={member}
+                        item={member}
                         viewMode={memberViewMode}
                         onView={() => handleViewMember(member.id)}
-                        isOrganizer={isOrganizer ?? undefined}
+                        userDisplay={isOrganizer ? "organizer" : "member"}
                       />
                     ))}
                   </div>
@@ -1373,7 +1374,7 @@ export function TournamentPageContent({
                     <TournamentCard
                       showDetails={false}
                       key={t.id}
-                      tournament={t}
+                      item={t}
                     />
                   ))}
                 </div>

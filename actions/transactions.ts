@@ -24,7 +24,7 @@ import {
 } from "@/types/api";
 import { db } from "@/lib/db";
 import { getAppSettings } from "./app-settings";
-import { getUserWalletById } from "./wallets";
+import { getUserWalletById, verifyWalletPin } from "./wallets";
 import { getCurrentUser } from "@/lib/auth/session";
 import {
   executeTransaction,
@@ -258,8 +258,9 @@ export async function createTransaction(
     metadata?: Record<string, any>;
     fees?: string;
     netAmount?: string;
+    pin?: string;
   },
-  options?: { allowDuplicate?: boolean }
+  options?: { allowDuplicate?: boolean; isSystem?: boolean }
 ): Promise<WalletTransaction> {
   if (!data.walletId || !data.type || !data.amount) {
     throw new Error("Données de transaction incomplètes");
@@ -268,13 +269,36 @@ export async function createTransaction(
   const user = await getCurrentUser();
   if (!user) throw new Error("Utilisateur non authentifié");
 
+  const isAdmin = user.role === "admin" || (user as any).isAdmin === true;
+
+  // 🛡️ SEC-001: Bloquer tout crédit direct (DEPOSIT, BONUS, REFUND) non-admin et non-système
+  const creditTypes = ["DEPOSIT", "BONUS", "REFUND"];
+  if (creditTypes.includes(data.type) && !isAdmin && !options?.isSystem) {
+    throw new Error(
+      "Opération non autorisée: les crédits directs (dépôts, bonus, remboursements) doivent résulter d'un paiement certifié ou d'une validation administrateur."
+    );
+  }
+
   // Récupérer le wallet
   const wallet = await getUserWalletById(data.walletId);
   if (!wallet) throw new Error("Wallet non trouvé");
-  if (wallet.userId !== user.id) throw new Error("Non autorisé");
+  if (wallet.userId !== user.id && !isAdmin) throw new Error("Non autorisé");
   if (!wallet.isActive) throw new Error("Wallet inactif");
   if (wallet.isLocked) throw new Error("Wallet verrouillé");
   if (!wallet.financialAccountId) throw new Error("Compte financier non lié");
+
+  // 🛡️ SEC-010: Validation obligatoire du code PIN côté serveur pour transferts et retraits
+  if (["TRANSFER", "WITHDRAWAL"].includes(data.type) && !isAdmin && !options?.isSystem) {
+    if (wallet.pinHash) {
+      if (!data.pin) {
+        throw new Error("Code PIN requis pour effectuer cette opération.");
+      }
+      const pinResult = await verifyWalletPin(wallet.id, data.pin);
+      if (!pinResult.success) {
+        throw new Error(pinResult.error || "Code PIN incorrect.");
+      }
+    }
+  }
 
   const amount = Number(data.amount);
   if (isNaN(amount) || amount <= 0) {
@@ -290,8 +314,7 @@ export async function createTransaction(
   if (lastTx[0]?.createdAt) {
     const lastDate = new Date(lastTx[0].createdAt as any).getTime();
     const now = Date.now();
-    const lastStatus = lastTx[0].status;
-    const minWait = lastStatus === "FAILED" ? 60_000 : 120_000;
+    const minWait = 60_000; // 1 minute interval pour toute opération
     const diff = now - lastDate;
     if (diff < minWait) {
       const remaining = Math.ceil((minWait - diff) / 1000);
@@ -329,8 +352,6 @@ export async function createTransaction(
     "TOURNAMENT_PARTICIPATION",
     "WITHDRAWAL",
   ];
-
-  const creditTypes = ["DEPOSIT", "BONUS", "REFUND"];
 
   let fromAccountId: string;
   let toAccountId: string;
@@ -683,7 +704,7 @@ export async function refundTransaction(
       netAmount: refundTransactionData.netAmount,
       description: refundTransactionData.description ?? undefined,
       metadata: refundTransactionData.metadata as Record<string, any>,
-    });
+    }, { isSystem: true });
 
     // Mise à jour du statut de la transaction originale
     await updateTransactionStatus(id, "REFUNDED", {

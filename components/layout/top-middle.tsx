@@ -156,6 +156,7 @@ const TopMiddle = ({
                 src={`/icons/icon-128.png`}
                 alt="app-logo"
                 fill
+                sizes="56px"
                 className="object-contain drop-shadow-lg"
                 priority
               />

@@ -1,7 +1,7 @@
 // app/api/auth/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getProfile, getMyProfile } from "@/actions/users";
-import { AuthService } from "@/lib/auth/service";
+import { getServerSession } from "@/lib/auth/session";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     
     if (me) {
       // Vérifier la session d'abord
-      const session = await AuthService.getSession();
+      const session = await getServerSession();
       if (!session?.user?.id) {
         return NextResponse.json(
           {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         limitPerRelation: 10,
       });
     } else {
-      const session = await AuthService.getSession();
+      const session = await getServerSession();
       if (!session?.user?.id) {
         return NextResponse.json(
           {

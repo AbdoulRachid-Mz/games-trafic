@@ -1,13 +1,11 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { EditionPageContent } from "@/components/pages/tournaments/edition-detail/edition-page-content";
-import {
-  TournamentMember
-} from "@/database/schema";
+import { TournamentMember } from "@/database/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getTournamentEditionWithRelations, getEditionActivePhase } from "@/actions/editions";
 import { getTournamentById, getTournamentEditionById, getTournamentMembers } from "@/actions/tournaments";
-import { getTournamentPhases } from "@/actions/phases";
+import { getTournamentPhases, getEditionRecentMatches } from "@/actions/phases";
 import { TransactionQRCode } from "@/components/shared/qr-code";
 import { encodeTransactionQR } from "@/utils/qr-utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,12 +26,12 @@ export async function generateMetadata({
   const edition = await getTournamentEditionById(editionId);
   return {
     title: edition
-      ? `Édition ${edition.name || `#${edition.editionNumber}`}`
-      : "Édition Inconnue",
+      ? `${edition.name || `Édition #${edition.editionNumber}`} | Games-Trafics Compétitions`
+      : "Édition Inconnue | Games-Trafics",
     description: edition
-      ? `Édition ${edition.name || `#${edition.editionNumber}`}`
-      : "Édition Inconnue",
-    keywords: "tournoi, édition, matchs",
+      ? `Participez et suivez les rencontres de ${edition.name || `l'Édition #${edition.editionNumber}`} sur Games-Trafics.`
+      : "Détails de l'édition du tournoi",
+    keywords: "tournoi, édition, esport, gaming, matchs, bracket, classement",
     robots: "index, follow",
   };
 }
@@ -60,14 +58,11 @@ export default async function EditionPage({ params }: PageProps) {
     options: { sortBy: "order", sortOrder: "asc" },
   });
   const phases = phasesResponse.data || edition.phases;
-  // console.log("phasesResponse", phases)
-
-  // Removed server-side standings load to use Client Component independent loading.
 
   // 2. Vérifier si l'utilisateur est organisateur
   const isOrganizer = !!(user && tournament.organizerId === user.id);
 
-  // 3. Vérifier si l'utilisateur est membre du tournoi
+  // 3. Vérifier si l'utilisateur est membre du tournoi et son inscription
   let currentUserMember: TournamentMember | undefined;
   let currentUserRegistration: any = undefined;
 
@@ -96,12 +91,11 @@ export default async function EditionPage({ params }: PageProps) {
   const hasPaid = currentUserRegistration?.feePaid ?? false;
   const showQR = !isFree && isRegistered && !hasPaid;
 
-  // 4. Récupérer les matchs récents pour le carrousel du header
-  const { getEditionRecentMatches } = await import("@/actions/phases");
+  // 4. Matchs récents pour le ticker
   const recentMatches = await getEditionRecentMatches(editionId);
 
   return (
-    <div className="space-y-8">
+    <div className="w-full">
       <EditionPageContent
         tournament={tournament}
         edition={edition}
@@ -113,46 +107,33 @@ export default async function EditionPage({ params }: PageProps) {
         recentMatches={recentMatches}
       />
 
-      {/* Free badge */}
-      {isFree && (
-        <div className="max-w-md mx-auto text-center">
-          <Badge className="bg-primary text-white text-lg px-6 py-2 font-black uppercase tracking-wider">
-            🎉 GRATUIT — Inscription libre
-          </Badge>
-        </div>
-      )}
-
-      {/* QR code only for registered users who haven't paid */}
+      {/* Bannière de paiement QR code pour les inscrits en attente de paiement */}
       {showQR && (
-        <Card className="max-w-md mx-auto">
-          <CardContent className="p-6 flex flex-col items-center">
-            <Typography variant="h4" className="font-black italic uppercase tracking-tighter mb-2">
-              Paiement d&apos;inscription
-            </Typography>
-            <Typography variant="caption1" theme="muted" className="mb-4 text-center">
-              Scannez pour régler {edition.entryFee} {edition.prizeCurrency || "GTC"}
-            </Typography>
-            <TransactionQRCode
-              data={encodeTransactionQR({
-                t: "TOURNAMENT_PARTICIPATION",
-                id: edition.id,
-                a: entryFee,
-                i: tournament.profileImage || "/icons/tournament-500.png",
-                m: { tournamentId, editionNumber: edition.editionNumber }
-              })}
-              label={edition.name || `Édition #${edition.editionNumber}`}
-              className="shadow-none border-none p-0 bg-transparent"
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Paid confirmation */}
-      {!isFree && isRegistered && hasPaid && (
-        <div className="max-w-md mx-auto text-center">
-          <Badge className="bg-primary text-white text-sm px-4 py-1.5">
-            ✅ Paiement confirmé
-          </Badge>
+        <div className="fixed bottom-6 right-6 z-40 max-w-sm animate-in slide-in-from-bottom-6">
+          <Card className="bg-card/95 backdrop-blur-2xl border-primary/30 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+            <CardContent className="p-5 flex flex-col items-center">
+              <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 uppercase font-black tracking-wider text-[10px] mb-2">
+                Paiement Requis
+              </Badge>
+              <Typography variant="h5" className="font-black italic tracking-tight text-center mb-1">
+                Réglez vos frais d&apos;inscription
+              </Typography>
+              <Typography variant="caption1" theme="muted" className="mb-3 text-center">
+                Scannez pour régler {edition.entryFee} {edition.prizeCurrency || "GTC"}
+              </Typography>
+              <TransactionQRCode
+                data={encodeTransactionQR({
+                  t: "TOURNAMENT_PARTICIPATION",
+                  id: edition.id,
+                  a: entryFee,
+                  i: tournament.profileImage || "/icons/tournament-500.png",
+                  m: { tournamentId, editionNumber: edition.editionNumber }
+                })}
+                label={edition.name || `Édition #${edition.editionNumber}`}
+                className="shadow-none border-none p-0 bg-transparent"
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

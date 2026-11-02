@@ -1,4 +1,4 @@
-// @/components/pages/games/games-grid.tsx
+﻿// @/components/pages/games/games-grid.tsx
 "use client";
 
 import React from "react";
@@ -27,6 +27,8 @@ export function GamesGrid({
   onLoadMore,
   emptyMessage,
 }: GamesGridProps) {
+  const router = useRouter();
+
   if (isLoading && items.length === 0) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
@@ -64,9 +66,8 @@ export function GamesGrid({
       </div>
     );
   }
-  const router = useRouter();
 
-      const handleViewGame = (gameId: string) => {
+  const handleViewGame = (gameId: string) => {
       router.push(`/games/${gameId}`);
     };
 

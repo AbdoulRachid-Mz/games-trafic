@@ -34,6 +34,8 @@ export interface Group {
 export interface BracketNode {
   id: string;
   round: number;
+  /** nodeCode may be null in DB rows that were created before the field was added. */
+  nodeCode?: string | null;
   match?: Match;
   nextNodeId?: string;
   metadata?: {
@@ -55,7 +57,23 @@ export interface Bracket {
 
 export interface Phase {
   id: string;
-  type: "GROUP" | "BRACKET";
+  /**
+   * Aligned with DB schema `tournamentFormatEnum`:
+   * ELIMINATION | GROUP_STAGE | ROUND_ROBIN | SWISS | KNOCKOUT | CUSTOM
+   *
+   * Legacy aliases "GROUP" and "BRACKET" are kept for backwards compatibility
+   * with in-memory engine code that has not yet been migrated.
+   * Do NOT use them for new DB comparisons — use the schema enum values.
+   */
+  type:
+    | "ELIMINATION"
+    | "GROUP_STAGE"
+    | "ROUND_ROBIN"
+    | "SWISS"
+    | "KNOCKOUT"
+    | "CUSTOM"
+    | "GROUP"
+    | "BRACKET";
   groups?: Group[];
   bracket?: Bracket;
   isActive: boolean;

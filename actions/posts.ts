@@ -524,7 +524,7 @@ export async function cleanupExpiredStories(): Promise<number> {
         )
       );
 
-    return result.count || 0;
+    return (result as any).rowCount ?? (result as any).count ?? 0;
   } catch (error) {
     console.error('Error cleaning up expired stories:', error);
     throw new Error('Failed to cleanup expired stories');

@@ -293,17 +293,19 @@ export function TransactionSuccess({
 
           {/* Actions */}
           <div className="w-full max-w-sm grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              onClick={handleDownloadReceipt}
-              className="rounded-xl h-11"
-            >
-              <Download className="mr-2 h-4 w-4" /> Reçu
-            </Button>
+            {!isRequest && (
+              <Button
+                variant="outline"
+                onClick={handleDownloadReceipt}
+                className="rounded-xl h-11"
+              >
+                <Download className="mr-2 h-4 w-4" /> Reçu
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleShare}
-              className="rounded-xl h-11"
+              className={cn("rounded-xl h-11", isRequest ? "col-span-2" : "")}
             >
               <Share2 className="mr-2 h-4 w-4" /> Partager
             </Button>

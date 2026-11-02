@@ -424,7 +424,7 @@ export function EditionMatchesTab({
                 <MatchCard
                   key={match.id}
                   viewMode={matchViewMode}
-                  match={match}
+                  item={match}
                   onViewP1={() =>
                     router.push(
                       `/tournaments/members/${match.participant1?.member?.userId || match.participant1?.member?.id}`,
@@ -490,7 +490,7 @@ export function EditionMatchesTab({
                   <MatchCard
                     viewMode={matchViewMode}
                     key={match.id}
-                    match={match}
+                    item={match}
                     currentUserId={currentUserId}
                     isAdmin={isAdmin}
                     onUpdate={() => refetchAll()}

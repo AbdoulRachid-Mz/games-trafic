@@ -284,7 +284,7 @@ export default async function BracketsDashboardPage({
                 {nodes.map((node: any) => (
                   <BracketNodeCard
                     key={node.id}
-                    node={node}
+                    item={node}
                     tournamentId={tournamentId}
                     editionId={editionId}
                     viewMode={viewMode}

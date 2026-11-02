@@ -161,23 +161,17 @@ export function MembersInfiniteList({
               },
             };
 
-            return (
-              <MemberCard
-                key={m.id}
-                member={memberData}
-                viewMode={viewMode}
-                userDisplay={isDashboard ? "organizer" : "member"}
-                actions={
-                  isDashboard
-                    ? {
-                        onToggleCoOrganizer: (id) => handleUpdateRole(id, m.role),
-                        onDelete: (id) => handleDeleteMember(id),
-                        onViewProfile: (id) => window.open(`/profile/${m.user?.username}`, "_blank"),
-                      }
-                    : undefined
-                }
-              />
-            );
+              return (
+                <MemberCard
+                  key={m.id}
+                  item={memberData as any}
+                  viewMode={viewMode}
+                  userDisplay={isDashboard ? "organizer" : "member"}
+                  onToggleCoOrganizer={isDashboard ? () => handleUpdateRole(m.id, m.role) : undefined}
+                  onDelete={isDashboard ? () => handleDeleteMember(m.id) : undefined}
+                  onViewProfile={isDashboard ? () => window.open(`/profile/${m.user?.username}`, "_blank") : undefined}
+                />
+              );
           })}
         </div>
       )}

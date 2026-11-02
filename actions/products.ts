@@ -289,12 +289,17 @@ export async function getProductContext(id: string): Promise<ProductContext | nu
  */
 export async function createProduct(productData: NewProduct): Promise<Product> {
   try {
+    // SEC-05 FIX: Verify the current user owns the shop they're adding to
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     // Validation des données requises
     if (!productData.shopId || !productData.name || !productData.price) {
       throw new Error('shopId, name and price are required');
     }
 
-    // Vérification que la boutique existe
+    // Vérification que la boutique existe ET appartient à l'utilisateur
     const shopExists = await db
       .select()
       .from(shops)
@@ -305,10 +310,17 @@ export async function createProduct(productData: NewProduct): Promise<Product> {
       throw new Error('Shop not found');
     }
 
+    if (!isAdmin && shopExists[0].ownerId !== currentUser.id) {
+      throw new Error('Accès refusé — vous n\'êtes pas propriétaire de cette boutique');
+    }
+
+    // userId is always sourced from session, never from client input
+    const safeProductData = { ...productData, userId: currentUser.id };
+
     const result = await db
       .insert(products)
       .values({
-        ...productData,
+        ...safeProductData,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -366,22 +378,44 @@ export async function createProduct(productData: NewProduct): Promise<Product> {
 
 /**
  * Met à jour un produit
+ * SEC-05 FIX: Owner (via shop) or admin only
  */
 export async function updateProduct(
   id: string,
   productData: Partial<NewProduct>
 ): Promise<Product> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     // Vérification que le produit existe
     const existingProduct = await getProductById(id);
     if (!existingProduct) {
       throw new Error('Product not found');
     }
 
+    // Ownership check via shop
+    if (!isAdmin) {
+      const shop = await db.select({ ownerId: shops.ownerId }).from(shops)
+        .where(eq(shops.id, existingProduct.shopId)).limit(1);
+      if (!shop[0] || shop[0].ownerId !== currentUser.id) {
+        throw new Error('Accès refusé — vous n\'êtes pas propriétaire de ce produit');
+      }
+    }
+
+    // Strip fields non-admins cannot modify
+    const safeData = { ...productData };
+    if (!isAdmin) {
+      delete (safeData as any).userId;
+      delete (safeData as any).shopId;
+      delete (safeData as any).status;
+    }
+
     const result = await db
       .update(products)
       .set({
-        ...productData,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(products.id, id))
@@ -407,12 +441,25 @@ export async function updateProduct(
 
 /**
  * Supprime un produit (soft delete)
+ * SEC-05 FIX: Owner (via shop) or admin only
  */
 export async function deleteProduct(id: string): Promise<Product> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     const product = await getProductById(id);
     if (!product) {
       throw new Error('Product not found');
+    }
+
+    if (!isAdmin) {
+      const shop = await db.select({ ownerId: shops.ownerId }).from(shops)
+        .where(eq(shops.id, product.shopId)).limit(1);
+      if (!shop[0] || shop[0].ownerId !== currentUser.id) {
+        throw new Error('Accès refusé — vous n\'êtes pas propriétaire de ce produit');
+      }
     }
 
     const result = await db
@@ -442,9 +489,14 @@ export async function deleteProduct(id: string): Promise<Product> {
 
 /**
  * Restaure un produit supprimé
+ * SEC-05 FIX: Admin only
  */
 export async function restoreProduct(id: string): Promise<Product> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+    if (!isAdmin) throw new Error('Accès réservé aux administrateurs');
     const result = await db
       .update(products)
       .set({

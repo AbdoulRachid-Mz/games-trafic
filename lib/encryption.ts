@@ -1,7 +1,16 @@
 // lib/encryption.ts
 import crypto from 'crypto';
 
-const SECRET_KEY = process.env.SEARCH_ENCRYPTION_KEY || 'your-secret-key-32-chars-long';
+// SEC-11 FIX: Fail fast if the encryption key is missing — never fall back to a
+// hardcoded insecure key. Set SEARCH_ENCRYPTION_KEY in your .env file (32+ chars).
+if (!process.env.SEARCH_ENCRYPTION_KEY) {
+  throw new Error(
+    '[encryption] SEARCH_ENCRYPTION_KEY environment variable is required but not set. ' +
+    'Please add it to your .env file.'
+  );
+}
+
+const SECRET_KEY = process.env.SEARCH_ENCRYPTION_KEY;
 const ALGORITHM = 'aes-256-gcm';
 
 export function encryptData(data: string): string {

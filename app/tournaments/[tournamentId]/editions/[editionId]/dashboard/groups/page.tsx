@@ -182,7 +182,7 @@ const allGroups = filteredPhases.flatMap(
           {allGroups.map((group: any) => (
             <GroupCard
               key={group.id}
-              group={group}
+              item={group}
               tournamentId={tournamentId}
               editionId={editionId}
               viewMode={viewMode}

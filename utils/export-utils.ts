@@ -79,7 +79,7 @@ export interface ExportData {
 
 // Configuration par défaut de l'application
 export const DEFAULT_APP_INFO = {
-  name: "Game Trafics",
+  name: "Games-Trafics",
   logo: "/icons/gt-primary.png",
   version: "2.0.0",
   contact: {

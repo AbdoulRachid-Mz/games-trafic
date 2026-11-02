@@ -95,7 +95,7 @@ function ResetPasswordForm() {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen flex items-center justify-center py-8 px-2 sm:px-4 lg:px-6">
         <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-xl">
           <CardContent className="p-8 bg-white/95 backdrop-blur-sm">
             <div className="text-center space-y-4">
@@ -116,7 +116,7 @@ function ResetPasswordForm() {
 
   if (!tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -176,7 +176,7 @@ function ResetPasswordForm() {
             className="inline-flex items-center justify-center gap-2"
           >
             <Sparkles className="h-8 w-8 text-primary" />
-            <span className="text-3xl font-black text-white tracking-tight">
+            <span className="text-3xl font-black text-secondary tracking-tight">
               Games<span className="text-primary">Trafics</span>
             </span>
           </motion.div>
@@ -334,7 +334,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen flex items-center justify-center py-8 px-2 sm:px-4 lg:px-6">
         <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-xl">
           <CardContent className="p-8 bg-white/95 backdrop-blur-sm">
             <div className="text-center space-y-4">

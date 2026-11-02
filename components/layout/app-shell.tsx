@@ -9,12 +9,14 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { AnnouncementDialog } from "@/components/announcements/announcement-dialog";
 import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 import { resolveRoute } from "@/lib/routes/resolver";
+import { canSkipWelcome } from "@/lib/routes/safe-redirect";
 import type { UserRoles, ResolvedRoute } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { useSearchParams } from "next/navigation";
 import OnTapPopup from "../auth/on-tap-popup";
 import Image from "next/image";
+import { PulseLoading } from "../loading-ui/pulse-loader";
 
 // Loading Screen Premium
 function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
@@ -134,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Handle welcome redirect
   useEffect(() => {
     const isWelcomePath = pathname === "/welcome";
-    const ignore = searchParams?.get("ignore_visite") === "true";
+    const ignore = canSkipWelcome(searchParams);
 
     if (ignore) {
       setWelcomeChecked(true);
@@ -228,7 +230,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Show loading during initialization
   if (!isInitialized || !welcomeChecked) {
-    return <LoadingScreen message="Initialisation..." />;
+    return <PulseLoading variant="primary" size={150} message="Initialisation..." />;
   }
 
   // Show loading during auth check for protected routes
@@ -242,7 +244,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!resolved) {
-    return <LoadingScreen message="Chargement..." />;
+    return <PulseLoading />;
   }
 
   // Special layout routes

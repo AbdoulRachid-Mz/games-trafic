@@ -56,8 +56,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
-    // Vérifie que l'utilisateur est le propriétaire de la boutique
-    if (shop.ownerId !== session.id) {
+    // Vérifie que l'utilisateur est le propriétaire de la boutique ou administrateur
+    const isAdmin = session.role === "admin" || (session as any).isAdmin === true;
+    if (shop.ownerId !== session.id && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -90,8 +91,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
-    // Vérifie que l'utilisateur est le propriétaire de la boutique
-    if (shop.ownerId !== session.id) {
+    // Vérifie que l'utilisateur est le propriétaire de la boutique ou administrateur
+    const isAdmin = session.role === "admin" || (session as any).isAdmin === true;
+    if (shop.ownerId !== session.id && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

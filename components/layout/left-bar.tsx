@@ -118,13 +118,13 @@ const defaultMenuItems: MenuItem[] = [
     icon: Gamepad2,
     group: "games",
   },
-  {
-    id: "game-clips",
-    label: "Clips",
-    link: "/game-clips",
-    icon: MessageSquare,
-    group: "games",
-  },
+  // {
+  //   id: "game-clips",
+  //   label: "Clips",
+  //   link: "/game-clips",
+  //   icon: MessageSquare,
+  //   group: "games",
+  // },
 
   // Application Features
   {

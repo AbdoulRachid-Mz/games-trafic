@@ -12,8 +12,9 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { AIAssistant } from "../shared/chatbot-assistant";
 import type { NavItem, FabAction } from "@/types/routes";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { QrTransaction } from "@/components/transactions/qr-transaction";
+import { QrTransaction } from "@/components/pages/transactions/qr-transaction";
 import OnTapPopup from "../auth/on-tap-popup";
+import { useNetworkStatus } from "@/hooks/network-status";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -63,12 +64,14 @@ export function MainLayout({
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);
   const closeRight = useCallback(() => setRightOpen(false), []);
+  const { isOnline, isReachable, isChecking } = useNetworkStatus();
+  const isConnected = isOnline && isReachable;
 
   return (
     <div className="relative min-h-screen bg-background">
 
       {/* Show on tap popup */}
-      {showOnTap && <OnTapPopup />}
+      {showOnTap && isConnected && <OnTapPopup />}
 
       {/* Top bar */}
       {(topMiddle && !shouldExcludeContainer) && (

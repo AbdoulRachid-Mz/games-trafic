@@ -194,7 +194,6 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    nextCookies(),
     admin({
       adminUserIds: process.env.ADMIN_USER_IDS?.split(",") || [],
       impersonationSessionDuration: 60 * 60 * 2, // 2 heures
@@ -209,6 +208,7 @@ export const auth = betterAuth({
     }),
     passkey(),
     oneTap(),
+    nextCookies(),
   ],
 });
 

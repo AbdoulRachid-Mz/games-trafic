@@ -184,7 +184,7 @@ export function ShopPageContent() {
             </Button>
 
             {/* relaod */}
-            <Button onClick={() => router.refresh()}>
+            <Button onClick={() => window.location.reload()}>
               Recharger
             </Button>
           </EmptyContent>
@@ -668,7 +668,7 @@ export function ShopPageContent() {
                     {products?.map((product: any, index: number) => (
                       <ProductCard
                         key={product.id}
-                        product={product}
+                        item={product}
                         viewMode={productViewMode}
                         onView={() => handleProductClick(product.id)}
                         onBuy={() => handleBuyClick(product.id)}
@@ -944,7 +944,7 @@ export function ShopPageContent() {
                       {similarShops.map((similarShop) => (
                         <ShopCard
                           key={similarShop.id}
-                          shop={similarShop}
+                          item={similarShop}
                           //   viewMode="grid"
                           showStats={false}
                           showActions={true}
@@ -964,7 +964,7 @@ export function ShopPageContent() {
                       {products?.slice(0, 4).map((product: any) => (
                         <ProductCard
                           key={product.id}
-                          product={product}
+                          item={product}
                           viewMode="compact"
                           showActions={false}
                           onView={() => handleProductClick(product.id)}

@@ -1,5 +1,6 @@
 // @/actions/shops.ts
 'use server';
+import { getCurrentUser } from '@/lib/auth/session';
 import { getAccountBalance } from '@/lib/ledger/ledger-utils';
 
 import {
@@ -558,28 +559,21 @@ export async function getShopLedgerStats(shopId: string, params?: { startDate?: 
 /**
  * Crée une nouvelle boutique
  */
-export async function createShop(shopData: NewShop): Promise<Shop> {
+export async function createShop(shopData: Omit<NewShop, 'ownerId'> & { ownerId?: string }): Promise<Shop> {
   try {
-    // Validation des données requises
-    if (!shopData.ownerId || !shopData.name) {
-      throw new Error('ownerId and name are required');
-    }
+    // SEC-05 FIX: ownerId is always sourced from the authenticated session,
+    // never from client-supplied input — prevents IDOR / shop ownership hijacking.
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+
+    const resolvedOwnerId = currentUser.id;
+
+    if (!shopData.name) throw new Error('name is required');
 
     // Vérification des doublons de nom
     const existingShop = await getShopByName(shopData.name);
     if (existingShop) {
       throw new Error('Shop with this name already exists');
-    }
-
-    // Vérification que le propriétaire existe
-    const owner = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, shopData.ownerId))
-      .limit(1);
-
-    if (owner.length === 0) {
-      throw new Error('Owner user not found');
     }
 
     return await db.transaction(async (tx) => {
@@ -595,11 +589,12 @@ export async function createShop(shopData: NewShop): Promise<Shop> {
         })
         .returning();
 
-      // 2. Create Shop
+      // 2. Create Shop — ownerId is always the authenticated user
       const [newShop] = await tx
         .insert(shops)
         .values({
           ...shopData,
+          ownerId: resolvedOwnerId,
           financialAccountId: account.id,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -631,10 +626,28 @@ export async function updateShop(
   shopData: Partial<NewShop>
 ): Promise<Shop> {
   try {
+    // SEC-05 FIX: Require auth + ownership or admin
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     // Vérification que la boutique existe
     const existingShop = await getShopById(id);
     if (!existingShop) {
       throw new Error('Shop not found');
+    }
+
+    if (!isAdmin && existingShop.ownerId !== currentUser.id) {
+      throw new Error('Accès refusé — vous n\'êtes pas propriétaire de cette boutique');
+    }
+
+    // Strip ownership-altering fields for non-admins
+    const safeData = { ...shopData };
+    if (!isAdmin) {
+      delete (safeData as any).ownerId;
+      delete (safeData as any).isVerified;
+      delete (safeData as any).isActive;
+      delete (safeData as any).financialAccountId;
     }
 
     // Vérification des doublons de nom si le nom est modifié
@@ -648,7 +661,7 @@ export async function updateShop(
     const result = await db
       .update(shops)
       .set({
-        ...shopData,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(shops.id, id))
@@ -668,9 +681,20 @@ export async function updateShop(
 
 /**
  * Supprime une boutique (soft delete)
+ * SEC-05 FIX: Owner or admin only
  */
 export async function deleteShop(id: string): Promise<Shop> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
+    const shop = await getShopById(id);
+    if (!shop) throw new Error('Shop not found');
+    if (!isAdmin && shop.ownerId !== currentUser.id) {
+      throw new Error('Accès refusé — vous n\'êtes pas propriétaire de cette boutique');
+    }
+
     const result = await db
       .update(shops)
       .set({
@@ -686,15 +710,6 @@ export async function deleteShop(id: string): Promise<Shop> {
       throw new Error('Shop not found');
     }
 
-    // Mise à jour du compteur de boutiques de l'utilisateur
-    // await db
-    //   .update(users)
-    //   .set({
-    //     shopsCount: sql`${users.shopsCount} - 1`,
-    //     updatedAt: new Date(),
-    //   })
-    //   .where(eq(users.id, result[0].ownerId));
-
     revalidateTag('shops', 'max');
     revalidateTag(`shop-${id}`, 'max');
     return result[0];
@@ -709,9 +724,15 @@ export async function deleteShop(id: string): Promise<Shop> {
 
 /**
  * Restaure une boutique supprimée
+ * SEC-05 FIX: Admin only (restoring a shop is an admin operation)
  */
 export async function restoreShop(id: string): Promise<Shop> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+    if (!isAdmin) throw new Error('Accès réservé aux administrateurs');
+
     const result = await db
       .update(shops)
       .set({
@@ -726,15 +747,6 @@ export async function restoreShop(id: string): Promise<Shop> {
     if (result.length === 0) {
       throw new Error('Shop not found');
     }
-
-    // Mise à jour du compteur de boutiques de l'utilisateur
-    // await db
-    //   .update(users)
-    //   .set({
-    //     shopsCount: sql`${users.shopsCount} + 1`,
-    //     updatedAt: new Date(),
-    //   })
-    //   .where(eq(users.id, result[0].ownerId));
 
     revalidateTag('shops', 'max');
     revalidateTag(`shop-${id}`, 'max');

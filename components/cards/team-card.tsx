@@ -1,44 +1,74 @@
+// @/components/cards/team-card.tsx
+"use client";
+
 import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MoreHorizontal, Users, Crown, Calendar } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Users, Crown } from "lucide-react";
 import { TeamWithRelations } from "@/database/schema";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
+import { cn } from "@/lib/utils";
 
-interface TeamCardProps {
-  team: TeamWithRelations;
-  viewMode?: "grid" | "list";
+export interface TeamCardProps extends BaseCardProps<TeamWithRelations> {
   userDisplay?: "admin" | "organizer" | "member";
-  actions?: {
-    onEdit?: (id: string) => void;
-    onDelete?: (id: string) => void;
-    onViewReset?: (id: string) => void;
-  };
+  onViewReset?: (item: TeamWithRelations) => void;
 }
 
 export function TeamCard({
-  team,
+  item: team,
   viewMode = "grid",
+  status,
+  isCliquable = true,
+  isMini = false,
+  activeAction = "view",
+  onEdit,
+  onView,
+  onDelete,
+  onViewReset,
   userDisplay = "member",
-  actions,
+  className,
 }: TeamCardProps) {
-  // Utilisation de currentSquadSize à la place de _count.members
   const memberCount = team.currentSquadSize || 0;
-  // Utilisation correcte du nom du capitaine depuis la relation captain
   const captainName = team.captain?.username || "N/A";
+  const isListView = viewMode === "list";
 
-  if (viewMode === "list") {
+  const handleView = () => {
+    if (onView) onView(team);
+    else if (onViewReset) onViewReset(team);
+  };
+
+  const handleMainAction = () => {
+    if (!isCliquable) return;
+    if (activeAction === "view") handleView();
+    else if (activeAction === "edit" && onEdit) onEdit(team);
+    else if (activeAction === "delete" && onDelete) onDelete(team);
+    else handleView();
+  };
+
+  const extraActions = [];
+  if (onViewReset) {
+    extraActions.push({
+      id: "view-reset",
+      label: "Voir détails",
+      icon: Users,
+      onClick: () => onViewReset(team)
+    });
+  }
+
+  const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
+
+  if (isListView) {
     return (
-      <div className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors group">
+      <div 
+        className={cn(
+          "flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors group relative overflow-hidden",
+          isCliquable && "cursor-pointer active:scale-[0.99]",
+          className
+        )}
+        onClick={handleMainAction}
+      >
         <div className="flex items-center gap-4">
           <Avatar className="h-12 w-12 rounded-lg border bg-muted">
             <AvatarImage
@@ -65,41 +95,19 @@ export function TeamCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           <span className="text-xs text-muted-foreground hidden sm:inline-block mr-4">
             Créée le {team.createdAt ? new Date(team.createdAt).toLocaleDateString() : "N/A"}
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Options d'équipe</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => actions?.onViewReset?.(team.id)}>
-                Voir détails
-              </DropdownMenuItem>
-              {userDisplay !== "member" && (
-                <>
-                  <DropdownMenuItem onClick={() => actions?.onEdit?.(team.id)}>
-                    Modifier
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => actions?.onDelete?.(team.id)}
-                  >
-                    Dissoudre l'équipe
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {hasActions && (
+            <CardActionMenu
+              onEdit={onEdit ? () => onEdit(team) : undefined}
+              onView={onView ? () => onView(team) : undefined}
+              onDelete={onDelete ? () => onDelete(team) : undefined}
+              entityName={`l'équipe ${team.name}`}
+              extraActions={extraActions}
+            />
+          )}
         </div>
       </div>
     );
@@ -107,11 +115,18 @@ export function TeamCard({
 
   // Grid View
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow group relative">
+    <Card 
+      className={cn(
+        "overflow-hidden hover:shadow-md transition-shadow group relative flex flex-col",
+        isCliquable && "cursor-pointer active:scale-[0.99]",
+        className
+      )}
+      onClick={handleMainAction}
+    >
       {/* Banner/Header Pattern */}
       <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-primary/50 to-purple-500/50" />
 
-      <CardContent className="p-6 flex flex-col gap-4">
+      <CardContent className="p-6 flex flex-col gap-4 h-full flex-1">
         <div className="flex justify-between items-start">
           <Avatar className="h-14 w-14 rounded-xl border-2 border-background shadow-sm bg-muted">
             <AvatarImage
@@ -124,30 +139,17 @@ export function TeamCard({
             </AvatarFallback>
           </Avatar>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 -mr-2 text-muted-foreground"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => actions?.onViewReset?.(team.id)}>
-                Voir détails
-              </DropdownMenuItem>
-              {userDisplay !== "member" && (
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => actions?.onDelete?.(team.id)}
-                >
-                  Dissoudre
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {hasActions && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <CardActionMenu
+                onEdit={onEdit ? () => onEdit(team) : undefined}
+                onView={onView ? () => onView(team) : undefined}
+                onDelete={onDelete ? () => onDelete(team) : undefined}
+                entityName={`l'équipe ${team.name}`}
+                extraActions={extraActions}
+              />
+            </div>
+          )}
         </div>
 
         <div>
@@ -169,7 +171,7 @@ export function TeamCard({
             {memberCount}
           </Badge>
           <div className="text-xs text-muted-foreground ml-auto">
-{team.createdAt ? new Date(team.createdAt).toLocaleDateString() : "N/A"}
+            {team.createdAt ? new Date(team.createdAt).toLocaleDateString() : "N/A"}
           </div>
         </div>
       </CardContent>

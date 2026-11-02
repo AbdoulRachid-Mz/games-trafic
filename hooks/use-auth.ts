@@ -30,11 +30,16 @@ interface UseAuthReturn {
 }
 
 async function fetchSession(): Promise<SessionResponse> {
-  const res = await fetch("/api/auth/session", {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Session fetch failed");
-  return res.json();
+  try {
+    const { data, error } = await authClient.getSession();
+    if (error || !data?.user) {
+      return { authenticated: false, user: null };
+    }
+    return { authenticated: true, user: data.user as unknown as User };
+  } catch (err) {
+    console.error("fetchSession error:", err);
+    return { authenticated: false, user: null };
+  }
 }
 
 function getPermissions(user: User | null): string[] {

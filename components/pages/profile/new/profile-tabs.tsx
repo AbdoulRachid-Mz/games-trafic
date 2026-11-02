@@ -107,7 +107,8 @@ export function ProfileTabs({
         mobileCount={3}
         tabletCount={4}
         desktopCount={tabs.length}
-        swipeable
+        swipeable={true}
+        labelCharacters={7}
       />
     </div>
   );

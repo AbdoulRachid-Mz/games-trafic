@@ -50,12 +50,12 @@ export function ShopsHero({ searchQuery, onSearch, onCreateShop, user }: ShopsHe
             <div className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Rechercher une boutique, un produit, une catégorie..."
+                placeholder="Rechercher une boutique, une catégorie..."
                 value={searchQuery}
                 onChange={(e) => onSearch(e.target.value)}
                 className="pl-12 h-14 text-base md:text-lg rounded-xl border-2 focus:border-primary bg-background/95 backdrop-blur-sm"
               />
-              <Button className="absolute right-2 top-2 bottom-2 px-4 md:px-6 rounded-lg">
+              <Button className="absolute right-2 top-2 bottom-2 py-5 px-4 md:px-6 rounded-lg">
                 Rechercher
               </Button>
             </div>

@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { InteractionButton } from "@/components/shared/interaction-button";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
+import { tournamentStatusLabel } from "@/utils/types-label";
 import {
   Trophy,
   Calendar,
@@ -22,16 +24,15 @@ import {
   Shield,
   TrendingUp,
   ChevronRight,
+  UserPlus,
 } from "lucide-react";
-import type { Tournament, TournamentWithRelations } from "@/database/schema";
+import type { Tournament } from "@/database/schema";
 import { useRouter } from "next/navigation";
 
-// Types
-export type ViewMode = "grid" | "list" | "compact";
 type TournamentStatus = "UPCOMING" | "LIVE" | "COMPLETED" | "CANCELLED";
 
-interface TournamentCardProps {
-  tournament: Tournament & {
+export interface TournamentCardProps extends BaseCardProps<
+  Tournament & {
     currentEdition?: {
       id: string;
       name: string;
@@ -42,34 +43,49 @@ interface TournamentCardProps {
     organizer?: {
       username: string;
     };
-  };
-  viewMode?: ViewMode;
+  }
+> {
   showDetails?: boolean;
   showStats?: boolean;
   showActions?: boolean;
   showFollowButton?: boolean;
   showLikeButton?: boolean;
-  onView?: (tournamentId: string) => void;
-  onJoin?: (tournamentId: string) => void;
-  className?: string;
+  onJoin?: (item: Tournament & {
+    currentEdition?: {
+      id: string;
+      name: string;
+      startDate: Date;
+      prizePool: number;
+      participants: number;
+    };
+    organizer?: {
+      username: string;
+    };
+  }) => void;
 }
 
 export function TournamentCard({
-  tournament,
+  item: tournament,
   viewMode = "grid",
+  status,
+  isCliquable = true,
+  isMini = false,
+  activeAction = "view",
+  onEdit,
+  onView,
+  onDelete,
+  onJoin,
   showDetails = true,
   showStats = true,
   showActions = true,
   showFollowButton = true,
   showLikeButton = false,
-  onView,
-  onJoin,
   className,
 }: TournamentCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isGrid = viewMode === "grid";
   const isList = viewMode === "list";
-  const isCompact = viewMode === "compact";
+  const isCompact = viewMode === "compact" || isMini;
   const router = useRouter();
 
   const statusConfig: Record<TournamentStatus, {
@@ -78,22 +94,22 @@ export function TournamentCard({
     icon: React.ReactNode;
   }> = {
     UPCOMING: {
-      label: "À venir",
+      label: tournamentStatusLabel("UPCOMING"),
       color: "bg-blue-500/10 text-blue-600 border-blue-500/20",
       icon: <Calendar className="w-3 h-3" />,
     },
     LIVE: {
-      label: "En cours",
+      label: tournamentStatusLabel("LIVE"),
       color: "bg-green-500/10 text-green-600 border-green-500/20 animate-pulse",
       icon: <TrendingUp className="w-3 h-3" />,
     },
     COMPLETED: {
-      label: "Terminé",
+      label: tournamentStatusLabel("COMPLETED"),
       color: "bg-gray-500/10 text-gray-600 border-gray-500/20",
       icon: <Award className="w-3 h-3" />,
     },
     CANCELLED: {
-      label: "Annulé",
+      label: tournamentStatusLabel("CANCELLED"),
       color: "bg-red-500/10 text-red-600 border-red-500/20",
       icon: <Shield className="w-3 h-3" />,
     },
@@ -101,17 +117,38 @@ export function TournamentCard({
 
   const handleView = () => {
     if (onView) {
-      onView(tournament.id);
+      onView(tournament);
+    } else {
+      router.push(`/tournaments/${tournament.id}`);
     }
-    router.push(`/tournaments/${tournament.id}`);
+  };
+
+  const handleMainAction = () => {
+    if (!isCliquable) return;
+    if (activeAction === "view" && onView) onView(tournament);
+    else if (activeAction === "edit" && onEdit) onEdit(tournament);
+    else if (activeAction === "delete" && onDelete) onDelete(tournament);
+    else handleView();
   };
 
   const handleJoin = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onJoin) {
-      onJoin(tournament.id);
+      onJoin(tournament);
     }
   };
+
+  const extraActions: extraActionsProps[] = [];
+  if (onJoin && tournament.status === "UPCOMING") {
+    extraActions.push({
+      id: "join",
+      label: "S'inscrire",
+      icon: UserPlus,
+      onClick: () => onJoin(tournament),
+    });
+  }
+
+  const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
 
   // Rendu de l'image
   const renderImage = () => (
@@ -136,7 +173,7 @@ export function TournamentCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
       {/* Statut en overlay */}
-      <div className="absolute top-3 right-3 z-10">
+      <div className="absolute top-3 right-3 z-10 flex gap-2 items-center">
         <Badge className={cn(
           "backdrop-blur-md border gap-1 px-3",
           statusConfig[tournament.status as TournamentStatus]?.color
@@ -144,6 +181,18 @@ export function TournamentCard({
           {statusConfig[tournament.status as TournamentStatus]?.icon}
           {statusConfig[tournament.status as TournamentStatus]?.label}
         </Badge>
+
+        {!isList && hasActions && (
+          <div onClick={(e) => e.stopPropagation()} className="z-20">
+            <CardActionMenu
+              onEdit={onEdit ? () => onEdit(tournament) : undefined}
+              onView={onView ? () => onView(tournament) : undefined}
+              onDelete={onDelete ? () => onDelete(tournament) : undefined}
+              entityName={`le tournoi ${tournament.name}`}
+              extraActions={extraActions}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -153,7 +202,7 @@ export function TournamentCard({
     if (isCompact) {
       return (
         <div className="flex items-center gap-3">
-          <div className="relative w-12 h-12 rounded-lg overflow-hidden">
+          <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted">
             {tournament.profileImage ? (
               <Image
                 src={tournament.profileImage}
@@ -178,6 +227,17 @@ export function TournamentCard({
               </Typography>
             </div>
           </div>
+          {isCompact && hasActions && (
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <CardActionMenu
+                onEdit={onEdit ? () => onEdit(tournament) : undefined}
+                onView={onView ? () => onView(tournament) : undefined}
+                onDelete={onDelete ? () => onDelete(tournament) : undefined}
+                entityName={`le tournoi ${tournament.name}`}
+                extraActions={extraActions}
+              />
+            </div>
+          )}
         </div>
       );
     }
@@ -209,6 +269,18 @@ export function TournamentCard({
               </div>
             )}
           </div>
+
+          {isList && hasActions && (
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <CardActionMenu
+                onEdit={onEdit ? () => onEdit(tournament) : undefined}
+                onView={onView ? () => onView(tournament) : undefined}
+                onDelete={onDelete ? () => onDelete(tournament) : undefined}
+                entityName={`le tournoi ${tournament.name}`}
+                extraActions={extraActions}
+              />
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -296,7 +368,7 @@ export function TournamentCard({
             </div>
 
             <div className="flex items-center gap-2">
-              {tournament.status === "UPCOMING" && (
+              {tournament.status === "UPCOMING" && onJoin && (
                 <Button
                   size="sm"
                   variant="default"
@@ -327,12 +399,13 @@ export function TournamentCard({
     return (
       <Card
         className={cn(
-          "group cursor-pointer transition-all hover:shadow-lg",
+          "group cursor-pointer transition-all hover:shadow-lg relative overflow-hidden",
+          isCliquable && "active:scale-[0.99]",
           className
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={handleView}
+        onClick={handleMainAction}
       >
         <div className="flex gap-4 p-4">
           <div className="w-64 flex-shrink-0">
@@ -356,10 +429,11 @@ export function TournamentCard({
       >
         <Card
           className={cn(
-            "group cursor-pointer h-full overflow-hidden transition-all hover:shadow-xl border-border/50",
+            "group cursor-pointer h-full overflow-hidden transition-all hover:shadow-xl border-border/50 relative",
+            isCliquable && "active:scale-[0.99]",
             className
           )}
-          onClick={handleView}
+          onClick={handleMainAction}
         >
           <CardContent className="p-0">
             {renderImage()}
@@ -375,8 +449,8 @@ export function TournamentCard({
   // Mode compact
   return (
     <Card
-      className={cn("cursor-pointer hover:shadow-md", className)}
-      onClick={handleView}
+      className={cn("cursor-pointer hover:shadow-md relative overflow-hidden", className)}
+      onClick={handleMainAction}
     >
       <CardContent className="p-3">
         {renderContent()}

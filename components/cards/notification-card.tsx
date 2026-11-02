@@ -1,13 +1,13 @@
-//@/components/cards/notification-card.tsx
+﻿// @/components/cards/notification-card.tsx
 "use client";
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
 import {
     Bell,
     MessageSquare,
@@ -20,7 +20,7 @@ import {
     Info, Gamepad2, Shield, Gift,
     AlertCircle,
     Mail, Settings,
-    FileText, Target, Package, CreditCard, Image,
+    FileText, Target, Package, CreditCard,
     Store,
     BookOpen,
     User,
@@ -30,12 +30,10 @@ import {
 } from "lucide-react";
 import type { Notification } from "@/database/schema";
 
-// Types
 type NotificationType = "info" | "success" | "warning" | "error" | "system";
-type ViewMode = "grid" | "list" | "compact";
 
-interface NotificationCardProps {
-    notification: Notification & {
+export interface NotificationCardProps extends BaseCardProps<
+    Notification & {
         sender?: {
             id: string;
             username?: string;
@@ -48,35 +46,52 @@ interface NotificationCardProps {
             title?: string;
             image?: string;
         };
-    };
-    viewMode?: ViewMode;
+    }
+> {
     showDetails?: boolean;
     showActions?: boolean;
     showMarkAsRead?: boolean;
     showDeleteButton?: boolean;
-    onMarkAsRead?: (notificationId: string) => void;
-    onDelete?: (notificationId: string) => void;
-    onClick?: (notificationId: string) => void;
-    className?: string;
+    onMarkAsRead?: (item: any) => void;
+}
+
+function formatTimeAgo(dateInput?: Date | string | null): string {
+    if (!dateInput) return "Récemment";
+    const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+    // eslint-disable-next-line react-hooks/purity
+    const diffInSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "À l'instant";
+    if (diffInSeconds < 3600) return `Il y a ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Il y a ${Math.floor(diffInSeconds / 3600)} h`;
+    if (diffInSeconds < 86400 * 7) return `Il y a ${Math.floor(diffInSeconds / 86400)} j`;
+
+    return date.toLocaleDateString("fr-FR");
 }
 
 export function NotificationCard({
-    notification,
+    item: notification,
     viewMode = "list",
+    status,
+    isCliquable = true,
+    isMini = false,
+    activeAction = "view",
+    onEdit,
+    onView,
+    onDelete,
     showDetails = true,
     showActions = true,
     showMarkAsRead = true,
     showDeleteButton = true,
     onMarkAsRead,
-    onDelete,
-    onClick,
     className,
 }: NotificationCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [isRead, setIsRead] = useState(notification.read || false);
+    
     const isGrid = viewMode === "grid";
     const isList = viewMode === "list";
-    const isCompact = viewMode === "compact";
+    const isCompact = viewMode === "compact" || isMini;
 
     const typeConfig = {
         info: {
@@ -131,52 +146,46 @@ export function NotificationCard({
         EDITION: Star,
     };
 
-    const handleMarkAsRead = (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleMarkAsRead = () => {
         setIsRead(true);
         if (onMarkAsRead) {
-            onMarkAsRead(notification.id);
+            onMarkAsRead(notification);
         }
     };
 
-    const handleDelete = (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleDelete = () => {
         if (onDelete) {
-            onDelete(notification.id);
+            onDelete(notification);
         }
     };
 
-    const handleClick = () => {
-        if (onClick) {
-            onClick(notification.id);
+    const handleView = () => {
+        if (onView) {
+            onView(notification);
         }
     };
 
-    const formatTimeAgo = (date: Date) => {
-        const now = new Date();
-        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-        if (diffInSeconds < 60) return "À l'instant";
-        if (diffInSeconds < 3600) return `Il y a ${Math.floor(diffInSeconds / 60)} min`;
-        if (diffInSeconds < 86400) return `Il y a ${Math.floor(diffInSeconds / 3600)} h`;
-        if (diffInSeconds < 604800) return `Il y a ${Math.floor(diffInSeconds / 86400)} j`;
-
-        return date.toLocaleDateString("fr-FR");
+    const handleMainAction = () => {
+        if (!isCliquable) return;
+        if (activeAction === "view") handleView();
+        else if (activeAction === "edit" && onEdit) onEdit(notification);
+        else if (activeAction === "delete" && onDelete) onDelete(notification);
+        else handleView();
     };
 
-    // Render sender avatar
+
     const renderAvatar = () => {
         const sender = notification.sender;
         if (!sender?.profileImage) {
             return (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center shrink-0">
                     <User className="w-5 h-5 text-primary/60" />
                 </div>
             );
         }
 
         return (
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-primary/10 to-primary/20">
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-primary/10 to-primary/20 shrink-0">
                 <img
                     src={sender.profileImage}
                     alt={sender.username || "Utilisateur"}
@@ -188,20 +197,19 @@ export function NotificationCard({
         );
     };
 
-    // Render entity image
     const renderEntityImage = () => {
         const entity = notification.relatedEntity;
         if (!entity?.image) {
             const IconComponent = entityIcons[entity?.type as keyof typeof entityIcons] || Bell;
             return (
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center shrink-0">
                     <IconComponent className="w-6 h-6 text-primary/60" />
                 </div>
             );
         }
 
         return (
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-primary/10 to-primary/20">
+            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-primary/10 to-primary/20 shrink-0">
                 <img
                     src={entity.image}
                     alt={entity.title || "Image"}
@@ -213,7 +221,18 @@ export function NotificationCard({
         );
     };
 
-    // Render content based on view mode
+    const extraActions: extraActionsProps[] = [];
+    if (showMarkAsRead && !isRead) {
+        extraActions.push({
+            id: "mark-read",
+            label: "Marquer comme lu",
+            icon: CheckCircle,
+            onClick: handleMarkAsRead,
+        });
+    }
+
+    const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
+
     const renderContent = () => {
         if (isCompact) {
             return (
@@ -226,20 +245,31 @@ export function NotificationCard({
                         <div className="flex items-center gap-2 mt-1">
                             <Clock className="w-3 h-3 text-muted-foreground" />
                             <Typography variant="caption1" theme="muted">
-                                {formatTimeAgo(new Date(notification.createdAt || Date.now()))}
+                                {formatTimeAgo(notification.createdAt)}
                             </Typography>
                         </div>
                     </div>
-                    {!isRead && (
-                        <div className="w-2 h-2 rounded-full bg-primary" />
-                    )}
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {!isRead && (
+                            <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                        )}
+                        {hasActions && (
+                            <CardActionMenu
+                                onEdit={onEdit ? () => onEdit(notification) : undefined}
+                                onView={onView ? () => onView(notification) : undefined}
+                                onDelete={onDelete ? () => onDelete(notification) : undefined}
+                                entityName={`la notification`}
+                                extraActions={extraActions}
+                            />
+                        )}
+                    </div>
                 </div>
             );
         }
 
         return (
             <div className="space-y-3">
-                {/* Header with type badge and time */}
+                {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Badge
@@ -259,11 +289,22 @@ export function NotificationCard({
                             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                         )}
                     </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <Typography variant="caption1">
-                            {formatTimeAgo(new Date(notification.createdAt || Date.now()))}
-                        </Typography>
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 text-muted-foreground mr-1">
+                            <Clock className="w-3 h-3" />
+                            <Typography variant="caption1">
+                                {formatTimeAgo(notification.createdAt)}
+                            </Typography>
+                        </div>
+                        {hasActions && (
+                            <CardActionMenu
+                                onEdit={onEdit ? () => onEdit(notification) : undefined}
+                                onView={onView ? () => onView(notification) : undefined}
+                                onDelete={onDelete ? () => onDelete(notification) : undefined}
+                                entityName={`la notification`}
+                                extraActions={extraActions}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -287,46 +328,18 @@ export function NotificationCard({
                     {notification.relatedEntity && renderEntityImage()}
                 </div>
 
-                {/* Actions */}
-                {showActions && (
+                {/* Info footer */}
+                {showActions && notification.sender && (
                     <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                        <div className="flex items-center gap-2">
-                            {notification.sender && (
-                                <Typography variant="caption1" theme="muted">
-                                    De: {notification.sender.fullName || notification.sender.username}
-                                </Typography>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {showMarkAsRead && !isRead && (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={handleMarkAsRead}
-                                    className="h-7 px-2"
-                                >
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Marquer comme lu
-                                </Button>
-                            )}
-                            {showDeleteButton && (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={handleDelete}
-                                    className="h-7 px-2 text-destructive hover:text-destructive"
-                                >
-                                    <XCircle className="w-3 h-3" />
-                                </Button>
-                            )}
-                        </div>
+                        <Typography variant="caption1" theme="muted">
+                            De: {notification.sender.fullName || notification.sender.username}
+                        </Typography>
                     </div>
                 )}
             </div>
         );
     };
 
-    // Render based on view mode
     if (isGrid) {
         return (
             <motion.div
@@ -337,11 +350,12 @@ export function NotificationCard({
             >
                 <Card
                     className={cn(
-                        "group cursor-pointer h-full overflow-hidden transition-all hover:shadow-lg border-border/50",
+                        "group cursor-pointer h-full overflow-hidden transition-all hover:shadow-lg border-border/50 relative",
+                        isCliquable && "active:scale-[0.99]",
                         !isRead && "border-primary/50 bg-primary/5",
                         className
                     )}
-                    onClick={handleClick}
+                    onClick={handleMainAction}
                 >
                     <CardContent className="p-4 space-y-4">
                         {renderContent()}
@@ -355,13 +369,14 @@ export function NotificationCard({
         return (
             <Card
                 className={cn(
-                    "group cursor-pointer transition-all hover:shadow-md",
+                    "group cursor-pointer transition-all hover:shadow-md relative overflow-hidden",
+                    isCliquable && "active:scale-[0.99]",
                     !isRead && "border-primary/50 bg-primary/5",
                     className
                 )}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                onClick={handleClick}
+                onClick={handleMainAction}
             >
                 <CardContent className="p-4">
                     {renderContent()}
@@ -370,15 +385,14 @@ export function NotificationCard({
         );
     }
 
-    // Compact mode
     return (
         <Card
             className={cn(
-                "cursor-pointer hover:shadow-sm",
+                "cursor-pointer hover:shadow-sm relative overflow-hidden",
                 !isRead && "border-primary/50 bg-primary/5",
                 className
             )}
-            onClick={handleClick}
+            onClick={handleMainAction}
         >
             <CardContent className="p-3">
                 {renderContent()}

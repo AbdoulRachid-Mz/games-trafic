@@ -8,9 +8,8 @@ import FeaturesSection from "./features-section";
 import ActivityFeedSection from "./activity-feed-section";
 import TestimonialsSection from "./testimonials-section";
 import CtaSection from "./cta-section";
-import { ParallaxBackground } from "./parallax-background";
 import { TypingText } from "./typing-text";
-import { HomeGameClipsSection } from "@/components/game-clips/home-game-clips-section";
+import { HomeGameClipsSection } from "@/components/pages/game-clips/home-game-clips-section";
 import { ScrollAnimations } from "./scroll-animations";
 import { useScreenSize } from "@/hooks/use-screen";
 import { motion } from "framer-motion";
@@ -40,9 +39,9 @@ export default function HomePage() {
       </section>
 
       {/* Game Clips Section - Instant engagement through video highlights */}
-      <section className="relative z-10 -mt-8 md:-mt-12">
+      {/* <section className="relative z-10 -mt-8 md:-mt-12">
         <HomeGameClipsSection />
-      </section>
+      </section> */}
 
       <ScrollAnimations>
         {/* Stats Section - Data-driven trust building */}

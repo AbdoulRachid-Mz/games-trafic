@@ -39,7 +39,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           profileImage: user?.image || "/icons/avatar.png",
           level: user?.level || "C",
         }}
-        sidebarBgType="gradient"
+        sidebarBgType="default"
       />
 
       <div className="p-3 space-y-2">
@@ -52,7 +52,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
         <SidebarGroup label="Activités" sidebarBgType="gradient">
           <SidebarItem title="Portefeuille" icon={Wallet} url="/dashboard/wallet" isActive={isActive("/dashboard/wallet", false)} sidebarBgType="gradient" />
-          <SidebarItem title="Messages" icon={MessageCircle} url="/dashboard/messages" isActive={isActive("/dashboard/messages", false)} sidebarBgType="gradient" />
           <SidebarItem title="Notifications" icon={Bell} url="/dashboard/notifications" isActive={isActive("/dashboard/notifications", false)} sidebarBgType="gradient" />
           <SidebarItem title="VIP" icon={Star} url="/dashboard/vip" isActive={isActive("/dashboard/vip", false)} sidebarBgType="gradient" />
         </SidebarGroup>
@@ -60,11 +59,11 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
       <SidebarFooter
         user={{
-          username: user?.username || "Utilisateur",
+          username: user?.fullName || "Utilisateur",
           profileImage: user?.profileImage || undefined,
           status: "online",
         }}
-        sidebarBgType="gradient"
+        sidebarBgType="default"
       />
     </SidebarContainer>
   );

@@ -39,7 +39,7 @@ export async function proxy(request: NextRequest) {
   if (!resolved.hasAccess) {
     const redirectTo =
       resolved.redirectTo ||
-      `/sign-in?redirect=${encodeURIComponent(pathname)}`;
+      "/sign-in?redirect=" + encodeURIComponent(pathname);
 
     // Éviter une boucle de redirection infinie
     if (redirectTo === pathname) {
@@ -56,3 +56,19 @@ export async function proxy(request: NextRequest) {
 
   return NextResponse.next();
 }
+
+export default proxy;
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths EXCEPT:
+     * - _next/static  (Next.js static files)
+     * - _next/image   (Next.js image optimization)
+     * - favicon.ico, sitemap.xml, robots.txt (root-level static files)
+     * - /api/auth/*   (Better Auth internal routes — must remain public)
+     * - Files with extensions (.png, .jpg, .svg, .woff2, etc.)
+     */
+    '/((?!_next/static|_next/image|favicon\\.ico|sitemap\\.xml|robots\\.txt|api/auth|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|otf|eot|css|js|map)$).*)',
+  ],
+};

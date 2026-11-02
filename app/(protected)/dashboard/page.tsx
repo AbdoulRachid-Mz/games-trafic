@@ -79,7 +79,7 @@ export default function DashboardPage() {
           change={12}
           changeLabel={`${stats?.shops.total_products ?? 0} produits`}
           trend="up"
-          className="border-2 border-l-primary border-r-secondary"
+          // className="border-2 border-l-primary border-r-secondary"
           delay={0}
         />
 
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           change={8}
           changeLabel={`${stats?.products.sold ?? 0} vendus`}
           trend="up"
-          className="border-2 border-l-primary border-r-secondary"
+          // className="border-2 border-l-primary border-r-secondary"
           delay={0.1}
         />
 
@@ -101,7 +101,7 @@ export default function DashboardPage() {
           change={-3}
           changeLabel={`${stats?.tournaments.total_participants ?? 0} participants`}
           trend="down"
-          className="border-2 border-l-primary border-r-secondary"
+          // className="border-2 border-l-primary border-r-secondary"
           delay={0.2}
         />
 
@@ -112,7 +112,7 @@ export default function DashboardPage() {
           change={15}
           changeLabel={`${stats?.overview.total_transactions ?? 0} transactions`}
           trend="up"
-          className="border-2 border-l-primary border-r-secondary"
+          // className="border-2 border-l-primary border-r-secondary"
           delay={0.3}
         />
       </StatsCarousel>

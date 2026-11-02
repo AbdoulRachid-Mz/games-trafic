@@ -51,6 +51,7 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
     }
   };
 
+
   const getTypeText = (type: string) => {
     switch (type) {
       case "COIN": return "Monnaie";
@@ -75,7 +76,7 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
       transition={{ duration: 0.3, ease: "easeOut" }}
       className="h-full"
     >
-      <Card className="h-full overflow-hidden border-border/60 bg-card/40 backdrop-blur-xl transition-all duration-300 shadow-sm hover:shadow-2xl hover:shadow-primary/10 rounded-[2rem] flex flex-col group">
+      <Card className="h-full overflow-hidden border-border/60 bg-card/40 backdrop-blur-xl transition-all duration-300 shadow-sm hover:shadow-2xl hover:shadow-primary/10 rounded-[2rem] flex flex-col group py-0">
         <CardContent className="p-0 flex-1">
           <Link href={`/games/${item.id}`} className="block h-full group/link">
             {/* Media Section */}
@@ -189,12 +190,12 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
                   </DialogContent>
                 </Dialog>
 
-                <Link
+                {/* <Link
                   href={`/games/${item.gameId}`}
                   className="text-[10px] font-black text-primary hover:text-primary/80 flex items-center gap-1 uppercase tracking-widest transition-colors"
                 >
                   {item.game?.name?.split(' ')[0]} <ChevronRight className="h-3 w-3" />
-                </Link>
+                </Link> */}
             </div>
           </div>
         </div>

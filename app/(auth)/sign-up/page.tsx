@@ -17,10 +17,21 @@ import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Phone, Sparkles, ChevronRight, Key, Cross } from "lucide-react";
+import {
+  Mail,
+  Lock,
+  User,
+  Phone,
+  Sparkles,
+  ChevronRight,
+  Key,
+  Cross,
+} from "lucide-react";
 import { ArrowRightIcon } from "@/components/icons/arrow-right";
+import MixBorder from "@/components/shared/mix-border";
+import { getSafeRedirectUrl } from "@/lib/routes/safe-redirect";
 
 // Schéma Zod
 const signupSchema = z
@@ -55,6 +66,8 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [showPasswordStrength, setShowPasswordStrength] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetUrl = getSafeRedirectUrl(searchParams?.get("redirect") || searchParams?.get("returnTo") || searchParams?.get("callbackUrl"), "/profile");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -77,11 +90,14 @@ export default function SignUpPage() {
   };
 
   const passwordStrength = getPasswordStrength(formData.password);
-  const strengthColor = 
-    passwordStrength <= 25 ? "bg-red-500" :
-    passwordStrength <= 50 ? "bg-orange-500" :
-    passwordStrength <= 75 ? "bg-yellow-500" :
-    "bg-green-500";
+  const strengthColor =
+    passwordStrength <= 25
+      ? "bg-red-500"
+      : passwordStrength <= 50
+        ? "bg-orange-500"
+        : passwordStrength <= 75
+          ? "bg-yellow-500"
+          : "bg-green-500";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,33 +116,33 @@ export default function SignUpPage() {
         email: formData.email,
         password: formData.password,
         name: formData.name,
-        callbackURL: "/profile",
+        callbackURL: targetUrl,
       },
       {
         onRequest: () => setLoading(true),
         onSuccess: () => {
           toast.success("Inscription réussie ! Bienvenue sur Games-Trafics.");
-          router.push("/profile");
+          router.push(targetUrl);
         },
         onError: (ctx) => {
           setError(ctx.error.message || "Erreur lors de l'inscription");
           setLoading(false);
         },
-      }
+      },
     );
   };
 
   const handleGoogleSignUp = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/profile",
+      callbackURL: targetUrl,
       errorCallbackURL: "/auth/error",
       newUserCallbackURL: "/profile",
     });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-8 px-2 sm:px-4 lg:px-6">
+    <div className="min-h-screen flex items-center justify-center py-8 px-2 sm:px-4 lg:px-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -136,7 +152,7 @@ export default function SignUpPage() {
         {/* skip button */}
         <button
           onClick={() => router.push("/")}
-          className="fixed bg-white/95 backdrop-blur-sm px-4 py-1 rounded-full top-4 right-4 text-slate-900 font-bold "
+          className="fixed z-10 bg-primary/20 flex gap-4 backdrop-blur-sm px-4 py-1 text-primary rounded-full hover:shadow-md top-4 right-4 font-bold "
         >
           <ArrowRightIcon className="h-4 w-4" />
           Ignorer
@@ -150,21 +166,79 @@ export default function SignUpPage() {
             className="inline-flex items-center justify-center gap-2"
           >
             <Sparkles className="h-8 w-8 text-primary" />
-            <span className="text-3xl font-black text-white tracking-tight">
+            <span className="text-3xl font-black text-secondary tracking-tight">
               Games<span className="text-primary">Trafics</span>
             </span>
           </motion.div>
         </div>
 
-        <Card className="overflow-hidden border-0 py-0 shadow-2xl bg-white/10 backdrop-blur-xl">
-          <CardContent className="p-0">
+        <Card className="overflow-hidden border-0 py-0 relative shadow-2xl bg-white/10 backdrop-blur-xl">
+          <CardContent className="relative z-10 p-1">
+            <MixBorder
+              radius={20}
+              className="absolute z-10 salut inset-0"
+              top={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  first: {
+                    color: "--primary",
+                    size: "50%",
+                    order: 1,
+                  },
+                  second: {
+                    color: "--secondary",
+                    size: "50%",
+                    order: 2,
+                  },
+                },
+              }}
+              bottom={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  first: {
+                    color: "--primary",
+                    size: "50%",
+                    order: 1,
+                  },
+                  second: {
+                    color: "--secondary",
+                    size: "50%",
+                    order: 2,
+                  },
+                },
+              }}
+              left={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  one: {
+                    color: "--primary",
+                    size: "100%",
+                    order: 1,
+                  },
+                },
+              }}
+              right={{
+                show: true,
+                thickness: 3,
+                colors: {
+                  one: {
+                    color: "--secondary",
+                    size: "100%",
+                    order: 2,
+                  },
+                },
+              }}
+            />
             <div className="grid md:grid-cols-2">
               {/* Form Section */}
               <div className="p-4 md:p-6 bg-white/95 backdrop-blur-sm">
                 <div className="space-y-4">
                   {/* Header */}
                   <div className="space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                    <h1 className="text-3xl font-bold tracking-tight">
                       Créez votre compte
                     </h1>
                     <p className="text-sm text-slate-500">
@@ -266,15 +340,21 @@ export default function SignUpPage() {
                                 key={i}
                                 className={cn(
                                   "flex-1 rounded-full transition-colors",
-                                  i * 25 <= passwordStrength ? strengthColor : "bg-slate-200"
+                                  i * 25 <= passwordStrength
+                                    ? strengthColor
+                                    : "bg-slate-200",
                                 )}
                               />
                             ))}
                           </div>
                           <p className="text-xs text-slate-500">
                             {passwordStrength <= 25 && "Faible"}
-                            {passwordStrength > 25 && passwordStrength <= 50 && "Moyen"}
-                            {passwordStrength > 50 && passwordStrength <= 75 && "Bon"}
+                            {passwordStrength > 25 &&
+                              passwordStrength <= 50 &&
+                              "Moyen"}
+                            {passwordStrength > 50 &&
+                              passwordStrength <= 75 &&
+                              "Bon"}
                             {passwordStrength > 75 && "Fort"}
                           </p>
                         </motion.div>
@@ -300,7 +380,9 @@ export default function SignUpPage() {
 
                     {/* Password requirements */}
                     <div className="bg-slate-50 rounded-lg p-3 space-y-1">
-                      <p className="text-xs font-medium text-slate-700">Exigences :</p>
+                      <p className="text-xs font-medium text-slate-700">
+                        Exigences :
+                      </p>
                       <ul className="text-xs text-slate-500 space-y-1">
                         {[
                           "Minimum 8 caractères",
@@ -309,18 +391,32 @@ export default function SignUpPage() {
                           "Au moins un caractère spécial",
                         ].map((req, i) => (
                           <li key={i} className="flex items-center gap-1">
-                            <span className={cn(
-                              "w-1 h-1 rounded-full",
-                              i === 0 && formData.password.length >= 8 && "bg-green-500",
-                              i === 1 && /[A-Z]/.test(formData.password) && "bg-green-500",
-                              i === 2 && /[0-9]/.test(formData.password) && "bg-green-500",
-                              i === 3 && /[^A-Za-z0-9]/.test(formData.password) && "bg-green-500",
-                              (!formData.password || 
-                                (i === 0 && formData.password.length < 8) ||
-                                (i === 1 && !/[A-Z]/.test(formData.password)) ||
-                                (i === 2 && !/[0-9]/.test(formData.password)) ||
-                                (i === 3 && !/[^A-Za-z0-9]/.test(formData.password))) && "bg-slate-300"
-                            )} />
+                            <span
+                              className={cn(
+                                "w-1 h-1 rounded-full",
+                                i === 0 &&
+                                  formData.password.length >= 8 &&
+                                  "bg-green-500",
+                                i === 1 &&
+                                  /[A-Z]/.test(formData.password) &&
+                                  "bg-green-500",
+                                i === 2 &&
+                                  /[0-9]/.test(formData.password) &&
+                                  "bg-green-500",
+                                i === 3 &&
+                                  /[^A-Za-z0-9]/.test(formData.password) &&
+                                  "bg-green-500",
+                                (!formData.password ||
+                                  (i === 0 && formData.password.length < 8) ||
+                                  (i === 1 &&
+                                    !/[A-Z]/.test(formData.password)) ||
+                                  (i === 2 &&
+                                    !/[0-9]/.test(formData.password)) ||
+                                  (i === 3 &&
+                                    !/[^A-Za-z0-9]/.test(formData.password))) &&
+                                  "bg-slate-300",
+                              )}
+                            />
                             {req}
                           </li>
                         ))}
@@ -330,12 +426,16 @@ export default function SignUpPage() {
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg shadow-primary/25"
+                      className="w-full h-12 text-base font-semibold bg-primary text-white shadow-lg shadow-primary/25"
                     >
                       {loading ? (
                         <motion.div
                           animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
                           className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                         />
                       ) : (
@@ -398,14 +498,21 @@ export default function SignUpPage() {
               </div>
 
               {/* Image Section */}
-              <div className="hidden md:block relative bg-gradient-to-br from-primary to-purple-600 p-10">
+              <div className="hidden md:block relative bg-primary p-10">
                 <div className="absolute inset-0 bg-black/20" />
                 <div className="relative h-full flex flex-col justify-end text-white">
                   {/* logo */}
                   <div className="w-full h-full flex items-center justify-center relative">
-                    <Image src="/images/icons/app/gt-primary.png" alt="logo" fill className="object-contain" />
+                    <Image
+                      src="/images/icons/app/gt-primary.png"
+                      alt="logo"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
-                  <h2 className="text-2xl font-bold mb-2">Rejoignez l'aventure</h2>
+                  <h2 className="text-2xl font-bold mb-2">
+                    Rejoignez l'aventure
+                  </h2>
                   <p className="text-white/80 text-sm mb-6">
                     Découvrez une plateforme unique dédiée aux gamers
                   </p>
@@ -435,13 +542,19 @@ export default function SignUpPage() {
         </Card>
 
         {/* Terms */}
-        <p className="text-center text-xs text-white/40 mt-6">
+        <p className="text-center text-xs mt-6">
           En vous inscrivant, vous acceptez nos{" "}
-          <Link href="/docs/legal/terms" className="text-white/60 hover:text-white underline underline-offset-2">
+          <Link
+            href="/docs/legal/terms"
+            className="text-primary hover:text-primary underline underline-offset-2"
+          >
             conditions d'utilisation
           </Link>{" "}
           et notre{" "}
-          <Link href="/docs/legal/privacy" className="text-white/60 hover:text-white underline underline-offset-2">
+          <Link
+            href="/docs/legal/privacy"
+            className="text-primary hover:text-primary underline underline-offset-2"
+          >
             politique de confidentialité
           </Link>
         </p>

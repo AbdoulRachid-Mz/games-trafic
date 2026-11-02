@@ -73,7 +73,7 @@ export default function NotificationsDashboardPage() {
         onSearchChange={onSearchChange}
         onFilterChange={onFilterChange}
         onViewModeChange={setViewMode}
-        renderCard={(item) => <NotificationCard notification={item} />}
+        renderCard={(item) => <NotificationCard item={item} />}
         showSearch={true}
         showFilters={true}
         showViewToggle={true}

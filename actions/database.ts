@@ -28,6 +28,17 @@ export interface DatabaseStats {
 // ============================================================================
 
 /**
+ * Extrait les lignes d'un résultat db.execute de manière agnostique au driver
+ * (supporte à la fois postgres-js et neon-http)
+ */
+function getRows<T = Record<string, any>>(result: any): T[] {
+  if (!result) return [];
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.rows)) return result.rows;
+  return [];
+}
+
+/**
  * Formate la taille en octets en chaîne lisible (Ko, Mo, Go)
  */
 function formatBytes(bytes: number): string {
@@ -60,7 +71,7 @@ export async function getAllTableStats(): Promise<TableStats[]> {
       ORDER BY n_live_tup DESC;
     `);
 
-    return result.map((row: any) => ({
+    return getRows(result).map((row: any) => ({
       tableName: row.tableName,
       rowCount: parseInt(row.rowCount, 10),
       totalSize: formatBytes(parseInt(row.totalSizeBytes, 10)),
@@ -81,7 +92,7 @@ export async function getDatabaseTotalSize(): Promise<string> {
     const result = await db.execute(sql`
       SELECT pg_database_size(current_database()) AS size;
     `);
-    const size = result[0]?.size;
+    const size = getRows(result)[0]?.size;
     return formatBytes(parseInt(size as string, 10));
   } catch (error) {
     console.error("Erreur lors de la récupération de la taille totale de la base:", error);
@@ -129,9 +140,10 @@ export async function getTableStats(tableName: keyof typeof schema): Promise<Tab
       LIMIT 1;
     `);
 
-    if (!result.length) return null;
+    const rows = getRows(result);
+    if (!rows.length) return null;
 
-    const row = result[0];
+    const row = rows[0];
     return {
       tableName: String(row.tableName),
       rowCount: parseInt(String(row.rowCount), 10),
@@ -157,7 +169,7 @@ export async function getTableNames(): Promise<string[]> {
         AND table_type = 'BASE TABLE'
       ORDER BY table_name;
     `);
-    return result.map((row: any) => row.table_name);
+    return getRows(result).map((row: any) => row.table_name);
   } catch (error) {
     console.error('Erreur lors de la récupération des noms des tables:', error);
     throw new Error('Impossible de récupérer les noms des tables');
@@ -174,7 +186,7 @@ export async function getTableCounts(): Promise<Record<string, number>> {
 
     for (const tableName of tableNames) {
       const result = await db.execute(sql`SELECT COUNT(*) AS count FROM ${sql.identifier(tableName)};`);
-      counts[tableName] = parseInt((result[0] as any)?.count ?? '0', 10);
+      counts[tableName] = parseInt((getRows(result)[0] as any)?.count ?? '0', 10);
     }
 
     return counts;
@@ -208,7 +220,7 @@ export async function getIndexStats(): Promise<Array<{
       ORDER BY pg_relation_size(i.indexname::regclass) DESC;
     `);
 
-    return result.map((row: any) => ({
+    return getRows(result).map((row: any) => ({
       tableName: row.tableName,
       indexName: row.indexName,
       indexSize: row.indexSize,
@@ -245,7 +257,7 @@ export async function getColumnStats(tableName: keyof typeof schema): Promise<Ar
       ORDER BY ordinal_position;
     `);
 
-    return result.map((row: any) => ({
+    return getRows(result).map((row: any) => ({
       columnName: row.columnName,
       dataType: row.dataType,
       isNullable: row.isNullable === 'YES',
@@ -288,7 +300,7 @@ export async function getForeignKeyStats(): Promise<Array<{
       ORDER BY tc.table_name, kcu.column_name;
     `);
 
-    return result.map((row: any) => ({
+    return getRows(result).map((row: any) => ({
       tableName: row.tableName,
       constraintName: row.constraintName,
       columnName: row.columnName,

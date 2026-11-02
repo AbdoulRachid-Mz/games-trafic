@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
             className="inline-flex items-center justify-center gap-2"
           >
             <Sparkles className="h-8 w-8 text-primary" />
-            <span className="text-3xl font-black text-white tracking-tight">
+            <span className="text-3xl font-black text-secondary tracking-tight">
               Games<span className="text-primary">Trafics</span>
             </span>
           </motion.div>
@@ -145,7 +145,7 @@ export default function ForgotPasswordPage() {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white shadow-lg shadow-primary/25"
+                    className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/25"
                   >
                     {isLoading ? (
                       <motion.div

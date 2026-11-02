@@ -1,4 +1,4 @@
-import { MotionValue, motion, useSpring, useTransform } from 'motion/react';
+﻿import { MotionValue, motion, useSpring, useTransform } from 'motion/react';
 import type React from 'react';
 import { useEffect } from 'react';
 
@@ -50,20 +50,18 @@ interface DigitProps {
   digitStyle?: React.CSSProperties;
 }
 
-function Digit({ place, value, height, digitStyle }: DigitProps) {
-  // Decimal point digit
-  if (place === '.') {
-    return (
-      <span
-        className="relative inline-flex items-center justify-center"
-        style={{ height, width: 'fit-content', ...digitStyle }}
-      >
-        .
-      </span>
-    );
-  }
+function DecimalDigit({ height, digitStyle }: { height: number; digitStyle?: React.CSSProperties }) {
+  return (
+    <span
+      className="relative inline-flex items-center justify-center"
+      style={{ height, width: 'fit-content', ...digitStyle }}
+    >
+      .
+    </span>
+  );
+}
 
-  // Numeric digit
+function NumericDigit({ place, value, height, digitStyle }: { place: number; value: number; height: number; digitStyle?: React.CSSProperties }) {
   const valueRoundedToPlace = getValueRoundedToPlace(value, place);
   const animatedValue = useSpring(valueRoundedToPlace);
 
@@ -85,6 +83,13 @@ function Digit({ place, value, height, digitStyle }: DigitProps) {
       ))}
     </span>
   );
+}
+
+function Digit({ place, value, height, digitStyle }: DigitProps) {
+  if (place === '.') {
+    return <DecimalDigit height={height} digitStyle={digitStyle} />;
+  }
+  return <NumericDigit place={place} value={value} height={height} digitStyle={digitStyle} />;
 }
 
 interface CounterProps {

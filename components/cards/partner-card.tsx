@@ -1,28 +1,36 @@
+// @/components/cards/partner-card.tsx
+"use client";
+
+import React, { useState } from "react";
 import { PartnerCard as PartnerCardType } from "@/types/view-models";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
-import { Building2, ExternalLink, Mail, Phone, MapPin, ShieldCheck } from "lucide-react";
+import { Building2, ExternalLink, MapPin, ShieldCheck, Globe } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
 
-type ViewMode = "grid" | "list" | "compact";
 type CardVariant = "default" | "premium" | "admin";
 
-interface PartnerCardProps {
-  partner: PartnerCardType;
-  viewMode?: ViewMode;
+export interface PartnerCardProps extends BaseCardProps<PartnerCardType> {
   showActions?: boolean;
   showBadge?: boolean;
   showDescription?: boolean;
   showContactInfo?: boolean;
   showWebsite?: boolean;
-  className?: string;
   variant?: CardVariant;
 }
 
 export function PartnerCard({
-  partner,
+  item: partner,
   viewMode = "grid",
+  status,
+  isCliquable = true,
+  isMini = false,
+  activeAction = "view",
+  onEdit,
+  onView,
+  onDelete,
   showActions = true,
   showBadge = true,
   showDescription = true,
@@ -30,8 +38,9 @@ export function PartnerCard({
   className,
   variant = "default"
 }: PartnerCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
   const isList = viewMode === "list";
-  const isCompact = viewMode === "compact";
+  const isCompact = viewMode === "compact" || isMini;
 
   const variantStyles = {
     default: "bg-card border-border hover:border-primary/30",
@@ -46,12 +55,42 @@ export function PartnerCard({
       : "flex-col p-6";
 
   const logoClasses = cn(
-    "relative flex-shrink-0 bg-muted rounded-lg overflow-hidden flex items-center justify-center transition-all",
+    "relative flex-shrink-0 bg-muted rounded-lg overflow-hidden flex items-center justify-center transition-all shrink-0",
     isList ? "w-20 h-20" : isCompact ? "w-12 h-12 mb-2" : "w-24 h-24 mb-4 mx-auto"
   );
 
+  const handleView = () => {
+    if (onView) onView(partner);
+    else if (partner.website) window.open(partner.website, "_blank");
+  };
+
+  const handleMainAction = () => {
+    if (!isCliquable) return;
+    if (activeAction === "view") handleView();
+    else if (activeAction === "edit" && onEdit) onEdit(partner);
+    else if (activeAction === "delete" && onDelete) onDelete(partner);
+    else handleView();
+  };
+
+  const extraActions: extraActionsProps[] = [];
+  if (partner.website) {
+    extraActions.push({
+      id: "website",
+      label: "Site web",
+      icon: Globe,
+      onClick: () => window.open(partner.website || "", "_blank")
+    });
+  }
+
+  const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
+
   return (
-    <Card className={cn("h-full transition-all duration-200", variantStyles[variant], className)}>
+    <Card 
+      className={cn("h-full transition-all duration-200 relative overflow-hidden", isCliquable && "cursor-pointer active:scale-[0.99]", variantStyles[variant], className)}
+      onClick={handleMainAction}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className={cn("flex h-full", layoutClasses)}>
         {/* Logo */}
         <div className={logoClasses}>
@@ -68,7 +107,7 @@ export function PartnerCard({
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 w-full">
           <div className="flex items-center justify-between gap-2 mb-1">
             <h3 className={cn(
               "font-bold truncate",
@@ -76,9 +115,20 @@ export function PartnerCard({
             )}>
               {partner.name}
             </h3>
-            {showBadge && variant === "premium" && (
-              <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
-            )}
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              {showBadge && variant === "premium" && (
+                <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
+              )}
+              {hasActions && (
+                <CardActionMenu
+                  onEdit={onEdit ? () => onEdit(partner) : undefined}
+                  onView={onView ? () => onView(partner) : undefined}
+                  onDelete={onDelete ? () => onDelete(partner) : undefined}
+                  entityName={`le partenaire ${partner.name}`}
+                  extraActions={extraActions}
+                />
+              )}
+            </div>
           </div>
 
           {!isCompact && showDescription && partner.shortDescription && (
@@ -115,7 +165,10 @@ export function PartnerCard({
 
         {/* Actions */}
         {showActions && partner.website && (
-          <div className={cn(isList ? "ml-auto" : "mt-auto pt-2")}>
+          <div 
+            className={cn(isList ? "ml-auto" : "mt-auto pt-2")}
+            onClick={(e) => e.stopPropagation()}
+          >
             <Button
               asChild
               variant={variant === "premium" ? "default" : "outline"}

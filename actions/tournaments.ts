@@ -1,6 +1,7 @@
 // @/actions/tournaments.ts
 "use server";
 
+import { getCurrentUser } from "@/lib/auth/session";
 import {
   tournaments,
   tournamentEditions,
@@ -332,6 +333,7 @@ export async function isUserTournamentOrganizer(
 
 /**
  * Met à jour le rôle d'un membre du tournoi
+ * SEC-07 FIX: Tournament organizer or admin only
  */
 export async function updateTournamentMemberRole(
   memberId: string,
@@ -339,6 +341,20 @@ export async function updateTournamentMemberRole(
   isCoOrganizer: boolean,
 ) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+    const member = await db.query.tournamentMembers.findFirst({
+      where: (tm, { eq }) => eq(tm.id, memberId),
+    });
+    if (!member) throw new Error("Membre non trouvé");
+
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(member.tournamentId, currentUser.id);
+      if (!isOrganizer) throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+    }
+
     const result = await db
       .update(tournamentMembers)
       .set({
@@ -365,9 +381,24 @@ export async function updateTournamentMemberRole(
 
 /**
  * Supprime un membre du tournoi
+ * SEC-07 FIX: Organizer, admin, or the member themself (leave)
  */
 export async function deleteTournamentMember(memberId: string) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+    const member = await db.query.tournamentMembers.findFirst({
+      where: (tm, { eq }) => eq(tm.id, memberId),
+    });
+    if (!member) throw new Error("Membre non trouvé");
+
+    if (!isAdmin && member.userId !== currentUser.id) {
+      const isOrganizer = await isUserTournamentOrganizer(member.tournamentId, currentUser.id);
+      if (!isOrganizer) throw new Error("Accès refusé");
+    }
+
     await db
       .delete(tournamentMembers)
       .where(eq(tournamentMembers.id, memberId));
@@ -679,12 +710,15 @@ export async function createTournament(
   tournamentData: NewTournament,
 ): Promise<Tournament> {
   try {
+    // SEC-07 FIX: organizerId is always sourced from the authenticated session
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+
     if (
-      !tournamentData.organizerId ||
       !tournamentData.name ||
       !tournamentData.game
     ) {
-      throw new Error("organizerId, name and game are required");
+      throw new Error("name and game are required");
     }
 
     const existingTournament = await db
@@ -701,6 +735,7 @@ export async function createTournament(
       .insert(tournaments)
       .values({
         ...tournamentData,
+        organizerId: currentUser.id, // Always use the authenticated user's ID
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -724,12 +759,23 @@ export async function createTournamentEdition(
   editionData: NewTournamentEdition,
 ): Promise<TournamentEdition> {
   try {
+    // SEC-07 FIX: Require auth + tournament ownership or admin
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     if (
       !editionData.tournamentId ||
       !editionData.editionNumber ||
       !editionData.startDate
     ) {
       throw new Error("tournamentId, editionNumber and startDate are required");
+    }
+
+    // Only the organizer or an admin can create editions
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(editionData.tournamentId, currentUser.id);
+      if (!isOrganizer) throw new Error('Accès refusé — vous n\'êtes pas organisateur de ce tournoi');
     }
 
     const result = await db.transaction(async (tx) => {
@@ -817,15 +863,27 @@ export async function createTournamentEdition(
 
 /**
  * Met à jour un tournoi
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function updateTournament(
   id: string,
   tournamentData: Partial<NewTournament>,
 ): Promise<Tournament> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
     const existingTournament = await getTournamentById(id);
     if (!existingTournament) {
       throw new Error("Tournament not found");
+    }
+
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(id, currentUser.id);
+      if (!isOrganizer) {
+        throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+      }
     }
 
     if (
@@ -842,10 +900,17 @@ export async function updateTournament(
       }
     }
 
+    const safeData = { ...tournamentData };
+    if (!isAdmin) {
+      delete (safeData as any).organizerId;
+      delete (safeData as any).isFeatured;
+      delete (safeData as any).isVerified;
+    }
+
     const result = await db
       .update(tournaments)
       .set({
-        ...tournamentData,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(tournaments.id, id))
@@ -865,21 +930,39 @@ export async function updateTournament(
 
 /**
  * Met à jour une édition de tournoi
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function updateTournamentEdition(
   id: string,
   editionData: Partial<NewTournamentEdition>,
 ): Promise<TournamentEdition> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
     const existingEdition = await getTournamentEditionById(id);
     if (!existingEdition) {
       throw new Error("Tournament edition not found");
     }
 
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(existingEdition.tournamentId, currentUser.id);
+      if (!isOrganizer) {
+        throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+      }
+    }
+
+    const safeData = { ...editionData };
+    if (!isAdmin) {
+      delete (safeData as any).tournamentId;
+      delete (safeData as any).financialAccountId;
+    }
+
     const result = await db
       .update(tournamentEditions)
       .set({
-        ...editionData,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(tournamentEditions.id, id))
@@ -899,9 +982,22 @@ export async function updateTournamentEdition(
 
 /**
  * Supprime un tournoi (soft delete)
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function deleteTournament(id: string): Promise<Tournament> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+    const existing = await getTournamentById(id);
+    if (!existing) throw new Error("Tournament not found");
+
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(id, currentUser.id);
+      if (!isOrganizer) throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+    }
+
     const result = await db
       .update(tournaments)
       .set({
@@ -929,11 +1025,24 @@ export async function deleteTournament(id: string): Promise<Tournament> {
 
 /**
  * Supprime une édition de tournoi (soft delete)
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function deleteTournamentEdition(
   id: string,
 ): Promise<TournamentEdition> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+    const existing = await getTournamentEditionById(id);
+    if (!existing) throw new Error("Tournament edition not found");
+
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(existing.tournamentId, currentUser.id);
+      if (!isOrganizer) throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+    }
+
     const result = await db
       .update(tournamentEditions)
       .set({
@@ -961,9 +1070,15 @@ export async function deleteTournamentEdition(
 
 /**
  * Restaure un tournoi supprimé
+ * SEC-07 FIX: Admin only
  */
 export async function restoreTournament(id: string): Promise<Tournament> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+    if (!isAdmin) throw new Error("Accès réservé aux administrateurs");
+
     const result = await db
       .update(tournaments)
       .set({
@@ -989,11 +1104,17 @@ export async function restoreTournament(id: string): Promise<Tournament> {
 
 /**
  * Restaure une édition de tournoi supprimée
+ * SEC-07 FIX: Admin only
  */
 export async function restoreTournamentEdition(
   id: string,
 ): Promise<TournamentEdition> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+    if (!isAdmin) throw new Error("Accès réservé aux administrateurs");
+
     const result = await db
       .update(tournamentEditions)
       .set({
@@ -1990,15 +2111,21 @@ import { recalculateGroupStandings } from "./phases";
 
 /**
  * Soumet un résultat de match par un participant ou un admin.
+ * SEC-07 FIX: Sourced from authenticated session
  */
 export async function submitMatchResult(
   id: string,
   score1: number,
   score2: number,
-  submittedByUserId: string,
+  submittedByUserId?: string,
   proofUrl?: string,
 ): Promise<Match> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+    const resolvedUserId = (isAdmin && submittedByUserId) ? submittedByUserId : currentUser.id;
+
     const match = await db.query.matches.findFirst({
       where: eq(matches.id, id),
     });
@@ -2008,7 +2135,7 @@ export async function submitMatchResult(
     const updateData: any = {
       score1,
       score2,
-      submittedByUserId,
+      submittedByUserId: resolvedUserId,
       proofUrl,
       updatedAt: new Date(),
     };
@@ -2022,13 +2149,13 @@ export async function submitMatchResult(
     const isParticipant1 =
       match.participant1RegistrationId &&
       (await isUserRegistered(
-        submittedByUserId,
+        resolvedUserId,
         match.participant1RegistrationId,
       ));
     const isParticipant2 =
       match.participant2RegistrationId &&
       (await isUserRegistered(
-        submittedByUserId,
+        resolvedUserId,
         match.participant2RegistrationId,
       ));
 
@@ -2039,7 +2166,7 @@ export async function submitMatchResult(
       updateData.confirmedByParticipant2 = true;
       updateData.status = "PENDING_REVIEW";
     } else {
-      // Admin submission
+      // Admin / Organizer submission
       updateData.status = "AWAITING_ADMIN_CONFIRMATION";
     }
 
@@ -2058,12 +2185,22 @@ export async function submitMatchResult(
 
 /**
  * Confirme un résultat de match par l'autre participant.
+ * SEC-07 FIX: Verified against authenticated user
  */
 export async function confirmMatchResult(
   id: string,
   registrationId: string,
 ): Promise<Match> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+    if (!isAdmin) {
+      const isOwner = await isUserRegistered(currentUser.id, registrationId);
+      if (!isOwner) throw new Error("Accès refusé — vous n'êtes pas ce participant");
+    }
+
     const match = await db.query.matches.findFirst({
       where: eq(matches.id, id),
     });
@@ -2102,6 +2239,7 @@ export async function confirmMatchResult(
     throw error;
   }
 }
+ 
 
 /**
  * Vérifie si le gagnant a terminé tous ses matches dans le bracket actuel
@@ -2261,7 +2399,8 @@ export async function getRegistrationWithMember(
 }
 
 /**
- * Validation finale par l'administrateur.
+ * Validation finale par l'administrateur ou l'organisateur.
+ * SEC-07 FIX: Admin or tournament organizer only
  */
 export async function adminConfirmMatchResult(
   id: string,
@@ -2276,11 +2415,25 @@ export async function adminConfirmMatchResult(
   progressionResult?: any;
 }> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
     const match = await db.query.matches.findFirst({
       where: eq(matches.id, id),
     });
 
     if (!match) throw new Error("Match not found");
+
+    if (!isAdmin) {
+      const edition = await db.query.tournamentEditions.findFirst({
+        where: eq(tournamentEditions.id, match.editionId),
+        columns: { tournamentId: true },
+      });
+      if (!edition) throw new Error("Édition non trouvée");
+      const isOrganizer = await isUserTournamentOrganizer(edition.tournamentId, currentUser.id);
+      if (!isOrganizer) throw new Error("Accès réservé aux organisateurs ou administrateurs");
+    }
 
     const s1 = score1 ?? match.score1 ?? 0;
     const s2 = score2 ?? match.score2 ?? 0;
@@ -2491,13 +2644,37 @@ export async function getMatches(
 
 /**
  * Crée une inscription à une édition
+ * SEC-07 FIX: Self-registration or tournament organizer/admin only
  */
 export async function createEditionRegistration(
   registrationData: NewEditionRegistration,
 ): Promise<EditionRegistration> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
     if (!registrationData.editionId || !registrationData.memberId) {
       throw new Error("editionId and memberId are required");
+    }
+
+    if (!isAdmin) {
+      const edition = await db.query.tournamentEditions.findFirst({
+        where: eq(tournamentEditions.id, registrationData.editionId),
+        columns: { tournamentId: true },
+      });
+      if (!edition) throw new Error("Édition non trouvée");
+
+      const isOrganizer = await isUserTournamentOrganizer(edition.tournamentId, currentUser.id);
+      if (!isOrganizer) {
+        const member = await db.query.tournamentMembers.findFirst({
+          where: eq(tournamentMembers.id, registrationData.memberId),
+          columns: { userId: true },
+        });
+        if (!member || member.userId !== currentUser.id) {
+          throw new Error("Accès refusé — vous ne pouvez inscrire que vous-même");
+        }
+      }
     }
 
     const existingRegistration = await db

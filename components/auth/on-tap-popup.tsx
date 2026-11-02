@@ -5,7 +5,6 @@ import { useTheme } from "next-themes";
 import { useEffect, useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { XIcon } from "../icons/x";
-import { useNetworkStatus } from "@/hooks/network-status";
 import { useAuthContext } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
@@ -13,9 +12,6 @@ export default function OnTapPopup() {
   const { resolvedTheme } = useTheme();
   const { user: session } = useAuthContext();
   const buttonRef = useRef<HTMLDivElement>(null);
-
-  const { isOnline, isReachable, isChecking } = useNetworkStatus();
-  const isConnected = isOnline && isReachable;
 
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,7 +39,7 @@ export default function OnTapPopup() {
 
   // ✅ Init One Tap uniquement si internet réel
   useEffect(() => {
-    if (!isMounted || !isConnected) return;
+    if (!isMounted) return;
     if (session) return;
 
     const initOneTap = async () => {
@@ -71,27 +67,10 @@ export default function OnTapPopup() {
     };
 
     initOneTap();
-  }, [resolvedTheme, session, isMounted, isConnected]);
+  }, [resolvedTheme, session, isMounted]);
 
   // ❌ Pas monté ou connecté ou loggé
   if (!isMounted || session) return null;
-
-  // 🔴 Pas de connexion réelle
-  // if (!isConnected) {
-  //   toast.warning(`${isOnline ? "Connexion instable..." : "Vous êtes hors ligne"}`);
-  // }
-
-  // if (!isConnected) {
-  //   return (
-  //     <div className="fixed top-20 right-3 z-100 w-[260px] rounded-lg border border-red-500 bg-background shadow-lg p-3 text-sm">
-  //       <p className="text-red-500">
-  //         {isOnline
-  //           ? "Connexion instable..."
-  //           : "Vous êtes hors ligne"}
-  //       </p>
-  //     </div>
-  //   );
-  // }
 
   return (
     <div
@@ -107,7 +86,7 @@ export default function OnTapPopup() {
         />
 
         {/* Loader global (init ou checking réseau) */}
-        {(isLoading || isChecking) && (
+        {(isLoading) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>

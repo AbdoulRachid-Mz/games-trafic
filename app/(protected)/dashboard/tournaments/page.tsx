@@ -54,7 +54,7 @@ export default function TournamentsDashboardPage() {
   const renderTournamentCard = (t: Tournament, index: number) => (
     <TournamentCard
         key={t.id}
-        tournament={t as any}
+        item={t as any}
         viewMode={viewMode === "grid" ? "grid" : "list"}
         onView={() => router.push(`/tournaments/${t.id}`)}
     />

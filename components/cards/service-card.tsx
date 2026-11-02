@@ -1,3 +1,4 @@
+// @/components/cards/service-card.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -7,37 +8,51 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { ArrowRight, CheckCircle, Star, Shield, Zap, Sparkles } from "lucide-react";
+import { ArrowRight, Star, Shield, Zap, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { type ServiceCard as ServiceCardType } from "@/types/view-models";
 import { useRouter } from "next/navigation";
-// import { useRouter } from "next/router";
+import { BaseCardProps, CardActionMenu } from "./card-action-menu";
 
-// Types simplifiés
-type ViewMode = "grid" | "list" | "compact";
 type CardVariant = "default" | "premium" | "admin";
 
-interface ServiceCardProps {
-    service: ServiceCardType;
-    className?: string;
-    viewMode?: ViewMode;
+export interface ServiceCardProps extends BaseCardProps<ServiceCardType> {
     variant?: CardVariant;
-    onView?: (serviceId: string) => void;
 }
 
-export function ServiceCard({ service, className, viewMode = "grid", variant = "default", onView }: ServiceCardProps) {
+export function ServiceCard({ 
+    item: service, 
+    className, 
+    viewMode = "grid", 
+    status,
+    isCliquable = true,
+    isMini = false,
+    activeAction = "view",
+    onEdit,
+    onView,
+    onDelete,
+    variant = "default" 
+}: ServiceCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const router = useRouter();
 
     const handleView = () => {
         if (onView) {
-            onView(service.id);
+            onView(service);
         } else {
             router.push(`/services/${service.id}`);
         }
     };
 
-    const isCompact = viewMode === "compact";
+    const handleMainAction = () => {
+        if (!isCliquable) return;
+        if (activeAction === "view") handleView();
+        else if (activeAction === "edit" && onEdit) onEdit(service);
+        else if (activeAction === "delete" && onDelete) onDelete(service);
+        else handleView();
+    };
+
+    const isCompact = viewMode === "compact" || isMini;
     const isList = viewMode === "list";
     const isPremium = variant === "premium";
     const isAdmin = variant === "admin";
@@ -68,6 +83,17 @@ export function ServiceCard({ service, className, viewMode = "grid", variant = "
 
     const descLines = isCompact ? 2 : isList ? 2 : 3;
 
+    const extraActions = [
+        {
+            id: "explore",
+            label: "Explorer",
+            icon: ArrowRight,
+            onClick: handleView
+        }
+    ];
+
+    const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
+
     return (
         <motion.div
             whileHover={{ y: -8 }}
@@ -75,14 +101,18 @@ export function ServiceCard({ service, className, viewMode = "grid", variant = "
             onMouseLeave={() => setIsHovered(false)}
             className="h-full"
         >
-            <Card className={cn(
-                "group relative h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20 hover:border-primary/50 rounded-[2rem]",
-                isCompact && "rounded-xl",
-                isList && "rounded-2xl",
-                isPremium && "ring-2 ring-amber-400/50",
-                isAdmin && "ring-2 ring-red-400/50",
-                className
-            )}>
+            <Card 
+                className={cn(
+                    "group relative h-full overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20 hover:border-primary/50 rounded-[2rem] relative",
+                    isCliquable && "cursor-pointer active:scale-[0.99]",
+                    isCompact && "rounded-xl",
+                    isList && "rounded-2xl",
+                    isPremium && "ring-2 ring-amber-400/50",
+                    isAdmin && "ring-2 ring-red-400/50",
+                    className
+                )}
+                onClick={handleMainAction}
+            >
                 {/* Decorative Background */}
                 <div className="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 bg-primary/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-32 h-32 bg-secondary/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -93,24 +123,33 @@ export function ServiceCard({ service, className, viewMode = "grid", variant = "
                         <div className={iconClass}>
                             {service.icon || "✨"}
                         </div>
-                        <div className="flex flex-col gap-2 items-end">
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             {isPremium && (
-                                <Badge variant="outline" className="bg-background/50 backdrop-blur-md border-primary/20 text-primary gap-1 px-3 py-1 rounded-full">
+                                <Badge variant="outline" className="bg-background/50 backdrop-blur-md border-primary/20 text-primary gap-1 px-3 py-1 rounded-full shrink-0">
                                     <Sparkles className="w-3 h-3" />
                                     Premium
                                 </Badge>
                             )}
                             {isAdmin && (
-                                <Badge variant="outline" className="bg-background/50 backdrop-blur-md border-red-500/20 text-red-500 gap-1 px-3 py-1 rounded-full">
+                                <Badge variant="outline" className="bg-background/50 backdrop-blur-md border-red-500/20 text-red-500 gap-1 px-3 py-1 rounded-full shrink-0">
                                     <Shield className="w-3 h-3" />
                                     Admin
                                 </Badge>
                             )}
                             {!isCompact && (
-                                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-500/10 px-2 py-1 rounded-full border border-amber-500/20">
+                                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-500/10 px-2 py-1 rounded-full border border-amber-500/20 shrink-0">
                                     <Star className="w-3 h-3 fill-current" />
                                     5.0
                                 </div>
+                            )}
+                            {hasActions && (
+                                <CardActionMenu
+                                    onEdit={onEdit ? () => onEdit(service) : undefined}
+                                    onView={onView ? () => onView(service) : undefined}
+                                    onDelete={onDelete ? () => onDelete(service) : undefined}
+                                    entityName={`le service ${service.title}`}
+                                    extraActions={extraActions}
+                                />
                             )}
                         </div>
                     </div>
@@ -151,51 +190,27 @@ export function ServiceCard({ service, className, viewMode = "grid", variant = "
                     )}
 
                     {/* CTA */}
-                    <div className="pt-4">
-                        {onView ? (
-                            <Button
-                                onClick={handleView}
-                                className={cn(
-                                    "w-full rounded-2xl h-12 text-base font-bold transition-all duration-500 group-hover:gap-4",
-                                    isCompact && "h-8 text-sm rounded-xl",
-                                    isList && "h-10 text-sm rounded-xl",
-                                    isHovered
-                                        ? "bg-primary text-primary-foreground shadow-xl shadow-primary/40"
-                                        : "bg-secondary/50 text-foreground hover:bg-secondary"
-                                )}
-                            >
-                                Explorer le service
-                                <ArrowRight className={cn(
-                                    "transition-transform duration-500",
-                                    isCompact && "w-4 h-4",
-                                    isList && "w-4 h-4",
-                                    !isCompact && !isList && "w-5 h-5",
-                                    isHovered && "translate-x-1"
-                                )} />
-                            </Button>
-                        ) : (
-                            <Link href={`/services/${service.id}`} className="block">
-                                <Button
-                                    className={cn(
-                                        "w-full rounded-2xl h-12 text-base font-bold transition-all duration-500 group-hover:gap-4",
-                                        isCompact && "h-8 text-sm rounded-xl",
-                                        isList && "h-10 text-sm rounded-xl",
-                                        isHovered
-                                            ? "bg-primary text-primary-foreground shadow-xl shadow-primary/40"
-                                            : "bg-secondary/50 text-foreground hover:bg-secondary"
-                                    )}
-                                >
-                                    Explorer le service
-                                    <ArrowRight className={cn(
-                                        "transition-transform duration-500",
-                                        isCompact && "w-4 h-4",
-                                        isList && "w-4 h-4",
-                                        !isCompact && !isList && "w-5 h-5",
-                                        isHovered && "translate-x-1"
-                                    )} />
-                                </Button>
-                            </Link>
-                        )}
+                    <div className="pt-4" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            onClick={handleView}
+                            className={cn(
+                                "w-full rounded-2xl h-12 text-base font-bold transition-all duration-500 group-hover:gap-4",
+                                isCompact && "h-8 text-sm rounded-xl",
+                                isList && "h-10 text-sm rounded-xl",
+                                isHovered
+                                    ? "bg-primary text-primary-foreground shadow-xl shadow-primary/40"
+                                    : "bg-secondary/50 text-foreground hover:bg-secondary"
+                            )}
+                        >
+                            Explorer le service
+                            <ArrowRight className={cn(
+                                "transition-transform duration-500",
+                                isCompact && "w-4 h-4",
+                                isList && "w-4 h-4",
+                                !isCompact && !isList && "w-5 h-5",
+                                isHovered && "translate-x-1"
+                            )} />
+                        </Button>
                     </div>
                 </CardContent>
 

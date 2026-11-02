@@ -2,9 +2,9 @@
 "use client";
 
 import { useGameClips } from "@/hooks/use-game-clips";
-import { GameClipReel } from "@/components/game-clips/game-clip-reel";
+import { GameClipReel } from "@/components/pages/game-clips/game-clip-reel";
 import { useCallback, Suspense, useMemo } from "react";
-import { GameTraficsLoader } from "@/components/game-clips/game-trafics-loader";
+import { GameTraficsLoader } from "@/components/pages/game-clips/game-trafics-loader";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useSearchParams } from "next/navigation";
 
@@ -12,7 +12,7 @@ function ClientGameClipsContentInner() {
   const { user } = useAuthContext();
   const searchParams = useSearchParams();
   const initialClipId = searchParams.get("activeClipId");
-  
+
   const {
     clips,
     loading,

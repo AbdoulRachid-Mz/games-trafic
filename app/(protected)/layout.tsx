@@ -1,24 +1,25 @@
 import React from "react";
-import { AuthService } from "@/lib/auth/service";
+import { getCurrentUser } from "@/lib/auth/session";
 import { getUserWalletByUserId, initializeUserWallet } from "@/actions/wallets";
+import { redirect } from "next/navigation";
 
 export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await AuthService.getSession();
-  if (!session) {
-    return window.location.href = "/unauthorized?redirectTo=/sign-in&msg=Vous n'avez pas la permission d'accéder à cette page";
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/sign-in");
   }
 
-  if (session?.user?.id) {
+  if (user.id) {
     try {
       // Vérifier si le wallet existe, sinon le créer
-      const wallet = await getUserWalletByUserId(session.user.id);
+      const wallet = await getUserWalletByUserId(user.id);
       if (!wallet) {
-        console.log(`Initialisation auto du wallet pour l'utilisateur ${session.user.id}`);
-        await initializeUserWallet(session.user.id);
+        console.log(`Initialisation auto du wallet pour l'utilisateur ${user.id}`);
+        await initializeUserWallet(user.id);
       }
     } catch (error) {
       console.error("Erreur lors de la vérification/initialisation du wallet:", error);

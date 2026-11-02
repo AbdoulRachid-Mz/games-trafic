@@ -325,6 +325,9 @@ export async function setupEliminationGroups(
         nodeCode: `R${round}-M${i + 1}`,
         round,
         matchNumber: matchCounter++,
+        // depth = 0 for the root/final (highest round), increasing toward leaves.
+        // Used by progression-engine to identify the winner node (depth === 0).
+        depth: totalRounds - round,
         bracketType: 'UPPER',
         order: matchCounter,
         parentNodeId,

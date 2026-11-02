@@ -38,9 +38,9 @@ function ChatPageContent() {
           <h1 className="text-3xl font-bold text-[var(--chat-text)]">
             GT Messenger
           </h1>
-          <p className="text-[var(--chat-textMuted)]">
-            Envoyez et recevez des messages sans avoir besoin de garder votre téléphone connecté.
-            Utilisez GT Messenger sur jusqu'à 4 appareils liés et 1 téléphone en même temps.
+          <p className="text-[var(--chat-textMuted)] leading-relaxed text-sm">
+            Échangez en temps réel avec vos coéquipiers, vendeurs et adversaires.
+            Négociez vos transactions, organisez vos matchs et restez connecté à la communauté Games-Trafics.
           </p>
         </div>
 
@@ -59,7 +59,7 @@ function ChatPageContent() {
         <div className="pt-4 border-t border-[var(--chat-border)]">
           <div className="flex items-center justify-center gap-2 text-sm text-[var(--chat-textMuted)]">
             <Shield className="h-4 w-4" />
-            <span>Chiffré de bout en bout</span>
+            <span>Chiffrement et protection des échanges</span>
           </div>
         </div>
 

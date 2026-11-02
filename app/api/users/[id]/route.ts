@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateUser, deleteUser } from '@/actions/users';
-import { getUserById } from '@/actions/users';
+import { updateUser, deleteUser, getUserById } from '@/actions/users';
+import { getCurrentUser } from '@/lib/auth/session';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -22,7 +22,24 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: user });
+    // Protection des données sensibles si le demandeur n'est ni le propriétaire ni un admin
+    const currentUser = await getCurrentUser();
+    const isOwnerOrAdmin = currentUser && (currentUser.id === id || currentUser.role === 'admin' || (currentUser as any).isAdmin === true);
+
+    const safeUser = isOwnerOrAdmin ? user : {
+      id: user.id,
+      fullName: user.fullName,
+      username: user.username,
+      profileImage: user.profileImage,
+      coverImage: user.coverImage,
+      bio: user.bio,
+      level: user.level,
+      isVip: user.isVip,
+      accountTypes: user.accountTypes,
+      createdAt: user.createdAt,
+    };
+
+    return NextResponse.json({ success: true, data: safeUser });
   } catch (error: any) {
     console.error('GET /api/users/[id] error:', error);
     return NextResponse.json(
@@ -32,17 +49,48 @@ export async function GET(
   }
 }
 
-
 // PATCH /api/users/:id – update user
 export async function PATCH(
   req: NextRequest,
   { params }: Props
 ) {
   try {
-    const body = await req.json();
-    const {id} = await params
+    // 🛡️ SEC-002: Contrôle d'authentification et d'autorisation
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentification requise' } },
+        { status: 401 }
+      );
+    }
 
-    const updatedUser = await updateUser(id, body);
+    const { id } = await params;
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
+    if (currentUser.id !== id && !isAdmin) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Vous ne pouvez modifier que votre propre profil' } },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+
+    // 🛡️ Filtrer les champs réservés aux administrateurs
+    const safeBody = { ...body };
+    if (!isAdmin) {
+      delete safeBody.role;
+      delete safeBody.isAdmin;
+      delete safeBody.isVip;
+      delete safeBody.banned;
+      delete safeBody.banReason;
+      delete safeBody.banExpires;
+      delete safeBody.accountTypes;
+      delete safeBody.level;
+      delete safeBody.isDeleted;
+    }
+
+    const updatedUser = await updateUser(id, safeBody);
 
     return NextResponse.json({ success: true, data: updatedUser });
   } catch (error: any) {
@@ -63,7 +111,25 @@ export async function DELETE(
   { params }: Props
 ) {
   try {
-        const {id} = await params
+    // 🛡️ SEC-002: Contrôle d'authentification et d'autorisation
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentification requise' } },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
+    if (currentUser.id !== id && !isAdmin) {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Action non autorisée' } },
+        { status: 403 }
+      );
+    }
+
     const deletedUser = await deleteUser(id);
 
     return NextResponse.json({ success: true, data: deletedUser });

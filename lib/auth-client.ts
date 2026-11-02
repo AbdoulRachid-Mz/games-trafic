@@ -1,3 +1,4 @@
+// @/lib/auth-client.ts
 import { anonymousClient, adminClient, lastLoginMethodClient, oneTapClient } from "better-auth/client/plugins";
 import { passkeyClient } from "@better-auth/passkey/client"
 import { createAuthClient } from "better-auth/react";

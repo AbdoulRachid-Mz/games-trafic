@@ -22,8 +22,8 @@ export async function getAppSettings(): Promise<NewAppSettings | null> {
     const rows = await db.select().from(appSettings).limit(1);
     return rows[0] ?? null;
   } catch (error) {
-    console.error('Error getting app settings:', error);
-    throw new Error('Failed to fetch app settings');
+    console.warn('Database offline or unreachable for app-settings, fallback to null:', (error as any)?.message || error);
+    return null;
   }
 }
 

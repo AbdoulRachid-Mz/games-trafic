@@ -4,13 +4,13 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { InteractionButton } from "@/components/shared/interaction-button";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
 import {
   Store,
   MapPin,
@@ -22,30 +22,20 @@ import {
   ChevronRight,
   Users,
   Globe,
-  Phone,
-  MoreVertical,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { type ShopCard as ShopCardType } from "@/types/view-models";
 
-// Types simplifiés
-type ViewMode = "grid" | "list" | "compact";
 type CardVariant = "default" | "premium" | "admin";
 
-interface ShopCardProps {
-  shop: ShopCardType & {
+export interface ShopCardProps extends BaseCardProps<
+  ShopCardType & {
     stats?: {
       productCount?: number;
       rating?: number;
       followersCount?: number;
     };
-  };
-  viewMode?: ViewMode;
+  }
+> {
   variant?: CardVariant;
   showDetails?: boolean;
   showStats?: boolean;
@@ -53,15 +43,22 @@ interface ShopCardProps {
   showFollowButton?: boolean;
   showLikeButton?: boolean;
   showQuickActions?: boolean;
-  onView?: (shopId: string) => void;
-  onFollow?: (shopId: string) => void;
-  onLike?: (shopId: string) => void;
-  className?: string;
+  onFollow?: (item: any) => void;
+  onLike?: (item: any) => void;
 }
 
 export function ShopCard({
-  shop,
+  item: shop,
   viewMode = "grid",
+  status,
+  isCliquable = true,
+  isMini = false,
+  activeAction = "view",
+  onEdit,
+  onView,
+  onDelete,
+  onFollow,
+  onLike,
   variant = "default",
   showDetails = true,
   showStats = true,
@@ -69,15 +66,12 @@ export function ShopCard({
   showFollowButton = true,
   showLikeButton = false,
   showQuickActions = true,
-  onView,
-  onFollow,
-  onLike,
   className,
 }: ShopCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isGrid = viewMode === "grid";
   const isList = viewMode === "list";
-  const isCompact = viewMode === "compact";
+  const isCompact = viewMode === "compact" || isMini;
   const isAdmin = variant === "admin";
   const isPremium = variant === "premium";
 
@@ -89,16 +83,46 @@ export function ShopCard({
 
   const handleView = () => {
     if (onView) {
-      onView(shop.id);
+      onView(shop);
     }
   };
+
+  const handleMainAction = () => {
+    if (!isCliquable) return;
+    if (activeAction === "view" && onView) onView(shop);
+    else if (activeAction === "edit" && onEdit) onEdit(shop);
+    else if (activeAction === "delete" && onDelete) onDelete(shop);
+    else handleView();
+  };
+
+  const extraActions: extraActionsProps[] = [];
+  if (shop.website) {
+    extraActions.push({
+      id: "website",
+      label: "Site web",
+      icon: Globe,
+      onClick: () => window.open(shop.website || "", "_blank")
+    });
+  }
+  if (isAdmin) {
+    extraActions.push({
+      id: "manage",
+      label: "Gérer",
+      icon: Users,
+      onClick: () => {
+        if (onEdit) onEdit(shop);
+      }
+    });
+  }
+
+  const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
 
   // Rendu du contenu selon le mode
   const renderContent = () => {
     if (isCompact) {
       return (
         <div className="flex items-center gap-3">
-          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-primary/10 to-primary/20">
+          <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-gradient-to-br from-primary/10 to-primary/20">
             {shop.profileImage ? (
               <Image
                 src={shop.profileImage}
@@ -122,15 +146,16 @@ export function ShopCard({
               {stats.products} produits
             </Typography>
           </div>
-          {showFollowButton && (
-            <InteractionButton
-              type="follow"
-              entityType="SHOP"
-              entityId={shop.id}
-              iconOnly
-              size="sm"
-              variant="ghost"
-            />
+          {isCompact && hasActions && (
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <CardActionMenu
+                onEdit={onEdit ? () => onEdit(shop) : undefined}
+                onView={onView ? () => onView(shop) : undefined}
+                onDelete={onDelete ? () => onDelete(shop) : undefined}
+                entityName={`la boutique ${shop.name}`}
+                extraActions={extraActions}
+              />
+            </div>
           )}
         </div>
       );
@@ -166,10 +191,10 @@ export function ShopCard({
             )}
           </div>
 
-          {/* Badges */}
-          {showDetails && (
-            <div className="flex flex-col gap-1 items-end">
-              {shop.verified && (
+          {/* Badges et Menu Actions */}
+          <div className="flex flex-col gap-1 items-end">
+            <div className="flex items-center gap-2">
+              {showDetails && shop.verified && (
                 <Badge
                   variant="outline"
                   className="gap-1 px-2 py-0.5 text-xs bg-green-500/10 border-green-500/20 text-green-600"
@@ -178,17 +203,29 @@ export function ShopCard({
                   Vérifié
                 </Badge>
               )}
-              {shop.featured && (
-                <Badge
-                  variant="outline"
-                  className="gap-1 px-2 py-0.5 text-xs bg-amber-500/10 border-amber-500/20 text-amber-600"
-                >
-                  <Award className="w-3 h-3" />
-                  Vedette
-                </Badge>
+              {isList && hasActions && (
+                <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                  <CardActionMenu
+                    onEdit={onEdit ? () => onEdit(shop) : undefined}
+                    onView={onView ? () => onView(shop) : undefined}
+                    onDelete={onDelete ? () => onDelete(shop) : undefined}
+                    entityName={`la boutique ${shop.name}`}
+                    extraActions={extraActions}
+                  />
+                </div>
               )}
             </div>
-          )}
+
+            {showDetails && shop.featured && (
+              <Badge
+                variant="outline"
+                className="gap-1 px-2 py-0.5 text-xs bg-amber-500/10 border-amber-500/20 text-amber-600 mt-1"
+              >
+                <Award className="w-3 h-3" />
+                Vedette
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Description */}
@@ -272,35 +309,6 @@ export function ShopCard({
             </Button>
           </div>
         )}
-
-        {/* Quick actions menu */}
-        {showQuickActions && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {shop.website && (
-                <DropdownMenuItem onClick={() => window.open((shop?.website ?? ''), '_blank')}>
-                  <Globe className="w-4 h-4 mr-2" />
-                  Site web
-                </DropdownMenuItem>
-              )}
-              {isAdmin && (
-                <DropdownMenuItem>
-                  <Users className="w-4 h-4 mr-2" />
-                  Gérer
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
     );
   };
@@ -346,6 +354,19 @@ export function ShopCard({
           )}
         </div>
       </div>
+
+      {/* Menu d'actions (overlay absolu en haut à droite pour grille) */}
+      {isGrid && hasActions && (
+        <div className="absolute top-3 right-3 z-20" onClick={(e) => e.stopPropagation()}>
+          <CardActionMenu
+            onEdit={onEdit ? () => onEdit(shop) : undefined}
+            onView={onView ? () => onView(shop) : undefined}
+            onDelete={onDelete ? () => onDelete(shop) : undefined}
+            entityName={`la boutique ${shop.name}`}
+            extraActions={extraActions}
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -354,16 +375,17 @@ export function ShopCard({
     return (
       <Card
         className={cn(
-          "group cursor-pointer transition-all duration-300 hover:shadow-lg",
+          "group cursor-pointer transition-all duration-300 hover:shadow-lg relative overflow-hidden",
+          isCliquable && "active:scale-[0.99]",
           isPremium && "border-primary/20 bg-gradient-to-br from-primary/5 to-transparent",
           className
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={handleView}
+        onClick={handleMainAction}
       >
         <div className="flex gap-4 p-4">
-          <div className="w-48 flex-shrink-0">{renderImage()}</div>
+          <div className="w-48 shrink-0">{renderImage()}</div>
           <CardContent className="p-0 flex-1">
             {renderContent()}
           </CardContent>
@@ -382,11 +404,12 @@ export function ShopCard({
       >
         <Card
           className={cn(
-            "group cursor-pointer h-full overflow-hidden transition-all duration-300 hover:shadow-xl border-border/50",
+            "group cursor-pointer h-full overflow-hidden transition-all duration-300 hover:shadow-xl border-border/50 relative",
+            isCliquable && "active:scale-[0.99]",
             isPremium && "border-primary/30 bg-gradient-to-br from-primary/5 to-transparent",
             className
           )}
-          onClick={handleView}
+          onClick={handleMainAction}
         >
           <CardContent className="p-4 space-y-4">
             {renderImage()}
@@ -401,10 +424,10 @@ export function ShopCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-md",
+        "cursor-pointer transition-all duration-200 hover:shadow-md relative overflow-hidden",
         className
       )}
-      onClick={handleView}
+      onClick={handleMainAction}
     >
       <CardContent className="p-3">
         {renderContent()}

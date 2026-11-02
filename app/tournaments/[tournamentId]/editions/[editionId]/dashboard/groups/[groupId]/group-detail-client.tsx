@@ -667,7 +667,7 @@ export function GroupDetailClient({
                         {matches.map((match) => (
                           <MatchCard
                             key={match.id}
-                            match={match}
+                            item={match}
                             isAdmin={true}
                             viewMode="list"
                             onUpdate={() => window.location.reload()}
@@ -707,7 +707,7 @@ export function GroupDetailClient({
                             .map((match) => (
                               <MatchCard
                                 key={match.id}
-                                match={match}
+                                item={match}
                                 viewMode="list"
                                 isAdmin={true}
                                 onUpdate={() => window.location.reload()}
@@ -724,7 +724,7 @@ export function GroupDetailClient({
                 {matches.map((match) => (
                   <MatchCard
                     key={match.id}
-                    match={match}
+                    item={match}
                     viewMode="list"
                     isAdmin={true}
                     onUpdate={() => window.location.reload()}
@@ -872,7 +872,7 @@ export function GroupDetailClient({
                                 <div className="p-4 flex-1">
                                   {nodeMatch ? (
                                     <MatchCard
-                                      match={nodeMatch}
+                                      item={nodeMatch}
                                       viewMode="compact"
                                       isAdmin={true}
                                       onUpdate={() => window.location.reload()}

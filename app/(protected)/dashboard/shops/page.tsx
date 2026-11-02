@@ -43,7 +43,7 @@ export default function ShopsDashboardPage() {
   const renderShopCard = (s: Shop, index: number) => (
     <ShopCard
       key={s.id}
-      shop={s as any}
+      item={s as any}
       viewMode={viewMode === "grid" ? "grid" : "list"}
       showDetails={false}
       onView={() => router.push(`/shops/${s.id}`)}

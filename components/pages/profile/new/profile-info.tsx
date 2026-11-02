@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Typography } from "@/components/ui/typography";
 import type { UserWithAllRelations } from "@/actions/users";
+import { accountTypesLabel, userLevelLabel, vipStatusLabel } from "@/utils/types-label";
 
 interface ProfileInfoProps {
   user: UserWithAllRelations;
@@ -79,18 +80,22 @@ export function ProfileInfo({
             Réseaux sociaux
           </Typography>
           <div className="flex flex-wrap gap-2">
-            {(user.socialMedia as any[]).map((social: any, idx: number) => (
-              <a
-                key={idx}
-                href={social.url || social.link || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted text-sm transition-colors border border-border/50 hover:border-primary/30"
-              >
-                <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>{social.platform || social.name || social.url || "Lien"}</span>
-              </a>
-            ))}
+            {(user.socialMedia as any[]).map((social: any, idx: number) => {
+              const socialUrl = social.url || social.link;
+              const href = typeof socialUrl === 'string' ? socialUrl : "#";
+              return (
+                <a
+                  key={idx}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted text-sm transition-colors border border-border/50 hover:border-primary/30"
+                >
+                  <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>{social.platform || social.name || social.url || "Lien"}</span>
+                </a>
+              );
+            })}
           </div>
         </div>
       )}
@@ -104,15 +109,15 @@ export function ProfileInfo({
         )}
         {user.accountTypes?.map((type: string) => (
           <Badge key={type} variant="secondary">
-            {type}
+            {accountTypesLabel(type)}
           </Badge>
         ))}
         {user.level && (
-          <Badge variant="outline">Niveau {user.level}</Badge>
+          <Badge variant="outline">{userLevelLabel(user.level)}</Badge>
         )}
         {user.isVip && (
           <Badge variant="default" className="bg-gradient-to-r from-yellow-500 to-orange-500">
-            VIP
+            {vipStatusLabel(user.vipStatus)}
           </Badge>
         )}
       </div>

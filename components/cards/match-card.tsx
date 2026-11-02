@@ -1,19 +1,19 @@
+// @/components/cards/match-card.tsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Clock,
-  AlertCircle,
-  CheckCircle2,
-  User,
-  History,
   Camera,
-  ShieldCheck,
-  Check,
   Trophy,
   ShieldAlert,
   ChevronRight,
+  User,
+  History,
+  CheckCircle2,
+  Swords,
 } from "lucide-react";
+import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -24,35 +24,44 @@ import Link from "next/link";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
 import { updateMatchResult } from "@/actions/tournaments";
 import { toast } from "sonner";
-import { Typography } from "../ui/typography";
+import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
+import { matchStatusLabel } from "@/utils/types-label";
+import { motion } from "framer-motion";
 
-interface MatchCardProps {
-  match: any;
+export interface MatchCardProps extends BaseCardProps<any> {
+  match?: any;
   registrations?: Record<string, any>;
-  onView?: () => void;
   onViewP1?: () => void;
   onViewP2?: () => void;
   currentUserId?: string;
   isAdmin?: boolean;
   onUpdate?: () => void;
-  viewMode?: "list" | "grid" | "compact";
-  showMinInfo?: boolean; // ✅ Nouveau: affichage minimal
-  className?: string;
+  showMinInfo?: boolean;
 }
 
 export function MatchCard({
-  match,
-  registrations,
+  item,
+  match: propMatch,
+  viewMode = "grid",
+  status,
+  isCliquable = true,
+  isMini = false,
+  activeAction = "view",
+  onEdit,
   onView,
+  onDelete,
+  registrations,
   onViewP1,
   onViewP2,
   currentUserId,
   isAdmin,
   onUpdate,
-  viewMode = "grid",
   showMinInfo = false,
   className,
 }: MatchCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const match = propMatch || item;
+  
   const p1 =
     match.participant1?.member?.user ||
     match.participant1?.member?.team ||
@@ -63,26 +72,25 @@ export function MatchCard({
     match.participant2;
 
   const p1Name =
+    match.participant1?.member?.team?.name ||
     match.participant1?.member?.displayName ||
     p1?.username ||
     p1?.name ||
-    "À déterminer";
+    "TBD";
   const p2Name =
+    match.participant2?.member?.team?.name ||
     match.participant2?.member?.displayName ||
     p2?.username ||
     p2?.name ||
-    "À déterminer";
-
-  const p1Id =
-    match.participant1?.member?.userId || match.participant1?.member?.id;
-  const p2Id =
-    match.participant2?.member?.userId || match.participant2?.member?.id;
+    "TBD";
 
   const p1Image =
+    match.participant1?.member?.team?.logo ||
     match.participant1?.member?.avatar ||
     p1?.profileImage ||
     "/icons/avatar-500.png";
   const p2Image =
+    match.participant2?.member?.team?.logo ||
     match.participant2?.member?.avatar ||
     p2?.profileImage ||
     "/icons/avatar-500.png";
@@ -120,91 +128,112 @@ export function MatchCard({
     }
   };
 
-  // ✅ Bordure latérale selon le statut
-  const getBorderColor = () => {
+  const handleView = () => {
+    if (onView) onView(match);
+  };
+
+  const getStatusStyle = () => {
     switch (match.status) {
       case "COMPLETED":
-        return "border-l-4 border-l-green-500";
+        return {
+          border: "border-green-500/50",
+          glow: "shadow-[0_0_15px_rgba(34,197,94,0.15)]",
+          badge: "bg-green-500/10 text-green-500 border-green-500/30",
+          bg: "from-green-500/5 to-transparent"
+        };
       case "IN_PROGRESS":
-        return "border-l-4 border-l-blue-500";
+        return {
+          border: "border-blue-500/50",
+          glow: "shadow-[0_0_15px_rgba(59,130,246,0.15)] animate-pulse",
+          badge: "bg-blue-500/10 text-blue-500 border-blue-500/30",
+          bg: "from-blue-500/5 to-transparent"
+        };
       case "PENDING_REVIEW":
       case "AWAITING_ADMIN_CONFIRMATION":
-        return "border-l-4 border-l-amber-500";
+        return {
+          border: "border-amber-500/50",
+          glow: "shadow-[0_0_15px_rgba(245,158,11,0.15)]",
+          badge: "bg-amber-500/10 text-amber-500 border-amber-500/30",
+          bg: "from-amber-500/5 to-transparent"
+        };
       case "DISPUTED":
-        return "border-l-4 border-l-red-500";
+        return {
+          border: "border-red-500/50",
+          glow: "shadow-[0_0_15px_rgba(239,68,68,0.15)]",
+          badge: "bg-red-500/10 text-red-500 border-red-500/30",
+          bg: "from-red-500/5 to-transparent"
+        };
       default:
-        return "border-l-4 border-l-slate-300";
+        return {
+          border: "border-border/50",
+          glow: "hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]",
+          badge: "bg-secondary text-secondary-foreground border-border/50",
+          bg: "from-muted/20 to-transparent"
+        };
     }
   };
+
+  const statusStyle = getStatusStyle();
 
   const getStatusBadge = () => {
-    switch (match.status) {
-      case "PENDING":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-slate-100 text-slate-700 text-[10px] h-5 px-1.5"
-          >
-            Programmé
-          </Badge>
-        );
-      case "IN_PROGRESS":
-        return (
-          <Badge className="bg-blue-100 text-blue-700 text-[10px] h-5 px-1.5">
-            En cours
-          </Badge>
-        );
-      case "PENDING_REVIEW":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-700 text-[10px] h-5 px-1.5">
-            En attente
-          </Badge>
-        );
-      case "AWAITING_ADMIN_CONFIRMATION":
-        return (
-          <Badge className="bg-orange-100 text-orange-700 text-[10px] h-5 px-1.5">
-            Vérification
-          </Badge>
-        );
-      case "COMPLETED":
-        return (
-          <Badge className="bg-green-100 text-green-700 text-[10px] h-5 px-1.5">
-            <Check className="w-2.5 h-2.5 mr-1" /> Terminé
-          </Badge>
-        );
-      case "DISPUTED":
-        return (
-          <Badge variant="destructive" className="text-[10px] h-5 px-1.5">
-            Litige
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-            {match.status}
-          </Badge>
-        );
-    }
+    const label = matchStatusLabel(match.status);
+    return (
+      <Badge className={cn("text-[9px] sm:text-[10px] px-1.5 py-0 sm:py-0.5 uppercase tracking-wider font-bold backdrop-blur-sm", statusStyle.badge)}>
+        {match.status === "COMPLETED" && <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />}
+        {match.status === "IN_PROGRESS" && <Swords className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1 animate-pulse" />}
+        {label}
+      </Badge>
+    );
   };
 
-  // ✅ Moins d'infos: affichage minimal
+  const extraActions: extraActionsProps[] = [];
+  if (onViewP1) {
+    extraActions.push({
+      id: "view-p1",
+      label: `Voir ${p1Name}`,
+      icon: User,
+      onClick: onViewP1
+    });
+  }
+  if (onViewP2) {
+    extraActions.push({
+      id: "view-p2",
+      label: `Voir ${p2Name}`,
+      icon: User,
+      onClick: onViewP2
+    });
+  }
+  if (canSubmit) {
+    extraActions.push({
+      id: "submit",
+      label: "Saisir le score",
+      icon: Trophy,
+      onClick: () => {
+        window.location.href = `/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}?submit=true`;
+      }
+    });
+  }
+
+  const hasActions = onEdit || onView || onDelete || extraActions.length > 0;
+
   if (showMinInfo) {
     const isCompleted = match.status === "COMPLETED";
     return (
       <div
         className={cn(
-          "group relative overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md cursor-pointer",
-          getBorderColor(),
+          "group relative overflow-hidden rounded-xl border bg-card/80 backdrop-blur-md transition-all duration-300 cursor-pointer",
+          statusStyle.border,
+          statusStyle.glow,
           className,
         )}
-        onClick={onView}
+        onClick={handleView}
       >
-        <div className="p-3">
-          {/* Ligne 1: statut et time */}
-          <div className="flex items-center justify-between mb-2">
+        <div className={cn("absolute inset-0 bg-gradient-to-r opacity-50", statusStyle.bg)} />
+        <div className="p-3 relative z-10">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5">
               <Clock className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[9px] text-muted-foreground">
+              <span className="text-[9px] font-bold tracking-wider uppercase text-muted-foreground">
                 {match.scheduledTime
                   ? format(new Date(match.scheduledTime), "dd MMM HH:mm", {
                       locale: fr,
@@ -212,361 +241,334 @@ export function MatchCard({
                   : "À planifier"}
               </span>
             </div>
-            {getStatusBadge()}
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              {getStatusBadge()}
+              {hasActions && (
+                <CardActionMenu
+                  onEdit={onEdit ? () => onEdit(match) : undefined}
+                  onView={onView ? () => onView(match) : undefined}
+                  onDelete={onDelete ? () => onDelete(match) : undefined}
+                  entityName={`le match ${p1Name} vs ${p2Name}`}
+                  extraActions={extraActions}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Ligne 2: participants + score */}
           <div className="flex items-center justify-between gap-2">
-            {/* Joueur 1 */}
             <div
-              className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer hover:text-primary transition-colors"
-              onClick={onViewP1}
+              className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:text-primary transition-colors group/p1"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onViewP1) onViewP1();
+              }}
             >
-              <Avatar className="h-6 w-6 ring-1 ring-slate-200">
-                <AvatarImage src={p1Image} />
-                <AvatarFallback className="bg-slate-100 text-[9px]">
-                  {p1Name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate text-xs font-medium max-w-[80px] sm:max-w-[100px]">
+              <div className="relative">
+                <Avatar className="h-7 w-7 rounded-md skew-x-[-10deg] border border-white/10 shrink-0 overflow-hidden shadow-lg group-hover/p1:border-primary/50 transition-colors">
+                  <div className="skew-x-[10deg] w-full h-full scale-[1.2]">
+                    <AvatarImage src={p1Image} className="object-cover" />
+                  </div>
+                  <AvatarFallback className="bg-muted text-[10px] skew-x-[10deg]">
+                    {p1Name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <span className="truncate text-xs font-bold max-w-[80px] sm:max-w-[100px]">
                 {p1Name}
               </span>
             </div>
 
-            {/* Score */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div
-                className={cn(
-                  "w-7 h-7 rounded-md flex items-center justify-center font-bold text-sm",
-                  isCompleted && match.score1 > match.score2
-                    ? "bg-green-100 text-green-700"
-                    : "bg-slate-100 text-slate-700",
-                )}
-              >
+            <div className="flex items-center gap-1.5 shrink-0 px-2 py-1 bg-background/50 rounded-lg border border-white/5 backdrop-blur-md">
+              <span className={cn(
+                "font-black text-sm italic tabular-nums leading-none",
+                isCompleted && match.score1 > match.score2 ? "text-primary" : "text-foreground"
+              )}>
                 {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
-              </div>
-              <span className="text-[10px] font-medium text-muted-foreground">
-                vs
               </span>
-              <div
-                className={cn(
-                  "w-7 h-7 rounded-md flex items-center justify-center font-bold text-sm",
-                  isCompleted && match.score2 > match.score1
-                    ? "bg-green-100 text-green-700"
-                    : "bg-slate-100 text-slate-700",
-                )}
-              >
+              <span className="text-[9px] font-black text-muted-foreground/50 mx-0.5">VS</span>
+              <span className={cn(
+                "font-black text-sm italic tabular-nums leading-none",
+                isCompleted && match.score2 > match.score1 ? "text-primary" : "text-foreground"
+              )}>
                 {match.status === "PENDING" ? "-" : (match.score2 ?? 0)}
-              </div>
+              </span>
             </div>
 
-            {/* Joueur 2 */}
             <div
-              className="flex items-center gap-1.5 flex-1 min-w-0 justify-end cursor-pointer hover:text-primary transition-colors"
-              onClick={onViewP2}
+              className="flex items-center gap-2 flex-1 min-w-0 justify-end cursor-pointer hover:text-primary transition-colors group/p2"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onViewP2) onViewP2();
+              }}
             >
-              <span className="truncate text-xs font-medium max-w-[80px] sm:max-w-[100px] text-right">
+              <span className="truncate text-xs font-bold max-w-[80px] sm:max-w-[100px] text-right">
                 {p2Name}
               </span>
-              <Avatar className="h-6 w-6 ring-1 ring-slate-200">
-                <AvatarImage src={p2Image} />
-                <AvatarFallback className="bg-slate-100 text-[9px]">
-                  {p2Name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-7 w-7 rounded-md skew-x-[-10deg] border border-white/10 shrink-0 overflow-hidden shadow-lg group-hover/p2:border-primary/50 transition-colors">
+                  <div className="skew-x-[10deg] w-full h-full scale-[1.2]">
+                    <AvatarImage src={p2Image} className="object-cover" />
+                  </div>
+                  <AvatarFallback className="bg-muted text-[10px] skew-x-[10deg]">
+                    {p2Name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
             </div>
-          </div>
-
-          {/* Flèche d'aperçu */}
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
       </div>
     );
   }
 
-  // ============================================
-  // MODE NORMAL (affichage complet)
-  // ============================================
+  const isListView = viewMode === "list";
+  const isCompactView = viewMode === "compact" || isMini;
 
-  const isGrid = viewMode === "grid";
-  const isList = viewMode === "list";
-  const isCompact = viewMode === "compact";
-
-  // ✅ Tailles responsives réduites
-  const getAvatarSize = () => {
-    if (isCompact) return "h-8 w-8";
-    if (isList) return "h-9 w-9 md:h-10 md:w-10";
-    return "h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14";
+  const handleMainAction = () => {
+    if (!isCliquable) return;
+    if (activeAction === "view" && onView) onView(match);
+    else if (activeAction === "edit" && onEdit) onEdit(match);
+    else if (activeAction === "delete" && onDelete) onDelete(match);
+    else if (onViewP1) onViewP1();
+    else if (onViewP2) onViewP2();
+    else if (onView) onView(match);
   };
-
-  const getScoreBoxSize = () => {
-    if (isCompact) return "h-7 w-7 text-sm";
-    if (isList) return "h-8 w-8 text-base md:h-9 md:w-9 md:text-lg";
-    return "h-9 w-9 text-lg sm:h-10 sm:w-10 sm:text-xl md:h-12 md:w-12 md:text-2xl";
-  };
-
-  const getNameMaxWidth = () => {
-    if (isCompact) return "max-w-[70px] sm:max-w-[90px]";
-    if (isList) return "max-w-[90px] sm:max-w-[120px] md:max-w-[150px]";
-    return "max-w-[100px] sm:max-w-[130px] md:max-w-[160px]";
-  };
-
-  const wrapperClasses = cn(
-    "group relative overflow-hidden rounded-xl border bg-card transition-all hover:shadow-md",
-    getBorderColor(),
-    isCompact ? "p-2" : "p-3 sm:p-4",
-    className,
-  );
-
-  const headerClasses = cn(
-    "flex items-center justify-between",
-    isCompact ? "mb-1.5" : "mb-3 sm:mb-4",
-  );
-
-  const participantsGrid = cn(
-    "items-center gap-3 sm:gap-4",
-    isList ? "flex justify-between" : "grid grid-cols-[1fr,auto,1fr]",
-  );
-
-  const scoreCenter = cn(
-    "flex flex-col items-center gap-0.5 sm:gap-1",
-    isList && "flex-row gap-1 sm:gap-2",
-  );
-
-  const buttonWrapper = cn(
-    "mt-3 flex gap-2",
-    isCompact ? "mt-2" : isList ? "mt-2 sm:mt-3" : "mt-4 sm:mt-6",
-  );
-
+  
   return (
-    <div className={wrapperClasses}>
-      {/* Header */}
-      <div className={headerClasses}>
-        <div
-          className={cn(
-            "flex",
-            isList
-              ? "flex-row items-center gap-2"
-              : "flex-col gap-0.5 sm:gap-1",
-          )}
-        >
-          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
-            <Clock className={cn("h-3 w-3", isCompact && "h-2.5 w-2.5")} />
-            {match.scheduledTime
-              ? format(new Date(match.scheduledTime), "dd MMM, HH:mm", {
-                  locale: fr,
-                })
-              : "Non planifié"}
-          </div>
-          <div
-            className={cn("flex items-center gap-1.5", isList ? "ml-2" : "")}
-          >
+    <motion.div 
+      whileHover={isCliquable ? { scale: 0.995, y: -2 } : {}}
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border bg-card/80 backdrop-blur-xl transition-all duration-300",
+        statusStyle.border,
+        statusStyle.glow,
+        isCompactView ? "p-3" : "p-4 sm:p-5",
+        isCliquable && "cursor-pointer",
+        className
+      )}
+      onClick={handleMainAction}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Background Effects */}
+      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-30", statusStyle.bg)} />
+      <div className={cn(
+        "absolute inset-0 -translate-x-[150%] skew-x-[-30deg] bg-gradient-to-r from-transparent via-white/5 to-transparent z-0 transition-transform duration-1000",
+        isHovered && "translate-x-[150%]"
+      )} />
+
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-background/50 rounded-md border border-white/5 backdrop-blur-sm text-[10px] sm:text-xs text-muted-foreground font-bold uppercase tracking-wider">
+              <Clock className={cn("h-3 w-3", isCompactView && "h-2.5 w-2.5")} />
+              {match.scheduledTime
+                ? format(new Date(match.scheduledTime), "dd MMM, HH:mm", { locale: fr })
+                : "Non planifié"}
+            </div>
             {match.phase?.name && (
-              <Badge
-                variant="secondary"
-                className={cn(
-                  "text-[8px] sm:text-[9px] h-3.5 sm:h-4 px-1 sm:px-1.5",
-                )}
-              >
+              <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest border-white/10 bg-background/30 backdrop-blur-sm">
                 {match.phase.name}
               </Badge>
             )}
             {match.round && (
-              <span
-                className={cn(
-                  "font-bold uppercase tracking-wider text-muted-foreground/70 text-[8px] sm:text-[9px]",
-                )}
-              >
+              <span className="font-black italic uppercase tracking-widest text-muted-foreground/50 text-[10px] sm:text-xs bg-muted/50 px-1.5 py-0.5 rounded">
                 R{match.round}
               </span>
             )}
           </div>
-        </div>
-        {getStatusBadge()}
-      </div>
-
-      {/* Participants et scores */}
-      <div className={participantsGrid}>
-        {/* Participant 1 */}
-        <div
-          className={cn(
-            "flex items-center gap-2",
-            isList ? "flex-col" : "flex-col text-center",
-          )}
-        >
-          <Avatar
-            className={cn(
-              getAvatarSize(),
-              "border-2 border-background ring-2 ring-slate-100 group-hover:ring-primary/20 transition-all",
-            )}
-          >
-            <AvatarImage src={p1Image} />
-            <AvatarFallback className="bg-slate-50 text-slate-400 text-xs sm:text-sm">
-              <User
-                className={cn(
-                  isCompact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5",
-                )}
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {getStatusBadge()}
+            {hasActions && (
+              <CardActionMenu
+                onEdit={onEdit ? () => onEdit(match) : undefined}
+                onView={onView ? () => onView(match) : undefined}
+                onDelete={onDelete ? () => onDelete(match) : undefined}
+                entityName={`le match ${p1Name} vs ${p2Name}`}
+                extraActions={extraActions}
               />
-            </AvatarFallback>
-          </Avatar>
-          <div className="space-y-0.5">
-            <button
-              onClick={onViewP1}
-              className={cn(
-                "truncate font-semibold text-foreground hover:text-primary transition-colors text-left",
-                getNameMaxWidth(),
-                isCompact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm",
-              )}
-            >
-              {p1Name}
-            </button>
-            {match.confirmedByParticipant1 && !isCompact && (
-              <span className="flex items-center justify-center text-[8px] sm:text-[9px] text-green-600 font-medium">
-                <CheckCircle2 className="mr-0.5 h-2.5 w-2.5" /> Confirmé
+            )}
+          </div>
+        </div>
+
+        {/* VS Area */}
+        <div className={cn("flex items-center justify-between gap-4", isListView ? "flex-row" : "flex-col sm:flex-row")}>
+          
+          {/* Player 1 */}
+          <div className={cn(
+            "flex flex-1 items-center gap-3",
+            isListView ? "justify-start" : "justify-center sm:justify-end"
+          )}>
+            <div className={cn("flex flex-col gap-1", isListView ? "items-start" : "items-center sm:items-end")}>
+              <span className={cn(
+                "font-black italic tracking-tight text-foreground transition-colors group-hover:text-primary",
+                isCompactView ? "text-sm" : "text-base sm:text-lg lg:text-xl",
+                !isListView && "text-center sm:text-right"
+              )}>
+                {p1Name}
               </span>
-            )}
-          </div>
-        </div>
-
-        {/* Score / VS */}
-        <div className={scoreCenter}>
-          <div
-            className={cn(
-              "flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors",
-              getScoreBoxSize(),
-            )}
-          >
-            {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
-          </div>
-          {isList ? (
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground mx-1 sm:mx-2">
-              vs
-            </span>
-          ) : (
-            <span className="text-[10px] sm:text-sm font-medium text-muted-foreground">
-              vs
-            </span>
-          )}
-          <div
-            className={cn(
-              "flex items-center justify-center rounded-lg bg-black/20 font-bold border-2 transition-colors",
-              getScoreBoxSize(),
-            )}
-          >
-            {match.status === "PENDING" ? "-" : (match.score2 ?? 0)}
-          </div>
-          {match.status === "COMPLETED" && !isCompact && (
-            <Typography
-              tooltipContent="Officiel"
-              hasTooltip={true}
-              tooltipSide={"top"}
-              className="mt-1 text-[8px]  sm:text-[9px] uppercase tracking-wider font-bold text-primary flex items-center gap-0.5"
-            >
-              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3" />{" "}
-              <span className="hidden md:block">&nbsp; Officiel</span>
-            </Typography>
-          )}
-        </div>
-
-        {/* Participant 2 */}
-        <div
-          className={cn(
-            "flex items-center gap-2",
-            isList ? "flex-col" : "flex-col text-center",
-          )}
-        >
-          <Avatar
-            className={cn(
-              getAvatarSize(),
-              "border-2 border-background ring-2 ring-slate-100 group-hover:ring-primary/20 transition-all",
-            )}
-          >
-            <AvatarImage src={p2Image} />
-            <AvatarFallback className="bg-slate-50 text-slate-400 text-xs sm:text-sm">
-              <User
-                className={cn(
-                  isCompact ? "h-3.5 w-3.5" : "h-4 w-4 sm:h-5 sm:w-5",
-                )}
-              />
-            </AvatarFallback>
-          </Avatar>
-          <div className="space-y-0.5">
-            <button
-              onClick={onViewP2}
-              className={cn(
-                "truncate font-semibold text-foreground hover:text-primary transition-colors text-left",
-                getNameMaxWidth(),
-                isCompact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm",
+              {match.confirmedByParticipant1 && (
+                <span className="flex items-center text-[9px] sm:text-[10px] text-green-500 font-bold uppercase tracking-wider bg-green-500/10 px-1.5 py-0.5 rounded">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmé
+                </span>
               )}
-            >
-              {p2Name}
-            </button>
-            {match.confirmedByParticipant2 && !isCompact && (
-              <span className="flex items-center justify-center text-[8px] sm:text-[9px] text-green-600 font-medium">
-                <CheckCircle2 className="mr-0.5 h-2.5 w-2.5" /> Confirmé
+            </div>
+            <div className="relative group/avatar" onClick={(e) => { e.stopPropagation(); if (onViewP1) onViewP1(); }}>
+              <div className={cn(
+                "relative overflow-hidden border-2 transition-all duration-300",
+                "bg-muted shadow-xl",
+                isCompactView ? "w-10 h-10 rounded-lg skew-x-[-10deg]" : "w-12 h-12 sm:w-16 sm:h-16 rounded-xl skew-x-[-12deg]",
+                "border-white/10 group-hover/avatar:border-primary/50 group-hover/avatar:shadow-primary/20"
+              )}>
+                <div className="w-full h-full scale-[1.2] skew-x-[12deg]">
+                  {p1Image ? (
+                    <Image src={p1Image} alt={p1Name} fill className="object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-black text-muted-foreground/30 text-xl">
+                      {p1Name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Score / VS Center */}
+          <div className={cn(
+            "flex items-center shrink-0 mx-2",
+            isListView ? "" : "my-2 sm:my-0"
+          )}>
+            <div className="relative flex items-center bg-background/80 backdrop-blur-xl rounded-xl p-1 sm:p-1.5 border border-white/10 shadow-inner">
+              <div className={cn(
+                "flex items-center justify-center font-black italic tabular-nums leading-none rounded-lg bg-card border border-white/5 transition-colors",
+                isCompactView ? "w-8 h-8 text-sm" : "w-10 h-10 sm:w-14 sm:h-14 text-lg sm:text-2xl",
+                match.status === "COMPLETED" && match.score1 > match.score2 ? "text-primary shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "text-foreground"
+              )}>
+                {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
+              </div>
+              <div className="px-2 sm:px-3 flex flex-col items-center justify-center">
+                <span className="text-[10px] sm:text-xs font-black italic text-muted-foreground/40">VS</span>
+              </div>
+              <div className={cn(
+                "flex items-center justify-center font-black italic tabular-nums leading-none rounded-lg bg-card border border-white/5 transition-colors",
+                isCompactView ? "w-8 h-8 text-sm" : "w-10 h-10 sm:w-14 sm:h-14 text-lg sm:text-2xl",
+                match.status === "COMPLETED" && match.score2 > match.score1 ? "text-primary shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "text-foreground"
+              )}>
+                {match.status === "PENDING" ? "-" : (match.score2 ?? 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Player 2 */}
+          <div className={cn(
+            "flex flex-1 items-center gap-3",
+            isListView ? "justify-end" : "justify-center sm:justify-start flex-row-reverse sm:flex-row"
+          )}>
+            <div className="relative group/avatar" onClick={(e) => { e.stopPropagation(); if (onViewP2) onViewP2(); }}>
+              <div className={cn(
+                "relative overflow-hidden border-2 transition-all duration-300",
+                "bg-muted shadow-xl",
+                isCompactView ? "w-10 h-10 rounded-lg skew-x-[-10deg]" : "w-12 h-12 sm:w-16 sm:h-16 rounded-xl skew-x-[-12deg]",
+                "border-white/10 group-hover/avatar:border-primary/50 group-hover/avatar:shadow-primary/20"
+              )}>
+                <div className="w-full h-full scale-[1.2] skew-x-[12deg]">
+                  {p2Image ? (
+                    <Image src={p2Image} alt={p2Name} fill className="object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-black text-muted-foreground/30 text-xl">
+                      {p2Name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className={cn("flex flex-col gap-1", isListView ? "items-end" : "items-center sm:items-start")}>
+              <span className={cn(
+                "font-black italic tracking-tight text-foreground transition-colors group-hover:text-primary",
+                isCompactView ? "text-sm" : "text-base sm:text-lg lg:text-xl",
+                !isListView && "text-center sm:text-left"
+              )}>
+                {p2Name}
               </span>
+              {match.confirmedByParticipant2 && (
+                <span className="flex items-center text-[9px] sm:text-[10px] text-green-500 font-bold uppercase tracking-wider bg-green-500/10 px-1.5 py-0.5 rounded">
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmé
+                </span>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer Actions */}
+        {(canSubmit || canAdminValidate || match.proofUrl) && (
+          <div 
+            className={cn("mt-4 flex gap-2 pt-3 border-t border-white/5", isCompactView ? "mt-3 pt-2" : "mt-5")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {canSubmit && (
+              <Link
+                href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}?submit=true`}
+                className="flex-1"
+              >
+                <Button
+                  variant="default"
+                  size={isCompactView ? "xs" : "sm"}
+                  className="w-full gap-2 font-bold uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(var(--primary),0.2)] hover:shadow-[0_0_25px_rgba(var(--primary),0.4)] transition-shadow"
+                >
+                  <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Saisir le score
+                </Button>
+              </Link>
+            )}
+            
+            {!canSubmit && (
+              <Link
+                href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`}
+                className="flex-1"
+              >
+                 <Button
+                  variant="outline"
+                  size={isCompactView ? "xs" : "sm"}
+                  className="w-full gap-2 font-bold uppercase tracking-wider text-xs border-white/10 hover:bg-white/5"
+                >
+                  <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Détails
+                </Button>
+              </Link>
+            )}
+
+            {canAdminValidate && (
+              <ConfirmationDialog
+                title="Validation Administrateur"
+                description={`Valider officiellement le score (${match.score1 ?? 0} - ${match.score2 ?? 0}) ?`}
+                onConfirm={handleAdminValidate}
+                confirmLabel="Valider"
+                variant="default"
+              >
+                <Button
+                  size={isCompactView ? "xs" : "sm"}
+                  variant="outline"
+                  className="shrink-0 border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/40"
+                  title="Validation Admin"
+                >
+                  <ShieldAlert className="h-4 w-4" />
+                </Button>
+              </ConfirmationDialog>
+            )}
+
+            {match.proofUrl && match.status !== "COMPLETED" && (
+              <Button
+                size={isCompactView ? "xs" : "sm"}
+                variant="outline"
+                className="shrink-0 border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/40"
+                title="Preuve disponible"
+                onClick={() => window.open(match.proofUrl, '_blank')}
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className={buttonWrapper}>
-        <Link
-          href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}${canSubmit ? "?submit=true" : ""}`}
-          className="flex-1"
-        >
-          <Button
-            variant={canSubmit ? "default" : "outline"}
-            size={isCompact ? "xs" : "sm"}
-            className={cn(
-              "flex-1 gap-1.5 text-xs sm:text-sm transition-all",
-              canSubmit && "shadow-md shadow-primary/20",
-            )}
-          >
-            {canSubmit ? (
-              <>
-                <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Saisir
-              </>
-            ) : (
-              <>
-                <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Détails
-              </>
-            )}
-          </Button>
-        </Link>
-
-        {canAdminValidate && (
-          <ConfirmationDialog
-            title="Validation Administrateur"
-            description={`Valider officiellement le score (${match.score1 ?? 0} - ${match.score2 ?? 0}) ?`}
-            onConfirm={handleAdminValidate}
-            confirmLabel="Valider"
-            variant="default"
-          >
-            <Button
-              size={isCompact ? "xs" : "sm"}
-              variant="outline"
-              className="shrink-0 border-primary/20 text-primary hover:bg-primary/5"
-              title="Validation Admin"
-            >
-              <ShieldAlert className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </Button>
-          </ConfirmationDialog>
         )}
       </div>
-
-      {/* Proof indicator */}
-      {match.proofUrl && match.status !== "COMPLETED" && (
-        <div
-          className="absolute top-2 right-2 p-1 bg-primary/10 rounded-full"
-          title="Preuve disponible"
-        >
-          <Camera className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-primary" />
-        </div>
-      )}
-    </div>
+    </motion.div>
   );
 }

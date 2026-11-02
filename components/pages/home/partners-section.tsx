@@ -52,7 +52,7 @@ export function PartnersSection() {
           {partners.map((partner) => (
             <PartnerCard
               key={partner.id}
-              partner={partner}
+              item={partner}
               viewMode="grid"
               showActions={false}
               showBadge={partner.verified ?? false}

@@ -32,8 +32,8 @@ export function ProfileAvatar({
   const [showViewer, setShowViewer] = useState(false);
 
   const sizeClasses = {
-    sm: "w-16 h-16 border-4",
-    md: "w-20 h-20 border-4",
+    sm: "w-20 h-20 border-4",
+    md: "w-28 h-28 border-4",
     lg: "w-32 h-32 border-4",
   };
 

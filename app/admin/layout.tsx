@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type React from "react";
 import {
@@ -58,6 +58,11 @@ export default function AdminLayout({
     getAccessibleRoutes,
   } = useAdminPermissions();
 
+  // 🔥 routes accessibles pour active state
+  const allRoutes = useMemo(() => {
+    return flatRoutes(getAccessibleRoutes());
+  }, [getAccessibleRoutes]);
+
   // 🔒 PROTECTION ROUTE
   useEffect(() => {
     if (!loading && user) {
@@ -97,10 +102,7 @@ export default function AdminLayout({
   // 📦 ROUTES (via config)
   const routeGroups = getAdminRouteGroups(adminLevel);
 
-  // 🔥 routes accessibles pour active state
-  const allRoutes = useMemo(() => {
-    return flatRoutes(getAccessibleRoutes());
-  }, [getAccessibleRoutes]);
+
 
   const activeRoute = allRoutes.find((route) =>
     isActive(route.path, route.path === "/admin"),

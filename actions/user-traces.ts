@@ -354,7 +354,7 @@ export async function createOptimizedUserTraces(
       .insert(userTraces)
       .values(tracesWithTimestamps);
     
-    return result.count || 0;
+    return result.rowCount || 0;
   } catch (error) {
     console.error('Error creating optimized user traces:', error);
     // Ne pas throw pour éviter de bloquer l'application
@@ -399,8 +399,7 @@ export async function markTracesAsSynced(ids: string[]): Promise<number> {
       .update(userTraces)
       .set({ synced: true })
       .where(inArray(userTraces.id, ids));
-
-    return result.count || 0;
+    return result.rowCount || 0;
   } catch (error) {
     console.error('Error marking traces as synced:', error);
     throw new Error('Failed to mark traces as synced');
@@ -442,7 +441,7 @@ export async function deleteUserTracesBatch(ids: string[]): Promise<number> {
       .delete(userTraces)
       .where(inArray(userTraces.id, ids));
 
-    return result.count || 0;
+    return result.rowCount || 0;
   } catch (error) {
     console.error('Error deleting user traces batch:', error);
     throw new Error('Failed to delete user traces batch');
@@ -461,7 +460,7 @@ export async function cleanupOldTraces(daysOld: number): Promise<number> {
       .delete(userTraces)
       .where(lt(userTraces.createdAt, cutoffDate));
 
-    return result.count || 0;
+    return result.rowCount || 0;
   } catch (error) {
     console.error('Error cleaning up old traces:', error);
     throw new Error('Failed to cleanup old traces');

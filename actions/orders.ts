@@ -13,6 +13,7 @@ import { OrderFilters, OrderStats, OrderStatus, PaginationResponse } from '@/typ
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
 import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from '@/lib/ledger/ledger-utils';
+import { encryptData, decryptData } from '@/lib/encryption';
 import {
   type OrderCard, type UserMini, type ShopMini,
   USER_MINI_COLUMNS, SHOP_MINI_COLUMNS, ORDER_CARD_COLUMNS,
@@ -27,7 +28,8 @@ export async function createProductOrder(
   data: {
     productId: string;
     buyerInstructions?: string;
-    totalAmount?: number;
+    // NOTE: totalAmount is intentionally removed — price is always read from the
+    // product record in the database to prevent client-side price manipulation.
   },
   options?: { allowDuplicate?: boolean }
 ): Promise<{ success: boolean; orderId?: string; error?: string; transactionId?: string }> {
@@ -75,7 +77,8 @@ export async function createProductOrder(
       // 3. Check Balance
       const balance = await getAccountBalance(buyerWallet.financialAccountId);
       const unitPrice = parseFloat(product.price);
-      const price = typeof data.totalAmount === 'number' && data.totalAmount > 0 ? data.totalAmount : unitPrice;
+      // SEC-06 FIX: price is always sourced from the DB — never from client input.
+      const price = unitPrice;
 
       if (balance < price) {
         throw new Error(`Solde insuffisant. Requis: ${price} GTC, Disponible: ${balance} GTC`);
@@ -147,9 +150,15 @@ export async function approveOrderShop(orderId: string, credentials: { login: st
       if (order.shop?.ownerId !== user.id) throw new Error("Action non autorisée");
       if (order.status !== 'PENDING') throw new Error("Statut de commande invalide");
 
+      // SEC-012 FIX: Encrypt gaming account credentials before persisting to DB
+      const encryptedPass = credentials.pass ? encryptData(credentials.pass) : "";
+
       await tx.update(orders).set({
         status: 'ACCEPTED_BY_SHOP',
-        sellerCredentials: credentials,
+        sellerCredentials: {
+          login: credentials.login,
+          encryptedPass: encryptedPass,
+        },
         updatedAt: new Date()
       }).where(eq(orders.id, orderId));
 
@@ -579,6 +588,11 @@ export async function getUserOrderStats(userId: string) {
   }
 }
 
+/**
+ * Récupère les identifiants d'un compte gaming acheté.
+ * SEC-012 FIX: Strictly accessible ONLY when status is COMPLETED (escrow finalized).
+ * Automatically decrypts credentials.
+ */
 export async function getOrderCredentialsForBuyer(orderId: string) {
   const user = await getCurrentUser();
   if (!user) {
@@ -593,14 +607,53 @@ export async function getOrderCredentialsForBuyer(orderId: string) {
   if (order.buyerId !== user.id) {
     throw new Error("Accès refusé");
   }
-  const allowedStatuses = ["COMPLETED", "ACCEPTED_BY_SHOP"] as OrderStatus[];
-  if (!allowedStatuses.includes(order.status as OrderStatus)) {
-    throw new Error("Identifiants indisponibles");
+
+  // Seul le statut COMPLETED permet à l'acheteur d'accéder aux identifiants
+  if (order.status !== "COMPLETED") {
+    throw new Error("Les identifiants ne sont disponibles qu'après la validation finale de la commande par l'administrateur.");
   }
+
   const credentials = order.sellerCredentials as any;
+  if (!credentials) return null;
+
+  let password = credentials?.pass || credentials?.password || null;
+  if (credentials?.encryptedPass) {
+    password = decryptData(credentials.encryptedPass);
+  }
+
   return {
     login: credentials?.login || credentials?.accountLogin || null,
-    password: credentials?.pass || credentials?.password || null,
+    password,
+  };
+}
+
+/**
+ * Récupère les identifiants pour vérification par un administrateur.
+ * SEC-012 FIX: Admin only
+ */
+export async function getOrderCredentialsForAdmin(orderId: string) {
+  const user = await getCurrentUser();
+  if (!user || (user.role !== "admin" && !(user as any).isAdmin)) {
+    throw new Error("Accès réservé aux administrateurs");
+  }
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+  });
+  if (!order) {
+    throw new Error("Commande non trouvée");
+  }
+
+  const credentials = order.sellerCredentials as any;
+  if (!credentials) return null;
+
+  let password = credentials?.pass || credentials?.password || null;
+  if (credentials?.encryptedPass) {
+    password = decryptData(credentials.encryptedPass);
+  }
+
+  return {
+    login: credentials?.login || credentials?.accountLogin || null,
+    password,
   };
 }
 

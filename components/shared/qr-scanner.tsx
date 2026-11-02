@@ -154,19 +154,19 @@ export function QrScanner({
           {/* Scanning Line Animation */}
           <motion.div
             animate={{
-              y: scanSuccess ? ["0%", "100%"] : ["0%", "100%"],
-              opacity: scanSuccess ? [1, 0] : [0.8, 0.4]
+              top: scanSuccess ? ["15%", "85%"] : ["15%", "85%", "15%"],
+              opacity: scanSuccess ? [1, 0] : [0.8, 0.2, 0.8]
             }}
             transition={{
-              duration: 2,
+              duration: 2.5,
               repeat: scanSuccess ? 0 : Infinity,
               ease: "linear"
             }}
             className={cn(
-              "absolute top-[15%] left-[15%] right-[15%] h-0.5 shadow-lg",
+              "absolute left-[15%] right-[15%] h-0.5 shadow-lg",
               scanSuccess 
                 ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.8)]" 
-                : "bg-primary shadow-[0_0_15px_rgba(var(--primary),0.8)]"
+                : "bg-primary shadow-[0_0_15px_hsl(var(--primary)/0.8)]"
             )}
           />
 

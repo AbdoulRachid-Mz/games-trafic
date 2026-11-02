@@ -5,12 +5,9 @@ import {
   shops, products, tournaments, 
   themes, services, guides, blogs, posts,
   searchHistory,
-  type Shop, type Product, type Tournament,
-  type Theme, type Service, type Guide, type Blog, type Post
 } from '@/database/schema';
 import { db } from '@/lib/db';
-import { ilike, or, and, desc, sql } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
+import { ilike, or, and, sql } from 'drizzle-orm';
 import { cacheTag, cacheLife } from 'next/cache';
 
 // Types pour les résultats de recherche
@@ -25,7 +22,231 @@ export interface SearchResult<T = any> {
   metadata: T;
 }
 
-// Fonction de recherche unifiée
+// ---------------------------------------------------------------------------
+// Internal per-entity query helpers — each returns a raw row array.
+// Keeping them separate allows running all queries in parallel via Promise.all.
+// ---------------------------------------------------------------------------
+
+async function searchShops(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: shops.id,
+      name: shops.name,
+      description: shops.description,
+      profileImage: shops.profileImage,
+      type: sql`'shop'`.as('type')
+    })
+    .from(shops)
+    .where(
+      and(
+        or(
+          ilike(shops.name, searchPattern),
+          ilike(shops.description || '', searchPattern)
+        ),
+        sql`${shops.isActive} = true`,
+        sql`${shops.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchProducts(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: products.id,
+      name: products.name,
+      description: products.description,
+      featuredImage: products.featuredImage,
+      price: products.price,
+      currency: products.currency,
+      type: sql`'product'`.as('type')
+    })
+    .from(products)
+    .where(
+      and(
+        or(
+          ilike(products.name, searchPattern),
+          ilike(products.description || '', searchPattern),
+          ilike(products.game || '', searchPattern)
+        ),
+        sql`${products.isActive} = true`,
+        sql`${products.isVisible} = true`,
+        sql`${products.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchTournaments(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      description: tournaments.description,
+      profileImage: tournaments.profileImage,
+      type: sql`'tournament'`.as('type')
+    })
+    .from(tournaments)
+    .where(
+      and(
+        or(
+          ilike(tournaments.name, searchPattern),
+          ilike(tournaments.description || '', searchPattern)
+        ),
+        sql`${tournaments.isActive} = true`,
+        sql`${tournaments.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchThemes(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: themes.id,
+      name: themes.name,
+      description: themes.description,
+      thumbnail: themes.thumbnail,
+      price: themes.price,
+      type: sql`'theme'`.as('type')
+    })
+    .from(themes)
+    .where(
+      and(
+        or(
+          ilike(themes.name, searchPattern),
+          ilike(themes.description || '', searchPattern)
+        ),
+        sql`${themes.isActive} = true`,
+        sql`${themes.isPublic} = true`,
+        sql`${themes.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchServices(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: services.id,
+      title: services.title,
+      description: services.description,
+      images: services.images,
+      type: sql`'service'`.as('type')
+    })
+    .from(services)
+    .where(
+      and(
+        or(
+          ilike(services.title, searchPattern),
+          ilike(services.description, searchPattern)
+        ),
+        sql`${services.isActive} = true`,
+        sql`${services.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchGuides(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: guides.id,
+      title: guides.title,
+      category: guides.category,
+      images: guides.images,
+      type: sql`'guide'`.as('type')
+    })
+    .from(guides)
+    .where(
+      and(
+        or(
+          ilike(guides.title, searchPattern),
+          ilike(guides.category, searchPattern)
+        ),
+        sql`${guides.isActive} = true`,
+        sql`${guides.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchBlogs(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: blogs.id,
+      title: blogs.title,
+      content: blogs.content,
+      images: blogs.images,
+      type: sql`'blog'`.as('type')
+    })
+    .from(blogs)
+    .where(
+      and(
+        or(
+          ilike(blogs.title, searchPattern),
+          ilike(blogs.content, searchPattern)
+        ),
+        sql`${blogs.isActive} = true`,
+        sql`${blogs.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+async function searchNews(searchPattern: string, itemLimit: number, offset: number) {
+  return db
+    .select({
+      id: posts.id,
+      content: posts.content,
+      images: posts.images,
+      type: sql`'news'`.as('type')
+    })
+    .from(posts)
+    .where(
+      and(
+        ilike(posts.content, searchPattern),
+        sql`${posts.isStory} = false`,
+        sql`${posts.isActive} = true`,
+        sql`${posts.isDeleted} = false`
+      )
+    )
+    .limit(itemLimit)
+    .offset(offset);
+}
+
+// Map of entity type → query function
+const ENTITY_QUERY_MAP: Record<
+  string,
+  (pattern: string, limit: number, offset: number) => Promise<any[]>
+> = {
+  shop: searchShops,
+  shops: searchShops,
+  product: searchProducts,
+  products: searchProducts,
+  tournament: searchTournaments,
+  tournaments: searchTournaments,
+  theme: searchThemes,
+  themes: searchThemes,
+  service: searchServices,
+  services: searchServices,
+  guide: searchGuides,
+  guides: searchGuides,
+  blog: searchBlogs,
+  blogs: searchBlogs,
+  news: searchNews,
+};
+
+// ---------------------------------------------------------------------------
+// Fonction de recherche unifiée (PERF-002: all entity queries run in parallel)
+// ---------------------------------------------------------------------------
 export async function unifiedSearch(
   entityTypes: string[],
   searchTerm: string,
@@ -44,218 +265,21 @@ export async function unifiedSearch(
     }
 
     const searchPattern = `%${cleanTerm}%`;
-    const results: SearchResult[] = [];
+    // Distribute the limit evenly across entity types
+    const itemLimit = Math.ceil(limit / entityTypes.length);
 
-    // Recherche dans chaque type d'entité demandé
-    for (const entityType of entityTypes) {
-      let entityResults: any[] = [];
-      
-      switch (entityType.toLowerCase()) {
-        case 'shops':
-        case 'shop':
-          entityResults = await db
-            .select({
-              id: shops.id,
-              name: shops.name,
-              description: shops.description,
-              profileImage: shops.profileImage,
-              type: sql`'shop'`.as('type')
-            })
-            .from(shops)
-            .where(
-              and(
-                or(
-                  ilike(shops.name, searchPattern),
-                  ilike(shops.description || '', searchPattern)
-                ),
-                sql`${shops.isActive} = true`,
-                sql`${shops.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
+    // PERF: run all entity queries in parallel instead of sequentially
+    const queryPromises = entityTypes.map(entityType => {
+      const queryFn = ENTITY_QUERY_MAP[entityType.toLowerCase()];
+      if (!queryFn) return Promise.resolve({ entityType, rows: [] as any[] });
+      return queryFn(searchPattern, itemLimit, offset).then(rows => ({ entityType, rows }));
+    });
 
-        case 'products':
-        case 'product':
-          entityResults = await db
-            .select({
-              id: products.id,
-              name: products.name,
-              description: products.description,
-              featuredImage: products.featuredImage,
-              price: products.price,
-              currency: products.currency,
-              type: sql`'product'`.as('type')
-            })
-            .from(products)
-            .where(
-              and(
-                or(
-                  ilike(products.name, searchPattern),
-                  ilike(products.description || '', searchPattern),
-                  ilike(products.game || '', searchPattern)
-                ),
-                sql`${products.isActive} = true`,
-                sql`${products.isVisible} = true`,
-                sql`${products.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
+    const settled = await Promise.all(queryPromises);
 
-        case 'tournaments':
-        case 'tournament':
-          entityResults = await db
-            .select({
-              id: tournaments.id,
-              name: tournaments.name,
-              description: tournaments.description,
-              profileImage: tournaments.profileImage,
-              type: sql`'tournament'`.as('type')
-            })
-            .from(tournaments)
-            .where(
-              and(
-                or(
-                  ilike(tournaments.name, searchPattern),
-                  ilike(tournaments.description || '', searchPattern)
-                ),
-                sql`${tournaments.isActive} = true`,
-                sql`${tournaments.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
-
-        case 'themes':
-        case 'theme':
-          entityResults = await db
-            .select({
-              id: themes.id,
-              name: themes.name,
-              description: themes.description,
-              thumbnail: themes.thumbnail,
-              price: themes.price,
-              type: sql`'theme'`.as('type')
-            })
-            .from(themes)
-            .where(
-              and(
-                or(
-                  ilike(themes.name, searchPattern),
-                  ilike(themes.description || '', searchPattern)
-                ),
-                sql`${themes.isActive} = true`,
-                sql`${themes.isPublic} = true`,
-                sql`${themes.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
-
-        case 'services':
-        case 'service':
-          entityResults = await db
-            .select({
-              id: services.id,
-              title: services.title,
-              description: services.description,
-              images: services.images,
-              type: sql`'service'`.as('type')
-            })
-            .from(services)
-            .where(
-              and(
-                or(
-                  ilike(services.title, searchPattern),
-                  ilike(services.description, searchPattern)
-                ),
-                sql`${services.isActive} = true`,
-                sql`${services.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
-
-        case 'guides':
-        case 'guide':
-          entityResults = await db
-            .select({
-              id: guides.id,
-              title: guides.title,
-              category: guides.category,
-              images: guides.images,
-              type: sql`'guide'`.as('type')
-            })
-            .from(guides)
-            .where(
-              and(
-                or(
-                  ilike(guides.title, searchPattern),
-                  ilike(guides.category, searchPattern)
-                ),
-                sql`${guides.isActive} = true`,
-                sql`${guides.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
-
-        case 'blogs':
-        case 'blog':
-          entityResults = await db
-            .select({
-              id: blogs.id,
-              title: blogs.title,
-              content: blogs.content,
-              images: blogs.images,
-              type: sql`'blog'`.as('type')
-            })
-            .from(blogs)
-            .where(
-              and(
-                or(
-                  ilike(blogs.title, searchPattern),
-                  ilike(blogs.content, searchPattern)
-                ),
-                sql`${blogs.isActive} = true`,
-                sql`${blogs.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
-
-        case 'news':
-          entityResults = await db
-            .select({
-              id: posts.id,
-              content: posts.content,
-              images: posts.images,
-              type: sql`'news'`.as('type')
-            })
-            .from(posts)
-            .where(
-              and(
-                ilike(posts.content, searchPattern),
-                sql`${posts.isStory} = false`,
-                sql`${posts.isActive} = true`,
-                sql`${posts.isDeleted} = false`
-              )
-            )
-            .limit(Math.ceil(limit / entityTypes.length))
-            .offset(offset);
-          break;
-      }
-
-      // Transformer les résultats
-      const transformed = entityResults.map(item => ({
+    // Flatten and transform results
+    const results: SearchResult[] = settled.flatMap(({ entityType, rows }) =>
+      rows.map(item => ({
         id: item.id,
         type: entityType.toLowerCase(),
         title: item.name || item.title || item.content?.substring(0, 50) || 'Sans titre',
@@ -265,10 +289,8 @@ export async function unifiedSearch(
         price: item.price,
         currency: item.currency,
         metadata: item
-      }));
-
-      results.push(...transformed);
-    }
+      }))
+    );
 
     // Enregistrer la tendance de recherche (asynchrone - ne pas attendre)
     if (userId && cleanTerm.length >= 2) {
@@ -285,7 +307,7 @@ export async function unifiedSearch(
 // Fonction pour enregistrer les tendances de recherche
 export async function recordSearchTrend(
   searchTerm: string,
-  entityTypes: string[] = [],
+  _entityTypes: string[] = [],
   userId?: string
 ): Promise<void> {
   try {
@@ -401,33 +423,29 @@ export async function searchWithSuggestions(
       return { results: [], suggestions: [] };
     }
 
-    // Recherche principale
-    const results = await unifiedSearch(
-      ['shop', 'product', 'tournament', 'theme', 'service', 'guide', 'blog', 'news'],
-      cleanTerm,
-      { limit: 10, userId }
-    );
+    // Recherche principale et suggestions en parallèle
+    const [results, userHistory] = await Promise.all([
+      unifiedSearch(
+        ['shop', 'product', 'tournament', 'theme', 'service', 'guide', 'blog', 'news'],
+        cleanTerm,
+        { limit: 10, userId }
+      ),
+      userId
+        ? db
+            .select({ query: searchHistory.query })
+            .from(searchHistory)
+            .where(
+              and(
+                sql`${searchHistory.userId} = ${userId}`,
+                sql`${searchHistory.query} ILIKE ${`%${cleanTerm}%`}`
+              )
+            )
+            .orderBy(sql`${searchHistory.createdAt} DESC`)
+            .limit(5)
+        : Promise.resolve([] as { query: string }[]),
+    ]);
 
-    // Suggestions basées sur l'historique de l'utilisateur
-    let suggestions: string[] = [];
-    
-    if (userId) {
-      const userHistory = await db
-        .select({
-          query: searchHistory.query
-        })
-        .from(searchHistory)
-        .where(
-          and(
-            sql`${searchHistory.userId} = ${userId}`,
-            sql`${searchHistory.query} ILIKE ${`%${cleanTerm}%`}`
-          )
-        )
-        .orderBy(sql`${searchHistory.createdAt} DESC`)
-        .limit(5);
-
-      suggestions = userHistory.map(h => h.query);
-    }
+    let suggestions: string[] = userHistory.map(h => h.query);
 
     // Ajouter des suggestions générales si l'utilisateur n'a pas d'historique
     if (suggestions.length === 0) {

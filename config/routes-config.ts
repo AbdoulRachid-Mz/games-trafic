@@ -62,12 +62,12 @@ export interface DockLinkConfig {
 export const defaultDockLinks: DockLinkConfig[] = [
   { href: "/", label: "Accueil", icon: "home", requireAuth: false },
   { href: "/games", label: "Jeux", icon: "swords", requireAuth: false },
-  {
-    href: "/game-clips",
-    label: "Clips",
-    icon: "gameClips",
-    requireAuth: false,
-  },
+  // {
+  //   href: "/game-clips",
+  //   label: "Clips",
+  //   icon: "gameClips",
+  //   requireAuth: false,
+  // },
   {
     href: "/marketplace",
     label: "Marché",
@@ -78,6 +78,12 @@ export const defaultDockLinks: DockLinkConfig[] = [
     href: "/tournaments",
     label: "Tournois",
     icon: "tournaments",
+    requireAuth: false,
+  },
+  {
+    href: "/shops",
+    label: "Boutiques",
+    icon: "shops",
     requireAuth: false,
   },
   { href: "/chats", label: "Chats", icon: "messages", requireAuth: true },
@@ -126,6 +132,17 @@ export const defaultFABActions: FABAction[] = [
 // =============================================
 
 export const ROUTE_CONFIG: RouteConfig[] = [
+  {
+    path: '/offline',
+    name: 'Hors-ligne',
+    requireAuth: false,
+    navigationLinks: false,
+    footer: false,
+    leftBar: false,
+    rightBar: false,
+    topMiddle: false,
+    floatingActions: false,
+  },
   // =============================================
   // ROUTES SANS LAYOUT (PRIORITÉ MAX)
   // =============================================
@@ -497,12 +514,12 @@ export const ROUTE_CONFIG: RouteConfig[] = [
         icon: "tournaments",
         requireAuth: false,
       },
-      {
-        href: "/game-clips",
-        label: "Clips",
-        icon: "clips",
-        requireAuth: false,
-      },
+      // {
+      //   href: "/game-clips",
+      //   label: "Clips",
+      //   icon: "clips",
+      //   requireAuth: false,
+      // },
     ],
     fabActions: defaultFABActions,
   },
@@ -586,6 +603,21 @@ export const ROUTE_CONFIG: RouteConfig[] = [
     floatingActions: false,
     showOnTap: true,
     hideTopMiddleOnScroll: true,
+  },
+  {
+    path: "/games",
+    name: "Jeux et Skins",
+    breadcrumbs: true,
+    footer: true,
+    topMiddle: true,
+    leftBar: true,
+    rightBar: true,
+    navigationLinks: true,
+    floatingActions: true,
+    showOnTap: true,
+    hideTopMiddleOnScroll: true,
+    dockLinks: defaultDockLinks,
+    fabActions: defaultFABActions,
   },
   {
     path: "/partners",

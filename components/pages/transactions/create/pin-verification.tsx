@@ -3,15 +3,17 @@
 import React, { useState } from "react";
 import { Typography } from "@/components/ui/typography";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Shield, Check, Delete, ArrowLeft } from "lucide-react";
+import { Lock, Check, Delete, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface PinVerificationProps {
   onVerify: (pin: string) => Promise<void>;
+  onVerifyPasskey?: () => Promise<void>;
+  hasPasskey?: boolean;
   onBack: () => void;
   isLoading?: boolean;
   transactionDetails: {
@@ -24,11 +26,46 @@ interface PinVerificationProps {
 
 export function PinVerification({
   onVerify,
+  onVerifyPasskey,
+  hasPasskey = false,
   onBack,
   isLoading = false,
   transactionDetails,
 }: PinVerificationProps) {
   const [pin, setPin] = useState("");
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+
+  const handlePasskeyVerify = async () => {
+    if (!onVerifyPasskey) return;
+    try {
+      setIsPasskeyLoading(true);
+      const { data, error } = await authClient.signIn.passkey();
+      if (error) throw error;
+      await onVerifyPasskey();
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de la vérification par Passkey");
+    } finally {
+      setIsPasskeyLoading(false);
+    }
+  };
+
+  const handleAddPasskey = async () => {
+    try {
+      setIsPasskeyLoading(true);
+      const { data, error } = await authClient.passkey.addPasskey();
+      if (error) throw error;
+      toast.success("Passkey ajouté avec succès !");
+      if (onVerifyPasskey) {
+        await onVerifyPasskey();
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de l'ajout du Passkey");
+    } finally {
+      setIsPasskeyLoading(false);
+    }
+  };
 
   const handleDigitClick = (digit: number) => {
     if (pin.length < 8) {
@@ -47,6 +84,8 @@ export function PinVerification({
     }
   };
 
+  const digits = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
       <div className="text-center">
@@ -62,89 +101,111 @@ export function PinVerification({
       </div>
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-xl overflow-hidden">
-        <CardContent className="p-8">
-          <div className="flex justify-center gap-6 mb-8">
+        <CardContent className="p-8 space-y-6">
+          {/* PIN dots display */}
+          <div className="flex justify-center gap-3 mb-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <motion.div
                 key={i}
-                initial={false}
                 animate={{
-                  scale: pin.length > i ? 1.2 : 1,
-                  borderColor:
-                    pin.length > i ? "var(--primary)" : "var(--border)",
+                  scale: pin.length > i ? 1.1 : 1,
                   backgroundColor:
-                    pin.length > i ? "var(--primary)" : "transparent",
+                    pin.length > i ? "hsl(var(--primary))" : "hsl(var(--muted))",
                 }}
-                className={cn(
-                  "w-4 h-4 rounded-full border-2 transition-colors duration-200",
-                  pin.length > i &&
-                    "bg-primary border-primary shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                )}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="w-4 h-4 rounded-full"
               />
             ))}
           </div>
 
-          {/* Custom Numeric Keypad for Mobile feel */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          {/* Numpad */}
+          <div className="grid grid-cols-3 gap-3">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
-              <button
+              <motion.button
                 key={digit}
-                type="button"
+                whileTap={{ scale: 0.92 }}
                 onClick={() => handleDigitClick(digit)}
-                disabled={isLoading || pin.length >= 8}
-                className="h-16 rounded-2xl bg-muted/30 hover:bg-muted/60 text-2xl font-bold transition-all active:scale-95 disabled:opacity-50"
+                disabled={isLoading || isPasskeyLoading}
+                className="h-14 rounded-xl bg-muted/40 hover:bg-primary/10 border border-border/30 hover:border-primary/40 transition-all text-lg font-semibold"
               >
                 {digit}
-              </button>
+              </motion.button>
             ))}
-            <button
-              type="button"
-              disabled={isLoading}
-              className="h-16 rounded-2xl flex items-center justify-center text-muted-foreground hover:bg-muted/30 transition-all active:scale-95"
-              onClick={onBack}
-            >
-              <Typography variant="caption1" weight="bold">
-                RETOUR
-              </Typography>
-            </button>
-            <button
-              type="button"
+            <div /> {/* empty cell */}
+            <motion.button
+              whileTap={{ scale: 0.92 }}
               onClick={() => handleDigitClick(0)}
-              disabled={isLoading || pin.length >= 8}
-              className="h-16 rounded-2xl bg-muted/30 hover:bg-muted/60 text-2xl font-bold transition-all active:scale-95 disabled:opacity-50"
+              disabled={isLoading || isPasskeyLoading}
+              className="h-14 rounded-xl bg-muted/40 hover:bg-primary/10 border border-border/30 hover:border-primary/40 transition-all text-lg font-semibold"
             >
               0
-            </button>
-            <button
-              type="button"
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
               onClick={handleDelete}
-              disabled={isLoading || pin.length === 0}
-              className="h-16 rounded-2xl flex items-center justify-center hover:bg-destructive/10 text-destructive transition-all active:scale-95 disabled:opacity-50"
+              disabled={isLoading || isPasskeyLoading || pin.length === 0}
+              className="h-14 rounded-xl bg-muted/40 hover:bg-destructive/10 border border-border/30 hover:border-destructive/40 transition-all flex items-center justify-center"
             >
-              <Delete className="w-6 h-6" />
-            </button>
+              <Delete className="h-5 w-5" />
+            </motion.button>
           </div>
 
-          <Button
-            onClick={() => handleSubmit()}
-            disabled={pin.length < 4 || isLoading}
-            className="w-full h-14 text-lg rounded-xl font-bold shadow-lg shadow-primary/25"
-          >
-            {isLoading ? (
-              <>
-                <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Vérification...
-              </>
-            ) : (
-              "Confirmer"
-            )}
-          </Button>
+          {/* Actions */}
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={handleSubmit}
+              disabled={pin.length < 4 || isLoading || isPasskeyLoading}
+              className="h-12 rounded-xl font-bold shadow-lg shadow-primary/25"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Vérification...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Check className="h-4 w-4" />
+                  Confirmer
+                </span>
+              )}
+            </Button>
 
-          <div className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/60">
-            <Shield className="h-3 w-3" />
-            <span className="text-xs uppercase tracking-widest font-medium">
-              Sécurisé & Chiffré
-            </span>
+            {hasPasskey && onVerifyPasskey ? (
+              <Button
+                variant="outline"
+                onClick={handlePasskeyVerify}
+                disabled={isLoading || isPasskeyLoading}
+                className="h-12 rounded-xl font-semibold border-primary/30"
+              >
+                {isPasskeyLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    Passkey...
+                  </span>
+                ) : (
+                  "🔐 Utiliser mon Passkey"
+                )}
+              </Button>
+            ) : !hasPasskey ? (
+              <Button
+                variant="ghost"
+                onClick={handleAddPasskey}
+                disabled={isLoading || isPasskeyLoading}
+                className="h-10 text-sm text-muted-foreground hover:text-primary"
+              >
+                + Ajouter un Passkey pour la prochaine fois
+              </Button>
+            ) : null}
+
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              disabled={isLoading || isPasskeyLoading}
+              className="h-10 text-sm flex items-center gap-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour
+            </Button>
           </div>
         </CardContent>
       </Card>

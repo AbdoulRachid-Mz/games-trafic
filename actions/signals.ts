@@ -184,7 +184,7 @@ export async function cleanOldProcessedSignals() {
       ),
     );
 
-  return result.count;
+  return result.rowCount || 0;
 }
 
 export async function assignSignal(id: string, adminId: string) {

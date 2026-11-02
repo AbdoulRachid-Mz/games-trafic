@@ -1,4 +1,4 @@
-// @/components/pages/tournaments/edition-detail/organize-wizard-client.tsx
+﻿// @/components/pages/tournaments/edition-detail/organize-wizard-client.tsx
 "use client";
 
 import {
@@ -239,7 +239,7 @@ function buildPhasesForApi(
   return phases.map((p, idx) => {
     // Calculer le nombre de groupes et participants par groupe
     let groupsCount = p.config.groupsCount || 1;
-    let participantsPerGroup = p.config.participantsPerGroup || 0;
+    const participantsPerGroup = p.config.participantsPerGroup || 0;
 
     // Pour ROUND_ROBIN, on force groupsCount = 1
     if (p.phaseType === "ROUND_ROBIN") {
@@ -664,6 +664,18 @@ export function OrganizeWizardClient({
     return phases;
   }, [autoConfig]);
 
+  /**
+   * Formate les phases draft pour l'API de preview
+   */
+  function buildPhasesForPreview(phases: DraftPhase[]): any[] {
+    return phases.map((p, idx) => ({
+      name: p.name,
+      phaseType: p.phaseType,
+      order: idx,
+      config: p.config,
+    }));
+  }
+
   // Mettre à jour le preview via le serveur
   useEffect(() => {
     const updatePreview = async () => {
@@ -700,18 +712,6 @@ export function OrganizeWizardClient({
     editionId,
     buildAutoPhases,
   ]);
-
-  /**
-   * Formate les phases draft pour l'API de preview
-   */
-  function buildPhasesForPreview(phases: DraftPhase[]): any[] {
-    return phases.map((p, idx) => ({
-      name: p.name,
-      phaseType: p.phaseType,
-      order: idx,
-      config: p.config,
-    }));
-  }
 
   // Validation de la configuration
   const validateConfig = useCallback((): {
@@ -2491,8 +2491,8 @@ function FloatingDeployButton({
   onClick,
   isLoading,
 }: any) {
-  if (currentParticipantsCount < 2) return null;
   const { isMobile } = useScreenSize();
+  if (currentParticipantsCount < 2) return null;
 
   return (
     <div

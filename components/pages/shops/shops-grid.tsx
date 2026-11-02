@@ -96,7 +96,7 @@ export function ShopsGrid({
                   transition={{ delay: index * 0.05 }}
                 >
                   <ShopCard
-                    shop={shop}
+                    item={shop}
                     viewMode="grid"
                     onView={() => onShopClick(shop.id)}
                   />
@@ -113,7 +113,7 @@ export function ShopsGrid({
                   transition={{ delay: index * 0.05 }}
                 >
                   <ShopCard
-                    shop={shop}
+                    item={shop}
                     viewMode="compact"
                     showDetails={false}
                     showStats={false}

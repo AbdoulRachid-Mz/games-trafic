@@ -81,12 +81,10 @@ function ParticipantAvatar({
   size?: "sm" | "md" | "lg";
 }) {
   const sizeClasses = {
-    sm: "h-8 w-8",
-    md: "h-10 w-10",
-    lg: "h-12 w-12",
+    sm: "h-8 w-8 text-xs",
+    md: "h-10 w-10 text-sm",
+    lg: "h-12 w-12 text-base",
   };
-
-  const router = useRouter();
 
   const name =
     participant?.member?.displayName ||
@@ -94,20 +92,19 @@ function ParticipantAvatar({
     "?";
   const image =
     participant?.member?.avatar ||
-    participant?.member?.user?.profileImage ||
-    "icons/avatar.png";
+    participant?.member?.user?.profileImage;
 
   return (
     <div
       className={cn(
-        "shrink-0 relative rounded-full bg-muted border-2 border-background shadow-sm flex items-center justify-center overflow-hidden",
+        "shrink-0 relative rounded-full bg-card border-2 border-white/10 shadow-lg flex items-center justify-center overflow-hidden font-black text-primary",
         sizeClasses[size],
       )}
     >
       {image ? (
         <Image src={image} fill className="object-cover" alt={name} />
       ) : (
-        <Users className="h-4 w-4 text-muted-foreground/50" />
+        name.charAt(0).toUpperCase()
       )}
     </div>
   );
@@ -127,12 +124,9 @@ function PublicMatchCard({
 
   const router = useRouter();
 
-  const getScoreClass = () => {
-    if (!match.score1 || !match.score2) return "";
-    if (match.score1 > match.score2) return "text-emerald-600 font-bold";
-    if (match.score2 > match.score1) return "text-emerald-600 font-bold";
-    return "";
-  };
+  const isCompleted = match.status === "COMPLETED";
+  const isP1Winner = isCompleted && typeof match.score1 === "number" && typeof match.score2 === "number" && match.score1 > match.score2;
+  const isP2Winner = isCompleted && typeof match.score1 === "number" && typeof match.score2 === "number" && match.score2 > match.score1;
 
   const getStatusBadge = () => {
     const status = match.status || "PENDING";
@@ -142,27 +136,32 @@ function PublicMatchCard({
     > = {
       COMPLETED: {
         label: "Terminé",
-        className: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+        className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
         icon: CheckCircle2,
       },
       IN_PROGRESS: {
-        label: "En cours",
-        className: "bg-blue-500/10 text-blue-600 border-blue-200",
-        icon: Clock,
+        label: "En direct",
+        className: "bg-red-500/15 text-red-400 border-red-500/30 animate-pulse",
+        icon: Zap,
       },
       PENDING_REVIEW: {
         label: "À valider",
-        className: "bg-amber-500/10 text-amber-600 border-amber-200",
+        className: "bg-amber-500/15 text-amber-400 border-amber-500/30",
         icon: AlertCircle,
       },
       DISPUTED: {
         label: "Litige",
-        className: "bg-destructive/10 text-destructive border-destructive/20",
+        className: "bg-destructive/15 text-destructive border-destructive/30",
         icon: AlertCircle,
       },
       PENDING: {
         label: "Programmé",
-        className: "bg-muted text-muted-foreground border-border",
+        className: "bg-muted/60 text-muted-foreground border-white/10",
+        icon: Calendar,
+      },
+      SCHEDULED: {
+        label: "Programmé",
+        className: "bg-muted/60 text-muted-foreground border-white/10",
         icon: Calendar,
       },
     };
@@ -170,7 +169,7 @@ function PublicMatchCard({
     return (
       <Badge
         variant="outline"
-        className={cn("text-[10px] uppercase font-bold gap-1", className)}
+        className={cn("text-[9px] uppercase font-black tracking-wider gap-1 px-2 py-0.5", className)}
       >
         <Icon className="h-3 w-3" />
         {label}
@@ -182,12 +181,12 @@ function PublicMatchCard({
     <CardContent className="p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-[9px]">
-            #{match.matchNumber}
+        <div className="flex items-center gap-1.5">
+          <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider border-white/10 bg-white/5">
+            #{String(match.matchNumber || 1).padStart(2, "0")}
           </Badge>
           {match.group?.name && (
-            <Badge variant="secondary" className="text-[9px]">
+            <Badge variant="secondary" className="text-[9px] font-bold border-none bg-primary/10 text-primary">
               {match.group.name}
             </Badge>
           )}
@@ -198,55 +197,88 @@ function PublicMatchCard({
       {/* Participants */}
       <div className="flex items-center justify-between gap-3">
         {/* Participant 1 */}
-        <div className="flex-1 text-center">
+        <div className="flex-1 text-center min-w-0">
           <div className="flex justify-center mb-2">
-            <ParticipantAvatar participant={match.participant1} size="md" />
+            <div className={cn("relative transition-all", isP1Winner && "ring-2 ring-emerald-500 rounded-full p-0.5")}>
+              <ParticipantAvatar participant={match.participant1} size="md" />
+              {isP1Winner && (
+                <div className="absolute -top-1 -right-1 bg-emerald-500 text-black rounded-full p-0.5 shadow-md">
+                  <Trophy className="h-2.5 w-2.5" />
+                </div>
+              )}
+            </div>
           </div>
           <div
-            className="font-medium text-sm truncate"
-            onClick={() =>
-              router.push(
-                `/tournaments/${match.tournamentId}/members/${match.participant1?.member?.id}`,
-              )
-            }
+            className={cn(
+              "text-xs md:text-sm truncate transition-colors",
+              isP1Winner ? "font-black text-foreground" : "font-medium text-foreground/80",
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              if (match.participant1?.member?.id) {
+                router.push(`/tournaments/${match.tournamentId}/members/${match.participant1.member.id}`);
+              }
+            }}
           >
             {match.participant1?.member?.displayName ||
               match.participant1?.member?.user?.username ||
               "TBD"}
           </div>
           {match.participant1?.member?.team?.name && (
-            <div className="text-[10px] text-muted-foreground truncate">
+            <div className="text-[10px] text-muted-foreground truncate font-medium">
               {match.participant1.member.team.name}
             </div>
           )}
         </div>
 
-        {/* Score */}
+        {/* Score Box Esports */}
         <div className="shrink-0 flex flex-col items-center gap-1">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg font-bold text-lg">
-            <span className={getScoreClass()}>{match.score1 ?? "-"}</span>
-            <span className="text-muted-foreground text-sm">-</span>
-            <span className={getScoreClass()}>{match.score2 ?? "-"}</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-background/80 border border-white/10 rounded-xl font-black text-base shadow-inner">
+            <span className={cn(isP1Winner ? "text-emerald-400" : isCompleted ? "text-muted-foreground/60" : "text-foreground")}>
+              {match.score1 ?? "-"}
+            </span>
+            <span className="text-muted-foreground/40 text-xs font-mono">:</span>
+            <span className={cn(isP2Winner ? "text-emerald-400" : isCompleted ? "text-muted-foreground/60" : "text-foreground")}>
+              {match.score2 ?? "-"}
+            </span>
           </div>
           {match.scheduledTime && (
-            <div className="text-[10px] text-muted-foreground">
+            <div className="text-[10px] text-muted-foreground font-mono">
               {format(new Date(match.scheduledTime), "dd/MM HH:mm")}
             </div>
           )}
         </div>
 
         {/* Participant 2 */}
-        <div className="flex-1 text-center">
+        <div className="flex-1 text-center min-w-0">
           <div className="flex justify-center mb-2">
-            <ParticipantAvatar participant={match.participant2} size="md" />
+            <div className={cn("relative transition-all", isP2Winner && "ring-2 ring-emerald-500 rounded-full p-0.5")}>
+              <ParticipantAvatar participant={match.participant2} size="md" />
+              {isP2Winner && (
+                <div className="absolute -top-1 -right-1 bg-emerald-500 text-black rounded-full p-0.5 shadow-md">
+                  <Trophy className="h-2.5 w-2.5" />
+                </div>
+              )}
+            </div>
           </div>
-          <div className="font-medium text-sm truncate">
+          <div
+            className={cn(
+              "text-xs md:text-sm truncate transition-colors",
+              isP2Winner ? "font-black text-foreground" : "font-medium text-foreground/80",
+            )}
+            onClick={(e) => {
+              e.preventDefault();
+              if (match.participant2?.member?.id) {
+                router.push(`/tournaments/${match.tournamentId}/members/${match.participant2.member.id}`);
+              }
+            }}
+          >
             {match.participant2?.member?.displayName ||
               match.participant2?.member?.user?.username ||
               "TBD"}
           </div>
           {match.participant2?.member?.team?.name && (
-            <div className="text-[10px] text-muted-foreground truncate">
+            <div className="text-[10px] text-muted-foreground truncate font-medium">
               {match.participant2.member.team.name}
             </div>
           )}
@@ -261,9 +293,9 @@ function PublicMatchCard({
     >
       <Card
         className={cn(
-          "transition-all hover:shadow-xl hover:border-primary/50 cursor-pointer h-full group",
+          "transition-all duration-300 bg-card/70 backdrop-blur-xl border border-white/10 hover:border-primary/50 hover:bg-card/90 hover:shadow-xl cursor-pointer h-full group",
           isUserParticipant &&
-            "border-primary/50 bg-primary/5 shadow-primary/5",
+            "border-primary/50 bg-primary/10 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] ring-1 ring-primary/30",
         )}
       >
         {cardContent}
@@ -561,6 +593,23 @@ export function EditionMatchesClient({
   const phases = phasesRes?.data || [];
   const matches = matchesRes?.data || [];
 
+  // Match statistics for StatsCarousel
+  const stats = useMemo(() => {
+    const total = matches.length;
+    const completed = matches.filter((m: any) => m.status === "COMPLETED").length;
+    const inProgress = matches.filter(
+      (m: any) => m.status === "IN_PROGRESS" || m.status === "LIVE",
+    ).length;
+    const upcoming = matches.filter(
+      (m: any) =>
+        m.status === "SCHEDULED" ||
+        m.status === "UPCOMING" ||
+        m.status === "PENDING",
+    ).length;
+    const userMatchesCount = myMatches?.myMatches?.length || 0;
+    return { total, completed, inProgress, upcoming, userMatchesCount };
+  }, [matches, myMatches]);
+
   // Filter tree data based on selected phase
   const phasesWithMatches = useMemo(() => {
     const allPhases = editionTree?.phases || [];
@@ -630,12 +679,14 @@ export function EditionMatchesClient({
     if (!myMatches?.myMatches.length) return null;
 
     return (
-      <Card className="border-primary/30 bg-primary/5 mb-8">
+      <Card className="border-primary/30 bg-primary/5 mb-8 backdrop-blur-xl">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-lg flex items-center gap-2 font-black italic uppercase tracking-tighter">
             <Swords className="h-5 w-5 text-primary" />
-            🔥 Mes matchs
-            <Badge variant="default">{myMatches.myMatches.length}</Badge>
+            🔥 Mes affrontements
+            <Badge className="bg-primary text-primary-foreground font-black ml-1">
+              {myMatches.myMatches.length}
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -657,43 +708,32 @@ export function EditionMatchesClient({
   };
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <Typography
-            variant="h2"
-            weight="bold"
-            className="flex items-center gap-2"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.back()}
-              className="mr-1"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+    <div className="container max-w-6xl mx-auto py-6 px-4">
+      {/* Esports Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/5">
+            <Swords className="h-6 w-6" />
+          </div>
+          <div>
             <Typography
-              variant="body-sm"
-              theme="muted"
-              className="ml-2 max-md:hidden"
+              variant="h2"
+              weight="bold"
+              className="font-black italic uppercase tracking-tighter text-2xl md:text-3xl text-foreground"
             >
-              Retour
+              Matchs & Affrontements
             </Typography>
-            <Trophy className="h-7 w-7 text-primary" />
-            Matchs du tournoi
-          </Typography>
-          <Typography variant="body-sm" theme="muted">
-            {edition?.name || `Édition ${edition?.editionNumber}`}
-          </Typography>
+            <Typography variant="body-sm" theme="muted" className="text-xs uppercase tracking-wider font-semibold">
+              {edition?.name || `Édition #${edition?.editionNumber}`}
+            </Typography>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Phase filter for list view */}
           {viewMode === "list" && phases.length > 0 && (
             <Select value={selectedPhaseId} onValueChange={setSelectedPhaseId}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px] bg-card/60 border-white/10 text-xs font-semibold">
                 <SelectValue placeholder="Toutes les phases" />
               </SelectTrigger>
               <SelectContent>
@@ -708,63 +748,100 @@ export function EditionMatchesClient({
           )}
 
           {/* View toggle */}
-          <div className="flex bg-muted p-1 rounded-lg">
+          <div className="flex bg-muted/60 border border-white/5 p-1 rounded-xl">
             <Button
               variant={viewMode === "tree" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setViewMode("tree")}
-              className="h-8 gap-1"
+              className="h-8 gap-1.5 font-bold text-xs rounded-lg"
             >
               <Layers className="h-3.5 w-3.5" />
-              <span className="text-xs hidden sm:inline">Structure</span>
+              <span className="hidden sm:inline">Structure</span>
             </Button>
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setViewMode("list")}
-              className="h-8 gap-1"
+              className="h-8 gap-1.5 font-bold text-xs rounded-lg"
             >
               <Filter className="h-3.5 w-3.5" />
-              <span className="text-xs hidden sm:inline">Liste</span>
+              <span className="hidden sm:inline">Liste</span>
             </Button>
           </div>
 
           {/* Export button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="gap-2 border-white/10 bg-card/60 text-xs font-bold rounded-xl h-8">
+                <Download className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Exporter</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Format d'export</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExport("excel", "all")}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel - Tous les
-                matchs
+            <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-xl border-white/10">
+              <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Format d&apos;export</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuItem onClick={() => handleExport("excel", "all")} className="text-xs font-medium cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" /> Excel - Tous les matchs
               </DropdownMenuItem>
               {selectedPhaseId !== "all" && (
                 <DropdownMenuItem
                   onClick={() => handleExport("excel", "phase")}
+                  className="text-xs font-medium cursor-pointer"
                 >
-                  <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel - Cette
-                  phase
+                  <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" /> Excel - Phase active
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => handleExport("csv", "all")}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV - Tous les
-                matchs
+              <DropdownMenuItem onClick={() => handleExport("csv", "all")} className="text-xs font-medium cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-400" /> CSV - Tous les matchs
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("json", "all")}>
-                <FileJson className="h-4 w-4 mr-2" /> JSON
+              <DropdownMenuItem onClick={() => handleExport("json", "all")} className="text-xs font-medium cursor-pointer">
+                <FileJson className="h-4 w-4 mr-2 text-amber-400" /> JSON
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf", "all")}>
-                <FileText className="h-4 w-4 mr-2" /> PDF
+              <DropdownMenuItem onClick={() => handleExport("pdf", "all")} className="text-xs font-medium cursor-pointer">
+                <FileText className="h-4 w-4 mr-2 text-red-400" /> PDF
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      </div>
+
+      {/* Stats rapides Esports */}
+      <div className="mb-8">
+        <StatsCarousel
+          data={[
+            {
+              title: "Total Matchs",
+              value: stats.total,
+              icon: <Swords className="h-5 w-5" />,
+              className: "bg-blue-500/10 text-blue-500 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]",
+            },
+            {
+              title: "En Direct",
+              value: stats.inProgress,
+              icon: <Zap className="h-5 w-5" />,
+              className: "bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]",
+            },
+            {
+              title: "Terminés",
+              value: stats.completed,
+              icon: <CheckCircle2 className="h-5 w-5" />,
+              className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]",
+            },
+            {
+              title: "À Venir",
+              value: stats.upcoming,
+              icon: <Clock className="h-5 w-5" />,
+              className: "bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]",
+            },
+            {
+              title: "Mes Matchs",
+              value: stats.userMatchesCount,
+              icon: <Users className="h-5 w-5" />,
+              className: "bg-purple-500/10 text-purple-500 border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]",
+            },
+          ]}
+          itemsPerView={{ mobile: 2, lg: 5 }}
+        />
       </div>
 
       {/* Mes matchs */}

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 
 export const metadata = {
-  title: "Tournois | GT-V2",
+  title: "Tournois | Games-Trafics",
   description: "Participez aux meilleurs tournois et compétitions e-sport.",
 };
 

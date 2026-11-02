@@ -1,5 +1,5 @@
 import { Metadata } from "next"
-import { QrTransaction } from "@/components/transactions/qr-transaction"
+import { QrTransaction } from "@/components/pages/transactions/qr-transaction"
 import { Typography } from "@/components/ui/typography"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser, getCurrentUser2 } from "@/lib/auth/session"

@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 // import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AnimatedItem } from "@/components/AnimatedList";
+import { TransactionCard } from "@/components/cards/transaction-card";
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -556,62 +558,16 @@ export default function TransactionsPage() {
                   </Button>
                 </div>
               ) : (
-                transactions.map((transaction, index) => {
-                  const Icon = getTypeIcon(transaction.type);
-                  const isIncome = transaction.type === "DEPOSIT" ||
-                    (transaction.type === "TRANSFER" && transaction.toUserId === user?.id);
-
-                  return (
-                    <motion.div
-                      key={transaction.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
-                    >
-                      <Card className="hover:shadow-md transition-shadow p-3">
-                        <CardContent className="p-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-full ${isIncome ? 'bg-green-100' : 'bg-red-100'}`}>
-                                <Icon className={`h-5 w-5 ${isIncome ? 'text-green-600' : 'text-red-600'}`} />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Typography variant="body-sm" weight="semibold">
-                                    {getTypeLabel(transaction.type)}
-                                  </Typography>
-                                  {getStatusBadge(transaction.status || "")}
-                                </div>
-                                <Typography variant="caption2" theme="muted">
-                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
-                                </Typography>
-                                {transaction.description && (
-                                  <Typography variant="caption2" theme="muted" className="mt-1">
-                                    {transaction.description}
-                                  </Typography>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Typography variant="body-lg" weight="bold" className={isIncome ? 'text-green-600' : 'text-red-600'}>
-                                {isIncome ? '+' : '-'}{parseFloat(transaction.amount)?.toFixed(2)} GTC
-                              </Typography>
-                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
-                                <Typography variant="caption2" theme="muted">
-                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
-                                </Typography>
-                              )}
-                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
-                                {transaction.id.slice(-8)}
-                              </Typography>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })
+                transactions.map((transaction, index) => (
+                  <AnimatedItem key={transaction.id} index={index} delay={0.05}>
+                    <TransactionCard
+                      item={transaction as any}
+                      currentUserId={user?.id}
+                      onView={() => router.push(`/wallet/transactions/${transaction.id}`)}
+                      viewMode="list"
+                    />
+                  </AnimatedItem>
+                ))
               )}
             </TabsContent>
 
@@ -638,60 +594,16 @@ export default function TransactionsPage() {
                   </Button>
                 </div>
               ) : (
-                filteredIncomeTransactions.map((transaction, index) => {
-                  const Icon = getTypeIcon(transaction.type);
-
-                  return (
-                    <motion.div
-                      key={transaction.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
-                    >
-                      <Card className="hover:shadow-md transition-shadow p-3">
-                        <CardContent className="p-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-full bg-green-100">
-                                <Icon className="h-5 w-5 text-green-600" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Typography variant="body-sm" weight="semibold">
-                                    {getTypeLabel(transaction.type)}
-                                  </Typography>
-                                  {getStatusBadge(transaction.status || "")}
-                                </div>
-                                <Typography variant="caption2" theme="muted">
-                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
-                                </Typography>
-                                {transaction.description && (
-                                  <Typography variant="caption2" theme="muted" className="mt-1">
-                                    {transaction.description}
-                                  </Typography>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Typography variant="body-lg" weight="bold" className="text-green-600">
-                                +{parseFloat(transaction.amount)?.toFixed(2)} GTC
-                              </Typography>
-                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
-                                <Typography variant="caption2" theme="muted">
-                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
-                                </Typography>
-                              )}
-                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
-                                {transaction.id.slice(-8)}
-                              </Typography>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })
+                filteredIncomeTransactions.map((transaction, index) => (
+                  <AnimatedItem key={transaction.id} index={index} delay={0.05}>
+                    <TransactionCard
+                      item={transaction as any}
+                      currentUserId={user?.id}
+                      onView={() => router.push(`/wallet/transactions/${transaction.id}`)}
+                      viewMode="list"
+                    />
+                  </AnimatedItem>
+                ))
               )}
             </TabsContent>
 
@@ -718,60 +630,16 @@ export default function TransactionsPage() {
                   </Button>
                 </div>
               ) : (
-                filteredExpenseTransactions.map((transaction, index) => {
-                  const Icon = getTypeIcon(transaction.type);
-
-                  return (
-                    <motion.div
-                      key={transaction.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
-                    >
-                      <Card className="hover:shadow-md transition-shadow p-3">
-                        <CardContent className="p-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-full bg-red-100">
-                                <Icon className="h-5 w-5 text-red-600" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Typography variant="body-sm" weight="semibold">
-                                    {getTypeLabel(transaction.type)}
-                                  </Typography>
-                                  {getStatusBadge(transaction.status || "")}
-                                </div>
-                                <Typography variant="caption2" theme="muted">
-                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
-                                </Typography>
-                                {transaction.description && (
-                                  <Typography variant="caption2" theme="muted" className="mt-1">
-                                    {transaction.description}
-                                  </Typography>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Typography variant="body-lg" weight="bold" className="text-red-600">
-                                -{parseFloat(transaction.amount)?.toFixed(2)} GTC
-                              </Typography>
-                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
-                                <Typography variant="caption2" theme="muted">
-                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
-                                </Typography>
-                              )}
-                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
-                                {transaction.id.slice(-8)}
-                              </Typography>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })
+                filteredExpenseTransactions.map((transaction, index) => (
+                  <AnimatedItem key={transaction.id} index={index} delay={0.05}>
+                    <TransactionCard
+                      item={transaction as any}
+                      currentUserId={user?.id}
+                      onView={() => router.push(`/wallet/transactions/${transaction.id}`)}
+                      viewMode="list"
+                    />
+                  </AnimatedItem>
+                ))
               )}
             </TabsContent>
 
@@ -798,64 +666,16 @@ export default function TransactionsPage() {
                   </Button>
                 </div>
               ) : (
-                filteredPendingTransactions.map((transaction, index) => {
-                  const Icon = getTypeIcon(transaction.type);
-
-                  return (
-                    <motion.div
-                      key={transaction.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => router.push(`/wallet/transactions/${transaction.id}`)}
-                    >
-                      <Card className="hover:shadow-md transition-shadow p-3">
-                        <CardContent className="p-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-full bg-yellow-100">
-                                <Icon className="h-5 w-5 text-yellow-600" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Typography variant="body-sm" weight="semibold">
-                                    {getTypeLabel(transaction.type)}
-                                  </Typography>
-                                  {getStatusBadge(transaction.status || "")}
-                                </div>
-                                <Typography variant="caption2" theme="muted">
-                                  {transaction.createdAt && format(new Date(transaction.createdAt), "dd MMMM yyyy HH:mm", { locale: fr })}
-                                </Typography>
-                                {transaction.description && (
-                                  <Typography variant="caption2" theme="muted" className="mt-1">
-                                    {transaction.description}
-                                  </Typography>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <Typography variant="body-lg" weight="bold" className="text-yellow-600">
-                                {transaction.type === "DEPOSIT" ||
-                                  (transaction.type === "TRANSFER" && transaction.toUserId === user?.id)
-                                  ? "+"
-                                  : "-"}
-                                {parseFloat(transaction.amount)?.toFixed(2)} GTC
-                              </Typography>
-                              {transaction.fees && parseFloat(transaction.fees) > 0 && (
-                                <Typography variant="caption2" theme="muted">
-                                  Frais: {parseFloat(transaction.fees)?.toFixed(2)} GTC
-                                </Typography>
-                              )}
-                              <Typography variant="caption2" theme="muted" className="mt-1 font-mono">
-                                {transaction.id.slice(-8)}
-                              </Typography>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })
+                filteredPendingTransactions.map((transaction, index) => (
+                  <AnimatedItem key={transaction.id} index={index} delay={0.05}>
+                    <TransactionCard
+                      item={transaction as any}
+                      currentUserId={user?.id}
+                      onView={() => router.push(`/wallet/transactions/${transaction.id}`)}
+                      viewMode="list"
+                    />
+                  </AnimatedItem>
+                ))
               )}
             </TabsContent>
 

@@ -1,38 +1,35 @@
+// @/components/pages/tournaments/edition-detail/edition-detail-header.tsx
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Typography } from "@/components/ui/typography";
 import {
   Calendar,
   Users,
   Trophy,
-  MapPin,
   Share2,
-  PlayCircle,
   Clock,
-  Shield,
   Award,
   ChevronRight,
   MoreVertical,
   Edit,
   Trash2,
-  ChevronLeft,
   MessageCircle,
+  Gamepad2,
+  Swords,
+  GitBranch,
+  LayoutGrid,
+  Star,
+  FileText,
+  Zap,
+  CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-  type CarouselApi,
-} from "@/components/ui/carousel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +42,16 @@ import { useScreenSize } from "@/hooks/use-screen";
 import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
-import { EditionJoinDialog } from "./edition-join-dialog";
-import { EditionPaymentDialog } from "./edition-payment-dialog";
 import { InteractionButton } from "@/components/shared/interaction-button";
+import { toast } from "sonner";
+
+export interface CompetitionTabItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  count?: number;
+  highlight?: boolean;
+}
 
 interface EditionDetailHeaderProps {
   tournament: Tournament;
@@ -61,7 +65,15 @@ interface EditionDetailHeaderProps {
   onCancelPayment?: () => void;
   onConfirmPayment?: () => void;
   isRegistered?: boolean;
+  /** @deprecated carousel removed — prop kept for backwards compat with callers */
   recentMatches?: any[];
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+  tabCounts?: {
+    matches?: number;
+    participants?: number;
+    phases?: number;
+  };
 }
 
 export function EditionDetailHeader({
@@ -72,548 +84,465 @@ export function EditionDetailHeader({
   onDelete,
   onJoinClick,
   onPaymentClick,
-  onCancelJoin,
-  onCancelPayment,
-  onConfirmPayment,
   isRegistered,
-  recentMatches = [],
+  // recentMatches intentionally unused — carousel removed
+  activeTab = "overview",
+  onTabChange,
+  tabCounts,
 }: EditionDetailHeaderProps) {
-  const [api, setApi] = useState<CarouselApi>();
-  const { isMobile, screenSize } = useScreenSize();
+  const { isMobile } = useScreenSize();
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
 
-  // Autoplay: 15 secondes
+  // ─── Compact sticky header detection ─────────────────────────────────────
+  // When the hero banner scrolls out of view, we show a compact edition info
+  // bar above the sticky tabs using an IntersectionObserver (no scroll events).
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [isCompact, setIsCompact] = useState(false);
+
   useEffect(() => {
-    if (!api) return;
-
-    const intervalId = setInterval(() => {
-      if (api.canScrollNext()) {
-        api.scrollNext();
-      } else {
-        api.scrollTo(0);
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsCompact(!entry.isIntersecting),
+      {
+        threshold: 0,
+        // rootMargin accounts for the TopMiddle bar height (h-16 = 64px)
+        // which hides on scroll (hideTopMiddleOnScroll: true), so we use 0
+        // once it's gone; this gives a clean trigger right at hero bottom.
+        rootMargin: "0px 0px 0px 0px",
       }
-    }, 15000);
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-    return () => clearInterval(intervalId);
-  }, [api]);
+  // ─── Derived values ───────────────────────────────────────────────────────
+  const currentParticipants = edition.registrations?.length || edition.currentParticipants || 0;
+  const maxParticipants = edition.maxParticipants || 32;
+  const fillPercentage = Math.min(100, Math.round((currentParticipants / maxParticipants) * 100));
 
-  // Nombre d'items visibles selon la taille d'écran
-  const getItemsPerView = () => {
-    if (screenSize.width < 640) return 1;
-    if (screenSize.width < 1024) return 2;
-    return 3;
-  };
+  const entryFeeNumber = Number(edition.entryFee || 0);
+  const isFree = entryFeeNumber === 0;
 
-  const dropdownData = [
-    {
-      label: "Tableau de bord",
-      icon: null,
-      onClick: () =>
-        router.push(
-          `/tournaments/${tournament.id}/editions/${edition.id}/dashboard`,
-        ),
-      disabled: false,
-      requireOrganizer: true,
-    },
-    {
-      label: "Discuter",
-      icon: MessageCircle,
-      onClick: () => router.push(`/chats?entityType=tournament&entityId=${tournament.id}`),
-      disabled: false,
-      requireOrganizer: false,
-    },
-    {
-      label: "Matchs",
-      icon: null,
-      onClick: () =>
-        router.push(
-          `/tournaments/${tournament.id}/editions/${edition.id}/matches`,
-        ),
-      disabled: false,
-      requireOrganizer: true,
-    },
-    {
-      label: "Calendrier",
-      icon: Calendar,
-      onClick: () =>
-        router.push(
-          `/tournaments/${tournament.id}/editions/${edition.id}/calendar`,
-        ),
-      disabled: false,
-      requireOrganizer: true,
-    },
-    {
-      label: "Modifier",
-      icon: Edit,
-      onClick: onEdit,
-      disabled: false,
-      requireOrganizer: true,
-    },
-    {
-      label: "Supprimer",
-      icon: Trash2,
-      onClick: () => {
-        if (confirm("Êtes-vous sûr de vouloir supprimer cette édition ?")) {
-          deleteMutation.mutate(edition.id, {
-            onSuccess: () => {
-              router.push(`/tournaments/${tournament.id}`);
-            },
-          });
-        }
-      },
-      disabled: deleteMutation.isPending,
-      requireOrganizer: true,
-      variant: "destructive",
-    },
-  ];
-
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
-      case "UPCOMING":
-        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
       case "LIVE":
-        return "bg-green-500/10 text-green-500 border-green-500/20 animate-pulse";
+        return {
+          label: "EN DIRECT",
+          className: "bg-red-500 text-white border-red-400 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]",
+          dotColor: "bg-white",
+        };
+      case "UPCOMING":
+        return {
+          label: "INSCRIPTIONS OUVERTES",
+          className: "bg-primary/20 text-primary border-primary/40 shadow-[0_0_15px_rgba(var(--primary),0.3)]",
+          dotColor: "bg-primary",
+        };
       case "COMPLETED":
-        return "bg-secondary text-secondary-foreground";
+        return {
+          label: "TERMINÉ",
+          className: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+          dotColor: "bg-amber-400",
+        };
       case "CANCELLED":
-        return "bg-red-500/10 text-red-500 border-red-500/20";
+        return {
+          label: "ANNULÉ",
+          className: "bg-muted text-muted-foreground border-white/10",
+          dotColor: "bg-muted-foreground",
+        };
       default:
-        return "bg-secondary text-secondary-foreground";
+        return {
+          label: status,
+          className: "bg-secondary text-secondary-foreground",
+          dotColor: "bg-foreground",
+        };
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "UPCOMING":
-        return "À venir";
-      case "LIVE":
-        return "En cours";
-      case "COMPLETED":
-        return "Terminé";
-      case "CANCELLED":
-        return "Annulé";
-      default:
-        return status;
+  const statusConfig = getStatusConfig(edition.status || "UPCOMING");
+
+  const competitionTabs: CompetitionTabItem[] = useMemo(() => [
+    { id: "overview", label: "Vue d'ensemble", icon: Trophy },
+    { id: "brackets", label: "Arbre & Playoffs", icon: GitBranch, highlight: true },
+    { id: "phases", label: "Phases & Poules", icon: LayoutGrid, count: tabCounts?.phases },
+    { id: "matches", label: "Matchs", icon: Swords, count: tabCounts?.matches },
+    { id: "standings", label: "Classement", icon: Award },
+    { id: "participants", label: "Participants", icon: Users, count: tabCounts?.participants },
+    { id: "calendar", label: "Calendrier", icon: Calendar },
+    { id: "stats", label: "MVPs & Stats", icon: Star },
+    { id: "rules", label: "Règlement", icon: FileText },
+    { id: "community", label: "Discussion", icon: MessageCircle },
+  ], [tabCounts]);
+
+  const handleShare = async () => {
+    if (typeof window !== "undefined") {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Lien copié dans le presse-papiers !");
+      } catch {
+        toast.error("Impossible de copier le lien");
+      }
     }
   };
-
-  const getLocationIcon = (type: string) => {
-    return type === "ONLINE" ? "🌐" : "📍";
-  };
-
-  const visibleActions = dropdownData.filter(
-    (item) => !item.requireOrganizer || isOrganizer,
-  );
-  const primaryActions = visibleActions.slice(0, 2);
-  const secondaryActions = visibleActions.slice(2);
 
   return (
-    <div className="relative border-b bg-gradient-to-b from-background via-background to-muted/10">
-      {/* Bannière Carousel avec shadcn/ui */}
-      <div className="relative w-full overflow-hidden">
-        {/* interaction button */}
-        <InteractionButton
-          entityType="EDITION"
-          entityId={edition.id}
-          type="follow"
-          className="absolute bg-primary/20 text-primary backdrop-blur top-4 right-4 z-10"
-          withCount
-          iconOnly={true}
-        />
-        <Carousel
-          setApi={setApi}
-          opts={{
-            loop: true,
-            align: "start",
-            slidesToScroll: 1,
-          }}
-          className="w-full"
-        >
-          <CarouselContent>
-            {/* Slide 1: Cover Image */}
-            <CarouselItem className="relative h-48 sm:h-64 md:h-80 lg:h-96">
-              <div className="relative w-full h-full group">
-                {tournament.coverImage ? (
-                  <Image
-                    src={tournament.coverImage}
-                    alt={tournament.name}
-                    fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    priority
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
-                <div className="absolute bottom-3 left-4 md:bottom-6 md:left-8">
-                  <Badge className="bg-primary/80 backdrop-blur-md border-primary/20 text-white px-2 py-0.5 md:px-3 md:py-1 uppercase tracking-[0.1em] text-[8px] md:text-[10px] font-black italic">
-                    Édition #{edition.editionNumber}
-                  </Badge>
+    <div className="relative border-b border-white/10 bg-gradient-to-b from-background via-card/20 to-background">
+      {/* 1. HERO BANNER ESPORTS */}
+      <div className="relative w-full overflow-hidden min-h-[220px] md:min-h-[300px] lg:min-h-[340px] flex flex-col justify-end">
+        {/* Arrière-plan avec Image de Couverture & Mesh Gradient */}
+        <div className="absolute inset-0 -z-10">
+          {tournament.coverImage ? (
+            <Image
+              src={tournament.coverImage}
+              alt={tournament.name}
+              fill
+              className="object-cover opacity-35 scale-105 filter blur-[1px]"
+              priority
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary/30 via-background to-card" />
+          )}
+          {/* Overlays Esports */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background/60" />
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
+        </div>
+
+        {/* Boutons Flottants en haut à droite : Partager & Suivre */}
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShare}
+            className="bg-background/60 backdrop-blur-xl border-white/10 hover:bg-background/90 text-foreground gap-1.5 shadow-xl text-xs font-bold"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Partager</span>
+          </Button>
+
+          <InteractionButton
+            entityType="EDITION"
+            entityId={edition.id}
+            type="follow"
+            className="bg-background/60 text-foreground backdrop-blur-xl border border-white/10 shadow-xl hover:bg-background/90"
+            withCount
+            iconOnly={true}
+          />
+        </div>
+
+        {/* Champion Spotlight si tournoi terminé */}
+        {edition.status === "COMPLETED" && Boolean(edition.winnerMetadata) && (
+          <div className="container mx-auto px-4 md:px-6 mb-4 z-20">
+            <div className="p-3.5 md:p-5 rounded-2xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-transparent border border-yellow-500/30 backdrop-blur-xl flex items-center justify-between shadow-[0_0_25px_rgba(234,179,8,0.1)]">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                  <Trophy className="h-5 w-5" />
                 </div>
-              </div>
-            </CarouselItem>
-
-            {/* Si terminé, afficher le Champion */}
-            {edition.status === "COMPLETED" && edition.winnerMetadata ? (
-              <CarouselItem className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4">
-                <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card border-2 border-yellow-500/50 shadow-xl shadow-yellow-500/20">
-                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-background to-background" />
-
-                  <div className="relative h-full w-full p-4 md:p-6 flex flex-col items-center justify-center text-center space-y-4">
-                    <div className="absolute top-4 right-4">
-                      <Trophy className="h-6 w-6 text-yellow-500 animate-pulse" />
-                    </div>
-
-                    <Badge className="bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border-yellow-500/50 uppercase tracking-widest text-[10px]">
-                      Champion de l'Édition
-                    </Badge>
-
-                    <div className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-muted overflow-hidden border-4 border-yellow-500 shadow-lg relative">
-                      {(edition.winnerMetadata as any).image ? (
-                        <Image
-                          src={(edition.winnerMetadata as any).image}
-                          alt={
-                            (edition.winnerMetadata as any).username ||
-                            "Champion"
-                          }
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary text-2xl font-bold">
-                          {(
-                            (edition.winnerMetadata as any).username || "C"
-                          ).charAt(0)}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <h3 className="text-xl md:text-2xl font-black italic tracking-tighter text-foreground">
-                        {(edition.winnerMetadata as any).username}
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Félicitations pour cette victoire !
-                      </p>
-                    </div>
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
+                    Champion de l&apos;Édition
+                  </div>
+                  <div className="text-base md:text-lg font-black italic tracking-tight text-foreground">
+                    {(edition.winnerMetadata as any).username || "Vainqueur Officiel"}
                   </div>
                 </div>
-              </CarouselItem>
-            ) : null}
+              </div>
+              <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/40 text-xs font-black uppercase">
+                Vainqueur
+              </Badge>
+            </div>
+          </div>
+        )}
 
-            {/* Slides des matchs récents */}
-            {edition.status !== "COMPLETED" &&
-              recentMatches.map((match, idx) => (
-                <CarouselItem
-                  key={match.id}
-                  className="basis-full sm:basis-1/2 lg:basis-1/3 pl-2 md:pl-4"
-                >
-                  <Link
-                    href={`/tournaments/${tournament.id}/editions/${edition.id}/matches/${match.id}`}
-                    className="block h-full"
-                  >
-                    <div className="relative h-48 sm:h-64 md:h-80 w-full rounded-xl md:rounded-2xl overflow-hidden group/card">
-                      {/* Background avec overlay */}
-                      <div className="absolute inset-0">
-                        {tournament.coverImage && (
-                          <Image
-                            src={tournament.coverImage}
-                            alt="background"
-                            fill
-                            className="object-cover opacity-20 blur-sm scale-110"
-                          />
-                        )}
-                      </div>
-
-                      {/* Contenu de la carte */}
-                      <div className="relative h-full w-full bg-gradient-to-br from-background/95 via-background/90 to-primary/5 backdrop-blur-sm p-3 md:p-5 flex flex-col justify-between">
-                        {/* Header de la carte */}
-                        <div className="flex items-center justify-between mb-2 md:mb-4">
-                          <Badge
-                            variant="outline"
-                            className="bg-background/50 backdrop-blur-sm border-white/10 text-[8px] md:text-[10px] uppercase font-bold tracking-wider text-muted-foreground"
-                          >
-                            {match.phase?.name || "Match"}
-                          </Badge>
-                          <div className="flex items-center gap-1 text-[8px] md:text-[10px] text-muted-foreground">
-                            <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" />
-                            {match.status === "COMPLETED"
-                              ? "Terminé"
-                              : match.scheduledTime
-                                ? format(
-                                    new Date(match.scheduledTime),
-                                    "HH:mm",
-                                    { locale: fr },
-                                  )
-                                : "À planifier"}
-                          </div>
-                        </div>
-
-                        {/* Participants et score */}
-                        <div className="flex items-center justify-center gap-2 md:gap-4 flex-1">
-                          {/* Participant 1 */}
-                          <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
-                            <div className="relative">
-                              <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
-                                {match.participant1?.member?.team?.logo ||
-                                match.participant1?.member?.user
-                                  ?.profileImage ? (
-                                  <Image
-                                    src={
-                                      match.participant1?.member?.team?.logo ||
-                                      match.participant1?.member?.user
-                                        ?.profileImage ||
-                                      match.participant1?.member?.user?.image ||
-                                      "/icons/avatar-500.png"
-                                    }
-                                    alt="participant1"
-                                    fill
-                                    className="object-cover"
-                                  />
-                                ) : (
-                                  <div className="text-white/20 font-black text-xs md:text-base">
-                                    ?
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
-                              {match.participant1?.member?.team?.name ||
-                                match.participant1?.member?.user?.username ||
-                                "TBD"}
-                            </span>
-                          </div>
-
-                          {/* Score / VS */}
-                          <div className="flex flex-col items-center">
-                            {match.status === "COMPLETED" ? (
-                              <div className="flex items-center gap-1 md:gap-2">
-                                <span
-                                  className={cn(
-                                    "text-lg md:text-2xl font-black italic",
-                                    (match.score1 ?? 0) > (match.score2 ?? 0)
-                                      ? "text-primary"
-                                      : "text-foreground",
-                                  )}
-                                >
-                                  {match.score1 ?? 0}
-                                </span>
-                                <span className="text-muted-foreground text-xs md:text-sm">
-                                  -
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-lg md:text-2xl font-black italic",
-                                    (match.score2 ?? 0) > (match.score1 ?? 0)
-                                      ? "text-primary"
-                                      : "text-foreground",
-                                  )}
-                                >
-                                  {match.score2 ?? 0}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="h-6 w-10 md:h-8 md:w-14 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
-                                <span className="text-[10px] md:text-xs font-black italic text-primary">
-                                  VS
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Participant 2 */}
-                          <div className="flex flex-col items-center gap-1.5 md:gap-2 flex-1 text-center">
-                            <div className="relative">
-                              <div className="h-10 w-10 md:h-14 md:w-14 rounded-full bg-muted/30 border-2 border-white/10 flex items-center justify-center overflow-hidden shadow-lg group-hover/card:scale-110 transition-transform">
-                                {match.participant2?.member?.team?.logo ||
-                                match.participant2?.member?.user
-                                  ?.profileImage ? (
-                                  <Image
-                                    src={
-                                      match.participant2?.member?.team?.logo ||
-                                      match.participant2?.member?.user
-                                        ?.profileImage ||
-                                      match.participant2?.member?.user?.image ||
-                                      "/icons/avatar-500.png"
-                                    }
-                                    alt="participant2"
-                                    fill
-                                    className="object-cover"
-                                  />
-                                ) : (
-                                  <div className="text-white/20 font-black text-xs md:text-base">
-                                    ?
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <span className="text-[10px] md:text-xs font-bold text-foreground line-clamp-1 max-w-[80px] md:max-w-[100px]">
-                              {match.participant2?.member?.team?.name ||
-                                match.participant2?.member?.user?.username ||
-                                "TBD"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="mt-2 md:mt-4 pt-1 md:pt-2 border-t border-white/5 flex justify-center">
-                          <span className="text-[8px] md:text-[9px] text-muted-foreground/60 uppercase tracking-wider">
-                            Cliquez pour voir les détails
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </CarouselItem>
-              ))}
-          </CarouselContent>
-
-          {/* Navigation buttons */}
-          <CarouselPrevious className="left-2 md:left-4 h-7 w-7 md:h-8 md:w-8 bg-background/80 backdrop-blur-sm border-white/20" />
-          <CarouselNext className="right-2 md:right-4 h-7 w-7 md:h-8 md:w-8 bg-background/80 backdrop-blur-sm border-white/20" />
-        </Carousel>
+        {/* Sentinel: triggers compact header when hero exits viewport */}
+        <div ref={sentinelRef} className="absolute bottom-0 left-0 w-full h-px pointer-events-none" />
       </div>
 
-      {/* Informations */}
-      <div className="container mx-auto px-3 md:px-4 relative -mt-8 md:-mt-12 z-10">
-        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 md:gap-4">
-          {/* Logo/Badge */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="relative"
-          >
-            <div className="relative">
-              <div className="w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-xl border-4 border-background bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-2xl overflow-hidden">
+      {/* 2. MAIN TOURNAMENT CARD */}
+      <div className="container mx-auto px-4 md:px-6 relative z-20 -mt-8 md:-mt-12 pb-4">
+        <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 md:p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          {/* Logo / Badge et Informations Principales */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 w-full lg:w-auto">
+            {/* Logo du Tournoi */}
+            <div className="relative shrink-0">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-2xl border-2 border-white/15 bg-card/80 overflow-hidden shadow-2xl relative flex items-center justify-center group">
                 <Image
-                  src={
-                    edition.tournament?.profileImage ??
-                    "/icons/tournament-500.png"
-                  }
-                  alt={edition.name || "edition image profile"}
+                  src={tournament.profileImage || "/icons/tournament-500.png"}
+                  alt={edition.name || tournament.name}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
-              <div className="absolute -bottom-2 -right-2">
-                <Badge
-                  className={cn(
-                    getStatusColor(edition.status || "UPCOMING"),
-                    "text-[8px] md:text-[10px] px-1.5 py-0 md:px-2 md:py-0.5",
-                  )}
-                >
-                  {getStatusLabel(edition.status || "UPCOMING")}
+              {/* Badge Numéro d'édition */}
+              <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                <Badge className="bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 border border-primary/40 shadow-lg">
+                  Édition #{edition.editionNumber}
                 </Badge>
               </div>
             </div>
-          </motion.div>
 
-          {/* Infos */}
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1 md:mb-2">
-              <Typography
-                variant="h3"
-                weight="bold"
-                className="text-xl md:text-2xl lg:text-3xl"
-              >
-                {edition.name || `Édition #${edition.editionNumber}`}
-              </Typography>
-              <div className="flex flex-wrap gap-1.5">
-                <Badge
-                  variant="outline"
-                  className="gap-0.5 text-[9px] md:text-xs"
-                >
-                  <span className="text-xs md:text-sm">
-                    {getLocationIcon(edition.locationType || "ONLINE")}
-                  </span>
-                  <span className="hidden sm:inline ml-0.5">
-                    {edition.locationType === "ONLINE"
-                      ? "En ligne"
-                      : "Présentiel"}
-                  </span>
+            {/* Titre & Metadonnées */}
+            <div className="flex-1 text-center sm:text-left space-y-2.5 min-w-0">
+              {/* Badges de statut & métadonnées */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <Badge className={cn("text-[10px] font-black uppercase tracking-wider px-2.5 py-1 flex items-center gap-1.5", statusConfig.className)}>
+                  <span className={cn("w-1.5 h-1.5 rounded-full", statusConfig.dotColor)} />
+                  {statusConfig.label}
                 </Badge>
-                {edition.entryFee && Number(edition.entryFee) > 0 && (
-                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 gap-0.5 text-[9px] md:text-xs">
-                    <Trophy className="h-2.5 w-2.5 md:h-3 md:w-3" />
+
+                <Badge variant="outline" className="border-white/10 bg-background/50 text-foreground gap-1.5 text-xs py-1">
+                  <Gamepad2 className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-bold">{tournament.game}</span>
+                </Badge>
+
+                <Badge variant="outline" className="border-white/10 bg-background/50 text-muted-foreground text-xs py-1">
+                  {edition.locationType === "ONLINE" ? "🌐 En ligne" : "📍 En présentiel"}
+                </Badge>
+
+                {isFree ? (
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs font-black">
+                    GRATUIT
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs font-black">
                     {edition.entryFee} {edition.prizeCurrency || "GTC"}
                   </Badge>
                 )}
               </div>
-            </div>
 
-            {edition.tagline && (
-              <Typography
-                variant="body-sm"
-                className="max-w-2xl mb-2 md:mb-3 text-muted-foreground text-xs md:text-sm"
-              >
-                {edition.tagline}
-              </Typography>
-            )}
-
-            <div className="flex flex-wrap gap-3 md:gap-6 text-xs md:text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
-                <span>
-                  {format(new Date(edition.startDate), "d MMM yyyy", {
-                    locale: fr,
-                  })}
-                </span>
+              {/* Titre de l'édition */}
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black italic tracking-tighter text-foreground">
+                  {edition.name || `Édition #${edition.editionNumber}`}
+                </h1>
+                <Link
+                  href={`/tournaments/${tournament.id}`}
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <span>Tournoi : {tournament.name}</span>
+                  <ExternalLink className="w-3 h-3 opacity-60" />
+                </Link>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
-                <span>
-                  {edition.registrations?.length || 0} /{" "}
-                  {edition.maxParticipants} participants
-                </span>
+
+              {/* Tagline si disponible */}
+              {edition.tagline && (
+                <p className="text-sm text-muted-foreground line-clamp-2 max-w-xl">
+                  {edition.tagline}
+                </p>
+              )}
+
+              {/* Quick Info Bar */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-1 text-xs text-muted-foreground font-medium">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <span>
+                    Du {format(new Date(edition.startDate), "d MMM yyyy", { locale: fr })}
+                    {edition.endDate && ` au ${format(new Date(edition.endDate), "d MMM yyyy", { locale: fr })}`}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-primary" />
+                  <span>
+                    <strong className="text-foreground">{currentParticipants}</strong> / {maxParticipants} participants
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
-            <div className="flex-1 sm:flex-initial flex gap-2">
-              {primaryActions.map((action, index) => (
-                <Button
-                  key={index}
-                  variant="default"
-                  size="sm"
-                  onClick={action.onClick}
-                  disabled={action.disabled}
-                  className="gap-1.5 text-xs flex-1 sm:flex-initial"
-                >
-                  {action.icon && <action.icon className="h-3.5 w-3.5" />}
-                  <span className="">{action.label}</span>
-                </Button>
-              ))}
+          {/* Panneau d'Actions & Jauge de Remplissage */}
+          <div className="w-full lg:w-auto flex flex-col sm:flex-row lg:flex-col items-stretch lg:items-end gap-3.5 shrink-0 pt-4 lg:pt-0 border-t border-white/10 lg:border-t-0">
+            {/* Jauge de participants */}
+            <div className="w-full sm:w-48 lg:w-56 bg-background/50 border border-white/5 rounded-xl p-2.5 space-y-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <span>Places</span>
+                <span className="text-foreground font-black">{fillPercentage}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-cyan-400 rounded-full transition-all duration-500"
+                  style={{ width: `${fillPercentage}%` }}
+                />
+              </div>
             </div>
-            {secondaryActions.length > 0 && (
+
+            {/* Actions principales */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Bouton d'inscription dynamique */}
+              {isRegistered ? (
+                <div className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-sm font-black uppercase tracking-wider">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Inscrit
+                </div>
+              ) : (
+                <Button
+                  size="lg"
+                  onClick={onJoinClick}
+                  className="flex-1 sm:flex-initial font-black uppercase tracking-wider text-sm px-7 py-6 italic shadow-[0_0_20px_rgba(var(--primary),0.35)] hover:shadow-[0_0_30px_rgba(var(--primary),0.55)] transition-all hover:scale-105"
+                >
+                  <Zap className="w-4 h-4 mr-2 fill-current" />
+                  S&apos;inscrire
+                </Button>
+              )}
+
+              {/* Bouton Dashboard si organisateur */}
+              {isOrganizer && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  asChild
+                  className="font-bold border-white/15 bg-background/60 hover:bg-background/90 py-6"
+                >
+                  <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard`}>
+                    Tableau de bord
+                  </Link>
+                </Button>
+              )}
+
+              {/* Menu Plus d'actions */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
+                  <Button variant="outline" size="icon" className="h-12 w-12 border-white/10 bg-background/50">
+                    <MoreVertical className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {secondaryActions.map((action, index) => (
-                    <DropdownMenuItem
-                      key={index}
-                      onClick={action.onClick}
-                      disabled={action.disabled}
-                      className={cn(
-                        action.variant === "destructive" && "text-destructive",
-                        "text-xs",
-                      )}
-                    >
-                      {action.icon && (
-                        <action.icon className="h-3.5 w-3.5 mr-2" />
-                      )}
-                      {action.label}
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-2xl border-white/10">
+                  <DropdownMenuItem onClick={handleShare} className="cursor-pointer">
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Partager l&apos;édition
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <Link href={`/chats?entityType=tournament&entityId=${tournament.id}`}>
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Discuter du tournoi
+                    </Link>
+                  </DropdownMenuItem>
+                  {isOrganizer && (
+                    <>
+                      <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Modifier l&apos;édition
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (confirm("Confirmer la suppression définitive de cette édition ?")) {
+                            deleteMutation.mutate(edition.id, {
+                              onSuccess: () => router.push(`/tournaments/${tournament.id}`),
+                            });
+                          }
+                        }}
+                        className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Supprimer l&apos;édition
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. COMPETITION TABS NAVIGATION BAR — sticky avec compact header */}
+      <div className="sticky top-0 z-30">
+        {/* ── Compact edition info bar (visible seulement quand le hero est scrollé) */}
+        <AnimatePresence>
+          {isCompact && (
+            <motion.div
+              key="compact-header"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="bg-background/97 backdrop-blur-2xl border-b border-white/10 shadow-md"
+            >
+              <div className="container mx-auto px-4 md:px-6 flex items-center gap-3 py-2">
+                {/* Mini logo */}
+                <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/15 shrink-0">
+                  <Image
+                    src={tournament.profileImage || "/icons/tournament-500.png"}
+                    alt={edition.name || tournament.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+
+                {/* Edition name + status */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-black italic tracking-tight text-foreground truncate">
+                    {edition.name || `Édition #${edition.editionNumber}`}
+                  </span>
+                  <Badge
+                    className={cn(
+                      "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 flex items-center gap-1 shrink-0",
+                      statusConfig.className
+                    )}
+                  >
+                    <span className={cn("w-1 h-1 rounded-full", statusConfig.dotColor)} />
+                    {statusConfig.label}
+                  </Badge>
+                </div>
+
+                {/* Participants count — secondary info */}
+                <div className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium shrink-0">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>
+                    <strong className="text-foreground">{currentParticipants}</strong>/{maxParticipants}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Tabs navigation bar */}
+        <div className="bg-background/95 backdrop-blur-2xl border-y border-white/10 shadow-lg">
+          <div className="container mx-auto px-4 md:px-6">
+            <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-2 -mx-2 px-2">
+              {competitionTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => onTabChange?.(tab.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all whitespace-nowrap shrink-0 relative",
+                      isActive
+                        ? "text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.15)] font-black"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5",
+                      tab.highlight && !isActive && "text-cyan-400"
+                    )}
+                  >
+                    <Icon className={cn("w-4 h-4", isActive ? "text-primary" : "opacity-70")} />
+                    <span>{tab.label}</span>
+                    {typeof tab.count === "number" && tab.count > 0 && (
+                      <span
+                        className={cn(
+                          "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black",
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-white/10 text-muted-foreground"
+                        )}
+                      >
+                        {tab.count}
+                      </span>
+                    )}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTabUnderline"
+                        className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary),0.8)]"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
       </div>

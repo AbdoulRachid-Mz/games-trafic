@@ -72,7 +72,7 @@ export default async function PartnersPage() {
                 {typePartners.map((partner) => (
                   <PartnerCard
                     key={partner.id}
-                    partner={partner}
+                    item={partner}
                     viewMode="grid"
                     showActions
                     showBadge

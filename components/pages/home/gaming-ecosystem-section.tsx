@@ -24,7 +24,7 @@ export default function GamingEcosystemSection() {
       icon: <Users className="w-6 h-6" />,
       color: "text-blue-500",
       bg: "bg-blue-500/10",
-      link: "/social",
+      link: "/chats",
       features: ["Posts & Stories", "Groupes privés", "Messagerie"],
     },
     {

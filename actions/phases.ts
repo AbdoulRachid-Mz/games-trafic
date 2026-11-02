@@ -83,6 +83,35 @@ import {
   recomputeParticipantEditionStats,
 } from "@/lib/tournaments/progression-engine";
 import { GeneratorOptions, isPlaceholder } from "@/lib/tournaments/generators";
+import { getCurrentUser } from "@/lib/auth/session";
+import { isUserTournamentOrganizer } from "@/actions/tournaments";
+
+// SEC-07 FIX: Helpers for access control on tournament phases and edition structures
+async function assertOrganizerOrAdminByEdition(editionId: string) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) throw new Error("Non authentifié");
+  const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+  if (isAdmin) return currentUser;
+
+  const edition = await db.query.tournamentEditions.findFirst({
+    where: eq(tournamentEditions.id, editionId),
+    columns: { tournamentId: true },
+  });
+  if (!edition) throw new Error("Édition non trouvée");
+
+  const isOrganizer = await isUserTournamentOrganizer(edition.tournamentId, currentUser.id);
+  if (!isOrganizer) throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+  return currentUser;
+}
+
+async function assertOrganizerOrAdminByPhase(phaseId: string) {
+  const phase = await db.query.tournamentPhases.findFirst({
+    where: eq(tournamentPhases.id, phaseId),
+    columns: { editionId: true },
+  });
+  if (!phase) throw new Error("Phase non trouvée");
+  return assertOrganizerOrAdminByEdition(phase.editionId);
+}
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -1366,6 +1395,7 @@ export async function generateBracketMatches(
 
 /**
  * Crée une nouvelle phase de tournoi
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function createTournamentPhase(
   phaseData: NewTournamentPhase,
@@ -1378,6 +1408,8 @@ export async function createTournamentPhase(
     ) {
       throw new Error("editionId, name and order are required");
     }
+
+    await assertOrganizerOrAdminByEdition(phaseData.editionId);
 
     const result = await db
       .insert(tournamentPhases)
@@ -1400,12 +1432,16 @@ export async function createTournamentPhase(
 
 /**
  * Crée plusieurs phases de tournoi en une seule transaction
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function bulkCreateTournamentPhases(
   phasesData: NewTournamentPhase[],
 ): Promise<TournamentPhase[]> {
   try {
     if (phasesData.length === 0) return [];
+    if (phasesData[0].editionId) {
+      await assertOrganizerOrAdminByEdition(phasesData[0].editionId);
+    }
 
     const result = await db
       .insert(tournamentPhases)
@@ -1427,12 +1463,15 @@ export async function bulkCreateTournamentPhases(
 
 /**
  * Met à jour une phase de tournoi
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function updateTournamentPhase(
   id: string,
   phaseData: Partial<NewTournamentPhase>,
 ): Promise<TournamentPhase> {
   try {
+    await assertOrganizerOrAdminByPhase(id);
+
     const existingPhase = await getTournamentPhaseById(id);
     if (!existingPhase) {
       throw new Error("Tournament phase not found");
@@ -1459,11 +1498,14 @@ export async function updateTournamentPhase(
 
 /**
  * Supprime une phase de tournoi (soft delete)
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function deleteTournamentPhase(
   id: string,
 ): Promise<TournamentPhase> {
   try {
+    await assertOrganizerOrAdminByPhase(id);
+
     const result = await db
       .update(tournamentPhases)
       .set({
@@ -3603,6 +3645,10 @@ export async function getStructurePreviewAction(
   }
 }
 
+/**
+ * Organise la structure complète d'une édition
+ * SEC-07 FIX: Organizer or admin only
+ */
 export async function organizeEditionStructure(
   editionId: string,
   phasesData: any[],
@@ -3616,6 +3662,8 @@ export async function organizeEditionStructure(
   } = {},
 ) {
   try {
+    await assertOrganizerOrAdminByEdition(editionId);
+
     const result = await createStructureEngine({
       editionId,
       phases: phasesData,
@@ -3637,6 +3685,7 @@ export async function organizeEditionStructure(
 
 /**
  * Action pour déclencher la génération de matchs via le moteur centralisé
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function generateMatchesAction(
   type: "PHASE" | "GROUP" | "NODE",
@@ -3644,6 +3693,13 @@ export async function generateMatchesAction(
   options: any = {},
 ) {
   try {
+    if (type === "PHASE") {
+      await assertOrganizerOrAdminByPhase(id);
+    } else {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) throw new Error("Non authentifié");
+    }
+
     const result = await generateMatchesEngine({ type, id, options });
 
     // Si c'est une phase et qu'elle est terminée, on peut tenter une propagation
@@ -3662,10 +3718,12 @@ export async function generateMatchesAction(
 /**
  * Réinitialise complètement la structure d'une édition (Phases, Groupes, Nœuds, Matchs)
  * ⚠️ ATTENTION : Action destructrice, demande confirmation côté UI !
+ * SEC-07 FIX: Organizer or admin only
  */
 export async function resetEditionStructure(editionId: string) {
   try {
     if (!editionId) throw new Error("ID de l'édition requis");
+    await assertOrganizerOrAdminByEdition(editionId);
 
     return await db.transaction(async (tx) => {
       // 1. Supprimer tous les matchs de l'édition

@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, ShoppingBag, Wallet, ShieldCheck, Users } from "lucide-react";
+import { Trophy, ShoppingBag, Users, Wallet, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useGlobalStats } from "@/hooks/use-stats";
 import { formatNumber } from "@/lib/utils";
@@ -52,7 +52,7 @@ export default function HeroSection() {
               className="px-4 py-1.5 border-primary/20 bg-primary/5 text-primary text-sm font-semibold tracking-wide flex items-center gap-2"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              L'ÉCOSYSTÈME GAMING DE NOUVELLE GÉNÉRATION
+              L&apos;ÉCOSYSTÈME GAMING NOUVELLE GÉNÉRATION
             </Badge>
           </motion.div>
 
@@ -61,11 +61,20 @@ export default function HeroSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6"
+            className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-4"
           >
-            Propulsez votre <span className="text-primary">passion gaming</span>{" "}
-            vers de nouveaux sommets
+            Joue, échange, <span className="text-primary">domine</span>
           </motion.h1>
+
+          {/* Slogan */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+            className="text-xl md:text-2xl font-semibold text-primary/90 mb-6"
+          >
+            L&apos;infini du gaming commence ici.
+          </motion.p>
 
           {/* Description */}
           <motion.p
@@ -74,8 +83,8 @@ export default function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl leading-relaxed"
           >
-            Gamers Trafics réunit compétition, économie et communauté.
-            Participez à des tournois professionnels, grez vos actifs GTC et
+            Games-Trafics réunit compétition e-sport, marketplace sécurisée et communauté gaming.
+            Participez à des tournois professionnels, gérez vos actifs GTC et
             rejoignez le marché gaming le plus dynamique.
           </motion.p>
 
@@ -92,7 +101,7 @@ export default function HeroSection() {
               asChild
             >
               <Link href="/tournaments">
-                Explorer l'Arène
+                Explorer l&apos;Arène
                 <Trophy className="ml-2 w-5 h-5 group-hover:rotate-12 transition-transform" />
               </Link>
             </Button>
