@@ -4018,6 +4018,9 @@ export async function organizeNextPhaseAction(
       participantRegIds = registrations.map((r) => r.id);
     }
 
+    // Dédoublonnage strict des participants pour garantir l'unicité des slots
+    participantRegIds = Array.from(new Set(participantRegIds));
+
     if (participantRegIds.length < 2) {
       throw new Error(
         `Pas assez de participants qualifiés (${participantRegIds.length}). Minimum 2 requis.`,

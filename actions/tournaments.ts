@@ -4312,6 +4312,21 @@ export async function addQualifiedToNextPhase({
 
     // Pour une phase d'élimination, créer un bracket node ou ajouter à un match existant
     if (nextPhase.phaseType === "ELIMINATION") {
+      // 🛡️ Vérifier si le participant est déjà présent dans un match de la phase suivante
+      const alreadyInPhase = await db.query.matches.findFirst({
+        where: and(
+          eq(matches.phaseId, nextPhaseId),
+          or(
+            eq(matches.participant1RegistrationId, registrationId),
+            eq(matches.participant2RegistrationId, registrationId),
+          ),
+        ),
+      });
+
+      if (alreadyInPhase) {
+        return { success: true }; // Déjà positionné, opération idempotente
+      }
+
       // Logique pour ajouter le participant au bracket
       // Soit créer un nouveau match, soit ajouter à un match existant avec un slot libre
       const existingMatches = await db.query.matches.findMany({
@@ -4332,7 +4347,7 @@ export async function addQualifiedToNextPhase({
 
         if (!match.participant1RegistrationId) {
           updateData.participant1RegistrationId = registrationId;
-        } else if (!match.participant2RegistrationId) {
+        } else if (!match.participant2RegistrationId && match.participant1RegistrationId !== registrationId) {
           updateData.participant2RegistrationId = registrationId;
         }
 
