@@ -164,7 +164,7 @@
 ### `TASK-ACT-01` : Modularisation de `actions/phases.ts` (~4880 lignes)
 - **Domaine** : Architecture / Server Actions
 - **Priorité** : P1 — Élevée
-- **Statut** : `[ ]`
+- **Statut** : `[x]`
 - **Fichiers concernés** : `actions/phases.ts`, `actions/phases/*.ts`
 - **Description** : Décomposer ce fichier massif en sous-modules thématiques (`queries.ts`, `mutations.ts`, `groups.ts`, `generation.ts`, `standings.ts`, `progression.ts`) tout en conservant `actions/phases.ts` comme façade de réexportation (`export * from ...`) pour une compatibilité absolue à 100% avec les imports existants.
 - **Critères de validation** :
