@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { MainLayout } from "./main-layout";
 import { useApp } from "@/contexts/app-context";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -14,11 +14,10 @@ import type { UserRoles, ResolvedRoute } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { useSearchParams } from "next/navigation";
-import OnTapPopup from "../auth/on-tap-popup";
 import Image from "next/image";
 import { PulseLoading } from "../loading-ui/pulse-loader";
 
-// Loading Screen Premium
+// Loading Screen Premium pour les transitions nécessitant un blocage
 function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
@@ -42,9 +41,6 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
             {/* Logo in center */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-8 w-8 rounded-lg flex items-center justify-center">
-                {/* <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg> */}
                 <Image
                   src="/icons/icon-72.png"
                   alt="Logo"
@@ -105,6 +101,7 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const {
     user,
@@ -112,9 +109,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     isAuthenticated,
     isAdmin,
     isVip,
-    refreshUser,
   } = useAuthContext();
+
+  // Mode partiel pour le profil uniquement si authentifié (évite requête 401 si non connecté)
   const { data: profile } = useUserProfile({
+    enabled: isAuthenticated,
     mode: "partial",
     relations: ["wallet"],
   });
@@ -128,12 +127,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     maintenanceMessage,
   } = useApp();
 
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [welcomeChecked, setWelcomeChecked] = useState(false);
-  const [initialPath] = useState(pathname);
-  const searchParams = useSearchParams();
+  // Optimisation démarrage : welcomeChecked initialisé immédiatement si déjà visité
+  const [welcomeChecked, setWelcomeChecked] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return !!localStorage.getItem("gt_welcome_visited") || pathname === "/welcome";
+  });
 
-  // Handle welcome redirect
+  // Gestion de la première visite (non-bloquante pour le premier rendu des composants)
   useEffect(() => {
     const isWelcomePath = pathname === "/welcome";
     const ignore = canSkipWelcome(searchParams);
@@ -155,7 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, router, searchParams]);
 
-  // Calculate user roles
+  // Calcul réactif des rôles
   const userRoles: UserRoles = useMemo(
     () => ({
       isAuthenticated,
@@ -167,57 +167,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [isAuthenticated, isAdmin, isVip, user?.id, profile?.wallet?.id],
   );
 
-  // Resolve route
-  const resolved = useMemo<ResolvedRoute | null>(() => {
-    if (!isInitialized) return null;
+  // Résolution synchrone de la route
+  const resolved = useMemo<ResolvedRoute>(() => {
     return resolveRoute(pathname, userRoles);
-  }, [pathname, userRoles, isInitialized]);
+  }, [pathname, userRoles]);
 
-  // Initialize app
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // Refresh user data on load
-        await refreshUser();
-      } catch (error) {
-        console.error("Error initializing app:", error);
-      } finally {
-        setIsInitialized(true);
-      }
-    };
-
-    init();
-  }, [refreshUser]);
-
-  // Handle announcements
+  // Gestion des annonces (différée et non-bloquante)
   useEffect(() => {
     if (
-      isInitialized &&
       !authLoading &&
-      settings.showAnnouncementsOnStartup &&
-      unreadAnnouncements.length > 0 &&
+      settings?.showAnnouncementsOnStartup &&
+      unreadAnnouncements?.length > 0 &&
       !showAnnouncements &&
       isAuthenticated
     ) {
       const timer = setTimeout(() => {
         toggleAnnouncements();
-      }, 1500); // Small delay for better UX
+      }, 1500);
 
       return () => clearTimeout(timer);
     }
   }, [
-    isInitialized,
     authLoading,
-    settings.showAnnouncementsOnStartup,
-    unreadAnnouncements.length,
+    settings?.showAnnouncementsOnStartup,
+    unreadAnnouncements?.length,
     showAnnouncements,
     toggleAnnouncements,
     isAuthenticated,
   ]);
 
-  // Handle maintenance mode
+  // Mode maintenance pour les routes nécessitant une restriction
   useEffect(() => {
-    if (maintenanceMode && !isAdmin && isInitialized) {
+    if (maintenanceMode && !isAdmin) {
       const isPublicRoute = resolved
         ? !resolved.requireAuth && !resolved.requireAdmin
         : false;
@@ -226,29 +207,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         router.push("/maintenance");
       }
     }
-  }, [maintenanceMode, isAdmin, isInitialized, resolved, pathname, router]);
+  }, [maintenanceMode, isAdmin, resolved, pathname, router]);
 
-  // Show loading during initialization
-  if (!isInitialized || !welcomeChecked) {
-    return <PulseLoading variant="primary" size={150} message="Initialisation..." />;
+  // 1. Pour les routes protégées nécessitant l'authentification : afficher le loader si auth en cours
+  if (resolved?.requireAuth && authLoading) {
+    return <LoadingScreen message="Vérification de la session..." />;
   }
 
-  // Show loading during auth check for protected routes
-  if (authLoading && resolved?.requireAuth) {
-    return <LoadingScreen message="Vérification..." />;
-  }
-
-  // Sécurité (si le proxy n'a pas redirigé pour une raison X ou Y)
+  // 2. Si l'accès est refusé sur une route protégée (géré par middleware, fallback client)
   if (resolved && !resolved.hasAccess) {
-    return null;
+    return <LoadingScreen message="Redirection en cours..." />;
   }
 
-  if (!resolved) {
-    return <PulseLoading />;
-  }
-
-  // Special layout routes
-  if (resolved && resolved?.layout === "none") {
+  // 3. Routes avec layout "none" (ex: auth, on-tap, splash)
+  if (resolved?.layout === "none") {
     return (
       <>
         {maintenanceMode && (
@@ -272,7 +244,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Normal layout
+  // 4. Rendu de l'interface principale (MainLayout) — immédiat sans blocage sur les routes publiques
   return (
     <>
       <AnimatePresence mode="wait">
@@ -312,7 +284,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         hideTopMiddleOnScroll={resolved?.topMiddle?.hideOnScroll}
         breadcrumbItems={resolved?.topMiddle?.breadcrumbs || []}
         floatingDockLinks={resolved?.floatingDock?.links || []}
-        shouldExcludeContainer={resolved?.layout === "none"}
+        shouldExcludeContainer={false}
         showOnTap={resolved?.showOnTap}
       >
         {children}

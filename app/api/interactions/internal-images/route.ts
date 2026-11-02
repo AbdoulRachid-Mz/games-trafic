@@ -1,115 +1,49 @@
+
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs/promises";
+import path from "node:path";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  
-  // Paramètres de base
-  const folder = searchParams.get("folder") || "images";
-  const action = searchParams.get("action") || "categories";
-  
-  // Paramètres de filtrage
-  const withSubfolders = searchParams.get("withSubfolders") !== "false";
-  const maxSize = searchParams.get("maxSize") ? parseInt(searchParams.get("maxSize")!) : null;
-  const minSize = searchParams.get("minSize") ? parseInt(searchParams.get("minSize")!) : null;
-  const extensions = searchParams.get("extensions")?.split(",") || null;
-  const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : null;
-  const sortBy = searchParams.get("sortBy") || "name"; // name, size, date
-  const sortOrder = searchParams.get("sortOrder") || "asc"; // asc, desc
-  const search = searchParams.get("search") || "";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  try {
-    const publicPath = path.join(process.cwd(), "public");
+const DEFAULT_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".bmp",
+  ".tiff",
+  ".ico",
+  ".avif",
+  ".jfif",
+];
 
-    // Action: récupérer la structure des dossiers avec leurs images
-    if (action === "categories") {
-      const categories = await getImageCategories(publicPath, folder, {
-        withSubfolders,
-        maxSize,
-        minSize,
-        extensions,
-        limit,
-        sortBy,
-        sortOrder,
-        search,
-      });
-      return NextResponse.json(categories, { status: 200 });
-    }
+const MAX_LIMIT = 1000;
+const MAX_FOLDER_LENGTH = 300;
 
-    // Action: récupérer toutes les images de tous les dossiers
-    if (action === "all") {
-      const allImages = await getAllImagesFromFolder(publicPath, folder, {
-        withSubfolders,
-        maxSize,
-        minSize,
-        extensions,
-        limit,
-        sortBy,
-        sortOrder,
-        search,
-      });
-      return NextResponse.json(allImages, { status: 200 });
-    }
-
-    // Action: récupérer les images d'un dossier spécifique
-    if (action === "folder") {
-      const folderPath = path.join(publicPath, folder);
-      const images = await getImagesFromFolder(folderPath, `/${folder}`, {
-        withSubfolders,
-        maxSize,
-        minSize,
-        extensions,
-        limit,
-        sortBy,
-        sortOrder,
-        search,
-      });
-      return NextResponse.json(images, { status: 200 });
-    }
-
-    // Action: obtenir les statistiques
-    if (action === "stats") {
-      const stats = await getFolderStats(publicPath, folder, { withSubfolders });
-      return NextResponse.json(stats, { status: 200 });
-    }
-
-    // Par défaut, retourner les catégories
-    const categories = await getImageCategories(publicPath, folder, {
-      withSubfolders,
-      maxSize,
-      minSize,
-      extensions,
-      limit,
-      sortBy,
-      sortOrder,
-      search,
-    });
-    return NextResponse.json(categories, { status: 200 });
-
-  } catch (error) {
-    console.error("Error scanning images folder:", error);
-    return NextResponse.json(
-      { 
-        error: "Unable to scan directory", 
-        details: error instanceof Error ? error.message : "Unknown error" 
-      },
-      { status: 500 }
-    );
-  }
-}
-
-/* === INTERFACES === */
+type SortBy = "name" | "size" | "date" | "count";
+type SortOrder = "asc" | "desc";
+type Action = "categories" | "all" | "folder" | "stats";
 
 interface FilterOptions {
-  withSubfolders?: boolean;
-  maxSize?: number | null;
-  minSize?: number | null;
-  extensions?: string[] | null;
-  limit?: number | null;
-  sortBy?: string;
-  sortOrder?: string;
-  search?: string;
+  withSubfolders: boolean;
+  maxSize: number | null;
+  minSize: number | null;
+  extensions: string[];
+  limit: number | null;
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+  search: string;
+}
+
+interface ImageInfo {
+  url: string;
+  name: string;
+  size: number;
+  extension: string;
+  lastModified: number;
 }
 
 interface ImageCategory {
@@ -122,14 +56,6 @@ interface ImageCategory {
   icon?: string;
 }
 
-interface ImageInfo {
-  url: string;
-  name: string;
-  size: number;
-  extension: string;
-  lastModified: number;
-}
-
 interface FolderStats {
   totalImages: number;
   totalSize: number;
@@ -139,391 +65,640 @@ interface FolderStats {
   smallestImage: ImageInfo | null;
 }
 
-/* === UTILS === */
+interface ScanEntry {
+  name: string;
+  fullPath: string;
+  relativePath: string;
+  isDirectory: boolean;
+}
 
-// Récupérer toutes les catégories d'images avec leurs contenus
-async function getImageCategories(
-  publicPath: string, 
-  baseFolder: string = "images",
-  options: FilterOptions = {}
-): Promise<ImageCategory[]> {
-  const categories: ImageCategory[] = [];
-  const baseFolderPath = path.join(publicPath, baseFolder);
-
-  if (!fs.existsSync(baseFolderPath)) {
-    console.warn(`Base folder ${baseFolderPath} does not exist`);
-    return categories;
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number = 400,
+  ) {
+    super(message);
+    this.name = "ApiError";
   }
+}
 
+/* -------------------------------------------------------------------------- */
+/*                                   ROUTE                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function GET(request: NextRequest) {
   try {
-    // Ajouter la catégorie "Toutes les images"
-    const allImages = await getAllImagesFromFolder(publicPath, baseFolder, options);
-    if (allImages.length > 0) {
-      categories.push({
-        name: "all",
-        path: "all",
-        displayName: "Toutes les images",
-        images: allImages,
-        hasSubfolders: false,
-        totalImages: allImages.length,
-        icon: "🖼️",
-      });
-    }
+    const params = request.nextUrl.searchParams;
 
-    // Scanner les sous-dossiers
-    const items = fs.readdirSync(baseFolderPath);
-    
-    for (const item of items) {
-      const itemPath = path.join(baseFolderPath, item);
-      const relativePath = path.join(baseFolder, item);
-      
-      if (fs.statSync(itemPath).isDirectory()) {
-        const images = await getImagesFromFolder(itemPath, `/${relativePath}`, options);
-        
-        if (images.length > 0) {
-          categories.push({
-            name: item,
-            path: relativePath,
-            displayName: formatDisplayName(item),
-            images: images,
-            hasSubfolders: await hasSubdirectories(itemPath),
-            totalImages: images.length,
-            icon: getFolderIcon(item),
-          });
-        }
+    const folder = validateFolder(params.get("folder") || "images");
+    const action = validateAction(params.get("action") || "categories");
+    const options = parseOptions(params);
+
+    const publicPath = path.resolve(process.cwd(), "public");
+    const baseFolderPath = resolveInside(publicPath, folder);
+
+    switch (action) {
+      case "categories": {
+        const categories = await getImageCategories(
+          publicPath,
+          folder,
+          options,
+        );
+
+        return NextResponse.json(categories);
       }
-    }
 
-    // Trier les catégories
-    return sortCategories(categories, options.sortBy, options.sortOrder);
-  } catch (error) {
-    console.error("Error getting image categories:", error);
-    return categories;
-  }
-}
+      case "all": {
+        const images = await getAllImagesFromFolder(
+          publicPath,
+          folder,
+          options,
+        );
 
-// Récupérer toutes les images d'un dossier et ses sous-dossiers (récursif)
-async function getAllImagesFromFolder(
-  publicPath: string, 
-  folderName: string,
-  options: FilterOptions = {}
-): Promise<ImageInfo[]> {
-  const folderPath = path.join(publicPath, folderName);
+        return NextResponse.json(images);
+      }
 
-  if (!fs.existsSync(folderPath)) {
-    return [];
-  }
+      case "folder": {
+        const images = await getImagesFromFolder(
+          baseFolderPath,
+          `/${folder}`,
+          options,
+        );
 
-  try {
-    const images = options.withSubfolders 
-      ? await getImagesRecursive(folderPath, `/${folderName}`, options)
-      : await getImagesFromFolder(folderPath, `/${folderName}`, options);
-    
-    return images;
-  } catch (error) {
-    console.error(`Error getting all images from ${folderName}:`, error);
-    return [];
-  }
-}
+        return NextResponse.json(images);
+      }
 
-// Récupérer les images d'un dossier de manière récursive
-async function getImagesRecursive(
-  dirPath: string, 
-  webPath: string,
-  options: FilterOptions = {}
-): Promise<ImageInfo[]> {
-  const images: ImageInfo[] = [];
-  
-  if (!fs.existsSync(dirPath)) {
-    return images;
-  }
+      case "stats": {
+        const stats = await getFolderStats(
+          publicPath,
+          folder,
+          options,
+        );
 
-  try {
-    const items = fs.readdirSync(dirPath);
-
-    for (const item of items) {
-      const fullPath = path.join(dirPath, item);
-      const relativePath = path.join(webPath, item).replace(/\\/g, "/");
-
-      if (fs.statSync(fullPath).isDirectory() && options.withSubfolders) {
-        const subImages = await getImagesRecursive(fullPath, relativePath, options);
-        images.push(...subImages);
-      } else if (fs.statSync(fullPath).isFile() && isImageFile(item, options.extensions)) {
-        const imageInfo = await getImageInfo(fullPath, relativePath);
-        if (imageInfo && passesFilters(imageInfo, options)) {
-          images.push(imageInfo);
-        }
+        return NextResponse.json(stats);
       }
     }
   } catch (error) {
-    console.error(`Error reading directory ${dirPath}:`, error);
-  }
-
-  return sortImages(images, options.sortBy, options.sortOrder, options.limit);
-}
-
-// Récupérer les images d'un dossier spécifique
-async function getImagesFromFolder(
-  folderPath: string, 
-  webPath: string,
-  options: FilterOptions = {}
-): Promise<ImageInfo[]> {
-  const images: ImageInfo[] = [];
-  
-  if (!fs.existsSync(folderPath)) {
-    return images;
-  }
-
-  try {
-    const items = fs.readdirSync(folderPath);
-
-    for (const item of items) {
-      const fullPath = path.join(folderPath, item);
-      const relativePath = path.join(webPath, item).replace(/\\/g, "/");
-      
-      if (fs.statSync(fullPath).isFile() && isImageFile(item, options.extensions)) {
-        const imageInfo = await getImageInfo(fullPath, relativePath);
-        if (imageInfo && passesFilters(imageInfo, options)) {
-          images.push(imageInfo);
-        }
-      } else if (fs.statSync(fullPath).isDirectory() && options.withSubfolders) {
-        const subImages = await getImagesFromFolder(fullPath, relativePath, options);
-        images.push(...subImages);
-      }
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
     }
-  } catch (error) {
-    console.error(`Error reading folder ${folderPath}:`, error);
-  }
 
-  return sortImages(images, options.sortBy, options.sortOrder, options.limit);
+    console.error("[Images API]", error);
+
+    return NextResponse.json(
+      { error: "Impossible de scanner le dossier." },
+      { status: 500 },
+    );
+  }
 }
 
-// Obtenir les informations d'une image
-async function getImageInfo(filePath: string, webPath: string): Promise<ImageInfo | null> {
-  try {
-    const stats = fs.statSync(filePath);
-    const extension = path.extname(filePath).toLowerCase();
-    const name = path.basename(filePath);
+/* -------------------------------------------------------------------------- */
+/*                                VALIDATION                                  */
+/* -------------------------------------------------------------------------- */
 
-    return {
-      url: webPath,
-      name,
-      size: stats.size,
-      extension,
-      lastModified: stats.mtime.getTime(),
-    };
-  } catch (error) {
-    console.error(`Error getting image info for ${filePath}:`, error);
+function validateFolder(value: string): string {
+  const normalized = value.trim().replace(/\\/g, "/");
+
+  if (
+    !normalized ||
+    normalized.length > MAX_FOLDER_LENGTH ||
+    normalized.startsWith("/") ||
+    /^[a-zA-Z]:/.test(normalized) ||
+    normalized.split("/").some(
+      (segment) =>
+        !segment ||
+        segment === "." ||
+        segment === "..",
+    )
+  ) {
+    throw new ApiError("Chemin de dossier invalide.");
+  }
+
+  return normalized;
+}
+
+function validateAction(value: string): Action {
+  const actions: Action[] = [
+    "categories",
+    "all",
+    "folder",
+    "stats",
+  ];
+
+  if (!actions.includes(value as Action)) {
+    throw new ApiError("Action non reconnue.");
+  }
+
+  return value as Action;
+}
+
+function parseInteger(
+  value: string | null,
+  name: string,
+): number | null {
+  if (value === null || value.trim() === "") {
     return null;
   }
+
+  const parsed = Number(value);
+
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new ApiError(`Paramètre ${name} invalide.`);
+  }
+
+  return parsed;
 }
 
-// Obtenir les statistiques d'un dossier
-async function getFolderStats(
-  publicPath: string, 
+function parseOptions(
+  params: URLSearchParams,
+): FilterOptions {
+  const maxSize = parseInteger(params.get("maxSize"), "maxSize");
+  const minSize = parseInteger(params.get("minSize"), "minSize");
+  const rawLimit = parseInteger(params.get("limit"), "limit");
+
+  if (maxSize !== null && minSize !== null && minSize > maxSize) {
+    throw new ApiError("minSize ne peut pas dépasser maxSize.");
+  }
+
+  if (rawLimit !== null && rawLimit === 0) {
+    throw new ApiError("limit doit être supérieur à zéro.");
+  }
+
+  const sortByValue = params.get("sortBy") || "name";
+  const sortOrderValue = params.get("sortOrder") || "asc";
+
+  const validSorts: SortBy[] = [
+    "name",
+    "size",
+    "date",
+    "count",
+  ];
+
+  if (!validSorts.includes(sortByValue as SortBy)) {
+    throw new ApiError("Valeur sortBy invalide.");
+  }
+
+  if (sortOrderValue !== "asc" && sortOrderValue !== "desc") {
+    throw new ApiError("Valeur sortOrder invalide.");
+  }
+
+  const extensionsParam = params.get("extensions");
+
+  const extensions = extensionsParam
+    ? extensionsParam
+        .split(",")
+        .map((extension) => {
+          const normalized = extension.trim().toLowerCase();
+          return normalized.startsWith(".")
+            ? normalized
+            : `.${normalized}`;
+        })
+        .filter(Boolean)
+    : DEFAULT_EXTENSIONS;
+
+  if (
+    extensions.length === 0 ||
+    extensions.some(
+      (extension) =>
+        !/^\.[a-z0-9]{1,10}$/.test(extension),
+    )
+  ) {
+    throw new ApiError("Liste d'extensions invalide.");
+  }
+
+  return {
+    withSubfolders: params.get("withSubfolders") !== "false",
+    maxSize,
+    minSize,
+    extensions: [...new Set(extensions)],
+    limit: rawLimit === null ? null : Math.min(rawLimit, MAX_LIMIT),
+    sortBy: sortByValue as SortBy,
+    sortOrder: sortOrderValue as SortOrder,
+    search: (params.get("search") || "").trim().toLowerCase(),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              PATH SECURITY                                 */
+/* -------------------------------------------------------------------------- */
+
+function resolveInside(basePath: string, relativePath: string): string {
+  const resolved = path.resolve(basePath, relativePath);
+  const relative = path.relative(basePath, resolved);
+
+  if (
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new ApiError("Accès au dossier interdit.", 403);
+  }
+
+  return resolved;
+}
+
+async function isDirectory(target: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(target);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function readDirectory(dirPath: string): Promise<ScanEntry[]> {
+  const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+  return entries.map((entry) => ({
+    name: entry.name,
+    fullPath: path.join(dirPath, entry.name),
+    relativePath: entry.name,
+    isDirectory: entry.isDirectory(),
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                IMAGE SCAN                                  */
+/* -------------------------------------------------------------------------- */
+
+async function getImageCategories(
+  publicPath: string,
+  baseFolder: string,
+  options: FilterOptions,
+): Promise<ImageCategory[]> {
+  const basePath = resolveInside(publicPath, baseFolder);
+
+  if (!(await isDirectory(basePath))) {
+    return [];
+  }
+
+  const categories: ImageCategory[] = [];
+
+  const allImages = await getAllImagesFromFolder(
+    publicPath,
+    baseFolder,
+    { ...options, limit: null },
+  );
+
+  if (allImages.length > 0) {
+    const limitedImages = applyLimit(
+      sortImages(allImages, options),
+      options.limit,
+    );
+
+    categories.push({
+      name: "all",
+      path: "all",
+      displayName: "Toutes les images",
+      images: limitedImages,
+      hasSubfolders: false,
+      totalImages: allImages.length,
+      icon: "🖼️",
+    });
+  }
+
+  const entries = await readDirectory(basePath);
+
+  for (const entry of entries) {
+    if (!entry.isDirectory) continue;
+
+    const categoryPath = path.join(baseFolder, entry.name)
+      .replace(/\\/g, "/");
+
+    const images = await getImagesFromFolder(
+      entry.fullPath,
+      `/${categoryPath}`,
+      options,
+    );
+
+    if (images.length === 0) continue;
+
+    const hasSubfolders = (
+      await readDirectory(entry.fullPath)
+    ).some((item) => item.isDirectory);
+
+    categories.push({
+      name: entry.name,
+      path: categoryPath,
+      displayName: formatDisplayName(entry.name),
+      images,
+      hasSubfolders,
+      totalImages: images.length,
+      icon: getFolderIcon(entry.name),
+    });
+  }
+
+  return sortCategories(categories, options);
+}
+
+async function getAllImagesFromFolder(
+  publicPath: string,
   folderName: string,
-  options: FilterOptions = {}
-): Promise<FolderStats> {
-  const images = await getAllImagesFromFolder(publicPath, folderName, options);
-  
-  const totalImages = images.length;
-  const totalSize = images.reduce((sum, img) => sum + img.size, 0);
-  const averageSize = totalImages > 0 ? totalSize / totalImages : 0;
-  
-  const extensionCounts: Record<string, number> = {};
-  images.forEach(img => {
-    extensionCounts[img.extension] = (extensionCounts[img.extension] || 0) + 1;
+  options: FilterOptions,
+): Promise<ImageInfo[]> {
+  const folderPath = resolveInside(publicPath, folderName);
+
+  if (!(await isDirectory(folderPath))) {
+    return [];
+  }
+
+  return scanDirectory(
+    folderPath,
+    `/${folderName}`,
+    options,
+  );
+}
+
+async function getImagesFromFolder(
+  folderPath: string,
+  webPath: string,
+  options: FilterOptions,
+): Promise<ImageInfo[]> {
+  if (!(await isDirectory(folderPath))) {
+    return [];
+  }
+
+  return scanDirectory(folderPath, webPath, options);
+}
+
+async function scanDirectory(
+  dirPath: string,
+  webPath: string,
+  options: FilterOptions,
+): Promise<ImageInfo[]> {
+  const images: ImageInfo[] = [];
+
+  async function walk(currentPath: string, currentWebPath: string) {
+    const entries = await readDirectory(currentPath);
+
+    for (const entry of entries) {
+      if (entry.isDirectory) {
+        if (options.withSubfolders) {
+          await walk(
+            entry.fullPath,
+            `${currentWebPath}/${entry.name}`,
+          );
+        }
+
+        continue;
+      }
+
+      // Ne suivre ni les liens symboliques ni les fichiers non-images.
+      if (!isImageFile(entry.name, options.extensions)) {
+        continue;
+      }
+
+      try {
+        const stats = await fs.lstat(entry.fullPath);
+
+        if (!stats.isFile() || stats.isSymbolicLink()) continue;
+
+        const image: ImageInfo = {
+          url: `${currentWebPath}/${entry.name}`.replace(/\\/g, "/"),
+          name: entry.name,
+          size: stats.size,
+          extension: path.extname(entry.name).toLowerCase(),
+          lastModified: stats.mtime.getTime(),
+        };
+
+        if (passesFilters(image, options)) {
+          images.push(image);
+        }
+      } catch {
+        // Ignorer un fichier devenu inaccessible pendant le scan.
+      }
+    }
+  }
+
+  try {
+    await walk(dirPath, webPath);
+
+    return applyLimit(
+      sortImages(images, options),
+      options.limit,
+    );
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError("Impossible de lire le dossier.", 500);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  FILTERS                                   */
+/* -------------------------------------------------------------------------- */
+
+function isImageFile(
+  filename: string,
+  extensions: string[],
+): boolean {
+  return extensions.includes(
+    path.extname(filename).toLowerCase(),
+  );
+}
+
+function passesFilters(
+  image: ImageInfo,
+  options: FilterOptions,
+): boolean {
+  if (options.minSize !== null && image.size < options.minSize) {
+    return false;
+  }
+
+  if (options.maxSize !== null && image.size > options.maxSize) {
+    return false;
+  }
+
+  if (
+    options.search &&
+    !image.name.toLowerCase().includes(options.search)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function sortImages(
+  images: ImageInfo[],
+  options: FilterOptions,
+): ImageInfo[] {
+  const sorted = [...images];
+
+  sorted.sort((a, b) => {
+    let result = 0;
+
+    switch (options.sortBy) {
+      case "size":
+        result = a.size - b.size;
+        break;
+
+      case "date":
+        result = a.lastModified - b.lastModified;
+        break;
+
+      case "name":
+      default:
+        result = a.name.localeCompare(b.name);
+        break;
+    }
+
+    return options.sortOrder === "desc" ? -result : result;
   });
 
-  const largestImage = images.reduce((largest, img) => 
-    !largest || img.size > largest.size ? img : largest, null as ImageInfo | null);
-  
-  const smallestImage = images.reduce((smallest, img) => 
-    !smallest || img.size < smallest.size ? img : smallest, null as ImageInfo | null);
+  return sorted;
+}
+
+function applyLimit<T>(
+  items: T[],
+  limit: number | null,
+): T[] {
+  return limit === null ? items : items.slice(0, limit);
+}
+
+function sortCategories(
+  categories: ImageCategory[],
+  options: FilterOptions,
+): ImageCategory[] {
+  const allCategory = categories.find((item) => item.name === "all");
+
+  const others = categories.filter(
+    (item) => item.name !== "all",
+  );
+
+  others.sort((a, b) => {
+    const result =
+      options.sortBy === "count"
+        ? a.totalImages - b.totalImages
+        : options.sortBy === "size"
+          ? a.images.reduce((sum, img) => sum + img.size, 0) -
+            b.images.reduce((sum, img) => sum + img.size, 0)
+          : options.sortBy === "date"
+            ? Math.max(...a.images.map((img) => img.lastModified)) -
+              Math.max(...b.images.map((img) => img.lastModified))
+            : a.displayName.localeCompare(b.displayName);
+
+    return options.sortOrder === "desc" ? -result : result;
+  });
+
+  return allCategory ? [allCategory, ...others] : others;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  STATISTICS                                */
+/* -------------------------------------------------------------------------- */
+
+async function getFolderStats(
+  publicPath: string,
+  folderName: string,
+  options: FilterOptions,
+): Promise<FolderStats> {
+  const images = await getAllImagesFromFolder(
+    publicPath,
+    folderName,
+    { ...options, limit: null },
+  );
+
+  const totalImages = images.length;
+  const totalSize = images.reduce(
+    (sum, image) => sum + image.size,
+    0,
+  );
+
+  const extensionCounts: Record<string, number> = {};
+
+  for (const image of images) {
+    extensionCounts[image.extension] =
+      (extensionCounts[image.extension] || 0) + 1;
+  }
 
   return {
     totalImages,
     totalSize,
-    averageSize,
+    averageSize: totalImages > 0 ? totalSize / totalImages : 0,
     extensionCounts,
-    largestImage,
-    smallestImage,
+    largestImage: images.reduce<ImageInfo | null>(
+      (largest, image) =>
+        !largest || image.size > largest.size ? image : largest,
+      null,
+    ),
+    smallestImage: images.reduce<ImageInfo | null>(
+      (smallest, image) =>
+        !smallest || image.size < smallest.size ? image : smallest,
+      null,
+    ),
   };
 }
 
-// Vérifier si un fichier est une image
-function isImageFile(filename: string, allowedExtensions?: string[] | null): boolean {
-  const defaultExtensions = [
-    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", 
-    ".bmp", ".tiff", ".ico", ".avif", ".jfif"
-  ];
-  
-  const extensions = allowedExtensions || defaultExtensions;
-  const fileExtension = path.extname(filename).toLowerCase();
-  
-  return extensions.includes(fileExtension);
-}
+/* -------------------------------------------------------------------------- */
+/*                                  DISPLAY                                   */
+/* -------------------------------------------------------------------------- */
 
-// Vérifier si une image passe les filtres
-function passesFilters(image: ImageInfo, options: FilterOptions): boolean {
-  // Filtre par taille
-  if (options.minSize && image.size < options.minSize) return false;
-  if (options.maxSize && image.size > options.maxSize) return false;
-  
-  // Filtre par recherche
-  if (options.search && !image.name.toLowerCase().includes(options.search.toLowerCase())) {
-    return false;
-  }
-  
-  return true;
-}
-
-// Trier les images
-function sortImages(
-  images: ImageInfo[], 
-  sortBy?: string, 
-  sortOrder?: string, 
-  limit?: number | null
-): ImageInfo[] {
-  let sorted = [...images];
-  
-  // Tri
-  switch (sortBy) {
-    case "size":
-      sorted.sort((a, b) => a.size - b.size);
-      break;
-    case "date":
-      sorted.sort((a, b) => a.lastModified - b.lastModified);
-      break;
-    case "name":
-    default:
-      sorted.sort((a, b) => a.name.localeCompare(b.name));
-      break;
-  }
-  
-  // Ordre
-  if (sortOrder === "desc") {
-    sorted.reverse();
-  }
-  
-  // Limite
-  if (limit && limit > 0) {
-    sorted = sorted.slice(0, limit);
-  }
-  
-  return sorted;
-}
-
-// Trier les catégories
-function sortCategories(
-  categories: ImageCategory[], 
-  sortBy?: string, 
-  sortOrder?: string
-): ImageCategory[] {
-  const sorted = [...categories];
-  
-  // Garder "Toutes les images" en premier
-  const allCategory = sorted.find(cat => cat.name === "all");
-  const otherCategories = sorted.filter(cat => cat.name !== "all");
-  
-  // Trier les autres catégories
-  switch (sortBy) {
-    case "count":
-      otherCategories.sort((a, b) => a.totalImages - b.totalImages);
-      break;
-    case "name":
-    default:
-      otherCategories.sort((a, b) => a.displayName.localeCompare(b.displayName));
-      break;
-  }
-  
-  if (sortOrder === "desc") {
-    otherCategories.reverse();
-  }
-  
-  return allCategory ? [allCategory, ...otherCategories] : otherCategories;
-}
-
-// Vérifier si un dossier a des sous-dossiers
-async function hasSubdirectories(dirPath: string): Promise<boolean> {
-  if (!fs.existsSync(dirPath)) {
-    return false;
-  }
-
-  try {
-    const items = fs.readdirSync(dirPath);
-    return items.some(item => {
-      const fullPath = path.join(dirPath, item);
-      return fs.statSync(fullPath).isDirectory();
-    });
-  } catch (error) {
-    return false;
-  }
-}
-
-// Formater le nom d'affichage des catégories
 function formatDisplayName(folderName: string): string {
-  const displayNames: Record<string, string> = {
-    'emoji': 'Émojis',
-    'emojis': 'Émojis',
-    'avatar': 'Avatars',
-    'avatars': 'Avatars',
-    'produits': 'Produits',
-    'products': 'Produits',
-    'background': 'Arrière-plans',
-    'backgrounds': 'Arrière-plans',
-    'profile': 'Profils',
-    'profiles': 'Profils',
-    'cover': 'Couvertures',
-    'covers': 'Couvertures',
-    'icons': 'Icônes',
-    'icon': 'Icônes',
-    'logos': 'Logos',
-    'logo': 'Logos',
-    'banners': 'Bannières',
-    'banner': 'Bannières',
-    'thumbnails': 'Miniatures',
-    'thumbnail': 'Miniatures',
-    'ui': 'Interface',
-    'buttons': 'Boutons',
-    'illustrations': 'Illustrations',
-    'photos': 'Photos',
-    'vectors': 'Vectoriels',
+  const names: Record<string, string> = {
+    emoji: "Émojis",
+    emojis: "Émojis",
+    avatar: "Avatars",
+    avatars: "Avatars",
+    produits: "Produits",
+    products: "Produits",
+    background: "Arrière-plans",
+    backgrounds: "Arrière-plans",
+    profile: "Profils",
+    profiles: "Profils",
+    cover: "Couvertures",
+    covers: "Couvertures",
+    icons: "Icônes",
+    icon: "Icônes",
+    logos: "Logos",
+    logo: "Logos",
+    banners: "Bannières",
+    banner: "Bannières",
+    thumbnails: "Miniatures",
+    thumbnail: "Miniatures",
+    ui: "Interface",
+    buttons: "Boutons",
+    illustrations: "Illustrations",
+    photos: "Photos",
+    vectors: "Vectoriels",
   };
 
-  return displayNames[folderName.toLowerCase()] || 
-         folderName.charAt(0).toUpperCase() + folderName.slice(1);
+  return (
+    names[folderName.toLowerCase()] ||
+    folderName.charAt(0).toUpperCase() + folderName.slice(1)
+  );
 }
 
-// Obtenir l'icône d'un dossier
 function getFolderIcon(folderName: string): string {
   const icons: Record<string, string> = {
-    'emoji': '😀',
-    'emojis': '😀',
-    'avatar': '👤',
-    'avatars': '👤',
-    'produits': '📦',
-    'products': '📦',
-    'background': '🖼️',
-    'backgrounds': '🖼️',
-    'profile': '👤',
-    'profiles': '👤',
-    'cover': '📄',
-    'covers': '📄',
-    'icons': '⭐',
-    'icon': '⭐',
-    'logos': '🏷️',
-    'logo': '🏷️',
-    'banners': '🎌',
-    'banner': '🎌',
-    'thumbnails': '🖼️',
-    'thumbnail': '🖼️',
-    'ui': '🎨',
-    'buttons': '🔘',
-    'illustrations': '🎨',
-    'photos': '📸',
-    'vectors': '📐',
+    emoji: "😀",
+    emojis: "😀",
+    avatar: "👤",
+    avatars: "👤",
+    produits: "📦",
+    products: "📦",
+    background: "🖼️",
+    backgrounds: "🖼️",
+    profile: "👤",
+    profiles: "👤",
+    cover: "📄",
+    covers: "📄",
+    icons: "⭐",
+    icon: "⭐",
+    logos: "🏷️",
+    logo: "🏷️",
+    banners: "🎌",
+    banner: "🎌",
+    thumbnails: "🖼️",
+    thumbnail: "🖼️",
+    ui: "🎨",
+    buttons: "🔘",
+    illustrations: "🎨",
+    photos: "📸",
+    vectors: "📐",
   };
 
-  return icons[folderName.toLowerCase()] || '📁';
+  return icons[folderName.toLowerCase()] || "📁";
 }
