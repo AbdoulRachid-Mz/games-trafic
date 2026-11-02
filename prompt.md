@@ -1,1545 +1,982 @@
-# REFONTE TECHNIQUE GLOBALE GAMES-TRAICIC
-## Transactions financières · Tournament Engine · Application Shell · PWA · Architecture
+# MASTER PROMPT — REFACTORING COMPLET DU SYSTÈME DE TRANSACTIONS
+## H³ Infinity Gaming — Architecture financière, administration et portefeuille utilisateur
 
-**Projet :** Games-Trafic  
-**Repository :** https://github.com/AbdoulRachid-Mz/games-trafic  
-**Stack existante :** Next.js App Router, TypeScript, Better Auth, PostgreSQL Neon, Drizzle ORM, TanStack Query, shadcn/ui, Tailwind CSS v4 et PWA.
+Tu interviens sur le projet **H³ Infinity Gaming (Games Trafic)**, une plateforme gaming avec un système de portefeuille GTC, des transactions entre utilisateurs, des achats, des inscriptions aux tournois, des dépôts, des retraits et des opérations administratives.
+
+Repository : https://github.com/AbdoulRachid-Mz/games-trafic
+
+Ta mission est de réaliser une **refonte complète, cohérente, sécurisée et maintenable du système de transactions**, aussi bien côté administration que côté utilisateurs.
+
+Il ne s'agit pas simplement de modifier quelques composants ou de refaire le design. Tu dois comprendre le fonctionnement financier actuel, identifier les incohérences, consolider les règles métier et reconstruire les parcours nécessaires sans casser les fonctionnalités existantes.
 
 ---
 
-# 1. OBJECTIF GÉNÉRAL
-
-Effectuer une refonte technique approfondie et progressive de l'application Games-Trafic.
-
-Cette refonte concerne quatre grands domaines :
-
-1. Le système de transactions financières et toutes ses dépendances.
-2. Le système de gestion des tournois et son moteur de compétition.
-3. L'architecture de l'Application Shell, des layouts et des mécanismes de vérification.
-4. Le système PWA, ses contrôles, son initialisation et ses interactions avec le cycle de vie de l'application.
-
-L'objectif n'est pas de simplement corriger les erreurs visibles ou de réorganiser quelques fichiers.
-
-Il faut analyser les responsabilités, les dépendances, les flux métier, les performances, les problèmes de sécurité et les incohérences architecturales, puis proposer et réaliser une architecture plus propre, modulaire, maintenable, performante et évolutive.
-
-**Règle fondamentale : préserver les fonctionnalités existantes et leur comportement métier lorsqu'ils sont corrects.**
-
-Ne pas réécrire aveuglément les systèmes existants. Toute modification doit être justifiée par une analyse du code, de ses dépendances et de ses effets sur les autres parties de l'application.
-
-# 2. RÈGLES DE TRAVAIL OBLIGATOIRES
+# PHASE 0 — RÈGLES DE TRAVAIL OBLIGATOIRES
 
 Avant toute modification :
 
-- Examiner le code réel du dépôt.
-- Lire les fichiers concernés dans leur intégralité lorsque nécessaire.
-- Rechercher toutes les utilisations des fonctions, composants, hooks, types et services concernés.
-- Identifier les dépendances directes et indirectes.
-- Examiner les relations entre les tables Drizzle.
-- Comparer les actions, les API, les hooks et les composants qui exécutent des opérations similaires.
-- Identifier les comportements réellement utilisés par l'application.
-- Distinguer les fonctionnalités terminées, partielles, simulées et inutilisées.
-- Vérifier les tests existants et les compléter avant les modifications risquées.
+1. Explore le projet réel et son architecture.
+2. Identifie les technologies, conventions et patterns déjà utilisés.
+3. Lis les schémas de base de données, les types, les actions serveur, les services, les API, les hooks et les composants concernés.
+4. Recherche toutes les références aux transactions et aux opérations financières.
+5. Trace les flux depuis l'interface jusqu'à la base de données.
+6. Identifie les dépendances entre les pages, les composants, les actions et les tables.
+7. Ne suppose jamais qu'une fonctionnalité existe uniquement parce qu'un type ou un composant porte son nom.
+8. Ne crée pas une deuxième implémentation d'une logique métier déjà présente sans avoir justifié cette décision.
+9. Ne supprime aucune fonctionnalité sans analyser ses dépendances et proposer une migration.
+10. Ne modifie pas le schéma de données avant d'avoir identifié les conséquences sur les données existantes.
 
-Ne jamais supposer qu'une fonction est inutilisée uniquement parce qu'elle n'est pas importée directement dans une page. Elle peut être appelée par un hook, une autre action, un composant partagé ou une autre couche du système.
+**Interdiction de commencer par le code.** La première étape est obligatoirement l'audit.
 
-Ne pas supprimer une fonction avant d'avoir identifié tous ses consommateurs.
+Ne te limite pas aux fichiers mentionnés dans ce prompt. Utilise la recherche globale du dépôt pour découvrir tous les fichiers qui participent réellement au système.
 
-Ne pas modifier le schéma de base de données sans avoir démontré la nécessité de cette modification et évalué ses conséquences sur les données existantes.
-
-Ne pas remplacer une bibliothèque, un système d'authentification ou un mécanisme de stockage sans justification technique.
-
-Ne pas introduire de dépendances inutiles.
-
-Ne pas créer de nouveaux fichiers génériques qui deviennent simplement des fichiers surchargés sous un autre nom.
-
-**Toutes les modifications doivent être progressives, vérifiables et accompagnées de tests.**
+Ne fais pas de refonte superficielle : chaque décision doit être fondée sur le code réellement trouvé.
 
 ---
 
-# 3. PHASE 0 — AUDIT INITIAL ET CARTOGRAPHIE COMPLÈTE
+# PHASE 1 — AUDIT COMPLET DU SYSTÈME EXISTANT
 
-Commencer par une analyse du dépôt entier, avec un focus particulier sur :
+## 1.1 Cartographie des transactions
 
-- `actions/`
-- `app/`
-- `components/`
+Explore notamment, sans te limiter à :
+
+- `actions/transactions.ts`
+- `actions/wallets.ts`
+- `types/transaction-types.ts`
+- `database/schema.ts`
+- `database/db.sql`
+- `app/admin/transactions/`
+- `app/(protected)/wallet/transactions/`
+- `components/pages/transactions/`
+- `components/pages/admin/transactions/`
+- `lib/finance/`
+- `validations/`
 - `hooks/`
-- `lib/`
-- `database/`
-- `types/`
 - `config/`
-- `public/`
-- `tests/`
-- `middleware.ts` ou `proxy.ts`, selon l'implémentation actuelle.
-- Les configurations PWA, Next.js et les layouts.
 
-Examiner les fichiers d'architecture et les rapports déjà présents, notamment :
+Vérifie les véritables chemins dans le projet et adapte-toi à leur organisation actuelle.
 
-- `README.md`
-- `ARCHITECTURE.md`
-- `ANALYSIS.md`
-- `TASK.md`
-- `IMPLEMENTATION-PLAN.md`
-- `TOURNAMENT-AUDIT.md`
-- `TOURNAMENT-IMPLEMENTATION-PLAN.md`
-- Les autres documents relatifs aux transactions et à la gestion des erreurs.
+Identifie :
 
-Les anciens documents peuvent être obsolètes. Vérifier leurs affirmations à partir du code actuel.
+- Toutes les catégories de transactions.
+- Tous les statuts possibles.
+- Les types de comptes financiers.
+- Les comptes de portefeuille.
+- Les écritures comptables.
+- Les mécanismes de débit et de crédit.
+- Les commissions et frais éventuels.
+- Les remboursements.
+- Les annulations.
+- Les demandes de transaction.
+- Les opérations administratives.
+- Les notifications associées.
+- Les historiques et reçus.
+- Les limites et règles de validation.
 
-## Livrables initiaux
+## 1.2 Traçage de chaque opération
 
-Créer ou actualiser :
+Pour chaque type de transaction, documente le parcours complet :
 
-### `ANALYSIS.md`
+`Page → Composant → Hook → Action/API → Service métier → Base de données → Résultat → Notification`
 
-Présenter :
-- L'état réel de l'architecture.
-- Les problèmes confirmés.
-- Les risques de sécurité.
-- Les problèmes de performance.
-- Les duplications.
-- Les incohérences entre les couches.
-- Les fonctionnalités partielles.
-- Les dépendances entre les différents domaines.
+Vérifie notamment :
 
-### `ARCHITECTURE.md`
+- Où le montant est calculé.
+- Où le solde est vérifié.
+- Où le destinataire est récupéré.
+- Où les autorisations sont vérifiées.
+- Où les écritures comptables sont créées.
+- Où le statut est modifié.
+- Comment les erreurs sont retournées.
+- Comment les doublons sont évités.
+- Comment les transactions concurrentes sont gérées.
 
-Décrire :
-- L'architecture actuelle.
-- L'architecture cible.
-- Les responsabilités de chaque couche.
-- Les relations entre les services.
-- Les flux financiers.
-- Le moteur de compétition.
-- Le système d'authentification et de vérification.
-- L'Application Shell.
-- Le PWA.
-- Les relations avec la base de données.
+Signale toutes les divergences entre le frontend et le backend.
 
-### `TASK.md`
+## 1.3 Audit des autorisations administratives
 
-Décomposer toutes les tâches techniques, avec :
-- Identifiant.
-- Description.
-- Fichiers concernés.
-- Priorité.
-- Dépendances.
-- Critères de validation.
-- Statut : TODO, IN_PROGRESS, DONE ou BLOCKED.
+Le projet possède des administrateurs de niveaux A, B et C.
 
-### `IMPLEMENTATION-PLAN.md`
+Recherche précisément :
 
-Définir l'ordre précis des modifications et les dépendances entre les phases.
+- La définition des rôles.
+- Le champ `users.level` et son enum.
+- Les permissions existantes.
+- Les contrôles dans les actions serveur.
+- Les contrôles dans les pages et composants.
+- Les éventuelles différences entre `role`, `isAdmin` et `level`.
 
-Ne pas commencer une refonte globale avant d'avoir terminé cette cartographie.
+Ne considère jamais qu'un simple contrôle `isAdmin` suffit à autoriser une opération financière.
 
----
+Documente les permissions réellement appliquées et les éventuelles failles.
 
-# 4. PHASE 1 — APPLICATION SHELL, LAYOUT ET PERFORMANCE INITIALE
+## 1.4 Audit de la création des transactions utilisateur
 
-**Priorité : P0 — À traiter avant les grandes refontes métier.**
+Analyse intégralement le parcours de création dans le portefeuille.
 
-Un problème de performance est constaté au démarrage de l'application : le système de vérification lié à l'Application Shell et aux layouts prend parfois trop de temps avant d'afficher l'application.
+Vérifie :
 
-L'utilisateur ne doit pas avoir l'impression que l'application est bloquée pendant l'exécution de vérifications secondaires.
+- Les paramètres URL.
+- La récupération des entités.
+- Les configurations par type.
+- Les étapes du formulaire.
+- Les composants conditionnels.
+- Les validations.
+- Les calculs de montant.
+- La confirmation.
+- L'exécution.
+- Les retours d'erreur.
+- La navigation après transaction.
 
-Il faut analyser précisément :
+Vérifie particulièrement les paramètres :
 
-- `components/layout/app-shell.tsx`
-- Tous les composants de `components/layout/`.
-- Les layouts de `app/`.
-- Les providers globaux.
-- Les hooks d'authentification.
-- Les mécanismes de résolution des rôles.
-- Les protections des routes.
-- `config/routes-config.ts`.
-- `middleware.ts` ou `proxy.ts`.
-- Les contrôles liés au PWA.
-- Les vérifications d'installation, de connectivité et de session.
+- `editionId`
+- `tournamentId`
+- `itemId`
+- `productId`
+- `userId`
+- `targetId`
+- `entityId`
+- `id`
 
-## 4.1 Cartographier le cycle de démarrage
-
-Identifier exactement les opérations effectuées avant l'affichage de l'application.
-
-Pour chacune, déterminer :
-
-- Est-elle indispensable avant le premier rendu ?
-- Est-elle indispensable avant l'accès à une route protégée ?
-- Peut-elle être exécutée côté serveur ?
-- Peut-elle être exécutée en arrière-plan ?
-- Peut-elle être mise en cache ?
-- Est-elle répétée inutilement ?
-- Déclenche-t-elle plusieurs requêtes ?
-- Peut-elle bloquer toute l'interface ?
-- Peut-elle être exécutée uniquement lorsque la fonctionnalité concernée est utilisée ?
-
-Créer un schéma du cycle de démarrage actuel.
-
-Mesurer les délais de chaque étape lorsque cela est possible.
-
-Ne pas attribuer toutes les lenteurs au PWA ou à l'authentification sans preuve.
-
-## 4.2 Réorganiser les vérifications
-
-Séparer clairement les contrôles en trois catégories.
-
-### A. Contrôles critiques
-
-Ils doivent être effectués avant d'autoriser une opération protégée :
-
-- Validation de la session côté serveur.
-- Vérification des permissions nécessaires.
-- Vérification des rôles pour les opérations administratives.
-- Autorisation des opérations financières.
-- Protection des données sensibles.
-
-Ces contrôles ne doivent jamais être supprimés pour améliorer les performances.
-
-### B. Contrôles nécessaires à certaines fonctionnalités
-
-Ils ne doivent être exécutés que lorsque la fonctionnalité correspondante est utilisée.
-
-Exemples :
-- Vérification des permissions d'une boutique.
-- Vérification des droits de gestion d'un tournoi.
-- Vérification d'une fonctionnalité nécessitant une connexion.
-- Vérification de certaines capacités du navigateur.
-
-### C. Vérifications secondaires
-
-Lorsqu'elles ne sont pas nécessaires à l'affichage ou à la sécurité, elles doivent être différées.
-
-Exemples :
-- Vérification de l'état d'installation PWA.
-- Synchronisation secondaire.
-- Vérification de certaines fonctionnalités du navigateur.
-- Initialisation de services non essentiels.
-- Vérification de mises à jour disponibles.
-- Collecte d'informations de diagnostic.
-
-## 4.3 Optimiser AppShell
-
-Réexaminer complètement `components/layout/app-shell.tsx`.
-
-Objectifs :
-
-- Réduire les responsabilités de ce composant.
-- Éviter qu'il devienne un orchestrateur de toutes les fonctionnalités.
-- Supprimer les requêtes redondantes.
-- Éviter les chaînes de vérifications asynchrones qui bloquent l'interface.
-- Éviter les re-renders globaux inutiles.
-- Ne pas monter plusieurs fois les mêmes providers.
-- Différencier les composants globaux des composants propres à certaines routes.
-- Éviter de charger toutes les fonctionnalités sur toutes les pages.
-
-L'Application Shell doit essentiellement gérer la structure globale et les services réellement nécessaires à son fonctionnement.
-
-Les responsabilités secondaires doivent être décentralisées.
-
-Exemple d'organisation indicative :
-
-```text
-components/
-  layout/
-    app-shell.tsx
-    app-providers.tsx
-    app-content.tsx
-    route-guard.tsx
-    navigation/
-    overlays/
-    loading/
-
-  pwa/
-    pwa-provider.tsx
-    pwa-install-prompt.tsx
-    pwa-update-manager.tsx
-    pwa-status.tsx
-```
-
-Cette organisation est indicative : l'adapter à l'architecture réellement présente.
-
-## 4.4 Authentification et résolution des rôles
-
-Examiner les mécanismes d'authentification et de résolution des permissions.
-
-Objectifs :
-
-- Ne pas répéter la récupération de la session dans plusieurs composants.
-- Éviter les appels successifs inutiles entre client et serveur.
-- Réutiliser les données déjà disponibles lorsque leur fraîcheur est suffisante.
-- Ne pas confondre état d'authentification côté client et autorisation côté serveur.
-- Vérifier les permissions au moment de chaque opération sensible.
-- Éviter de charger les informations administratives pour les utilisateurs ordinaires.
-- Empêcher les boucles de redirection.
-- Gérer correctement les états de chargement, d'expiration et d'erreur.
-
-Ne jamais considérer un rôle stocké dans le navigateur comme une preuve d'autorisation.
-
-## 4.5 Routes et layouts
-
-Examiner la structure des layouts Next.js.
-
-Identifier les routes qui utilisent réellement les mêmes providers et composants.
-
-Éviter de charger dans toutes les pages :
-- Les providers administratifs.
-- Les fonctionnalités de chat.
-- Les services de notifications non nécessaires.
-- Les gestionnaires de mises à jour PWA.
-- Les fonctionnalités réservées aux boutiques ou aux tournois.
-
-Utiliser les layouts imbriqués lorsque cela améliore réellement la séparation des responsabilités.
-
-Ne pas multiplier artificiellement les layouts.
-
-## 4.6 Critères de validation
-
-- L'application affiche rapidement son interface principale.
-- Les contrôles de sécurité restent effectifs.
-- Les opérations secondaires ne bloquent plus inutilement le premier rendu.
-- Aucune route protégée ne devient accessible sans autorisation.
-- Aucun comportement de navigation existant n'est cassé.
-- Les providers ne sont pas initialisés plusieurs fois.
-- Les requêtes répétitives sont réduites.
-- Les erreurs et états de chargement sont correctement gérés.
+Chaque paramètre doit être interprété selon le type de transaction. Ne te contente pas de récupérer un identifiant générique si cela risque de charger la mauvaise entité.
 
 ---
 
-# 5. PHASE 2 — RESTRUCTURATION DU SYSTÈME PWA
+# PHASE 2 — DOCUMENTATION ET PROPOSITION D'ARCHITECTURE
 
-**Priorité : P1.**
+Avant d'implémenter, crée deux fichiers à la racine :
 
-Analyser les fonctionnalités PWA réellement implémentées et leurs interactions avec AppShell, les layouts, les services workers et les composants.
+## `TRANSACTION-AUDIT.md`
 
-Examiner :
-- La configuration PWA.
-- Le service worker.
-- Les stratégies de cache.
-- Le manifeste.
-- L'installation.
-- Les notifications.
-- Les mises à jour.
-- Le mode hors ligne.
-- La synchronisation.
-- Les événements de cycle de vie.
-- Les composants de statut PWA.
-- Les hooks et providers associés.
+Il doit contenir :
 
-## 5.1 Responsabilités distinctes
+1. Architecture financière actuelle.
+2. Cartographie des fichiers concernés.
+3. Liste des types et statuts existants.
+4. Fonctionnement du ledger.
+5. Flux de chaque transaction.
+6. Fonctionnement administratif actuel.
+7. Fonctionnement utilisateur actuel.
+8. Problèmes de sécurité.
+9. Incohérences entre types, enums et schémas.
+10. Problèmes UX/UI.
+11. Doublons et logiques dispersées.
+12. Risques de régression.
+13. Éléments fonctionnels à préserver.
 
-Séparer les responsabilités suivantes :
+Chaque constat doit mentionner les fichiers concernés et, lorsque possible, les fonctions responsables.
 
-1. Détection des capacités PWA.
-2. Installation.
-3. Gestion du service worker.
-4. Détection des mises à jour.
-5. Activation des mises à jour.
-6. Stratégies de cache.
-7. Détection du mode hors ligne.
-8. Synchronisation éventuelle.
-9. Notifications.
+Ne présente pas une hypothèse comme un problème confirmé.
 
-Chaque fonctionnalité doit être initialisée au moment opportun.
+## `TRANSACTION-IMPLEMENTATION-PLAN.md`
 
-## 5.2 Optimisation du cycle de vie
+Il doit contenir :
 
-Éviter :
+1. Architecture cible.
+2. Organisation des modules.
+3. Modèle financier proposé.
+4. Permissions A/B/C.
+5. Fonctionnement des demandes administratives.
+6. Parcours utilisateur par type.
+7. Modifications du schéma.
+8. Modifications des types.
+9. Modifications des actions et services.
+10. Modifications des interfaces.
+11. Stratégie de migration.
+12. Tests nécessaires.
+13. Plan d'implémentation par phases.
+14. Risques et mesures de protection.
 
-- L'enregistrement répétitif du service worker.
-- Les vérifications répétées à chaque rendu.
-- Les listeners dupliqués.
-- Les initialisations inutiles à chaque navigation.
-- Les appels réseau non indispensables au démarrage.
-- Les stratégies de cache qui peuvent afficher des données obsolètes dans des contextes financiers.
-
-Définir une stratégie de cache adaptée à chaque catégorie de données.
-
-**Règle importante :** ne jamais mettre en cache de manière non maîtrisée les données privées, les soldes, les transactions ou les informations sensibles.
-
-Ne pas utiliser une réponse cache obsolète pour autoriser une opération financière.
-
-## 5.3 Interface PWA
-
-Les invitations d'installation et les notifications de mise à jour doivent être discrètes.
-
-Elles ne doivent pas bloquer l'application.
-
-Les composants PWA doivent avoir des responsabilités propres et ne pas encombrer AppShell.
-
-## 5.4 Validation
-
-Tester :
-- Première installation.
-- Application déjà installée.
-- Mise à jour du service worker.
-- Mode hors ligne.
-- Retour en ligne.
-- Navigation normale.
-- Session expirée.
-- Accès aux pages financières.
-- Absence de doublons d'écouteurs.
-- Comportement sur mobile et desktop.
+**Arrête-toi après ces deux documents et présente le bilan de l'audit ainsi que les décisions architecturales proposées.** Ne commence l'implémentation qu'après validation du plan.
 
 ---
 
-# 6. PHASE 3 — REFONTE DU SYSTÈME DE TRANSACTIONS
+# PHASE 3 — NOUVELLE ARCHITECTURE FINANCIÈRE
 
-**Priorité : P0 — Sécurité et intégrité financière.**
+Après validation du plan, refactorise le système autour d'un moteur financier centralisé.
 
-Réaliser une refonte complète du système financier sans perdre les fonctionnalités existantes.
+## 3.1 Principe fondamental
 
-Examiner toutes les couches :
+Il doit exister une seule source de vérité pour les opérations financières.
 
-- Pages.
-- Composants.
-- Hooks.
-- Server Actions.
-- API Routes.
-- Services.
-- Ledger.
-- Comptes financiers.
-- Wallets.
-- Commandes.
-- Paiements.
-- Demandes de dépôt et retrait.
-- Escrow.
-- Remboursements.
-- Frais.
-- Récompenses.
-- Schéma de base de données.
-- Types.
-- Exports et historiques.
+Les opérations doivent passer par des services métier communs qui garantissent :
 
-Fichiers particulièrement importants :
+- La cohérence du ledger.
+- L'atomicité.
+- La validation des montants.
+- Les autorisations.
+- L'idempotence.
+- La traçabilité.
+- La gestion des erreurs.
+- La cohérence des statuts.
 
-```text
-actions/transactions.ts
-actions/wallets.ts
-actions/orders.ts
-actions/requests.ts
+Les Server Actions et API routes doivent rester des points d'entrée. Elles ne doivent pas contenir toute la logique comptable.
 
-lib/ledger/
-lib/db/
+## 3.2 Architecture indicative
 
-types/transaction-types.ts
-
-app/api/transactions/
-app/api/wallet/
-
-app/(protected)/wallet/
-app/admin/transactions/
-```
-
-Rechercher également toutes les autres utilisations de ces fonctions dans l'application.
-
-## 6.1 Sécurité
-
-Corriger impérativement :
-
-- Les actions financières sans contrôle d'autorisation suffisant.
-- Les remboursements accessibles sans vérification adéquate.
-- Les modifications de statut non autorisées.
-- Les opérations système accessibles par un argument contrôlé par le client.
-- Les accès aux transactions d'autres utilisateurs.
-- Les possibilités de falsification des montants.
-- Les possibilités de rejouer une opération.
-- Les problèmes de concurrence.
-- Les transitions de statut invalides.
-
-Les permissions doivent être vérifiées côté serveur.
-
-Les fonctions internes du système financier ne doivent pas être exposées directement comme Server Actions accessibles au navigateur.
-
-## 6.2 Architecture financière cible
-
-Organiser le système en domaines spécialisés :
+Propose une organisation adaptée au projet, par exemple :
 
 ```text
 lib/
   finance/
     core/
-      money.ts
-      finance-errors.ts
-      transaction-types.ts
-      transaction-state.ts
-
-    accounts/
-      account-service.ts
-      account-validation.ts
-
-    wallets/
-      wallet-service.ts
-      wallet-balance.ts
-
-    ledger/
-      ledger-engine.ts
-      ledger-validation.ts
-      ledger-utils.ts
-
+      ledger.ts
+      accounts.ts
+      transaction-engine.ts
+      transaction-context.ts
+      idempotency.ts
     transactions/
-      transaction-service.ts
-      transaction-policy.ts
+      transfer.ts
+      issuance.ts
+      deposit.ts
+      withdrawal.ts
+      purchase.ts
+      refund.ts
+    requests/
+      transaction-requests.ts
+      approval.ts
+    policies/
+      admin-transaction-policy.ts
+      transaction-limits.ts
+    validations/
       transaction-validation.ts
-      idempotency-service.ts
+    utils/
+      transaction-reference.ts
+      transaction-errors.ts
 
-    fees/
-      fee-engine.ts
-      fee-rules.ts
-
-    payments/
-      payment-service.ts
-      provider-registry.ts
-      deposit-service.ts
-      withdrawal-service.ts
-
-    escrow/
-      escrow-service.ts
-
-    refunds/
-      refund-service.ts
-
-    orders/
-      order-payment-service.ts
-
-    tournament/
-      tournament-payment-service.ts
-
-    rewards/
-      reward-service.ts
-```
-
-Adapter cette structure aux fonctionnalités existantes.
-
-Ne pas multiplier les services artificiellement : chaque fichier doit correspondre à une responsabilité identifiable.
-
-## 6.3 Ledger et atomicité
-
-Le ledger doit être la source comptable de vérité.
-
-Garantir :
-
-- Équilibre débit/crédit.
-- Validation des comptes.
-- Impossibilité de créer des écritures non équilibrées.
-- Gestion des devises et précisions monétaires.
-- Traçabilité.
-- Historique immuable.
-- Remboursements par écritures inverses ou compensatoires.
-- Idempotence.
-- Protection contre les doubles débits.
-- Protection contre les soldes négatifs lorsque cela est interdit.
-
-L'ensemble des modifications nécessaires à une opération doit être atomique.
-
-Utiliser le contexte transactionnel Drizzle (`tx`) et transmettre ce contexte aux services qui participent à l'opération.
-
-Ne pas effectuer un débit dans une transaction SQL puis enregistrer ses effets métier dans une deuxième transaction indépendante.
-
-## 6.4 Machine à états
-
-Centraliser les transitions autorisées.
-
-Définir précisément les statuts existants et leur signification.
-
-Exemple indicatif :
-
-```text
-PENDING
-  -> PROCESSING
-  -> COMPLETED
-  -> FAILED
-
-COMPLETED
-  -> REFUNDED
-```
-
-Ne pas imposer ces transitions si le métier existant nécessite d'autres cas.
-
-Chaque transition doit :
-- Être autorisée.
-- Être validée.
-- Être traçable.
-- Être idempotente.
-- Être exécutée côté serveur.
-
-## 6.5 Calcul des frais
-
-Un seul moteur doit calculer les frais.
-
-Éliminer les implémentations concurrentes dans :
-- `actions/transactions.ts`
-- `lib/ledger/ledger-utils.ts`
-- Les API de calcul des frais.
-
-Le client peut demander une estimation, mais le montant définitif doit toujours être recalculé et validé côté serveur.
-
-Définir une représentation monétaire fiable.
-
-Éviter les erreurs de précision liées aux calculs flottants.
-
-## 6.6 Commandes et escrow
-
-Revoir le parcours complet :
-
-1. Création de commande.
-2. Vérification du produit.
-3. Vérification du prix.
-4. Réservation du produit.
-5. Débit de l'acheteur.
-6. Immobilisation des fonds.
-7. Confirmation de livraison.
-8. Validation de la commande.
-9. Paiement du vendeur.
-10. Déduction des frais.
-11. Gestion des litiges.
-12. Annulation.
-13. Remboursement.
-
-Vérifier particulièrement la cohérence entre le montant brut, les frais, le montant net et le solde réellement disponible dans l'escrow.
-
-## 6.7 Paiements de tournoi
-
-Revoir complètement le parcours d'inscription payante.
-
-Il doit garantir la cohérence entre :
-- L'édition.
-- L'inscription.
-- Le participant.
-- Le montant.
-- Les frais.
-- La transaction.
-- Le paiement.
-- Le statut de l'inscription.
-
-Éviter les inscriptions payantes incomplètes.
-
-Définir le comportement en cas de :
-- Solde insuffisant.
-- Double clic.
-- Timeout.
-- Erreur SQL.
-- Paiement réussi mais réponse perdue.
-- Inscription annulée.
-- Tournoi supprimé ou fermé.
-- Remboursement.
-
-## 6.8 API et Server Actions
-
-Les Server Actions doivent être de fines couches d'entrée.
-
-Elles doivent :
-1. Valider les données.
-2. Récupérer l'identité de l'utilisateur.
-3. Vérifier les permissions.
-4. Appeler le service métier.
-5. Retourner une réponse typée et cohérente.
-
-Les API Routes et Server Actions qui exécutent la même opération doivent utiliser les mêmes services.
-
-Éviter les implémentations métier indépendantes.
-
-## 6.9 Interface et hooks
-
-Ne pas casser les pages et composants existants.
-
-Préserver les fonctionnalités de :
-- Dépôt.
-- Retrait.
-- Transfert.
-- Achat.
-- Paiement.
-- Historique.
-- Détail d'une transaction.
-- Administration.
-- Demandes.
-- Remboursement.
-
-Corriger les formulaires, états de chargement, erreurs et validations.
-
-Les montants affichés doivent être cohérents avec les données du serveur.
-
----
-
-# 7. PHASE 4 — RECONSTRUCTION DU TOURNAMENT ENGINE
-
-**Priorité : P1 — Domaine métier majeur.**
-
-Le système de tournoi doit devenir un véritable moteur de compétition, indépendant de l'interface utilisateur.
-
-Les pages et composants ne doivent plus contenir les algorithmes de génération, de classement, de qualification ou de progression.
-
-Le moteur doit fonctionner indépendamment de React, Next.js et des composants UI.
-
-## 7.1 Audit complet des consommateurs
-
-Analyser notamment :
-
-```text
-actions/editions.ts
-actions/phases.ts
-actions/participants.ts
-actions/tournaments.ts
-actions/edition-registrations.ts
-
-lib/tournaments/
-
-hooks/
-
-components/pages/tournaments/
-
-app/
-  .../tournaments/
-  .../editions/
-
-types/
-database/schema.ts
-
-tests/unit/tournaments/
-```
-
-Ne pas se limiter à ces fichiers : rechercher tous les consommateurs réels.
-
-Documenter les relations entre :
-- Tournois.
-- Éditions.
-- Inscriptions.
-- Participants.
-- Joueurs.
-- Équipes.
-- Phases.
-- Groupes.
-- Brackets.
-- Nœuds.
-- Matchs.
-- Résultats.
-- Classements.
-- Qualifications.
-
-## 7.2 Participant normalisé
-
-Le moteur doit prendre en charge deux catégories de participants :
-
-### Participant individuel
-
-Un utilisateur inscrit à une compétition.
-
-### Participant équipe
-
-Une équipe inscrite à une compétition.
-
-Le moteur doit utiliser une représentation métier normalisée.
-
-Il ne doit pas supposer que tous les participants sont des utilisateurs.
-
-Il ne doit pas non plus confondre une équipe avec ses membres.
-
-Le roster de l'équipe doit rester une responsabilité distincte.
-
-Préserver la compatibilité avec le schéma existant autant que possible.
-
-## 7.3 Formats de compétition
-
-Auditer chaque format existant et établir son niveau réel de fonctionnement.
-
-Formats à prendre en compte :
-
-### A. Single Elimination
-
-- Génération du tableau.
-- Nombre de participants.
-- Puissance de deux.
-- BYE.
-- Répartition initiale.
-- Têtes de série.
-- Matchs.
-- Progression.
-- Demi-finales.
-- Finale.
-- Détermination du vainqueur.
-
-### B. Double Elimination
-
-- Upper bracket.
-- Lower bracket.
-- Passage des perdants.
-- Répartition des perdants dans le lower bracket.
-- Matchs de qualification.
-- Grande finale.
-- Finale de reset si nécessaire.
-- Gestion des BYE dans les deux branches.
-
-Ne pas déclarer ce format fonctionnel tant que les deux branches et leurs interactions ne sont pas correctement implémentées.
-
-### C. Round Robin
-
-- Tous contre tous.
-- Nombre de journées.
-- Gestion du nombre impair de participants.
-- BYE.
-- Aller simple.
-- Aller-retour si pris en charge.
-- Classement final.
-
-### D. Group Stage
-
-- Nombre de groupes.
-- Nombre de participants par groupe.
-- Répartition équilibrée.
-- Tirage.
-- Têtes de série.
-- Journées.
-- Classement.
-- Qualification.
-- Passage à la phase suivante.
-
-### E. Swiss System
-
-- Génération de la première ronde.
-- Appariements successifs.
-- Points.
-- Adversaires déjà rencontrés.
-- Éviter les rematches lorsque possible.
-- BYE.
-- Tiebreakers.
-- Classement.
-- Détermination des qualifiés.
-
-Ne pas créer uniquement des nœuds pour toutes les rondes : il faut un véritable moteur d'appariement successif.
-
-### F. Formats combinés
-
-Prévoir la possibilité de construire une compétition comprenant plusieurs phases.
-
-Exemple :
-
-```text
-Édition
-  |
-  |-- Phase 1 : Group Stage
-  |       |
-  |       |-- Groupe A
-  |       |-- Groupe B
-  |       |-- Groupe C
-  |
-  |-- Qualification
-  |
-  |-- Phase 2 : Single Elimination
-          |
-          |-- Quarts
-          |-- Demi-finales
-          |-- Finale
-```
-
-Les transitions doivent être configurables et vérifiables.
-
-## 7.4 Architecture cible du moteur
-
-Réorganiser `lib/tournaments/` en domaines cohérents.
-
-Structure indicative :
-
-```text
-lib/
-  tournaments/
-    core/
-      types.ts
-      errors.ts
-      constants.ts
-      rules.ts
-      participant.ts
-      registry.ts
-
-    registration/
-      registration-service.ts
-      participant-service.ts
-      team-service.ts
-      roster-service.ts
-      check-in-service.ts
-
-    draws/
-      draw-engine.ts
-      seeding-engine.ts
-      random-draw.ts
-      seeded-draw.ts
-
-    generation/
-      group-allocation.ts
-      match-generator.ts
-      phase-generator.ts
-      bracket-generator.ts
-
-    formats/
-      single-elimination/
-        generator.ts
-        progression.ts
-        rules.ts
-
-      double-elimination/
-        generator.ts
-        progression.ts
-        rules.ts
-
-      round-robin/
-        generator.ts
-        standings.ts
-        rules.ts
-
-      group-stage/
-        generator.ts
-        qualification.ts
-        rules.ts
-
-      swiss/
-        pairing-engine.ts
-        standings.ts
-        rules.ts
-
-    standings/
-      standings-engine.ts
-      tiebreaker-engine.ts
-      qualification-engine.ts
-
-    progression/
-      progression-engine.ts
-      propagation-engine.ts
-      result-engine.ts
-
-    services/
-      tournament-service.ts
-      edition-service.ts
-      phase-service.ts
-      match-service.ts
-      result-service.ts
-
-    repositories/
-      tournament.repository.ts
-      edition.repository.ts
-      phase.repository.ts
-      participant.repository.ts
-      match.repository.ts
-
-    validation/
-      tournament-validation.ts
-      phase-validation.ts
-      registration-validation.ts
-      result-validation.ts
-
-    tests/
-```
-
-Adapter cette organisation à l'existant.
-
-Ne pas déplacer arbitrairement les fichiers si cela ne simplifie pas réellement les responsabilités.
-
-## 7.5 Responsabilité des moteurs
-
-Les moteurs doivent être constitués de fonctions aussi pures que possible.
-
-Exemples :
-
-```ts
-generateBracket(input)
-allocateParticipantsToGroups(input)
-generateRoundRobinSchedule(input)
-generateSwissPairings(input)
-calculateStandings(input)
-resolveTieBreakers(input)
-selectQualifiedParticipants(input)
-resolveMatchWinner(input)
-calculateNextPhaseParticipants(input)
-```
-
-Ces fonctions ne doivent pas directement effectuer de requêtes SQL.
-
-Les services métier orchestrent les moteurs, les validations et les opérations en base.
-
-Les repositories gèrent l'accès aux données.
-
-Les Server Actions servent uniquement de points d'entrée.
-
-## 7.6 Prévisualisation avant génération
-
-Créer un mécanisme de simulation permettant de prévisualiser une configuration avant de l'enregistrer.
-
-La prévisualisation doit présenter :
-
-- Nombre de participants.
-- Nombre de groupes.
-- Répartition des participants.
-- Nombre de matchs.
-- Nombre de journées.
-- BYE.
-- Nombre de tours.
-- Structure des brackets.
-- Nombre de qualifiés.
-- Structure des phases suivantes.
-- Incohérences détectées.
-- Règles qui ne peuvent pas être satisfaites.
-
-La simulation ne doit modifier aucune donnée persistante.
-
-La génération réelle doit utiliser les mêmes algorithmes et validations que la prévisualisation.
-
-## 7.7 Tirages et têtes de série
-
-Distinguer :
-
-- Tirage aléatoire.
-- Tirage avec têtes de série.
-- Répartition équilibrée.
-- Tirage manuel.
-- Tirage reproductible.
-
-Pour les tirages aléatoires, prévoir une graine (`seed`) permettant de reproduire un tirage.
-
-Enregistrer les informations nécessaires pour auditer le résultat.
-
-Ne pas permettre de modifier silencieusement un tirage après la génération des matchs.
-
-## 7.8 Classements et départages
-
-Centraliser les règles de classement.
-
-Les règles doivent être configurables en fonction du format.
-
-Examiner notamment :
-
-- Points.
-- Confrontation directe.
-- Différence de buts.
-- Buts marqués.
-- Victoires.
-- Départages supplémentaires.
-- Égalités multiples.
-
-Ne pas annoncer la prise en charge d'une règle qui n'est pas réellement exécutée.
-
-Les résultats non confirmés ne doivent pas influencer les classements.
-
-## 7.9 Qualifications et progression
-
-Définir un mécanisme générique de qualification entre phases.
-
-Une règle doit préciser :
-- La phase source.
-- La méthode de sélection.
-- Le nombre de qualifiés.
-- Les éventuels critères de départage.
-- La phase destination.
-- Le groupe ou emplacement destination.
-- L'ordre d'insertion.
-
-Éviter les références symboliques non contrôlées.
-
-Chaque qualification doit être résolue et traçable.
-
-Gérer les modifications de résultats après progression.
-
-Si un résultat est corrigé après la génération de la phase suivante, définir une stratégie sûre :
-- Recalcul.
-- Invalidation des résultats dépendants.
-- Blocage si des matchs dépendants ont déjà commencé.
-- Validation administrative si nécessaire.
-
-Ne jamais laisser des participants incohérents dans les phases suivantes.
-
-## 7.10 Transactions SQL et concurrence
-
-Toutes les opérations qui modifient plusieurs éléments d'une compétition doivent être atomiques lorsque nécessaire.
-
-Exemples :
-- Génération d'une phase.
-- Création des matchs.
-- Confirmation d'un résultat.
-- Mise à jour du classement.
-- Qualification.
-- Progression.
-- Propagation.
-- Clôture d'une édition.
-
-Utiliser un contexte transactionnel Drizzle cohérent.
-
-Prévenir :
-- Les doubles générations.
-- Les doubles qualifications.
-- Les doubles matchs.
-- Les résultats concurrents.
-- Les doubles progressions.
-- Les participants dupliqués.
-- Les transitions invalides.
-
-Prévoir une stratégie d'idempotence.
-
----
-
-# 8. PHASE 5 — ALLÈGEMENT DES ACTIONS SURCHARGÉES
-
-**Priorité : P1.**
-
-Les fichiers suivants sont actuellement trop volumineux et regroupent trop de responsabilités :
-
-```text
-actions/phases.ts
-actions/tournaments.ts
-```
-
-Leur refactorisation est obligatoire.
-
-Cependant, il faut impérativement préserver les imports utilisés dans les pages, composants et hooks existants.
-
-## 8.1 Principe : compatibilité des points d'entrée
-
-Ne pas commencer par renommer tous les imports de l'application.
-
-Déplacer d'abord les fonctions vers des modules spécialisés.
-
-Puis conserver les anciens fichiers comme façades de compatibilité.
-
-Exemple :
-
-```text
 actions/
-  tournaments/
-    index.ts
-    queries.ts
-    mutations.ts
-    participants.ts
-    registrations.ts
-    administration.ts
-    settings.ts
+  transactions/
+    transfer.ts
+    purchase.ts
+    deposit.ts
+    withdrawal.ts
+    requests.ts
+  admin/
+    transactions/
+      issuance.ts
+      requests.ts
+      history.ts
+      refund.ts
 
-  phases/
-    index.ts
-    queries.ts
-    mutations.ts
-    generation.ts
-    groups.ts
-    progression.ts
-    standings.ts
-    qualifications.ts
-    administration.ts
+components/
+  pages/
+    transactions/
+      create/
+    admin/
+      transactions/
 ```
 
-Les anciens fichiers peuvent devenir :
+Cette structure est indicative. Ne la reproduis pas aveuglément si l'organisation actuelle du projet justifie une meilleure solution.
 
-```ts
-// actions/tournaments.ts
-
-export * from "./tournaments/index";
-```
-
-Et :
-
-```ts
-// actions/phases.ts
-
-export * from "./phases/index";
-```
-
-Les chemins existants doivent continuer à fonctionner.
-
-**Ne pas imposer une modification de tous les imports existants simplement parce que les fichiers ont été réorganisés.**
-
-## 8.2 Répartition des responsabilités
-
-Déplacer les fonctions en fonction de leur véritable responsabilité.
-
-Exemples :
-
-| Domaine | Responsabilités |
-|---|---|
-| Queries | Lecture des tournois, éditions, phases, matchs |
-| Mutations | Création, modification, suppression |
-| Participants | Ajout, retrait, gestion des participants |
-| Registrations | Inscriptions, validation, annulation |
-| Generation | Génération des structures et des matchs |
-| Groups | Gestion des groupes et affectations |
-| Standings | Classements et statistiques |
-| Qualifications | Sélection et transfert des qualifiés |
-| Progression | Passage aux tours et phases suivantes |
-| Administration | Actions administratives et validations |
-
-Ne pas copier une fonction dans deux modules.
-
-Chaque responsabilité doit avoir une implémentation unique.
-
-## 8.3 Préserver les signatures
-
-Conserver autant que possible :
-
-- Les noms des fonctions.
-- Les paramètres.
-- Les valeurs de retour.
-- Les types.
-- Les comportements métier.
-- Les contrats utilisés par les hooks.
-
-Si une signature doit changer, effectuer une migration complète et documentée.
-
-Ne pas introduire des changements de contrat silencieux.
-
-## 8.4 Réduire la duplication
-
-Identifier les fonctions similaires dans :
-
-- `actions/tournaments.ts`
-- `actions/phases.ts`
-- `actions/editions.ts`
-- `actions/participants.ts`
-- `actions/edition-registrations.ts`
-- `lib/tournaments/`
-
-Les actions ne doivent pas réimplémenter les mêmes règles métier.
-
-Les opérations communes doivent être déplacées vers les services correspondants.
-
-## 8.5 Compatibilité Next.js Server Actions
-
-Vérifier les contraintes de Next.js concernant les modules contenant `"use server"`.
-
-Ne pas transformer aveuglément un module d'actions en simple fichier de réexportation si cela provoque des problèmes de compilation ou d'export.
-
-Conserver une organisation compatible avec la version Next.js du projet.
-
-Vérifier les builds réels après chaque lot.
+Évite les fichiers géants et les dépendances circulaires.
 
 ---
 
-# 9. PHASE 6 — PAGES, COMPOSANTS ET HOOKS DES TOURNOIS
+# PHASE 4 — SYSTÈME DE CRÉDIT GTC ADMINISTRATEUR
 
-Après stabilisation du moteur et des services, auditer toutes les interfaces de gestion des tournois.
+C'est une fonctionnalité prioritaire.
 
-Objectifs :
+Nous devons créer un véritable système d'émission contrôlée de GTC, distinct d'un transfert classique.
 
-- Réduire les composants trop volumineux.
-- Supprimer les calculs métier présents dans l'interface.
-- Centraliser les types de réponses.
-- Éviter les requêtes répétées.
-- Unifier les états de chargement et les erreurs.
-- Réutiliser les composants lorsque cela a du sens.
-- Améliorer l'expérience mobile et desktop.
+## 4.1 Règles métier
 
-Les composants doivent afficher et déclencher des opérations, pas contenir le moteur de compétition.
+### Administrateurs A et B
 
-## 9.1 Hooks
+Les administrateurs de niveau A et B peuvent :
 
-Examiner les hooks existants.
+- Créer une opération de crédit GTC.
+- Choisir un destinataire.
+- Créditer un utilisateur ordinaire.
+- Créditer un administrateur C.
+- Indiquer un montant.
+- Ajouter un motif obligatoire.
+- Consulter leurs opérations.
+- Consulter les détails et le statut des opérations.
 
-Les hooks doivent :
-- Appeler les points d'entrée existants.
-- Utiliser TanStack Query de manière cohérente.
-- Définir des clés de requête stables.
-- Invalider uniquement les données concernées.
-- Gérer correctement les erreurs.
-- Éviter les appels en double.
-- Ne pas reproduire les calculs métier du serveur.
+Ils ne doivent pas avoir besoin de posséder eux-mêmes les GTC envoyés.
 
-Préserver les signatures publiques des hooks autant que possible.
+**Important :** le système ne doit pas débiter leur portefeuille personnel.
 
-## 9.2 Pages et composants
+### Administrateurs C
 
-Analyser :
-- Liste des tournois.
-- Détail d'un tournoi.
-- Liste des éditions.
-- Détail d'une édition.
-- Inscriptions.
-- Participants.
-- Équipes.
-- Groupes.
-- Matchs.
-- Brackets.
-- Classements.
-- Résultats.
-- Administration.
-- Exports.
+Les administrateurs C ne peuvent pas émettre directement des GTC.
 
-Conserver l'identité visuelle de H³ Infinity Gaming.
+Ils peuvent :
 
-Ne pas effectuer une refonte graphique arbitraire.
+- Créer une demande de crédit.
+- Sélectionner le destinataire.
+- Indiquer le montant.
+- Fournir un motif obligatoire.
+- Consulter leurs demandes.
+- Consulter le statut de chaque demande.
+- Voir les informations de validation ou de rejet.
 
-Améliorer l'organisation et l'expérience utilisateur en cohérence avec le thème actuel.
+Aucun GTC ne doit être crédité lors de la soumission.
+
+### Approbateurs
+
+Les administrateurs autorisés, selon la politique définie, peuvent :
+
+- Consulter les demandes en attente.
+- Examiner le demandeur.
+- Examiner le destinataire.
+- Vérifier le montant.
+- Consulter le motif.
+- Approuver.
+- Rejeter avec une justification obligatoire.
+
+Une approbation déclenche le mouvement comptable réel.
+
+Un rejet ne doit jamais modifier le solde.
+
+Le demandeur ne peut pas approuver sa propre demande.
+
+## 4.2 Modèle comptable recommandé
+
+Étudie le ledger existant avant de créer de nouvelles tables.
+
+Le modèle recommandé est un compte de contrepartie système dédié à l'émission, par exemple :
+
+`SYSTEM_GTC_ISSUANCE`
+
+Lors d'une émission de 500 GTC :
+
+- Débit du compte système d'émission : 500 GTC.
+- Crédit du compte portefeuille destinataire : 500 GTC.
+
+Le mouvement doit être équilibré et enregistré atomiquement.
+
+Le compte système doit être clairement identifié comme un compte technique de contrepartie, pas comme le portefeuille d'un utilisateur.
+
+Ne crée pas de solde système fictif ou de mécanisme qui permettrait d'émettre sans aucune trace comptable.
+
+Si le modèle de ledger actuel n'est pas compatible, propose et documente la migration nécessaire.
+
+## 4.3 Limites et contrôle
+
+Prévoir une architecture permettant de configurer :
+
+- Le montant minimal.
+- Le montant maximal par opération.
+- Le plafond journalier.
+- Les limites par niveau.
+- Les opérations nécessitant une deuxième approbation.
+
+Ces limites doivent être validées côté serveur.
+
+Ne fixe pas arbitrairement des montants métier sans justification. Utilise une configuration documentée et des valeurs adaptées à la politique actuelle du projet.
+
+## 4.4 Traçabilité
+
+Chaque émission doit conserver :
+
+- Identifiant de transaction.
+- Administrateur émetteur.
+- Niveau administratif au moment de l'opération.
+- Destinataire.
+- Montant.
+- Motif.
+- Date.
+- Type d'émission.
+- Compte de contrepartie.
+- Statut.
+- Référence comptable.
+
+Pour les demandes :
+
+- Demandeur.
+- Destinataire.
+- Montant.
+- Motif.
+- Date de soumission.
+- Statut.
+- Approbateur.
+- Date de décision.
+- Justification de rejet éventuelle.
+- Transaction réellement générée après approbation.
+
+L'historique ne doit pas être modifiable par les utilisateurs ordinaires.
 
 ---
 
-# 10. PHASE 7 — EXPORTS ET RAPPORTS
+# PHASE 5 — REFONTE COMPLÈTE DE L'INTERFACE ADMINISTRATEUR
 
-Examiner les systèmes d'export :
+La page `/admin/transactions` doit disposer de son propre système d'interface.
+
+**Ne réutilise pas directement les formulaires de création utilisateur.**
+
+Les composants peuvent partager des éléments UI génériques, mais les parcours et les règles métier doivent être distincts.
+
+## 5.1 Tableau de bord
+
+Organise l'interface autour de :
+
+- Vue générale des transactions.
+- Historique.
+- Émissions GTC.
+- Demandes de crédit.
+- Dépôts.
+- Retraits.
+- Remboursements.
+- Filtres et recherches.
+
+N'affiche que les catégories réellement supportées par le backend.
+
+## 5.2 Formulaire d'émission
+
+Créer un formulaire spécifique avec :
+
+1. Sélection du destinataire.
+2. Recherche par pseudo, nom ou identifiant.
+3. Identification claire du destinataire.
+4. Affichage de son portefeuille.
+5. Saisie du montant GTC.
+6. Motif obligatoire.
+7. Récapitulatif.
+8. Confirmation.
+9. Résultat de l'opération.
+
+Le formulaire doit afficher explicitement que l'émission ne débite pas le portefeuille personnel de l'administrateur.
+
+Prévoir un état de chargement, les erreurs, les validations et la confirmation de réussite.
+
+## 5.3 Formulaire de demande
+
+Pour un administrateur C :
+
+1. Sélection du destinataire.
+2. Saisie du montant.
+3. Motif.
+4. Récapitulatif.
+5. Soumission de la demande.
+
+Afficher clairement que la demande n'est pas encore un crédit et que le portefeuille ne sera modifié qu'après approbation.
+
+## 5.4 Gestion des demandes
+
+Créer une interface adaptée aux approbateurs :
+
+- Liste des demandes.
+- Filtres par statut.
+- Détails complets.
+- Bouton approuver.
+- Bouton rejeter.
+- Champ de justification du rejet.
+- Confirmation avant décision.
+- Historique des décisions.
+
+Les boutons doivent être conditionnés par les permissions réelles.
+
+## 5.5 Composants
+
+Créer des composants spécialisés et réutilisables :
+
+- `AdminTransactionTable`
+- `AdminTransactionFilters`
+- `AdminGtcIssuanceForm`
+- `AdminGtcRequestForm`
+- `TransactionRequestTable`
+- `TransactionRequestDetails`
+- `TransactionApprovalDialog`
+- `TransactionRejectionDialog`
+- `TransactionAuditDetails`
+
+Adapte les noms et l'organisation aux conventions du projet.
+
+---
+
+# PHASE 6 — REFONTE DU PARCOURS UTILISATEUR / WALLET
+
+Le parcours de création de transaction côté utilisateur doit être repensé pour être entièrement piloté par le type de transaction.
+
+Objectif : ne plus afficher un formulaire générique avec des champs qui ne correspondent pas à l'opération.
+
+Chaque type doit disposer de ses propres données, composants, validations et étapes.
+
+## 6.1 Architecture du parcours
+
+Le parcours doit suivre une logique commune, mais avec des étapes conditionnelles :
 
 ```text
-lib/utils/member-export-utils.ts
-utils/export-utils.ts
-
-components/pages/tournaments/edition-detail/
-  bracket-export-button.tsx
+Identification du type
+       ↓
+Chargement des données nécessaires
+       ↓
+Formulaire spécifique au type
+       ↓
+Validation
+       ↓
+Récapitulatif
+       ↓
+Confirmation
+       ↓
+Exécution serveur
+       ↓
+Résultat
 ```
 
-Vérifier les formats réellement implémentés.
+Ne force pas tous les types à utiliser exactement le même nombre d'étapes.
 
-Objectifs :
-- Unifier la préparation des données.
-- Éviter les calculs de classement différents entre écran et export.
-- Garantir l'exactitude des participants.
-- Garantir l'exactitude des résultats.
-- Respecter les permissions.
-- Éviter l'exposition des données privées.
-- Préserver les formats fonctionnels.
+Les composants génériques doivent se limiter aux éléments réellement communs : progression, navigation, récapitulatif, erreurs et confirmation.
 
-Ne pas annoncer un format d'export qui n'est pas réellement pris en charge.
+## 6.2 TRANSFER — Transfert entre utilisateurs
 
----
+Le formulaire doit proposer :
 
-# 11. PHASE 8 — TESTS ET VALIDATION GLOBALE
-
-Les tests existants doivent être conservés et complétés.
-
-## 11.1 Tests financiers
-
-Tester notamment :
-
-- Débit.
-- Crédit.
-- Transfert.
-- Dépôt.
-- Retrait.
-- Frais.
-- Solde insuffisant.
-- Ledger équilibré.
-- Remboursement.
-- Escrow.
-- Commande.
-- Paiement de tournoi.
-- Double soumission.
-- Concurrence.
-- Autorisations.
-- Statuts invalides.
-- Échec au milieu d'une opération.
-
-Vérifier qu'une erreur ne laisse jamais une opération partiellement enregistrée.
-
-## 11.2 Tests tournoi
-
-Tester notamment :
-
-- Participants individuels.
-- Équipes.
-- Inscriptions.
-- Tirages.
-- Têtes de série.
-- Répartition des groupes.
-- Round Robin.
-- Single Elimination.
-- Double Elimination.
-- Swiss.
-- BYE.
-- Classements.
-- Départages.
-- Qualifications.
-- Progression.
-- Correction de résultats.
-- Concurrence.
-- Annulation.
-- Réinitialisation lorsque permise.
-
-Inclure des tests avec des nombres de participants très variés : 1, 2, 3, 5, 7, 8, 11, 16, 32 et d'autres cas limites.
-
-## 11.3 Tests AppShell et PWA
+- Recherche du destinataire.
+- Sélection du destinataire.
+- Vérification du destinataire.
+- Affichage de son identité.
+- Montant à envoyer.
+- Frais éventuels.
+- Total à débiter.
+- Motif facultatif si le modèle le permet.
+- PIN ou confirmation de sécurité si déjà implémenté.
 
 Vérifier :
-- Premier rendu.
-- Session valide.
-- Session expirée.
-- Utilisateur non connecté.
-- Utilisateur administrateur.
-- Utilisateur standard.
-- Navigation entre layouts.
-- Redirections.
-- Installation PWA.
-- Mise à jour.
-- Mode hors ligne.
-- Retour en ligne.
-- Absence de vérifications répétitives.
 
-## 11.4 Validation de compilation
+- Solde suffisant.
+- Destinataire existant et autorisé.
+- Absence d'auto-transfert.
+- Limites applicables.
+- Frais.
+- Idempotence.
+
+## 6.3 TOURNAMENT_PARTICIPATION — Inscription à un tournoi
+
+Le formulaire doit récupérer les informations du tournoi et surtout de son édition.
+
+Si l'URL contient `editionId`, ce paramètre doit être prioritaire pour charger l'édition.
+
+Afficher :
+
+- Image et nom du tournoi.
+- Nom de l'édition.
+- Dates.
+- Jeu concerné.
+- Format.
+- Frais d'inscription.
+- Informations du participant.
+- Conditions de participation.
+- Montant final.
+
+Ne jamais se contenter de récupérer le tournoi parent si l'opération concerne une édition.
+
+Vérifier côté serveur :
+
+- Édition existante.
+- Édition ouverte aux inscriptions.
+- Date limite.
+- Places disponibles.
+- Éligibilité du participant.
+- Inscription déjà existante.
+- Frais réels définis en base.
+- Cohérence entre édition et tournoi.
+
+La transaction et l'inscription doivent être cohérentes : aucune inscription payée ne doit exister sans mouvement comptable valide, et aucun débit ne doit rester sans inscription correspondante en cas d'échec.
+
+## 6.4 GAME_ITEM_PURCHASE — Achat d'items de jeu
+
+Récupérer l'item exact depuis son identifiant.
+
+Afficher :
+
+- Nom de l'item.
+- Image.
+- Jeu associé.
+- Description.
+- Prix GTC.
+- Quantité si autorisée.
+- Total.
+- Informations nécessaires à la livraison.
+
+Valider :
+
+- Item disponible.
+- Prix actuel.
+- Stock éventuel.
+- Quantité.
+- Propriétaire/vendeur.
+- Conditions de vente.
+
+Ne jamais faire confiance au prix envoyé depuis le client.
+
+## 6.5 PRODUCT_PURCHASE — Achat de produits
+
+Afficher :
+
+- Produit.
+- Boutique.
+- Vendeur.
+- Prix.
+- Quantité.
+- Livraison ou retrait selon les fonctionnalités existantes.
+- Total.
+- Informations complémentaires nécessaires.
+
+Vérifier la disponibilité et le prix réel côté serveur.
+
+## 6.6 THEME_PURCHASE — Achat de thème
+
+Afficher :
+
+- Aperçu du thème.
+- Nom.
+- Créateur.
+- Prix.
+- Conditions d'utilisation.
+
+Vérifier que le thème est disponible et que l'utilisateur ne le possède pas déjà si cette règle s'applique.
+
+## 6.7 VIP_SUBSCRIPTION — Abonnement VIP
+
+Afficher :
+
+- Offre.
+- Durée.
+- Prix.
+- Avantages.
+- Date de début et de fin estimée.
+
+Valider l'offre et les règles de renouvellement côté serveur.
+
+## 6.8 DEPOSIT — Dépôt
+
+Afficher uniquement les moyens de dépôt réellement disponibles.
+
+Adapter les champs au fournisseur :
+
+- Montant.
+- Fournisseur.
+- Référence.
+- Numéro ou compte de paiement.
+- Justificatif si nécessaire.
+
+Ne pas mélanger les champs de retrait et de dépôt.
+
+## 6.9 WITHDRAWAL — Retrait
+
+Afficher :
+
+- Montant.
+- Frais.
+- Total débité.
+- Moyen de retrait.
+- Coordonnées du bénéficiaire.
+- Récapitulatif.
+- Confirmation.
+
+Valider les limites et les coordonnées côté serveur.
+
+## 6.10 Cohérence des paramètres URL
+
+Créer une stratégie centralisée de résolution des entités.
+
+Exemples :
+
+- `TOURNAMENT_PARTICIPATION` → `editionId` prioritaire.
+- `GAME_ITEM_PURCHASE` → `itemId`.
+- `PRODUCT_PURCHASE` → `productId`.
+- `TRANSFER` → `userId` ou `targetId`, selon la convention réellement retenue.
+- `THEME_PURCHASE` → identifiant du thème.
+- `VIP_SUBSCRIPTION` → identifiant de l'offre.
+
+Ne pas interpréter arbitrairement un paramètre `id` sans connaître le type.
+
+Gérer les cas :
+
+- Identifiant manquant.
+- Entité inexistante.
+- Entité indisponible.
+- Type incompatible.
+- Paramètres contradictoires.
+- Données de chargement.
+- Erreur réseau.
+- Retour arrière.
+
+Les entités doivent être récupérées depuis la base de données avec les autorisations nécessaires.
+
+---
+
+# PHASE 7 — SÉCURITÉ ET INTÉGRITÉ COMPTABLE
+
+Cette phase est non négociable.
+
+## 7.1 Ledger
+
+Chaque opération financière doit respecter le principe de partie double.
+
+Pour chaque transaction :
+
+- Somme des débits = somme des crédits.
+- Aucune écriture isolée.
+- Aucun solde négatif non autorisé.
+- Aucune modification manuelle du solde sans écriture correspondante.
+- Aucune suppression d'une transaction financière validée.
+
+## 7.2 Atomicité
+
+Utilise les transactions SQL adaptées au driver réellement utilisé.
+
+Les opérations doivent regrouper dans une même transaction :
+
+- Vérification des conditions.
+- Verrouillage si nécessaire.
+- Écritures comptables.
+- Mise à jour des soldes matérialisés si le projet en utilise.
+- Enregistrement de la transaction.
+- Mise à jour du statut.
+- Création des références nécessaires.
+
+Vérifie les possibilités réelles du driver et de Neon/PostgreSQL. Ne suppose pas qu'une méthode ou un verrouillage existe sans vérifier sa compatibilité.
+
+## 7.3 Idempotence
+
+Chaque opération financière sensible doit être protégée contre les répétitions.
+
+Une même clé d'idempotence ne doit pas générer plusieurs débits ou crédits.
+
+## 7.4 Concurrence
+
+Empêche notamment :
+
+- Deux débits simultanés qui dépassent le solde.
+- Deux approbations de la même demande.
+- Deux inscriptions payantes pour une même place restante.
+- Deux achats du même stock disponible.
+
+Utilise les contraintes et mécanismes PostgreSQL adaptés.
+
+## 7.5 Permissions
+
+Toutes les permissions doivent être vérifiées côté serveur.
+
+Ne fais jamais confiance :
+
+- Au rôle fourni par le client.
+- Au niveau A/B/C envoyé par le client.
+- Au montant calculé dans le frontend.
+- Au statut envoyé par le frontend.
+- À l'identifiant d'un compte financier fourni par le client.
+
+## 7.6 Remboursements
+
+Un remboursement doit créer un véritable mouvement comptable inverse.
+
+Ne transforme pas une transaction en `REFUNDED` sans mouvement financier réel.
+
+Vérifie les remboursements partiels, les remboursements multiples et les opérations déjà compensées.
+
+## 7.7 Journal d'audit
+
+Prévoir une traçabilité fiable des opérations sensibles.
+
+Les journaux doivent permettre de reconstituer qui a fait quoi, sur quel compte, à quel moment, pour quel motif et avec quel résultat.
+
+---
+
+# PHASE 8 — TYPES, SCHÉMA ET MIGRATIONS
+
+Analyse toutes les définitions TypeScript et PostgreSQL.
+
+Harmonise :
+
+- Enums.
+- Types de transaction.
+- Statuts.
+- Références.
+- Comptes.
+- Demandes.
+- Écritures comptables.
+- Résultats d'actions.
+- DTO.
+- Schémas de validation.
+
+Ne laisse pas une valeur définie dans TypeScript mais absente de PostgreSQL.
+
+Ne conserve pas des catégories obsolètes uniquement pour faire compiler le projet.
+
+Toute modification de schéma doit inclure :
+
+1. Migration Drizzle adaptée.
+2. Gestion des données existantes.
+3. Valeurs par défaut pertinentes.
+4. Index.
+5. Contraintes.
+6. Relations et clés étrangères.
+7. Vérification des requêtes existantes.
+8. Compatibilité avec le déploiement.
+
+Ne réinitialise jamais la base de données pour simplifier la migration.
+
+---
+
+# PHASE 9 — TESTS ET VALIDATION
+
+Ajoute ou adapte des tests couvrant au minimum les scénarios suivants.
+
+## 9.1 Administrateurs
+
+- A émet des GTC vers un utilisateur.
+- A émet des GTC vers un administrateur C.
+- B émet des GTC vers un utilisateur.
+- B émet des GTC vers un administrateur C.
+- C ne peut pas émettre directement.
+- C peut soumettre une demande.
+- Une demande ne crédite aucun portefeuille avant approbation.
+- A/B peuvent approuver selon la politique.
+- Le demandeur ne peut pas approuver sa propre demande.
+- Un rejet ne modifie aucun solde.
+- Une demande ne peut pas être approuvée deux fois.
+- Un utilisateur non autorisé ne peut pas appeler les actions administratives.
+
+## 9.2 Comptabilité
+
+- Chaque émission équilibre les écritures.
+- Le compte système est correctement débité.
+- Le destinataire est correctement crédité.
+- Aucun portefeuille personnel d'administrateur n'est débité pour une émission.
+- Les opérations répétées sont idempotentes.
+- Les échecs SQL ne laissent aucune écriture partielle.
+- Les opérations concurrentes restent cohérentes.
+- Les remboursements génèrent des écritures inverses.
+
+## 9.3 Utilisateurs
+
+- Transfert valide.
+- Transfert vers soi-même refusé.
+- Solde insuffisant.
+- Destinataire inexistant.
+- Édition de tournoi récupérée avec `editionId`.
+- Édition fermée aux inscriptions.
+- Inscription déjà existante.
+- Item de jeu indisponible.
+- Prix modifié entre affichage et confirmation.
+- Produit indisponible.
+- Thème déjà possédé.
+- Offre VIP invalide.
+- Dépôt avec paramètres manquants.
+- Retrait avec coordonnées invalides.
+
+## 9.4 Interface
+
+Vérifie :
+
+- Desktop.
+- Mobile.
+- États de chargement.
+- États vides.
+- Erreurs.
+- Confirmations.
+- Navigation.
+- Rafraîchissement.
+- Filtres.
+- Recherche.
+- Accessibilité.
+- Cohérence du thème H³ Infinity Gaming.
+
+---
+
+# PHASE 10 — DESIGN ET UX/UI
+
+La refonte doit respecter l'identité visuelle actuelle de H³ Infinity Gaming.
+
+Ne crée pas un design étranger à l'application.
+
+## Principes
+
+- Interface moderne et cohérente.
+- Hiérarchie visuelle claire.
+- Composants spécialisés.
+- Formulaires lisibles.
+- Récapitulatifs financiers explicites.
+- Montants GTC clairement affichés.
+- Statuts immédiatement identifiables.
+- Dialogues de confirmation adaptés au risque.
+- Responsive design.
+- États vides et erreurs soignés.
+
+Évite les interfaces surchargées.
+
+Ne réutilise pas le même formulaire pour toutes les transactions simplement pour réduire le nombre de composants.
+
+Privilégie une composition de composants spécialisés à partir de composants UI génériques.
+
+---
+
+# PHASE 11 — QUALITÉ ET NON-RÉGRESSION
 
 Après chaque phase :
 
-- Exécuter le typecheck.
-- Exécuter les tests pertinents.
-- Exécuter ESLint selon les scripts du projet.
-- Vérifier les imports.
-- Vérifier les exports.
-- Effectuer un build de production lorsque le lot le permet.
+1. Vérifie les types TypeScript.
+2. Lance les tests concernés.
+3. Lance le lint si disponible.
+4. Vérifie les imports.
+5. Vérifie les actions serveur.
+6. Vérifie les pages concernées.
+7. Vérifie les migrations.
+8. Contrôle les régressions.
 
-Ne pas désactiver les vérifications TypeScript ou ESLint pour faire passer le build.
+N'ajoute pas de `any` pour contourner les erreurs.
 
-Ne pas masquer les erreurs avec des `any`, des casts abusifs ou des `@ts-ignore` non justifiés.
+N'utilise pas de `@ts-ignore` ou de désactivation de lint sans justification documentée.
 
----
+Ne masque pas les erreurs avec des valeurs par défaut artificielles.
 
-# 12. ORDRE D'EXÉCUTION OBLIGATOIRE
+Ne duplique pas les validations métier entre frontend et backend : le frontend améliore l'expérience, le backend reste l'autorité.
 
-Ne pas exécuter toutes les modifications simultanément.
-
-Respecter cet ordre :
-
-| Ordre | Phase | Priorité |
-|---|---|---|
-| 0 | Audit et cartographie | Obligatoire |
-| 1 | AppShell, layout et cycle de démarrage | P0 |
-| 2 | PWA et initialisation différée | P1 |
-| 3 | Sécurité et intégrité financière | P0 |
-| 4 | Refactorisation du Tournament Engine | P1 |
-| 5 | Décomposition des actions surchargées | P1 |
-| 6 | Adaptation des pages, hooks et composants | P1 |
-| 7 | Exports et rapports | P2 |
-| 8 | Tests globaux et stabilisation | Obligatoire |
-
-Les problèmes critiques de sécurité financière doivent être traités immédiatement après leur identification, sans attendre la fin des optimisations visuelles.
-
-Si une dépendance impose de modifier l'ordre, documenter la raison dans `IMPLEMENTATION-PLAN.md`.
+Ne modifie pas les fonctionnalités hors périmètre sans justification.
 
 ---
 
-# 13. STRATÉGIE DE MODIFICATION
+# PHASE 12 — RAPPORT FINAL
 
-Travailler par lots indépendants et vérifiables.
+À la fin, mets à jour ou crée :
 
-Pour chaque lot :
+- `TRANSACTION-AUDIT.md`
+- `TRANSACTION-IMPLEMENTATION-PLAN.md`
+- `TRANSACTION-IMPLEMENTATION-REPORT.md`
 
-1. Identifier les fichiers concernés.
-2. Identifier les consommateurs.
-3. Définir le comportement attendu.
-4. Ajouter ou adapter les tests.
-5. Effectuer les modifications.
-6. Vérifier les types.
-7. Vérifier les imports.
-8. Exécuter les tests.
-9. Comparer le comportement avant/après.
-10. Mettre à jour les documents.
-
-Ne pas mélanger plusieurs refontes majeures dans un même lot.
-
-Ne pas supprimer les anciennes implémentations avant que les nouvelles aient été validées.
-
-Préserver les points d'entrée publics lorsque possible.
-
-Si une migration de base de données est nécessaire :
-- Documenter le changement.
-- Prévoir la compatibilité avec les données existantes.
-- Éviter les pertes de données.
-- Prévoir une stratégie de migration et de rollback.
-
-Ne jamais effectuer une opération destructive sur la base de production.
-
----
-
-# 14. CRITÈRES DE RÉUSSITE
-
-La refonte sera considérée comme réussie lorsque les conditions suivantes seront satisfaites.
-
-## Application Shell et PWA
-
-- Le premier affichage n'attend plus des vérifications secondaires.
-- Les contrôles critiques restent sécurisés.
-- Les providers sont organisés.
-- Les initialisations sont maîtrisées.
-- Les fonctionnalités PWA ne bloquent plus l'application.
-- Les navigations et redirections fonctionnent correctement.
-
-## Transactions
-
-- Les opérations sont sécurisées côté serveur.
-- Le ledger reste équilibré.
-- Les opérations sont atomiques.
-- Les doublons sont empêchés.
-- Les remboursements sont traçables.
-- Les frais sont centralisés.
-- Les commandes et l'escrow sont cohérents.
-- Les paiements de tournoi fonctionnent correctement.
-- Les pages et composants existants conservent leurs fonctionnalités.
-
-## Tournois
-
-- Les responsabilités sont séparées.
-- Les actions surchargées sont allégées.
-- Les imports existants restent compatibles.
-- Les participants individuels et les équipes sont correctement gérés.
-- Les générateurs produisent des structures valides.
-- Les BYE sont correctement gérés.
-- Les classements sont exacts.
-- Les qualifications sont déterministes.
-- La progression est atomique.
-- Les formats annoncés sont réellement fonctionnels.
-- Les pages, hooks et composants restent opérationnels.
-
-## Qualité générale
-
-- Pas de régression fonctionnelle.
-- Pas de duplication métier inutile.
-- Pas de contournement de sécurité.
-- Pas de désactivation des vérifications de qualité.
-- Pas de dépendances inutiles.
-- Documentation à jour.
-- Tests pertinents et reproductibles.
-
----
-
-# 15. RAPPORT FINAL OBLIGATOIRE
-
-À la fin, produire un rapport détaillé indiquant :
+Le rapport final doit présenter :
 
 1. Les problèmes identifiés.
 2. Les problèmes corrigés.
-3. Les problèmes non corrigés et pourquoi.
+3. L'architecture finale.
 4. Les fichiers créés.
-5. Les fichiers déplacés.
-6. Les fichiers supprimés.
-7. Les fonctions conservées.
-8. Les fonctions refactorisées.
-9. Les compatibilités préservées.
-10. Les changements de schéma.
-11. Les migrations.
-12. Les améliorations de performances mesurées.
-13. Les résultats des tests.
-14. Les résultats du build.
-15. Les éventuelles limitations restantes.
+5. Les fichiers modifiés.
+6. Les migrations.
+7. Les règles A/B/C effectivement appliquées.
+8. Le fonctionnement du compte d'émission.
+9. Le fonctionnement des demandes.
+10. Les parcours utilisateur par type.
+11. Les tests exécutés.
+12. Les résultats des tests.
+13. Les erreurs restantes.
+14. Les points non implémentés.
+15. Les éventuelles opérations manuelles nécessaires avant déploiement.
 
-Mettre à jour :
-
-- `ANALYSIS.md`
-- `ARCHITECTURE.md`
-- `TASK.md`
-- `IMPLEMENTATION-PLAN.md`
-- `README.md` si les instructions ou l'architecture publique changent.
-
-Ne pas déclarer une phase terminée tant que ses critères de validation ne sont pas satisfaits.
+Ne prétends jamais qu'un test a réussi s'il n'a pas été exécuté.
 
 ---
 
-# INSTRUCTION FINALE
+# DIRECTIVE FINALE
 
-Je veux une véritable amélioration architecturale de H³ Infinity Gaming, pas un simple nettoyage esthétique.
+Le résultat attendu n'est pas une simple amélioration visuelle.
 
-Il faut privilégier :
+Nous voulons un système financier cohérent, centralisé, traçable, sécurisé et évolutif.
 
-- La séparation claire des responsabilités.
-- La cohérence des règles métier.
-- La sécurité des opérations.
-- La fiabilité des transactions.
-- La précision des algorithmes de compétition.
-- La performance du démarrage de l'application.
-- La stabilité des interfaces existantes.
-- La compatibilité des imports.
-- La testabilité.
-- La maintenabilité à long terme.
+Les deux espaces doivent être distincts dans leur expérience :
 
-**Commence par la PHASE 0 : audit, cartographie et documentation.**
+- **Administration :** gestion des transactions, émission de GTC, demandes et approbations, supervision et historique.
+- **Utilisateur :** création guidée de transactions adaptées au type d'opération, avec récupération précise des entités et affichage des informations pertinentes.
 
-Ne commence pas à modifier massivement le code avant d'avoir établi l'état réel du système et les dépendances.
+Cependant, ils doivent utiliser le même moteur financier et les mêmes garanties comptables.
 
-Ensuite, exécute les phases dans l'ordre défini, en validant chaque lot avant de passer au suivant.
+**Commence exclusivement par la PHASE 0 et la PHASE 1.** Explore le dépôt, trace les flux réels, puis rédige `TRANSACTION-AUDIT.md` et `TRANSACTION-IMPLEMENTATION-PLAN.md`.
 
-En cas de doute sur une fonctionnalité existante, recherche son comportement réel avant de la modifier.
+Présente-moi ensuite le bilan et attends ma validation avant toute modification du code.
 
-**La priorité est de construire une architecture fiable sans casser ce qui fonctionne déjà.**
+Ne fais aucune migration, suppression, modification de schéma ou refonte UI pendant cette première étape.
+
+La priorité absolue est la justesse des opérations financières, la sécurité des permissions et l'intégrité du ledger.
