@@ -1,6 +1,4 @@
-"use server";
 
-import { getCurrentUser } from "@/lib/auth/session";
 import {
   tournaments,
   tournamentEditions,
@@ -86,18 +84,6 @@ import {
   type QueryOptions,
 } from "@/types/api";
 
-import { db } from "@/lib/db";
-import { revalidatePath, revalidateTag, cacheTag, cacheLife } from "next/cache";
-import { createNotification } from "@/actions/notifications";
-import {
-  type TournamentCard,
-  type TournamentStats,
-  TOURNAMENT_CARD_COLUMNS,
-  USER_MINI_COLUMNS,
-  EDITION_SUMMARY_COLUMNS,
-  PAGINATION_DEFAULTS,
-} from "@/types/view-models";
-
 
 export {
   buildTournamentPhaseWhereConditions,
@@ -106,95 +92,6 @@ export {
   buildBracketNodeWhereConditions,
   buildMatchWhereConditions,
 } from "@/actions/phases";
-
-export async function buildTournamentWhereConditions(
-  filters: TournamentFilters,
-  options: QueryOptions = {},
-) {
-  const conditions = [];
-
-  if (!options.includeDeleted) {
-    conditions.push(eq(tournaments.isDeleted, false));
-  }
-  if (!options.includeInactive) {
-    conditions.push(eq(tournaments.isActive, true));
-  }
-
-  if (filters.id) conditions.push(eq(tournaments.id, filters.id));
-  if (filters.organizerId)
-    conditions.push(eq(tournaments.organizerId, filters.organizerId));
-  if (filters.name)
-    conditions.push(ilike(tournaments.name, `%${filters.name}%`));
-  if (filters.game)
-    conditions.push(ilike(tournaments.game, `%${filters.game}%`));
-  if (filters.platform && filters.platform.length > 0) {
-    conditions.push(inArray(tournaments.platform, filters.platform));
-  }
-  if (filters.statuses && filters.statuses.length > 0) {
-    conditions.push(inArray(tournaments.status, filters.statuses));
-  }
-  if (filters.visibility)
-    conditions.push(eq(tournaments.visibility, filters.visibility));
-  if (filters.requiresAccessCode !== undefined) {
-    conditions.push(
-      eq(tournaments.requiresAccessCode, filters.requiresAccessCode),
-    );
-  }
-  if (filters.themeId)
-    conditions.push(eq(tournaments.themeId, filters.themeId));
-
-  if (filters.maxParticipantsPerEditionMin !== undefined) {
-    conditions.push(
-      gte(
-        tournaments.maxParticipantsPerEdition,
-        filters.maxParticipantsPerEditionMin,
-      ),
-    );
-  }
-  if (filters.maxParticipantsPerEditionMax !== undefined) {
-    conditions.push(
-      lte(
-        tournaments.maxParticipantsPerEdition,
-        filters.maxParticipantsPerEditionMax,
-      ),
-    );
-  }
-  if (filters.totalParticipantsMin !== undefined) {
-    conditions.push(
-      gte(tournaments.totalParticipants, filters.totalParticipantsMin),
-    );
-  }
-  if (filters.totalParticipantsMax !== undefined) {
-    conditions.push(
-      lte(tournaments.totalParticipants, filters.totalParticipantsMax),
-    );
-  }
-  if (filters.totalPrizePoolMin !== undefined) {
-    conditions.push(
-      gte(tournaments.totalPrizePool, String(filters.totalPrizePoolMin)),
-    );
-  }
-  if (filters.totalPrizePoolMax !== undefined) {
-    conditions.push(
-      lte(tournaments.totalPrizePool, String(filters.totalPrizePoolMax)),
-    );
-  }
-  if (filters.viewCountMin !== undefined) {
-    conditions.push(gte(tournaments.viewCount, filters.viewCountMin));
-  }
-  if (filters.viewCountMax !== undefined) {
-    conditions.push(lte(tournaments.viewCount, filters.viewCountMax));
-  }
-
-  if (filters.createdFrom) {
-    conditions.push(gte(tournaments.createdAt, new Date(filters.createdFrom)));
-  }
-  if (filters.createdTo) {
-    conditions.push(lte(tournaments.createdAt, new Date(filters.createdTo)));
-  }
-
-  return conditions.length > 0 ? and(...conditions) : undefined;
-}
 
 /**
  * Construit les conditions WHERE pour les éditions de tournoi

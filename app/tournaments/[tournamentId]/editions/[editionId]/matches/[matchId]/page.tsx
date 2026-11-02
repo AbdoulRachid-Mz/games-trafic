@@ -701,7 +701,7 @@ function ParticipantLargeAvatar({
     participant?.member?.avatar ||
     participant?.member?.user?.profileImage ||
     participant?.member?.user?.image ||
-    "icons/avatar.png";
+    "/icons/avatar.png";
 
   return (
     <div

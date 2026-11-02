@@ -3,6 +3,7 @@ export * from "./tournaments";
 export * from "./editions";
 export * from "./members";
 export * from "./results";
+// export * from "./build.tournament";
 
 // Backward-compatible re-exports from phases/matches
 export {

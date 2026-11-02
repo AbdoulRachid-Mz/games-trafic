@@ -1,3 +1,4 @@
+"use server";
 // lib/auth/session.ts - MISE À JOUR
 import { auth } from "../auth";
 import { headers } from "next/headers";
