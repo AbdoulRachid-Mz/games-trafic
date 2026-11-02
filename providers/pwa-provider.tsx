@@ -29,6 +29,9 @@ export default function PWAProvider({
       navigator.serviceWorker?.getRegistrations().then(regs => {
         regs.forEach(reg => reg.unregister());
       });
+      if ("caches" in window) {
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+      }
       return;
     }
 
@@ -37,7 +40,7 @@ export default function PWAProvider({
     let interval: NodeJS.Timeout;
 
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/sw.js', { scope: '/', updateViaCache: 'none' })
       .then(registration => {
         interval = setInterval(() => {
           registration.update().catch(console.error);

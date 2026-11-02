@@ -81,12 +81,17 @@ export function usePWA() {
     if (typeof window === "undefined" || !("serviceWorker" in navigator))
       return;
 
+    if (process.env.NODE_ENV !== "production") return;
+
     const registerSW = async () => {
       try {
-        const registration = await navigator.serviceWorker.register("/sw.js", {
-          scope: "/",
-          updateViaCache: "none",
-        });
+        let registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) {
+          registration = await navigator.serviceWorker.register("/sw.js", {
+            scope: "/",
+            updateViaCache: "none",
+          });
+        }
 
         console.log("✅ Service Worker enregistré:", registration.scope);
         setState((prev) => ({ ...prev, registration }));
@@ -106,7 +111,7 @@ export function usePWA() {
 
                 // Notifier l'utilisateur de la mise à jour
                 if (Notification.permission === "granted") {
-                  new Notification("Games Trafics - Mise à jour disponible", {
+                  new Notification("Games-Trafics - Mise à jour disponible", {
                     body: "Une nouvelle version est disponible. Cliquez pour mettre à jour.",
                     icon: "/icons/icon-192.png",
                     tag: "update-available",

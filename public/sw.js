@@ -44,6 +44,18 @@ const NEVER_CACHE_PATTERNS = [
   /sign-in/,
   /sign-up/,
 
+  // 💰 Contextes financiers & transactions (JAMAIS mis en cache pour intégrité et confidentialité)
+  /\/wallet(\/|\?|$)/i,
+  /\/wallets(\/|\?|$)/i,
+  /\/transactions(\/|\?|$)/i,
+  /\/checkout(\/|\?|$)/i,
+  /\/payments(\/|\?|$)/i,
+  /\/shops\/[^\/]+\/dashboard\/wallet/i,
+  /\/tournaments\/[^\/]+\/editions\/[^\/]+\/dashboard\/payments/i,
+  /\/admin\/transactions/i,
+  /\/admin\/wallets/i,
+
+
 
   
   // WebSockets et temps réel
@@ -58,7 +70,6 @@ const NEVER_CACHE_PATTERNS = [
   // Dev
   /_next\/webpack/,
   /_next\/static\/hmr/,
-    /\/_next\/static\//,
   
   // Service Worker lui-même
   /sw\.js$/,
@@ -162,6 +173,10 @@ async function handleImageRequest(request) {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
+  // 🚫 Ne jamais intercepter les Server Actions
+  if (request.headers.get('Next-Action') || request.headers.get('x-action')) {
+    return;
+  }
 
   // 🎮 Images → Cache First (style cached_network_image)
 if (IMAGE_PATTERNS.some(pattern => pattern.test(request.url))) {
@@ -197,11 +212,13 @@ if (IMAGE_PATTERNS.some(pattern => pattern.test(request.url))) {
 });
 
 async function handleNavigation(request) {
+  const navUrl = new URL(request.url);
+  const isPrivateOrFinancial = /(wallet|transaction|payment|checkout|admin|auth|account|settings)/i.test(navUrl.pathname);
   try {
     const networkResponse = await fetch(request);
     
     // Mettre en cache si réussite
-    if (networkResponse.ok) {
+    if (networkResponse.ok && !isPrivateOrFinancial) {
       const cache = await caches.open(RUNTIME_CACHE);
       cache.put(request, networkResponse.clone()).catch(err => 
         console.warn("⚠️ Erreur mise en cache navigation:", err)
@@ -211,6 +228,16 @@ async function handleNavigation(request) {
   } catch (error) {
     console.log("📴 Hors ligne - Recherche navigation en cache:", request.url);
     
+    // Si route financière ou privée, ne JAMAIS servir de cache obsolète
+    if (isPrivateOrFinancial) {
+      const offlineResponse = await caches.match('/offline');
+      if (offlineResponse) return offlineResponse;
+      return new Response('Section sécurisée nécessitant une connexion internet.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
     // Chercher en cache
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
