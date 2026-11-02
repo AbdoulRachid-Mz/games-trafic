@@ -49,7 +49,7 @@ export function GameTraficsLoader() {
           transition={{ delay: 0.3 }}
           className="text-white text-lg font-bold tracking-wide"
         >
-          Game Trafics
+          Games-Trafics
         </motion.h1>
 
         {/* Subtitle */}

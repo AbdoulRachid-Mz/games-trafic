@@ -56,8 +56,8 @@ export function ParticipantsManagementClient({
 
   const handleExport = (format: 'csv' | 'json' | 'pdf') => {
     const exportData = {
-      appName: "Games Trafic",
-      appContact: "contact@gamestrafic.com | +225 0102030405",
+      appName: "Games-Trafics",
+      appContact: "contact@gamestrafics.com | +221 78 274 40 23",
       editionName: "Édition de tournoi", // Idéalement passer le nom de l'édition
       members: participants.map(p => ({
         ...p.member,

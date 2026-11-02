@@ -54,11 +54,11 @@ export function ExportMatchesButton({ editionId, phaseId, groupId, bracketNodeId
             title: scope === "all" ? "Feuille de Matchs - Tous" : `Feuille de Matchs - ${scope.toUpperCase()}`,
             subtitle: `Édition: ${editionId.slice(0, 8)}`,
             header: {
-              title: "Game Trafics - Tournois",
+              title: "Games-Trafics - Tournois",
               subtitle: scope === "all" ? "Liste complète des matchs" : `Extraction par ${scope}`,
             },
             footer: {
-              text: "Document généré par Game Trafics",
+              text: "Document généré par Games-Trafics",
               pageNumbers: true
             }
           };

@@ -44,7 +44,7 @@ import Image from "next/image";
 import { MatchControlClient } from "./match-control-client";
 
 export const metadata: Metadata = {
-  title: "Détail du match | Game Trafics",
+  title: "Détail du match | Games-Trafics",
 };
 
 interface PageProps {

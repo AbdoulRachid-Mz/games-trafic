@@ -318,7 +318,7 @@ export function LeftBar({
                     theme="muted"
                     className="truncate"
                   >
-                    Games Trafic
+                    Games-Trafics
                   </Typography>
                 </div>
               )}

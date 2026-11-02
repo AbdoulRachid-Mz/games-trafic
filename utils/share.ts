@@ -73,7 +73,7 @@ export const shareContent = async ({
  */
 export const shareProduct = (productId: string, productName: string, options?: Partial<ShareOptions>) => {
   return shareContent({
-    title: `${productName} | Games Trafic`,
+    title: `${productName} | Games-Trafics`,
     text: `Découvrez ce produit: ${productName}`,
     url: `${window.location.origin}/produits/${productId}`,
     ...options,
@@ -85,7 +85,7 @@ export const shareProduct = (productId: string, productName: string, options?: P
  */
 export const shareBoutique = (boutiqueId: string, boutiqueName: string, options?: Partial<ShareOptions>) => {
   return shareContent({
-    title: `${boutiqueName} | Games Trafic`,
+    title: `${boutiqueName} | Games-Trafics`,
     text: `Découvrez cette boutique: ${boutiqueName}`,
     url: `${window.location.origin}/boutiques/${boutiqueId}`,
     ...options,
@@ -97,7 +97,7 @@ export const shareBoutique = (boutiqueId: string, boutiqueName: string, options?
  */
 export const shareTournament = (tournamentId: string, tournamentName: string, options?: Partial<ShareOptions>) => {
   return shareContent({
-    title: `${tournamentName} | Games Trafic`,
+    title: `${tournamentName} | Games-Trafics`,
     text: `Rejoignez ce tournoi: ${tournamentName}`,
     url: `${window.location.origin}/tournois/${tournamentId}`,
     ...options,

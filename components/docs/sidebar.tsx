@@ -74,7 +74,7 @@ export function DocsSidebar({ navItems }: DocsSidebarProps) {
 
           <Link href="/" className="flex items-center gap-2 font-bold text-xl">
             <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              {isMediumScreen ? "Games Trafic" : "GT"}
+              {isMediumScreen ? "Games-Trafics" : "GT"}
             </span>
             <span className="text-sm text-muted-foreground font-medium">/ Docs</span>
           </Link>

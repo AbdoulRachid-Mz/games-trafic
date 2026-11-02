@@ -107,3 +107,17 @@ Le plan de travail priorisé défini dans `PROMPT.md` est confirmé :
 - **Phase 4 & 5** : Décomposition modulaire de `actions/phases.ts` et `actions/tournaments.ts`, pureté des moteurs de compétition.
 - **Phase 6 & 7** : Consolidation UI, composants et exports.
 - **Phase 8** : Tests complets et validation globale.
+
+---
+
+## 5. Bilan d'Exécution & Validation Globale
+
+Toutes les phases de la refonte ont été exécutées avec succès et validées :
+1. **AppShell & Performance** : Rendu non-bloquant des routes publiques et déduplication des requêtes de profil.
+2. **PWA** : Exclusion absolue du cache pour toutes les données financières et privées (`public/sw.js`), cycle de vie PWA assaini.
+3. **Finance & Ledger** : Moteur de frais unifié et autoritaire (`lib/finance/fees/fee-engine.ts`), ledger à partie double atomique avec verrous pessimistes (`lib/finance/ledger/ledger-engine.ts`), délégation complète depuis les Server Actions.
+4. **Tournament Engine** : Modèle de participant normalisé (`NormalizedParticipant`), moteur de prévisualisation pure (`previewPhaseStructure`), déduplication stricte des qualifiés inter-phases.
+5. **Server Actions** : `actions/phases.ts` et `actions/tournaments.ts` décomposés en sous-modules thématiques propres avec façades rétrocompatibles garantissant 100% de compatibilité d'import.
+6. **UI, Composants & Hooks** : Consommation directe des Server Actions et TanStack Query, élimination des calculs de classement inline dans les composants.
+7. **Exports & Identité de Marque** : Exports enrichis (PDF, Excel, CSV, JSON) et harmonisation stricte de la marque `"Games-Trafics"`.
+8. **Tests & Validation** : 111/111 tests Vitest passés avec succès, 0 erreur TypeScript (`tsc --noEmit`).

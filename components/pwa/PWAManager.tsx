@@ -196,7 +196,7 @@ export default function PWAManager({
                 <CardTitle className="text-sm font-semibold">
                   {isUpdateAvailable
                     ? "Mise à jour disponible"
-                    : "Games Trafic"}
+                    : "Games-Trafics"}
                 </CardTitle>
                 <CardDescription className="text-xs">
                   {isUpdateAvailable

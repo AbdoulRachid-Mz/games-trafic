@@ -221,7 +221,7 @@ export function StandingsTable({
       title: title || "Classement du Tournoi",
       subtitle: mode === "group" ? `Groupe: ${activeGroup?.groupName}` : mode === "edition" ? "Classement Général" : "Phases Finales",
       header: {
-        title: "Game Trafics",
+        title: "Games-Trafics",
         subtitle: "Export du classement automatique",
       }
     };
