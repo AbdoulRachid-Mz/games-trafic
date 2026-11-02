@@ -4,6 +4,19 @@ export type ParticipantStatus =
   | "QUALIFIED"
   | "PENDING";
 
+export type ParticipantType = "INDIVIDUAL" | "TEAM";
+
+export interface NormalizedParticipant {
+  registrationId: string;
+  type: ParticipantType;
+  userId?: string | null;
+  teamId?: string | null;
+  displayName: string;
+  avatarUrl?: string | null;
+  seed?: number | null;
+  status: ParticipantStatus;
+}
+
 export interface Participant {
   id: string;
   name: string;
