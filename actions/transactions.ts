@@ -30,6 +30,7 @@ import {
   executeTransaction,
   getOrCreatePlatformAccount
 } from "@/lib/ledger/ledger-utils";
+import { calculateTransactionFees } from "@/lib/finance";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -550,76 +551,7 @@ async function handleTransactionTypeSafe(
 
 
 export async function getTransactionFees(type: string, amount: number) {
-  try {
-    const settings = await getAppSettings();
-
-    let feePercentage = 0;
-    switch (type) {
-      case "THEME_PURCHASE":
-      case "PRODUCT_PURCHASE":
-      case "GAME_ITEM_PURCHASE":
-      case "ORDER_PURCHASE":
-        feePercentage = parseFloat(
-          settings?.purchaseFeePercentage?.toString() || "0"
-        );
-        break;
-      case "VIP_SUBSCRIPTION":
-        feePercentage = parseFloat(
-          settings?.transactionFeePercentage?.toString() || "0"
-        );
-        break;
-      case "TOURNAMENT_PARTICIPATION":
-        feePercentage = parseFloat(
-          settings?.tournamentParticipationFeePercentage?.toString() || "0"
-        );
-        break;
-      case "DEPOSIT":
-        feePercentage = parseFloat(
-          settings?.depositFeePercentage?.toString() || "0"
-        );
-        break;
-      case "WITHDRAWAL":
-        feePercentage = parseFloat(
-          settings?.withdrawalFeePercentage?.toString() || "0"
-        );
-        break;
-      case "TRANSFER":
-        feePercentage = parseFloat(
-          settings?.transferFeePercentage?.toString() || "0"
-        );
-        break;
-      default:
-        feePercentage = 0;
-    }
-
-    const sessionUser = await getCurrentUser();
-    if (sessionUser) {
-      const found = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, sessionUser.id))
-        .limit(1);
-      const isVip = !!found[0]?.isVip;
-      if (isVip) {
-        feePercentage = Math.max(0, feePercentage * 0.5);
-      }
-    }
-
-    const fees = amount * feePercentage;
-    const totalAmount = amount;
-
-    return {
-      feePercentage,
-      fees,
-      totalAmount,
-    };
-  } catch (error) {
-    console.error("Error calculating fees:", error);
-    const feePercentage = 0;
-    const fees = 0;
-    const totalAmount = amount;
-    return { feePercentage, fees, totalAmount };
-  }
+  return calculateTransactionFees(type, amount);
 }
 
 /**
