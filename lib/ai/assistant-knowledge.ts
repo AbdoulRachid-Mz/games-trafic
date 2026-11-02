@@ -5,7 +5,7 @@ import { GuideWithRelations } from '@/database/schema';
 export const LOCAL_KNOWLEDGE_BASE = {
   shops: {
     general: [
-      "Les boutiques sur Games Trafics sont des espaces personnalisés où les vendeurs proposent leurs comptes gaming.",
+      "Les boutiques sur Games-Trafics sont des espaces personnalisés où les vendeurs proposent leurs comptes gaming.",
       "Chaque boutique peut avoir un thème unique, créé par le propriétaire ou sélectionné parmi les thèmes disponibles.",
       "Les boutiques vérifiées (badge bleu ✓) ont été examinées par notre équipe pour garantir leur fiabilité."
     ],
@@ -21,7 +21,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
     ],
     products: [
       "Les produits sont des comptes de jeux vidéo que vous pouvez vendre dans votre boutique.",
-      "Chaque produit doit avoir un prix en GTC (Games Trafics Currency).",
+      "Chaque produit doit avoir un prix en GTC (Games-Trafics Currency).",
       "Vous pouvez ajouter des images, décrire le compte et spécifier le jeu et la plateforme.",
       "Les produits ont différents statuts : Non vendu, Réservé, En échange, Livré, Vendu, Annulé."
     ]
@@ -51,8 +51,8 @@ export const LOCAL_KNOWLEDGE_BASE = {
   },
   wallet: {
     general: [
-      "Le wallet (portefeuille) est votre compte monétaire sur Games Trafics.",
-      "La devise principale est le GTC (Games Trafics Currency).",
+      "Le wallet (portefeuille) est votre compte monétaire sur Games-Trafics.",
+      "La devise principale est le GTC (Games-Trafics Currency).",
       "Vous devez vérifier votre identité pour activer toutes les fonctionnalités du wallet."
     ],
     transactions: [

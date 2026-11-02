@@ -165,7 +165,7 @@ export class AssistantService {
         "Comment livrer un compte ?"
       ],
       general: [
-        "Comment commencer sur Games Trafics ?",
+        "Comment commencer sur Games-Trafics ?",
         "Qu'est-ce que le programme VIP ?",
         "Comment signaler un problème ?",
         "Comment contacter le support ?"

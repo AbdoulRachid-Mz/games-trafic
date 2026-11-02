@@ -66,7 +66,7 @@ interface AIAssistantProps {
 
 export function AIAssistant({
   context = "general",
-  welcomeMessage = "👋 Bonjour ! Je suis votre assistant IA Games Trafics. Je combine nos guides officiels avec mes connaissances pour vous aider. Posez-moi vos questions sur les boutiques, tournois, wallet, ou autre chose !",
+  welcomeMessage = "👋 Bonjour ! Je suis votre assistant IA Games-Trafics. Je combine nos guides officiels avec mes connaissances pour vous aider. Posez-moi vos questions sur les boutiques, tournois, wallet, ou autre chose !",
   position = "bottom-right",
 }: AIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
