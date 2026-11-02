@@ -65,7 +65,7 @@
 ### `TASK-PWA-01` : Nettoyage et centralisation du cycle de vie PWA
 - **Domaine** : PWA / Service Worker
 - **Priorité** : P1 — Élevée
-- **Statut** : `[ ]`
+- **Statut** : `[x]`
 - **Fichiers concernés** : `providers/pwa-provider.tsx`, `components/pwa/PWAManager.tsx`, `components/pwa/disable-sw-in-dev.tsx`
 - **Description** : Consolider la désactivation en mode dev et l'enregistrement propre du Service Worker en production pour éviter tout doublon d'écouteurs ou vérification excessive lors des changements de page.
 - **Critères de validation** :
@@ -77,7 +77,7 @@
 ### `TASK-PWA-02` : Exclusion absolue de mise en cache sur contextes financiers
 - **Domaine** : PWA / Sécurité Financière
 - **Priorité** : P0 — Critique sécurité
-- **Statut** : `[ ]`
+- **Statut** : `[x]`
 - **Fichiers concernés** : `public/sw.js` (ou générateur de SW), `next.config.ts`
 - **Description** : Vérifier et forcer l'interdiction de mise en cache pour tous les endpoints et Server Actions traitant des soldes, wallets, devises et ledger.
 - **Critères de validation** :
