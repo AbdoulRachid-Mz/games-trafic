@@ -435,26 +435,49 @@ export async function cancelVipSubscription(id: string): Promise<VipSubscription
 
 /**
  * Renouvelle un abonnement VIP
+ * SEC-09 FIX: Owner or Admin auth check + calcul autoritaire de la durée côté serveur (I6-02)
  */
 export async function renewVipSubscription(
   id: string,
-  newEndDate: Date,
+  newEndDate?: Date,
   transactionId?: string
 ): Promise<VipSubscription> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error('Non authentifié');
+    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+
     const subscription = await getVipSubscriptionById(id);
     if (!subscription) {
       throw new Error('VIP subscription not found');
+    }
+
+    if (!isAdmin && subscription.userId !== currentUser.id) {
+      throw new Error('Accès refusé');
     }
 
     if (subscription.status === 'CANCELLED') {
       throw new Error('Cannot renew a cancelled VIP subscription');
     }
 
+    // Determine renewed end date server-side (I6-02)
+    let calculatedEndDate = newEndDate;
+    if (!calculatedEndDate) {
+      const baseDate = subscription.endDate && new Date(subscription.endDate) > new Date()
+        ? new Date(subscription.endDate)
+        : new Date();
+      calculatedEndDate = new Date(baseDate);
+      if (subscription.planType === 'YEARLY') {
+        calculatedEndDate.setFullYear(calculatedEndDate.getFullYear() + 1);
+      } else {
+        calculatedEndDate.setMonth(calculatedEndDate.getMonth() + 1);
+      }
+    }
+
     const result = await db
       .update(vipSubscriptions)
       .set({
-        endDate: newEndDate,
+        endDate: calculatedEndDate,
         status: 'ACTIVE',
         transactionId: transactionId || subscription.transactionId,
         updatedAt: new Date(),

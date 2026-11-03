@@ -176,8 +176,8 @@ export async function approveOrderShop(orderId: string, credentials: { login: st
 export async function completeOrderAdmin(orderId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await getCurrentUser();
-    // In a real app, check for isAdmin role
-    if (!user || user.role !== 'admin') throw new Error("Accès refusé");
+    const isAdmin = user && (user.role === 'admin' || (user as any).isAdmin === true);
+    if (!isAdmin) throw new Error("Accès refusé: Réservé aux administrateurs");
 
     return await db.transaction(async (tx) => {
       const order = await tx.query.orders.findFirst({
@@ -225,8 +225,8 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         fromAccountId: escrowAccount.id,
         toAccountId: shopAccountId!,
         amount: amount,
-        type: 'TRANSFER',
-        description: `Paiement pour commande #${order.id.slice(0, 8)}`,
+        type: 'ORDER_PURCHASE',
+        description: `Paiement vendeur commande #${order.id.slice(0, 8)}`,
         metadata: { orderId: order.id, type: 'SHOP_PAYOUT' },
         walletId: ownerWallet.id
       });

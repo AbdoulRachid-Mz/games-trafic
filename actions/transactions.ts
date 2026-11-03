@@ -409,6 +409,7 @@ export async function createTransaction(
     "VIP_SUBSCRIPTION",
     "THEME_PURCHASE",
     "PRODUCT_PURCHASE",
+    "ORDER_PURCHASE",
     "GAME_ITEM_PURCHASE",
     "TOURNAMENT_PARTICIPATION",
     "WITHDRAWAL",
@@ -447,7 +448,8 @@ export async function createTransaction(
     throw new Error(`Type de transaction non supporté: ${data.type}`);
   }
 
-  const pendingTypes = ["PRODUCT_PURCHASE", "TOURNAMENT_PARTICIPATION"];
+  const canonicalType = (data.type === "PRODUCT_PURCHASE" ? "ORDER_PURCHASE" : data.type) as any;
+  const pendingTypes = ["PRODUCT_PURCHASE", "ORDER_PURCHASE", "TOURNAMENT_PARTICIPATION"];
   const initialStatus = pendingTypes.includes(data.type) ? "PENDING" : "COMPLETED";
 
   // 🚀 Utiliser executeTransaction pour garantir la double-entry
@@ -455,7 +457,7 @@ export async function createTransaction(
     fromAccountId,
     toAccountId,
     amount,
-    type: data.type,
+    type: canonicalType,
     status: initialStatus,
     description: data.description,
     metadata: data.metadata,
@@ -466,7 +468,7 @@ export async function createTransaction(
   // 🎯 Actions spécifiques selon le type
   await db.transaction(async (tx) => {
     await handleTransactionTypeSafe(tx, {
-      type: data.type,
+      type: canonicalType,
       metadata: result.transaction.metadata as Record<string, any>,
       userId: user.id,
       transactionId: result.transaction.id,

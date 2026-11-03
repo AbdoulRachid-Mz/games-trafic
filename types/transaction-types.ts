@@ -1,12 +1,11 @@
+import { transactionTypeEnum } from "@/database/schema";
+
+export type PostgresTransactionType = (typeof transactionTypeEnum.enumValues)[number];
+
+// Includes canonical PostgreSQL enum values + backwards-compatible UI aliases (I4-01, I4-02)
 export type TransactionType =
-  | 'THEME_PURCHASE'
-  | 'VIP_SUBSCRIPTION'
-  | 'PRODUCT_PURCHASE'
-  | 'TOURNAMENT_PARTICIPATION'
-  | 'GAME_ITEM_PURCHASE'
-  | 'DEPOSIT'
-  | 'WITHDRAWAL'
-  | 'TRANSFER';
+  | PostgresTransactionType
+  | 'PRODUCT_PURCHASE';
 
 
 
@@ -112,6 +111,41 @@ export const TRANSACTION_CONFIGS: Record<TransactionType, TransactionConfig> = {
     needsTargetId: false,
     feeType: 'transfer',
     steps: ['RECIPIENT_SELECTION', 'AMOUNT_INPUT', 'PIN_VERIFICATION', 'CONFIRMATION', 'SUCCESS']
+  },
+  ORDER_PURCHASE: {
+    type: 'ORDER_PURCHASE',
+    label: 'Achat de produit',
+    requiresEntity: true,
+    entityType: 'product',
+    needsTargetId: true,
+    feeType: 'purchase',
+    steps: ['ENTITY_SELECTION', 'AMOUNT_INPUT', 'PIN_VERIFICATION', 'CONFIRMATION', 'SUCCESS']
+  },
+  PURCHASE: {
+    type: 'PURCHASE',
+    label: 'Achat général',
+    requiresEntity: false,
+    needsTargetId: false,
+    feeType: 'purchase',
+    steps: ['AMOUNT_INPUT', 'CONFIRMATION', 'SUCCESS']
+  },
+  REFUND: {
+    type: 'REFUND',
+    label: 'Remboursement',
+    requiresEntity: false,
+    needsTargetId: false,
+    isAdminAction: true,
+    feeType: 'transfer',
+    steps: ['AMOUNT_INPUT', 'CONFIRMATION', 'SUCCESS']
+  },
+  BONUS: {
+    type: 'BONUS',
+    label: 'Bonus / Gratification',
+    requiresEntity: false,
+    needsTargetId: false,
+    isAdminAction: true,
+    feeType: 'deposit',
+    steps: ['AMOUNT_INPUT', 'CONFIRMATION', 'SUCCESS']
   }
 };
 

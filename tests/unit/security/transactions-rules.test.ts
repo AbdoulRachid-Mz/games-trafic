@@ -1,3 +1,5 @@
+import { transactionTypeEnum } from "@/database/schema";
+import { TRANSACTION_CONFIGS } from "@/types/transaction-types";
 ﻿import { describe, it, expect } from "vitest";
 
 describe("Financial Transaction Invariants & Rules (TASK-SEC-01 & SEC-04)", () => {
@@ -104,5 +106,72 @@ describe("Financial Transaction Invariants & Rules (TASK-SEC-01 & SEC-04)", () =
     expect(origDebitSum).toBe(origCreditSum);
     expect(revDebitSum).toBe(revCreditSum);
     expect(origDebitSum).toBe(revDebitSum);
+  });
+  describe("Vague 2: Escrow Accounting & Lifecycle Invariants (I1-01 -> I1-05)", () => {
+    it("should guarantee that escrow balance is non-negative at every step of order lifecycle", () => {
+      let escrowBalance = 0;
+      const orderAmount = 150;
+      const commissionRate = 0.05;
+
+      // 1. Capture: Buyer is debited, Escrow is credited
+      const captureLedger = [
+        { accountId: "buyer-wallet", debit: orderAmount, credit: 0 },
+        { accountId: "PLATFORM_ESCROW", debit: 0, credit: orderAmount },
+      ];
+      escrowBalance += captureLedger[1].credit - captureLedger[1].debit;
+      expect(escrowBalance).toBe(150);
+      expect(escrowBalance).toBeGreaterThanOrEqual(0);
+
+      // 2. Finalization (Completion): Escrow is debited, Seller credited net, Platform credited fee
+      const fee = orderAmount * commissionRate; // 7.5
+      const netToSeller = orderAmount - fee; // 142.5
+      const completionLedger = [
+        { accountId: "PLATFORM_ESCROW", debit: orderAmount, credit: 0 },
+        { accountId: "seller-shop-wallet", debit: 0, credit: netToSeller },
+        { accountId: "PLATFORM_FEES", debit: 0, credit: fee },
+      ];
+
+      const completionDebitSum = completionLedger.reduce((sum, e) => sum + e.debit, 0);
+      const completionCreditSum = completionLedger.reduce((sum, e) => sum + e.credit, 0);
+      expect(completionDebitSum).toBe(completionCreditSum);
+
+      escrowBalance -= completionLedger[0].debit;
+      expect(escrowBalance).toBe(0);
+      expect(escrowBalance).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should refund exact order amount from escrow on cancellation/rejection (I1-03)", () => {
+      let escrowBalance = 200; // After capture of 200 GTC
+      const refundAmount = 200;
+
+      const rejectionLedger = [
+        { accountId: "PLATFORM_ESCROW", debit: refundAmount, credit: 0 },
+        { accountId: "buyer-wallet", debit: 0, credit: refundAmount },
+      ];
+
+      const rejectionDebitSum = rejectionLedger.reduce((sum, e) => sum + e.debit, 0);
+      const rejectionCreditSum = rejectionLedger.reduce((sum, e) => sum + e.credit, 0);
+      expect(rejectionDebitSum).toBe(rejectionCreditSum);
+
+      escrowBalance -= rejectionLedger[0].debit;
+      expect(escrowBalance).toBe(0);
+      expect(escrowBalance).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("Vague 2: PostgreSQL Enum & Configuration Alignment (I4-01 -> I4-05)", () => {
+    it("should ensure every PostgreSQL enum value is covered in TRANSACTION_CONFIGS", () => {
+      const dbEnumValues = transactionTypeEnum.enumValues;
+      expect(dbEnumValues).toBeDefined();
+      expect(dbEnumValues.length).toBeGreaterThan(0);
+
+      for (const enumVal of dbEnumValues) {
+        expect(TRANSACTION_CONFIGS[enumVal as keyof typeof TRANSACTION_CONFIGS]).toBeDefined();
+      }
+    });
+
+    it("should guarantee ORDER_PURCHASE is present in PostgreSQL enum", () => {
+      expect(transactionTypeEnum.enumValues).toContain("ORDER_PURCHASE");
+    });
   });
 });

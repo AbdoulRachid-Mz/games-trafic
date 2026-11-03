@@ -3,6 +3,8 @@
 import {
   tournamentEditions,
   editionRegistrations,
+  registrationPayments,
+  userWallets,
   TournamentEditionWithRelations,
   tournamentPhases,
   phaseGroupParticipants,
@@ -12,6 +14,8 @@ import {
 import { db } from "@/lib/db";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { verifyWalletPin } from "./wallets";
 import { getMatchesWithParticipants } from "./phases";
 
 import { Parser } from "@json2csv/plainjs";
@@ -137,6 +141,10 @@ export async function joinEdition(
   editionId: string,
   userId: string,
   userInfo: { username: string; image?: string | null },
+  options?: {
+    payWithWallet?: boolean;
+    pin?: string;
+  }
 ): Promise<{
   success: boolean;
   message?: string;
@@ -149,107 +157,197 @@ export async function joinEdition(
   };
 }> {
   try {
-    // 1. Get Edition with tournament info
-    const edition = await db.query.tournamentEditions.findFirst({
-      where: eq(tournamentEditions.id, editionId),
-      with: { tournament: true },
-    });
+    return await db.transaction(async (tx) => {
+      // 1. Lock and fetch Edition with tournament info (P1-F1)
+      const [edition] = await tx
+        .select()
+        .from(tournamentEditions)
+        .where(eq(tournamentEditions.id, editionId))
+        .for("update");
 
-    if (!edition) throw new Error("Edition introuvable");
+      if (!edition) throw new Error("Edition introuvable");
 
-    // 2. Performance checks
-    if (edition.tournament?.organizerId === userId) {
-      return {
-        success: false,
-        message:
-          "L'organisateur ne peut pas s'inscrire à sa propre compétition.",
-      };
-    }
-
-    if (edition.status !== "UPCOMING") {
-      return {
-        success: false,
-        message:
-          "Les inscriptions sont fermées. Le tournoi a déjà commencé ou est terminé.",
-      };
-    }
-
-    const currentParticipants = edition.currentParticipants || 0;
-    const maxParticipants = edition.maxParticipants || 0;
-    if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
-      return {
-        success: false,
-        message: "Désolé, cette édition est déjà complète.",
-      };
-    }
-
-    // 3. Check/Create Tournament Member using the new members action
-    const { getTournamentMembers, addTournamentMember } =
-      await import("./members");
-
-    const memberRes = await getTournamentMembers({
-      filters: { tournamentId: edition.tournamentId, userId },
-    });
-
-    let member = memberRes.data[0];
-
-    if (!member) {
-      member = await addTournamentMember({
-        tournamentId: edition.tournamentId,
-        userId: userId,
-        role: "PARTICIPANT",
-        displayName: userInfo.username,
-        avatar: userInfo.image,
+      // 2. Strict business rule validations (I2-01)
+      const tournament = await tx.query.tournaments.findFirst({
+        where: (t, { eq }) => eq(t.id, edition.tournamentId),
       });
-    }
 
-    // 3. Check for Existing Registration
-    const existingRegistration = await db.query.editionRegistrations.findFirst({
-      where: and(
-        eq(editionRegistrations.editionId, editionId),
-        eq(editionRegistrations.memberId, member.id),
-      ),
-    });
+      if (tournament?.organizerId === userId) {
+        return {
+          success: false,
+          message: "L'organisateur ne peut pas s'inscrire à sa propre compétition.",
+        };
+      }
 
-    if (existingRegistration) {
-      return {
-        success: true,
-        message: "Déjà inscrit",
-        registration: existingRegistration,
-      };
-    }
+      if (edition.status !== "UPCOMING") {
+        return {
+          success: false,
+          message: "Les inscriptions sont fermées. Le tournoi a déjà commencé ou est terminé.",
+        };
+      }
 
-    // 4. Handle Private/Paid Editions
-    const entryFee = Number(edition.entryFee || 0);
-    if (entryFee > 0) {
-      return {
-        success: false,
-        paymentRequired: true,
-        paymentDetails: {
-          amount: edition.entryFee || "0",
+      const now = new Date();
+      if (edition.registrationOpens && now < new Date(edition.registrationOpens)) {
+        return {
+          success: false,
+          message: "Les inscriptions ne sont pas encore ouvertes pour cette édition.",
+        };
+      }
+
+      if (edition.registrationDeadline && now > new Date(edition.registrationDeadline)) {
+        return {
+          success: false,
+          message: "La date limite d'inscription est dépassée.",
+        };
+      }
+
+      const currentParticipants = edition.currentParticipants || 0;
+      const maxParticipants = edition.maxParticipants || 0;
+      if (maxParticipants > 0 && currentParticipants >= maxParticipants) {
+        return {
+          success: false,
+          message: "Désolé, cette édition est déjà complète.",
+        };
+      }
+
+      // 3. Resolve Tournament Member
+      const { getTournamentMembers, addTournamentMember } = await import("./members");
+
+      const memberRes = await getTournamentMembers({
+        filters: { tournamentId: edition.tournamentId, userId },
+      });
+
+      let member = memberRes.data[0];
+      if (!member) {
+        member = await addTournamentMember({
+          tournamentId: edition.tournamentId,
+          userId: userId,
+          role: "PARTICIPANT",
+          displayName: userInfo.username,
+          avatar: userInfo.image,
+        });
+      }
+
+      // 4. Check for Existing Registration
+      const existingRegistration = await tx.query.editionRegistrations.findFirst({
+        where: and(
+          eq(editionRegistrations.editionId, editionId),
+          eq(editionRegistrations.memberId, member.id),
+        ),
+      });
+
+      if (existingRegistration) {
+        return {
+          success: true,
+          message: "Déjà inscrit",
+          registration: existingRegistration,
+        };
+      }
+
+      // 5. Handle Paid Editions Atomically (P1-F1, I2-02, I2-04)
+      const entryFee = Number(edition.entryFee || 0);
+      let paidTransactionId: string | null = null;
+
+      if (entryFee > 0) {
+        if (!options?.payWithWallet) {
+          return {
+            success: false,
+            paymentRequired: true,
+            paymentDetails: {
+              amount: edition.entryFee || "0",
+              currency: edition.prizeCurrency || "GTC",
+              editionName: edition.name || `Édition #${edition.editionNumber}`,
+            },
+          };
+        }
+
+        // Fetch user wallet
+        const [userWallet] = await tx
+          .select()
+          .from(userWallets)
+          .where(eq(userWallets.userId, userId))
+          .for("update");
+
+        if (!userWallet || !userWallet.financialAccountId) {
+          throw new Error("Portefeuille introuvable ou compte financier manquant");
+        }
+
+        // Validate PIN if configured
+        if (userWallet.pinHash) {
+          if (!options.pin) {
+            throw new Error("Code PIN requis pour valider le paiement d'inscription.");
+          }
+          const pinRes = await verifyWalletPin(userWallet.id, options.pin);
+          if (!pinRes.success) {
+            throw new Error(pinRes.error || "Code PIN incorrect.");
+          }
+        }
+
+        // Destination account: edition prize pool or platform escrow
+        const targetAccountId =
+          edition.financialAccountId ||
+          (await getOrCreatePlatformAccount(tx, "PLATFORM_ESCROW")).id;
+
+        // Execute atomic double-entry transfer (I2-02, I2-04)
+        const transferRes = await executeTransaction({
+          fromAccountId: userWallet.financialAccountId,
+          toAccountId: targetAccountId,
+          amount: entryFee,
+          type: "TOURNAMENT_PARTICIPATION",
+          status: "COMPLETED",
+          description: `Frais d'inscription tournoi: ${edition.name || edition.id}`,
+          userId,
+          walletId: userWallet.id,
+          tx,
+          metadata: {
+            editionId,
+            tournamentId: edition.tournamentId,
+            entryFee: entryFee.toString(),
+          },
+        });
+
+        paidTransactionId = transferRes.transaction.id;
+      }
+
+      // 6. Create Registration
+      const [registration] = await tx
+        .insert(editionRegistrations)
+        .values({
+          editionId,
+          memberId: member.id,
+          status: "REGISTERED",
+          checkedIn: false,
+          feePaid: entryFee > 0 ? true : true,
+        })
+        .returning();
+
+      // 7. If paid, link registration payment atomically
+      if (entryFee > 0 && paidTransactionId) {
+        await tx.insert(registrationPayments).values({
+          registrationId: registration.id,
+          transactionId: paidTransactionId,
+          amount: entryFee.toFixed(2),
           currency: edition.prizeCurrency || "GTC",
-          editionName: edition.name || `Édition #${edition.editionNumber}`,
-        },
-      };
-    }
+          status: "COMPLETED",
+          paymentMethod: "WALLET",
+          paidAt: new Date(),
+          metadata: { editionId },
+        });
+      }
 
-    // 5. Register
-    const registration = await db
-      .insert(editionRegistrations)
-      .values({
-        editionId,
-        memberId: member.id,
-        status: "REGISTERED",
-        checkedIn: false,
-        feePaid: true,
-      })
-      .returning();
+      // 8. Increment participant counter on locked edition
+      await tx
+        .update(tournamentEditions)
+        .set({
+          currentParticipants: currentParticipants + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(tournamentEditions.id, editionId));
 
-    revalidatePath(
-      `/tournaments/${edition.tournamentId}/editions/${editionId}`,
-    );
+      revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}`);
 
-    return { success: true, registration: registration[0] };
+      return { success: true, registration };
+    });
   } catch (error) {
     console.error("Error joining edition:", error);
     throw error;
