@@ -1,7 +1,7 @@
 # MASTER PROMPT — REFACTORING COMPLET DU SYSTÈME DE TRANSACTIONS
-## H³ Infinity Gaming — Architecture financière, administration et portefeuille utilisateur
+## Games Trafic — Architecture financière, administration et portefeuille utilisateur
 
-Tu interviens sur le projet **H³ Infinity Gaming (Games Trafic)**, une plateforme gaming avec un système de portefeuille GTC, des transactions entre utilisateurs, des achats, des inscriptions aux tournois, des dépôts, des retraits et des opérations administratives.
+Tu interviens sur le projet **Games Trafic**, une plateforme gaming avec un système de portefeuille GTC, des transactions entre utilisateurs, des achats, des inscriptions aux tournois, des dépôts, des retraits et des opérations administratives.
 
 Repository : https://github.com/AbdoulRachid-Mz/games-trafic
 
