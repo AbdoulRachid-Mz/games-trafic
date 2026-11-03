@@ -1,6 +1,7 @@
 "use server";
 
 import { getCurrentUser } from '@/lib/auth/session';
+import { isAdmin, assertAuthenticated, assertOwnerOrAdmin } from '@/lib/auth/permissions';
 import {
   messages,
   type Message,
@@ -95,6 +96,9 @@ export async function getConversationsForUser(
   userId: string,
 ): Promise<Conversation[]> {
   try {
+    const currentUser = await getCurrentUser();
+    assertOwnerOrAdmin(currentUser, userId);
+
     // 1. Trouver toutes les conversations où l'utilisateur est participant
     const userConversationsRaw = await db.query.conversations.findMany({
       where: (c, { sql }) => sql`${c.participantIds} @> ARRAY[${userId}]::text[]`,
@@ -598,6 +602,24 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
       throw new Error("Cannot specify both groupId and recipientId");
     }
 
+    // A2-01: Vérifier l'appartenance au groupe si c'est un message de groupe
+    if (isGroupMessage) {
+      const isMember = await db.query.groupMembers.findFirst({
+        where: and(
+          eq(groupMembers.groupId, messageData.groupId!),
+          eq(groupMembers.userId, currentUser.id)
+        ),
+      });
+      if (!isMember && !isAdmin(currentUser)) {
+        throw new Error("Accès refusé: Vous n'êtes pas membre de ce groupe");
+      }
+    }
+
+    // A2-02: Empêcher de s'envoyer un message privé à soi-même
+    if (isDirectMessage && messageData.recipientId === currentUser.id) {
+      throw new Error("Impossible d'envoyer un message privé à soi-même");
+    }
+
     // ---------------------------------------------------
 
     // senderId is always the authenticated user — strip any client-provided value
@@ -666,6 +688,7 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
         entityType: convEntityType,
         entityId: convEntityId,
         lastMessageId: newMessage.id,
+        unreadCount: 1,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
@@ -673,8 +696,7 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
         set: {
           lastMessageId: newMessage.id,
           updatedAt: new Date(),
-          // Increment unread count logic could be added here
-          // For now, we'll just update the timestamp
+          unreadCount: sql`COALESCE(${conversations.unreadCount}, 0) + 1`,
         },
       });
 
@@ -855,6 +877,9 @@ export async function markConversationAsRead(
   userId: string,
 ): Promise<void> {
   try {
+    const currentUser = await getCurrentUser();
+    assertOwnerOrAdmin(currentUser, userId);
+
     // 1. Trouver tous les messages de cette conversation (basé sur l'entité)
     const [type, id] = chatId.split(":");
     
@@ -863,8 +888,6 @@ export async function markConversationAsRead(
       whereClause = eq(messages.groupId, id);
     } else if (type === "user") {
       // Pour les DMs, on cherche les messages entre les deux participants
-      // C'est un peu complexe sans un ID de conversation sur le message, 
-      // mais on peut utiliser recipientId/senderId
       whereClause = or(
         and(eq(messages.senderId, userId), eq(messages.recipientId, id)),
         and(eq(messages.senderId, id), eq(messages.recipientId, userId))
@@ -883,8 +906,14 @@ export async function markConversationAsRead(
       })
       .where(and(whereClause, sql`NOT (${userId} = ANY(${messages.readBy}))`));
 
-    // 2. Mettre à jour le compteur de la conversation si nécessaire
-    // TODO: Si on stocke un unreadCount par utilisateur dans une table pivot, le mettre à 0 ici
+    // 2. Mettre à jour le compteur de la conversation (P4-01)
+    await db
+      .update(conversations)
+      .set({
+        unreadCount: 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(conversations.chatId, chatId));
   } catch (error) {
     console.error("Error marking conversation as read:", error);
   }

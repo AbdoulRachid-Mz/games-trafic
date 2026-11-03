@@ -26,6 +26,7 @@ import { db } from "@/lib/db";
 import { getAppSettings } from "./app-settings";
 import { getUserWalletById, verifyWalletPin } from "./wallets";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isAdmin, assertAuthenticated } from "@/lib/auth/permissions";
 import {
   executeTransaction,
   getOrCreatePlatformAccount
@@ -268,13 +269,13 @@ export async function createTransaction(
   }
 
   const user = await getCurrentUser();
-  if (!user) throw new Error("Utilisateur non authentifié");
+  assertAuthenticated(user);
 
-  const isAdmin = user.role === "admin" || (user as any).isAdmin === true;
+  const isAdminUser = isAdmin(user);
 
   // 🛡️ SEC-001: Bloquer tout crédit direct (DEPOSIT, BONUS, REFUND) non-admin et non-système
   const creditTypes = ["DEPOSIT", "BONUS", "REFUND"];
-  if (creditTypes.includes(data.type) && !isAdmin && !options?.isSystem) {
+  if (creditTypes.includes(data.type) && !isAdminUser && !options?.isSystem) {
     throw new Error(
       "Opération non autorisée: les crédits directs (dépôts, bonus, remboursements) doivent résulter d'un paiement certifié ou d'une validation administrateur."
     );
@@ -283,13 +284,13 @@ export async function createTransaction(
   // Récupérer le wallet
   const wallet = await getUserWalletById(data.walletId);
   if (!wallet) throw new Error("Wallet non trouvé");
-  if (wallet.userId !== user.id && !isAdmin) throw new Error("Non autorisé");
+  if (wallet.userId !== user.id && !isAdminUser) throw new Error("Non autorisé");
   if (!wallet.isActive) throw new Error("Wallet inactif");
   if (wallet.isLocked) throw new Error("Wallet verrouillé");
   if (!wallet.financialAccountId) throw new Error("Compte financier non lié");
 
   // 🛡️ SEC-010: Validation obligatoire du code PIN côté serveur pour transferts et retraits
-  if (["TRANSFER", "WITHDRAWAL"].includes(data.type) && !isAdmin && !options?.isSystem) {
+  if (["TRANSFER", "WITHDRAWAL"].includes(data.type) && !isAdminUser && !options?.isSystem) {
     if (wallet.pinHash) {
       if (!data.pin) {
         throw new Error("Code PIN requis pour effectuer cette opération.");

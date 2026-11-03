@@ -39,6 +39,7 @@ import { db } from '@/lib/db';
 import { encryptData, decryptData } from '@/lib/encryption';
 import { executeTransaction, getOrCreatePlatformAccount } from '@/lib/ledger/ledger-utils';
 import { getCurrentUser } from '@/lib/auth/session';
+import { assertCanApproveRequests, getAdminLevel } from '@/lib/auth/permissions';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -425,15 +426,12 @@ export async function approveRequest(
   id: string,
   adminUserIdParam?: string
 ) {
-  // Authenticate admin from session (P0-F6)
+  // Authenticate admin from session (P0-F6 / P1-02)
   const sessionUser = await getCurrentUser();
-  const isAdmin = sessionUser && (sessionUser.role === "admin" || (sessionUser as any).isAdmin === true);
-  if (!isAdmin) {
-    throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent approuver une demande.");
-  }
+  assertCanApproveRequests(sessionUser);
 
   const effectiveAdminId = sessionUser.id;
-  const adminLevel = (sessionUser as any).level || "STANDARD";
+  const adminLevel = getAdminLevel(sessionUser);
 
   return await db.transaction(async (tx) => {
     const request = await tx
@@ -541,10 +539,7 @@ export async function rejectRequest(
 ): Promise<Request> {
   try {
     const sessionUser = await getCurrentUser();
-    const isAdmin = sessionUser && (sessionUser.role === "admin" || (sessionUser as any).isAdmin === true);
-    if (!isAdmin) {
-      throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent rejeter une demande.");
-    }
+    assertCanApproveRequests(sessionUser);
 
     const effectiveAdminId = sessionUser.id;
     // Support both signatures: rejectRequest(id, reason) and legacy rejectRequest(id, adminUserId, reason)

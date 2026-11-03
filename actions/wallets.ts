@@ -44,6 +44,7 @@ import { WalletUtils } from '@/lib/wallet/wallet-utils';
 import { getAppSettings } from '@/actions/app-settings';
 import { createUserTrace } from '@/actions/user-traces';
 import { getCurrentUser } from '@/lib/auth/session';
+import { assertCanDeposit, assertOwnerOrAdmin, isAdmin } from '@/lib/auth/permissions';
 import {
   executeTransaction,
   getOrCreatePlatformAccount,
@@ -751,11 +752,10 @@ export async function transferMoney(
 ): Promise<{ success: boolean; transaction?: WalletTransaction; error?: string }> {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return { success: false, error: "Non authentifié" };
-    }
-    if (currentUser.id !== fromUserId && currentUser.role !== "admin" && (currentUser as any).isAdmin !== true) {
-      return { success: false, error: "Non autorisé à transférer depuis ce compte" };
+    try {
+      assertOwnerOrAdmin(currentUser, fromUserId);
+    } catch (authErr: any) {
+      return { success: false, error: authErr.message || "Non autorisé à transférer depuis ce compte" };
     }
 
     if (amount <= 0 || isNaN(amount)) {
@@ -916,9 +916,10 @@ export async function depositToWallet(
 ): Promise<{ success: boolean; transaction?: WalletTransaction; error?: string }> {
   try {
     const currentUser = await getCurrentUser();
-    const isAdmin = currentUser && (currentUser.role === 'admin' || (currentUser as any).isAdmin === true);
-    if (!isAdmin) {
-      return { success: false, error: "UNAUTHORIZED: Seuls les administrateurs peuvent créditer manuellement un compte." };
+    try {
+      assertCanDeposit(currentUser);
+    } catch (authErr: any) {
+      return { success: false, error: authErr.message || "UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent créditer manuellement un compte." };
     }
 
     if (amount <= 0 || isNaN(amount)) {

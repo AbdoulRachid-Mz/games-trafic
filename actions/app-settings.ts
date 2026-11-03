@@ -4,6 +4,7 @@ import { appSettings, type AppSettings, type NewAppSettings } from '@/database/s
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
+import { assertAdmin, assertCanManageFees } from '@/lib/auth/permissions';
 import { createUserTrace } from '@/actions/user-traces';
 import type { AppSettingsUpdate } from '@/config/app-config';
 import { cacheTag, cacheLife } from 'next/cache';
@@ -120,10 +121,7 @@ export async function updateAppSettings(
 ): Promise<NewAppSettings> {
   try {
     const sessionUser = await getCurrentUser();
-    const isAdmin = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true);
-    if (!isAdmin) {
-      throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent modifier les paramètres.");
-    }
+    assertAdmin(sessionUser);
 
     const existing = await getAppSettings();
     if (!existing) throw new Error('App settings not found');
@@ -224,10 +222,7 @@ export async function updateVipPricing(pricing: {
 }): Promise<NewAppSettings> {
   try {
     const sessionUser = await getCurrentUser();
-    const isLevelA = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true) && (sessionUser as any).level === 'A';
-    if (!isLevelA) {
-      throw new Error("UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent modifier la tarification VIP.");
-    }
+    assertCanManageFees(sessionUser);
 
     const updates: AppSettingsUpdate = {};
     if (pricing.monthly !== undefined) updates.vipMonthlyPrice = pricing.monthly;
@@ -268,10 +263,7 @@ export async function updateTransactionFees(fees: {
 }): Promise<NewAppSettings> {
   try {
     const sessionUser = await getCurrentUser();
-    const isLevelA = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true) && (sessionUser as any).level === 'A';
-    if (!isLevelA) {
-      throw new Error("UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent modifier les frais de transaction.");
-    }
+    assertCanManageFees(sessionUser);
 
     const updates: AppSettingsUpdate = {};
     if (fees.transaction !== undefined) updates.transactionFeePercentage = fees.transaction;
@@ -380,10 +372,7 @@ export async function updateRoutes(routes: {
 export async function resetAppSettings(): Promise<void> {
   try {
     const sessionUser = await getCurrentUser();
-    const isLevelA = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true) && (sessionUser as any).level === 'A';
-    if (!isLevelA) {
-      throw new Error("UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent réinitialiser les paramètres.");
-    }
+    assertAdmin(sessionUser, 'A');
     await db.delete(appSettings);
   } catch (error) {
     console.error('Error resetting app settings:', error);

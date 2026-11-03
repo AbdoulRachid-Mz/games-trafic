@@ -12,6 +12,7 @@ import { and, count, eq, inArray, sql, SQL } from 'drizzle-orm';
 import { OrderFilters, OrderStats, OrderStatus, PaginationResponse } from '@/types/api';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
+import { assertCanManageOrders, isAdmin, assertAuthenticated } from '@/lib/auth/permissions';
 import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from '@/lib/ledger/ledger-utils';
 import { encryptData, decryptData } from '@/lib/encryption';
 import {
@@ -176,8 +177,7 @@ export async function approveOrderShop(orderId: string, credentials: { login: st
 export async function completeOrderAdmin(orderId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await getCurrentUser();
-    const isAdmin = user && (user.role === 'admin' || (user as any).isAdmin === true);
-    if (!isAdmin) throw new Error("Accès refusé: Réservé aux administrateurs");
+    assertCanManageOrders(user);
 
     return await db.transaction(async (tx) => {
       const order = await tx.query.orders.findFirst({
@@ -270,9 +270,9 @@ export async function rejectOrder(orderId: string, reason: string): Promise<{ su
 
       const isBuyer = order.buyerId === user.id;
       const isShop = order.shop?.ownerId === user.id;
-      const isAdmin = user.role === 'admin';
+      const userIsAdmin = isAdmin(user);
 
-      if (!isBuyer && !isShop && !isAdmin) throw new Error("Non autorisé");
+      if (!isBuyer && !isShop && !userIsAdmin) throw new Error("Non autorisé");
       if (['COMPLETED', 'CANCELLED', 'REJECTED_BY_SHOP', 'REJECTED_BY_ADMIN'].includes(order.status as string)) {
         throw new Error("Commande déjà traitée");
       }
@@ -280,7 +280,7 @@ export async function rejectOrder(orderId: string, reason: string): Promise<{ su
       // Determine new status
       let newStatus: any = 'CANCELLED';
       if (isShop) newStatus = 'REJECTED_BY_SHOP';
-      if (isAdmin) newStatus = 'REJECTED_BY_ADMIN';
+      if (userIsAdmin) newStatus = 'REJECTED_BY_ADMIN';
 
       // Refund only if funds were already captured
       if (order.walletTransactionId) {

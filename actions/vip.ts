@@ -1,6 +1,7 @@
 'use server';
 
 import { getCurrentUser } from '@/lib/auth/session';
+import { assertAdmin, assertOwnerOrAdmin } from '@/lib/auth/permissions';
 import { 
   vipSubscriptions, 
   type VipSubscription, 
@@ -264,9 +265,7 @@ export async function createVipSubscription(
     // SEC-09 FIX: Only admins can directly create VIP subscriptions.
     // User-initiated VIP purchases go through the wallet/payment flow instead.
     const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error('Non authentifié');
-    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
-    if (!isAdmin) throw new Error('Accès réservé aux administrateurs — utilisez le flux d\'achat VIP');
+    assertAdmin(currentUser);
 
     // Validation des données requises
     if (!subscriptionData.userId || !subscriptionData.endDate) {
@@ -343,9 +342,7 @@ export async function updateVipSubscription(
   try {
     // SEC-09 FIX: Admin-only
     const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error('Non authentifié');
-    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
-    if (!isAdmin) throw new Error('Accès réservé aux administrateurs');
+    assertAdmin(currentUser);
 
     // Vérifier que l'abonnement existe
     const existingSubscription = await getVipSubscriptionById(id);
@@ -390,8 +387,7 @@ export async function updateVipSubscription(
 export async function cancelVipSubscription(id: string): Promise<VipSubscription> {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error('Non authentifié');
-    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+    assertAuthenticated(currentUser);
 
     const subscription = await getVipSubscriptionById(id);
     if (!subscription) {
@@ -399,9 +395,7 @@ export async function cancelVipSubscription(id: string): Promise<VipSubscription
     }
 
     // Only admin or the subscription owner can cancel
-    if (!isAdmin && subscription.userId !== currentUser.id) {
-      throw new Error('Accès refusé');
-    }
+    assertOwnerOrAdmin(currentUser, subscription.userId);
 
     if (subscription.status === 'CANCELLED') {
       throw new Error('VIP subscription is already cancelled');
@@ -444,17 +438,14 @@ export async function renewVipSubscription(
 ): Promise<VipSubscription> {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error('Non authentifié');
-    const isAdmin = currentUser.role === 'admin' || (currentUser as any).isAdmin === true;
+    assertAuthenticated(currentUser);
 
     const subscription = await getVipSubscriptionById(id);
     if (!subscription) {
       throw new Error('VIP subscription not found');
     }
 
-    if (!isAdmin && subscription.userId !== currentUser.id) {
-      throw new Error('Accès refusé');
-    }
+    assertOwnerOrAdmin(currentUser, subscription.userId);
 
     if (subscription.status === 'CANCELLED') {
       throw new Error('Cannot renew a cancelled VIP subscription');

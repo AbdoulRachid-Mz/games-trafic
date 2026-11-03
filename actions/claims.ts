@@ -5,6 +5,7 @@ import { eq, and, or, like, ilike, desc, asc, sql, count, inArray, isNull, isNot
 import { type ClaimFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
+import { assertAdmin, assertOwnerOrAdmin } from '@/lib/auth/permissions';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -265,10 +266,7 @@ export async function updateClaim(
       throw new Error('Claim not found');
     }
 
-    const isAdmin = sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true;
-    if (existingClaim.userId !== sessionUser.id && !isAdmin) {
-      throw new Error('FORBIDDEN: Vous ne pouvez modifier que vos propres réclamations.');
-    }
+    assertOwnerOrAdmin(sessionUser, existingClaim.userId);
 
     // Vérification de la transaction si elle est fournie
     if (claimData.transactionId) {
@@ -320,10 +318,7 @@ export async function updateClaimStatus(
 ): Promise<Claim> {
   try {
     const sessionUser = await getCurrentUser();
-    const isAdmin = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true);
-    if (!isAdmin) {
-      throw new Error('FORBIDDEN: Seuls les administrateurs peuvent modifier le statut d\'une réclamation.');
-    }
+    assertAdmin(sessionUser);
     const result = await db
       .update(claims)
       .set({
@@ -354,10 +349,7 @@ export async function updateClaimStatus(
 export async function deleteClaim(id: string): Promise<Claim> {
   try {
     const sessionUser = await getCurrentUser();
-    const isAdmin = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true);
-    if (!isAdmin) {
-      throw new Error('FORBIDDEN: Seuls les administrateurs peuvent supprimer une réclamation.');
-    }
+    assertAdmin(sessionUser);
     const result = await db
       .update(claims)
       .set({

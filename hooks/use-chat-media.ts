@@ -84,33 +84,52 @@ export function useChatMedia(user: User | null) {
     file: File,
     onProgress?: (progress: number) => void
   ): Promise<string> => {
-    // TODO: Implement actual file upload to your storage service
-    // This is a placeholder that simulates upload
-    
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append('file', file);
 
-      // Simulate upload progress
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 10;
-        if (onProgress) {
-          onProgress(Math.min(progress, 90));
-        }
+      const xhr = new XMLHttpRequest();
 
-        if (progress >= 100) {
-          clearInterval(interval);
-          // Return a mock URL - replace with actual upload endpoint
-          resolve(`/uploads/${Date.now()}-${file.name}`);
+      if (onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            onProgress(progress);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.url) {
+              resolve(data.url);
+            } else {
+              reject(new Error('Réponse invalide du serveur (URL manquante)'));
+            }
+          } catch {
+            reject(new Error('Erreur de parsing de la réponse'));
+          }
+        } else {
+          try {
+            const errData = JSON.parse(xhr.responseText);
+            reject(new Error(errData.error || `Erreur d'upload: ${xhr.status}`));
+          } catch {
+            reject(new Error(`Erreur d'upload: ${xhr.status}`));
+          }
         }
-      }, 200);
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Erreur réseau lors de l\'upload'));
+      };
+
+      xhr.open('POST', '/api/upload', true);
+      xhr.send(formData);
     });
   }, []);
 
-  /**
-   * Process and upload a single file
-   */
   const uploadFile = useCallback(async (file: File): Promise<string> => {
     const fileId = `${Date.now()}-${file.name}`;
 

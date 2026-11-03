@@ -6,6 +6,7 @@ import {
 } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
+import { assertCanRefund, isAdmin as checkIsAdmin } from "@/lib/auth/permissions";
 
 export interface RefundOptions {
   reason?: string;
@@ -23,12 +24,8 @@ export async function executeRefund(
   options: RefundOptions = {}
 ): Promise<WalletTransaction> {
   const currentUser = await getCurrentUser();
-  const isAdmin =
-    currentUser &&
-    (currentUser.role === "admin" || (currentUser as any).isAdmin === true);
-
-  if (!isAdmin && !options.adminId) {
-    throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent initier un remboursement.");
+  if (!options.adminId) {
+    assertCanRefund(currentUser);
   }
 
   const effectiveAdminId = currentUser?.id || options.adminId || "system";
