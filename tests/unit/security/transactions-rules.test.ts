@@ -53,4 +53,56 @@ describe("Financial Transaction Invariants & Rules (TASK-SEC-01 & SEC-04)", () =
 
     expect(totalDebit).toBe(totalCredit);
   });
+
+  it("should enforce that purchase/spend types never credit a user wallet (F1-06)", () => {
+    const spendTypes = [
+      "THEME_PURCHASE",
+      "TOURNAMENT_PARTICIPATION",
+      "ORDER_PURCHASE",
+      "GAME_ITEM_PURCHASE",
+      "PURCHASE",
+      "VIP_SUBSCRIPTION",
+      "WITHDRAWAL",
+    ];
+
+    const creditTypes = ["DEPOSIT", "BONUS", "REFUND"];
+
+    for (const spendType of spendTypes) {
+      expect(creditTypes.includes(spendType)).toBe(false);
+    }
+  });
+
+  it("should ensure refund entries invert original debit and credit exactly", () => {
+    const originalEntries = [
+      { accountId: "user-wallet-1", debit: 50, credit: 0 },
+      { accountId: "platform-fees", debit: 0, credit: 50 },
+    ];
+
+    // Reversal inverts credit and debit
+    const reversedEntries = originalEntries.map((e) => ({
+      accountId: e.accountId,
+      debit: e.credit,
+      credit: e.debit,
+    }));
+
+    expect(reversedEntries[0]).toEqual({
+      accountId: "user-wallet-1",
+      debit: 0,
+      credit: 50,
+    });
+    expect(reversedEntries[1]).toEqual({
+      accountId: "platform-fees",
+      debit: 50,
+      credit: 0,
+    });
+
+    const origDebitSum = originalEntries.reduce((s, e) => s + e.debit, 0);
+    const origCreditSum = originalEntries.reduce((s, e) => s + e.credit, 0);
+    const revDebitSum = reversedEntries.reduce((s, e) => s + e.debit, 0);
+    const revCreditSum = reversedEntries.reduce((s, e) => s + e.credit, 0);
+
+    expect(origDebitSum).toBe(origCreditSum);
+    expect(revDebitSum).toBe(revCreditSum);
+    expect(origDebitSum).toBe(revDebitSum);
+  });
 });

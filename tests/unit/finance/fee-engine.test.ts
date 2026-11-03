@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calculatePureFee,
   resolveBaseFeePercentage,
+  calculateTransactionFees,
 } from "@/lib/finance/fees/fee-engine";
 
 describe("lib/finance/fees/fee-engine - Fee Engine Invariants (TASK-FIN-01)", () => {
@@ -105,6 +106,13 @@ describe("lib/finance/fees/fee-engine - Fee Engine Invariants (TASK-FIN-01)", ()
     it("should handle null or empty settings gracefully", () => {
       expect(resolveBaseFeePercentage("PRODUCT_PURCHASE", null)).toBe(0);
       expect(resolveBaseFeePercentage("UNKNOWN_TYPE", {})).toBe(0);
+    });
+  });
+  describe("calculateTransactionFees error handling (F8-02)", () => {
+    it("should throw FEE_POLICY_UNAVAILABLE when settings are null or unavailable", async () => {
+      await expect(
+        calculateTransactionFees("TRANSFER", 100, { settings: null })
+      ).rejects.toThrow("FEE_POLICY_UNAVAILABLE");
     });
   });
 });

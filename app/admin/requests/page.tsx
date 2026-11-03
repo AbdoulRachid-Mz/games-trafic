@@ -167,7 +167,7 @@ export default function AdminRequestsPage() {
 
     setIsApproving(true);
     try {
-      await approveRequest(selectedRequest.id, auth?.id);
+      await approveRequest(selectedRequest.id);
       await createNotification({
         userId: selectedRequest.userId,
         title: "Demande approuvée",
@@ -202,7 +202,7 @@ export default function AdminRequestsPage() {
 
     setIsRejecting(true);
     try {
-      await rejectRequest(selectedRequest.id, auth?.id, actionReason);
+      await rejectRequest(selectedRequest.id, actionReason);
 
       if (selectedRequest.transactionId) {
         try {

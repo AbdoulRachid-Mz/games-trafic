@@ -6,7 +6,7 @@ import {
   vipSubscriptions, type WalletTransaction,
   type NewWalletTransaction, users, registrationPayments,
   requests
-} from "@/database/schema";
+, gameItems, themes, tournamentEditions} from "@/database/schema";
 import {
   eq,
   and, desc,
@@ -30,7 +30,7 @@ import {
   executeTransaction,
   getOrCreatePlatformAccount
 } from "@/lib/ledger/ledger-utils";
-import { calculateTransactionFees } from "@/lib/finance";
+import { calculateTransactionFees, executeRefund } from "@/lib/finance";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -301,7 +301,67 @@ export async function createTransaction(
     }
   }
 
-  const amount = Number(data.amount);
+  let amount = Number(data.amount);
+
+  // 🛡️ P0-F5: Server-side price enforcement for purchase/entry types
+  if (data.type === "GAME_ITEM_PURCHASE") {
+    const itemId = data.metadata?.targetId || data.metadata?.gameItemId;
+    if (itemId) {
+      const item = await db.query.gameItems.findFirst({
+        where: eq(gameItems.id, itemId),
+      });
+      if (!item || !item.isActive) {
+        throw new Error("Item non disponible");
+      }
+      const quantity = Math.max(1, Number(data.metadata?.quantity || 1));
+      const serverPrice = parseFloat(item.priceGtc) * quantity;
+      if (!isNaN(amount) && Math.abs(amount - serverPrice) > 0.01) {
+        throw new Error("PRICE_CHANGED: Le prix de l'article a été actualisé.");
+      }
+      amount = serverPrice;
+    }
+  } else if (data.type === "TOURNAMENT_PARTICIPATION") {
+    const editionId = data.metadata?.targetId || data.metadata?.editionId;
+    if (editionId) {
+      const edition = await db.query.tournamentEditions.findFirst({
+        where: eq(tournamentEditions.id, editionId),
+      });
+      if (!edition) {
+        throw new Error("Édition introuvable");
+      }
+      const serverFee = parseFloat(edition.entryFee || "0");
+      if (!isNaN(amount) && Math.abs(amount - serverFee) > 0.01) {
+        throw new Error("PRICE_CHANGED: Les frais d'inscription du tournoi ont été actualisés.");
+      }
+      amount = serverFee;
+    }
+  } else if (data.type === "THEME_PURCHASE") {
+    const themeId = data.metadata?.targetId || data.metadata?.themeId;
+    if (themeId) {
+      const theme = await db.query.themes.findFirst({
+        where: eq(themes.id, themeId),
+      });
+      if (!theme) {
+        throw new Error("Thème introuvable");
+      }
+      const serverPrice = parseFloat(theme.price || "0");
+      if (!isNaN(amount) && Math.abs(amount - serverPrice) > 0.01) {
+        throw new Error("PRICE_CHANGED: Le prix du thème a été actualisé.");
+      }
+      amount = serverPrice;
+    }
+  } else if (data.type === "VIP_SUBSCRIPTION") {
+    const settings = await getAppSettings();
+    const isYearly = data.metadata?.plan === "YEARLY";
+    const serverVipPrice = parseFloat(
+      (isYearly ? settings?.vipYearlyPrice : settings?.vipMonthlyPrice) || (isYearly ? "2500" : "250")
+    );
+    if (!isNaN(amount) && Math.abs(amount - serverVipPrice) > 0.01) {
+      throw new Error("PRICE_CHANGED: Le tarif de l'abonnement VIP a été actualisé.");
+    }
+    amount = serverVipPrice;
+  }
+
   if (isNaN(amount) || amount <= 0) {
     throw new Error("Montant invalide");
   }
@@ -594,58 +654,14 @@ export async function updateTransactionStatus(
 
 /**
  * Annule (rembourse) une transaction
+ * Utilise le moteur de remboursement autoritaire avec inversion stricte du ledger
  */
 export async function refundTransaction(
   id: string,
   reason?: string
 ): Promise<WalletTransaction> {
   try {
-    // Récupération de la transaction originale
-    const originalTransaction = await getTransactionById(id);
-    if (!originalTransaction) {
-      throw new Error("Transaction not found");
-    }
-
-    if (originalTransaction.status !== "COMPLETED") {
-      throw new Error("seuls les transactions terminées peuvent être remboursées");
-    }
-
-    // Création d'une transaction de remboursement
-    const refundTransactionData: NewWalletTransaction = {
-      walletId: originalTransaction.walletId,
-      fromUserId: originalTransaction.toUserId,
-      toUserId: originalTransaction.fromUserId,
-      amount: originalTransaction.netAmount,
-      fees: "0",
-      netAmount: originalTransaction.netAmount,
-      balanceAfter: originalTransaction.netAmount,
-      type: "REFUND",
-      status: "COMPLETED",
-      description: `Refund for transaction ${id}${reason ? `: ${reason}` : ""}`,
-      metadata: {
-        originalTransactionId: id,
-        refundReason: reason,
-      },
-    };
-
-    const refundResult = await createTransaction({
-      walletId: refundTransactionData.walletId,
-      type: refundTransactionData.type,
-      amount: refundTransactionData.amount,
-      fees: refundTransactionData.fees ?? undefined,
-      netAmount: refundTransactionData.netAmount,
-      description: refundTransactionData.description ?? undefined,
-      metadata: refundTransactionData.metadata as Record<string, any>,
-    }, { isSystem: true });
-
-    // Mise à jour du statut de la transaction originale
-    await updateTransactionStatus(id, "REFUNDED", {
-      refundTransactionId: refundResult.id,
-      refundReason: reason,
-      refundedAt: new Date(),
-    });
-
-    return refundResult;
+    return await executeRefund(id, { reason });
   } catch (error) {
     console.error("Erreur lors du remboursement de la transaction:", error);
     if (error instanceof Error) {

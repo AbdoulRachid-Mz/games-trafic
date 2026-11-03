@@ -20,12 +20,12 @@
 
 - [ ] **PREP-01** Créer une branche dédiée (`refactor/transactions`).
 - [ ] **PREP-02** Sauvegarder la base (dump) et vérifier la restauration en préprod.
-- [ ] **PREP-03** Exécuter la baseline : typecheck, lint, build, tests. Noter les échecs préexistants.
+- [x] **PREP-03** Exécuter la baseline : typecheck, lint, build, tests. Noter les échecs préexistants.
 - [ ] **PREP-04** Recenser les `ledger_entries` orphelines (`transaction_id` sans `wallet_transactions`).
 - [ ] **PREP-05** Recenser les comptes système en double (`SYSTEM_ADJUSTMENT`, `PLATFORM_ESCROW`, `PLATFORM_FEES`, `TOURNAMENT_POOL`).
 - [ ] **PREP-06** Recenser les transactions `REFUNDED` sans transaction de remboursement liée.
 - [ ] **PREP-07** Recenser les escrows à solde négatif.
-- [ ] **PREP-08** Figer la liste des appelants de `actions/wallets.ts::createTransaction`, `transferMoney`, `depositToWallet`, `approveRequest`, `refundTransaction`.
+- [x] **PREP-08** Figer la liste des appelants de `actions/wallets.ts::createTransaction`, `transferMoney`, `depositToWallet`, `approveRequest`, `refundTransaction`.
 - [ ] **PREP-09** Définir les feature flags (`FINANCE_V2`, `ADMIN_ISSUANCE_V2`, `USER_FLOW_V2`).
 - [ ] **PREP-10** Valider les décisions du §15 de `TRANSACTION-IMPLEMENTATION-PLAN.md`.
 
@@ -37,42 +37,42 @@
 
 ### 2.1 P0-F1 — Neutraliser `actions/wallets.ts::createTransaction`
 
-- [ ] **F1-01** Remplacer le corps par un wrapper déprécié qui délègue au service sûr ou lève `DEPRECATED_USE_FINANCE_SERVICE`.
-- [ ] **F1-02** Migrer `transferMoney` vers le service de transfert.
-- [ ] **F1-03** Migrer `depositToWallet` vers le service de dépôt (ou le supprimer).
-- [ ] **F1-04** Migrer `actions/requests.ts` vers `executeFinancialOperation`.
+- [x] **F1-01** Remplacer le corps par un wrapper déprécié qui délègue au service sûr ou lève `DEPRECATED_USE_FINANCE_SERVICE`.
+- [x] **F1-02** Migrer `transferMoney` vers le service de transfert.
+- [x] **F1-03** Migrer `depositToWallet` vers le service de dépôt (ou le supprimer).
+- [x] **F1-04** Migrer `actions/requests.ts` vers `executeFinancialOperation`.
 - [ ] **F1-05** Migrer `app/api/transactions/create/route.ts`.
-- [ ] **F1-06** Ajouter un test prouvant que `THEME_PURCHASE`, `TOURNAMENT_PARTICIPATION`, `ORDER_PURCHASE` ne créditent jamais.
-- [ ] **F1-07** Mettre à jour les imports et supprimer les chemins morts.
+- [x] **F1-06** Ajouter un test prouvant que `THEME_PURCHASE`, `TOURNAMENT_PARTICIPATION`, `ORDER_PURCHASE` ne créditent jamais.
+- [x] **F1-07** Mettre à jour les imports et supprimer les chemins morts.
 
 **Fichiers :** `actions/wallets.ts`, `actions/requests.ts`, `app/api/transactions/create/route.ts`, `lib/finance/**`.
 **DoD :** plus aucune écriture hors moteur ; tests verts ; typecheck vert.
 
 ### 2.2 P0-F2 — `transferMoney`
 
-- [ ] **F2-01** Supprimer les deux transactions et l'usage de `SYSTEM_ADJUSTMENT`.
-- [ ] **F2-02** Créer un transfert unique `wallet → wallet` + frais `PLATFORM_FEES`.
-- [ ] **F2-03** Test : une seule transaction, ledger équilibré, escrow inchangé.
+- [x] **F2-01** Supprimer les deux transactions et l'usage de `SYSTEM_ADJUSTMENT`.
+- [x] **F2-02** Créer un transfert unique `wallet → wallet` + frais `PLATFORM_FEES`.
+- [x] **F2-03** Test : une seule transaction, ledger équilibré, escrow inchangé.
 - [ ] **F2-04** Vérifier les appelants (`app/shops`, `app/tournaments`, `components/tournaments`).
 
 **DoD :** un transfert = une transaction = deux/trois écritures équilibrées.
 
 ### 2.3 P0-F3 — Remboursements
 
-- [ ] **F3-01** Créer `lib/finance/transactions/refund.ts`.
-- [ ] **F3-02** Inverser les écritures d'origine (débit ↔ crédit, mêmes comptes).
-- [ ] **F3-03** Refuser le double remboursement et le remboursement au-delà du restant.
-- [ ] **F3-04** Remplacer `handleRefund` dans `app/admin/transactions/page.tsx`.
-- [ ] **F3-05** Remplacer `refundTransaction` par un wrapper du service.
-- [ ] **F3-06** Ajouter `reversal_of` / `reversed_by` (voir P1 schéma) ou un lien équivalent.
+- [x] **F3-01** Créer `lib/finance/transactions/refund.ts`.
+- [x] **F3-02** Inverser les écritures d'origine (débit ↔ crédit, mêmes comptes).
+- [x] **F3-03** Refuser le double remboursement et le remboursement au-delà du restant.
+- [x] **F3-04** Remplacer `handleRefund` dans `app/admin/transactions/page.tsx`.
+- [x] **F3-05** Remplacer `refundTransaction` par un wrapper du service.
+- [x] **F3-06** Ajouter `reversal_of` / `reversed_by` (voir P1 schéma) ou un lien équivalent.
 - [ ] **F3-07** Test : `REFUNDED` impossible sans transaction liée.
 
 **DoD :** tout remboursement produit des écritures inverses équilibrées.
 
 ### 2.4 P0-F4 — Transfert admin
 
-- [ ] **F4-01** Retirer le bouton « Transfert » admin ou le remplacer par « Émission GTC ».
-- [ ] **F4-02** Supprimer l'usage de `completeData.wallet.id` comme source implicite.
+- [x] **F4-01** Retirer le bouton « Transfert » admin ou le remplacer par « Émission GTC ».
+- [x] **F4-02** Supprimer l'usage de `completeData.wallet.id` comme source implicite.
 - [ ] **F4-03** Afficher la source réelle et le fait que le wallet admin n'est pas débité.
 - [ ] **F4-04** Test : aucune écriture sur le wallet de l'admin.
 
@@ -80,32 +80,32 @@
 
 ### 2.5 P0-F5 — Prix côté serveur
 
-- [ ] **F5-01** Item : relire `game_items.priceGtc`, stock et vendeur ; recalculer la quantité et le total.
-- [ ] **F5-02** Tournoi : relire `tournament_editions.entryFee` ; ignorer le montant client.
-- [ ] **F5-03** Thème : relire `themes.price` ; vérifier la propriété.
-- [ ] **F5-04** VIP : relire l'offre et la durée ; ignorer le prix client.
+- [x] **F5-01** Item : relire `game_items.priceGtc`, stock et vendeur ; recalculer la quantité et le total.
+- [x] **F5-02** Tournoi : relire `tournament_editions.entryFee` ; ignorer le montant client.
+- [x] **F5-03** Thème : relire `themes.price` ; vérifier la propriété.
+- [x] **F5-04** VIP : relire l'offre et la durée ; ignorer le prix client.
 - [ ] **F5-05** Produit : conserver `createProductOrder` mais vérifier la quantité.
-- [ ] **F5-06** Retourner `PRICE_CHANGED` si le prix a changé entre affichage et confirmation.
+- [x] **F5-06** Retourner `PRICE_CHANGED` si le prix a changé entre affichage et confirmation.
 - [ ] **F5-07** Tests : modification du montant client sans effet.
 
 **DoD :** aucun prix client n'atteint le ledger.
 
 ### 2.6 P0-F6 — Approbateur depuis la session
 
-- [ ] **F6-01** Supprimer `adminUserId` des signatures publiques de `approveRequest`/`rejectRequest`.
-- [ ] **F6-02** Lire `getCurrentUser()` + `users.level` en base.
-- [ ] **F6-03** Refuser l'auto-approbation.
-- [ ] **F6-04** Mettre à jour `app/admin/requests/page.tsx`.
-- [ ] **F6-05** Journaliser l'approbateur et son niveau.
+- [x] **F6-01** Supprimer `adminUserId` des signatures publiques de `approveRequest`/`rejectRequest`.
+- [x] **F6-02** Lire `getCurrentUser()` + `users.level` en base.
+- [x] **F6-03** Refuser l'auto-approbation.
+- [x] **F6-04** Mettre à jour `app/admin/requests/page.tsx`.
+- [x] **F6-05** Journaliser l'approbateur et son niveau.
 
 **DoD :** un faux `adminUserId` client est sans effet.
 
 ### 2.7 P2-P7 / P2-P8 — No-op et frais
 
-- [ ] **F7-01** Supprimer `updateWalletBalance` ou la remplacer par une opération ledger.
-- [ ] **F7-02** Vérifier tous ses appelants.
-- [ ] **F8-01** Remplacer le fallback silencieux `fees: 0` par une erreur `FEE_POLICY_UNAVAILABLE` ou un fallback configuré et audité.
-- [ ] **F8-02** Test : paramètres indisponibles → erreur explicite.
+- [x] **F7-01** Supprimer `updateWalletBalance` ou la remplacer par une opération ledger.
+- [x] **F7-02** Vérifier tous ses appelants.
+- [x] **F8-01** Remplacer le fallback silencieux `fees: 0` par une erreur `FEE_POLICY_UNAVAILABLE` ou un fallback configuré et audité.
+- [x] **F8-02** Test : paramètres indisponibles → erreur explicite.
 
 **DoD :** aucun appel ne promet un changement de solde sans écriture ; aucun frais silencieusement nul.
 

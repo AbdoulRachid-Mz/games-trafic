@@ -84,7 +84,11 @@ export async function calculateTransactionFees(
   options?: { isVip?: boolean; settings?: any }
 ): Promise<FeeCalculation> {
   try {
-    const settings = options?.settings ?? (await getAppSettings());
+    const settings = options?.settings !== undefined ? options.settings : (await getAppSettings());
+    if (settings === null || settings === undefined) {
+      throw new Error("FEE_POLICY_UNAVAILABLE: Impossible de récupérer les paramètres de politique de frais.");
+    }
+
     const basePercentage = resolveBaseFeePercentage(type, settings);
 
     let isVip = options?.isVip;
@@ -96,11 +100,9 @@ export async function calculateTransactionFees(
     return calculatePureFee(amount, basePercentage, { isVip });
   } catch (error) {
     console.error("Error calculating transaction fees:", error);
-    return {
-      feePercentage: 0,
-      fees: 0,
-      netAmount: amount,
-      totalAmount: amount,
-    };
+    if (error instanceof Error && error.message.includes("FEE_POLICY_UNAVAILABLE")) {
+      throw error;
+    }
+    throw new Error("FEE_POLICY_UNAVAILABLE: Erreur lors de l'évaluation de la politique de frais.");
   }
 }

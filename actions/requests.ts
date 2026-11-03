@@ -38,7 +38,6 @@ import {
 import { db } from '@/lib/db';
 import { encryptData, decryptData } from '@/lib/encryption';
 import { executeTransaction, getOrCreatePlatformAccount } from '@/lib/ledger/ledger-utils';
-import { createTransaction } from './wallets';
 import { getCurrentUser } from '@/lib/auth/session';
 
 // ============================================================================
@@ -424,8 +423,18 @@ export async function updateRequestStatus(
  */
 export async function approveRequest(
   id: string,
-  adminUserId: string
+  adminUserIdParam?: string
 ) {
+  // Authenticate admin from session (P0-F6)
+  const sessionUser = await getCurrentUser();
+  const isAdmin = sessionUser && (sessionUser.role === "admin" || (sessionUser as any).isAdmin === true);
+  if (!isAdmin) {
+    throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent approuver une demande.");
+  }
+
+  const effectiveAdminId = sessionUser.id;
+  const adminLevel = (sessionUser as any).level || "STANDARD";
+
   return await db.transaction(async (tx) => {
     const request = await tx
       .select()
@@ -437,6 +446,11 @@ export async function approveRequest(
     if (!request) throw new Error("Request not found");
     if (request.status !== "PENDING")
       throw new Error("Request is not pending");
+
+    // Refuse self-approval (P0-F6)
+    if (request.userId === effectiveAdminId) {
+      throw new Error("UNAUTHORIZED: L'auto-approbation d'une demande est strictement interdite.");
+    }
 
     const wallet = await tx.query.userWallets.findFirst({
       where: eq(userWallets.userId, request.userId),
@@ -491,7 +505,8 @@ export async function approveRequest(
       description: `Approved ${request.type} request ${request.id}`,
       metadata: {
         requestId: request.id,
-        approvedBy: adminUserId,
+        approvedBy: effectiveAdminId,
+        approverLevel: adminLevel,
       },
       walletId: wallet.id,
       userId: request.userId,
@@ -503,7 +518,7 @@ export async function approveRequest(
       .update(requests)
       .set({
         status: "COMPLETED",
-        processedByUserId: adminUserId,
+        processedByUserId: effectiveAdminId,
         processedAt: new Date(),
         completedAt: new Date(),
         transactionId: result.transaction.id,
@@ -521,11 +536,23 @@ export async function approveRequest(
  */
 export async function rejectRequest(
   id: string,
-  adminUserId: string,
-  reason: string
+  reasonOrAdminId?: string,
+  reasonParam?: string
 ): Promise<Request> {
   try {
-    return await updateRequestStatus(id, 'REJECTED', adminUserId, reason);
+    const sessionUser = await getCurrentUser();
+    const isAdmin = sessionUser && (sessionUser.role === "admin" || (sessionUser as any).isAdmin === true);
+    if (!isAdmin) {
+      throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent rejeter une demande.");
+    }
+
+    const effectiveAdminId = sessionUser.id;
+    // Support both signatures: rejectRequest(id, reason) and legacy rejectRequest(id, adminUserId, reason)
+    const effectiveReason = reasonParam !== undefined
+      ? reasonParam
+      : (reasonOrAdminId || "Demande rejetée par l'administrateur");
+
+    return await updateRequestStatus(id, 'REJECTED', effectiveAdminId, effectiveReason);
   } catch (error) {
     console.error('Error rejecting request:', error);
     if (error instanceof Error) {

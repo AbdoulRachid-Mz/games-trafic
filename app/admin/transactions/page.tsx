@@ -41,7 +41,7 @@ import { useTransactionFees } from "@/hooks/use-transaction-fees";
 import { TransactionType } from "@/types/transaction-types";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useUserProfile } from "@/hooks/use-profile";
-import { createTransaction } from "@/actions/transactions";
+import { createTransaction, refundTransaction } from "@/actions/transactions";
 import { createRequest } from "@/actions/requests";
 import {
   getWalletTransactions,
@@ -155,25 +155,7 @@ export default function AdminTransactionsPage() {
   const handleActionConfirm = async () => {
     if (!actionType || !completeData?.wallet?.id || !user?.id) return;
     try {
-      if (actionType === "TRANSFER") {
-        if (!actionData.recipientWalletId) {
-          toast.error("Destinataire requis");
-          return;
-        }
-        await createTransaction(
-          {
-            walletId: completeData.wallet.id,
-            type: "TRANSFER",
-            amount: actionData.amount.toFixed(2),
-            description: `Transfert à ${actionData.recipientUser?.name || "utilisateur"}`,
-            metadata: {
-              recipientWalletId: actionData.recipientWalletId,
-              recipientName: actionData.recipientUser?.name,
-            },
-          },
-          { allowDuplicate: false }
-        );
-      } else if (actionType === "DEPOSIT" || actionType === "WITHDRAWAL") {
+      if (actionType === "DEPOSIT" || actionType === "WITHDRAWAL") {
         await createRequest(
           {
             userId: user.id,
@@ -200,11 +182,12 @@ export default function AdminTransactionsPage() {
 
   const handleRefund = async (transactionId: string) => {
     try {
-      await updateTransactionStatus(transactionId, "REFUNDED");
-      toast.success("Transaction remboursée");
-      loadData();
-    } catch (error) {
-      toast.error("Erreur lors du remboursement");
+      await refundTransaction(transactionId, "Remboursement administratif");
+      toast.success("Transaction remboursée avec succès");
+      setSelectedTransaction(null);
+      await loadData();
+    } catch (error: any) {
+      toast.error(error?.message || "Erreur lors du remboursement");
     }
   };
 
@@ -250,15 +233,6 @@ export default function AdminTransactionsPage() {
           </Typography>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openActionDialog("TRANSFER")}
-            className="gap-2 items-center flex justify-center"
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            <span className="hidden md:inline-block">Transférer</span>
-          </Button>
           <Button
             variant="outline"
             size="sm"

@@ -520,35 +520,28 @@ export async function updateWalletPinAction(
 }
 
 /**
- * Met à jour le solde d'un wallet
+ * @deprecated Cette fonction est un no-op trompeur. Les soldes sont autoritairement dérivés du ledger.
  */
 export async function updateWalletBalance(
   walletId: string,
   newBalance: string
 ): Promise<UserWallet> {
-  try {
-    const [updatedWallet] = await db
-      .update(userWallets)
-      .set({
-        updatedAt: new Date(),
-      })
-      .where(eq(userWallets.id, walletId))
-      .returning();
+  console.warn("DEPRECATED: updateWalletBalance appelée mais les soldes sont dérivés du ledger.");
+  const [updatedWallet] = await db
+    .update(userWallets)
+    .set({
+      updatedAt: new Date(),
+    })
+    .where(eq(userWallets.id, walletId))
+    .returning();
 
-    if (!updatedWallet) {
-      throw new Error('Wallet not found');
-    }
-
-    return updatedWallet;
-  } catch (error) {
-    console.error('Error updating wallet balance:', error);
-    throw new Error('Failed to update wallet balance');
+  if (!updatedWallet) {
+    throw new Error('Wallet not found');
   }
+
+  return updatedWallet;
 }
 
-/**
- * Verrouille/déverrouille un wallet
- */
 export async function toggleWalletLock(
   walletId: string,
   isLocked: boolean
@@ -705,105 +698,18 @@ export async function getWalletTransactions(
 }
 
 /**
- * Crée une nouvelle transaction
+ * @deprecated NE PAS UTILISER.
+ * Cette action non sécurisée est dépréciée pour des raisons de sécurité comptable.
+ * Utiliser actions/transactions.ts::createTransaction ou lib/ledger/ledger-utils.ts::executeTransaction.
  */
 export async function createTransaction(
   transactionData: NewWalletTransaction
 ): Promise<WalletTransaction> {
-  try {
-    // Validation
-    if (!transactionData.walletId || !transactionData.amount || !transactionData.type) {
-      throw new Error('walletId, amount et type sont requis');
-    }
-
-    // Calculer les frais si non fournis
-    const fees = transactionData.fees || '0';
-    const netAmount = transactionData.netAmount || transactionData.amount;
-    let balanceAfter = transactionData.balanceAfter || transactionData.amount;
-
-    const wallet = await getUserWalletById(transactionData.walletId);
-    if (!wallet) {
-      throw new Error('Wallet not found');
-    }
-    const accountId = wallet.financialAccountId || null;
-    let currentBalance = 0;
-    if (accountId) {
-      const balRes = await db
-        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
-        .from(ledgerEntries)
-        .where(eq(ledgerEntries.accountId, accountId));
-      currentBalance = parseFloat(balRes[0]?.balance || '0');
-    }
-    const amountNum = parseFloat(transactionData.amount);
-    const spendTypes = ['PURCHASE', 'WITHDRAWAL', 'TRANSFER', 'VIP_SUBSCRIPTION', 'GAME_ITEM_PURCHASE'];
-    if (spendTypes.includes(transactionData.type) && currentBalance < amountNum) {
-      throw new Error('Solde insuffisant');
-    }
-    balanceAfter = spendTypes.includes(transactionData.type)
-      ? (currentBalance - amountNum).toFixed(2)
-      : (currentBalance + parseFloat(netAmount)).toFixed(2);
-
-    // Créer la transaction
-    const [newTransaction] = await db
-      .insert(walletTransactions)
-      .values({
-        ...transactionData,
-        financialAccountId: accountId,
-        fees,
-        netAmount,
-        balanceAfter,
-        createdAt: new Date(),
-      })
-      .returning();
-
-    if (accountId) {
-      const debit = spendTypes.includes(transactionData.type) ? transactionData.amount : '0';
-      const credit = spendTypes.includes(transactionData.type) ? '0' : netAmount;
-      await db.insert(ledgerEntries).values({
-        transactionId: newTransaction.id,
-        accountId,
-        debit,
-        credit,
-        currency: 'GTC',
-        createdAt: new Date(),
-      });
-      // Contrepartie plateforme/système
-      const [platformAccount] = await db
-        .select()
-        .from(financialAccounts)
-        .where(eq(financialAccounts.type, spendTypes.includes(transactionData.type) ? 'PLATFORM_ESCROW' : 'SYSTEM_ADJUSTMENT'))
-        .limit(1);
-      const platformId = platformAccount?.id || (await db.insert(financialAccounts).values({
-        type: spendTypes.includes(transactionData.type) ? 'PLATFORM_ESCROW' : 'SYSTEM_ADJUSTMENT',
-        currency: 'GTC',
-        isActive: true,
-        isLocked: false,
-        metadata: { autoCreated: true },
-        createdAt: new Date(),
-      }).returning())[0].id;
-      await db.insert(ledgerEntries).values({
-        transactionId: newTransaction.id,
-        accountId: platformId,
-        debit: spendTypes.includes(transactionData.type) ? '0' : netAmount,
-        credit: spendTypes.includes(transactionData.type) ? transactionData.amount : '0',
-        currency: 'GTC',
-        createdAt: new Date(),
-      });
-    }
-
-    return newTransaction;
-  } catch (error) {
-    console.error('Error creating transaction:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to create transaction');
-  }
+  throw new Error(
+    "DEPRECATED_USE_FINANCE_SERVICE: actions/wallets.ts::createTransaction est déprécié. Utilisez le service financier canonique actions/transactions.ts."
+  );
 }
 
-/**
- * Met à jour le statut d'une transaction
- */
 export async function updateTransactionStatus(
   id: string,
   status: WalletTransaction['status']
@@ -834,7 +740,8 @@ export async function updateTransactionStatus(
 // ============================================================================
 
 /**
- * Transfert d'argent entre utilisateurs
+ * Transfert d'argent entre utilisateurs (F2 — Refonte atomique avec ledger)
+ * Exécute un transfert unique et atomique : débit expéditeur, crédit destinataire, commission plateforme.
  */
 export async function transferMoney(
   fromUserId: string,
@@ -843,117 +750,77 @@ export async function transferMoney(
   description?: string
 ): Promise<{ success: boolean; transaction?: WalletTransaction; error?: string }> {
   try {
-    // Valider le montant
-    if (amount <= 0) {
-      return { success: false, error: 'Montant invalide' };
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Non authentifié" };
+    }
+    if (currentUser.id !== fromUserId && currentUser.role !== "admin" && (currentUser as any).isAdmin !== true) {
+      return { success: false, error: "Non autorisé à transférer depuis ce compte" };
     }
 
-    // Récupérer les wallets
+    if (amount <= 0 || isNaN(amount)) {
+      return { success: false, error: "Montant invalide" };
+    }
+
+    if (fromUserId === toUserId) {
+      return { success: false, error: "Impossible de transférer à soi-même" };
+    }
+
     const fromWallet = await getUserWalletByUserId(fromUserId);
     const toWallet = await getUserWalletByUserId(toUserId);
 
     if (!fromWallet || !toWallet) {
-      return { success: false, error: 'Un des wallets n\'existe pas' };
+      return { success: false, error: "Un des wallets n'existe pas" };
     }
 
     if (fromWallet.isLocked || toWallet.isLocked) {
-      return { success: false, error: 'Un des wallets est verrouillé' };
+      return { success: false, error: "Un des wallets est verrouillé" };
     }
 
-    // Vérifier le solde via ledger
-    let fromBalance = 0;
-    if (fromWallet.financialAccountId) {
-      const [bal] = await db
-        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
-        .from(ledgerEntries)
-        .where(eq(ledgerEntries.accountId, fromWallet.financialAccountId));
-      fromBalance = parseFloat(bal?.balance || '0');
+    if (!fromWallet.financialAccountId || !toWallet.financialAccountId) {
+      return { success: false, error: "Compte financier introuvable pour l'un des portefeuilles" };
     }
-    if (fromBalance < amount) return { success: false, error: 'Solde insuffisant' };
 
-    const settings = await getAppSettings();
-    let feePercentage = parseFloat(settings?.transferFeePercentage?.toString() || "0");
-    const [fromUser] = await db
-      .select({ isVip: users.isVip })
-      .from(users)
-      .where(eq(users.id, fromUserId))
-      .limit(1);
-    if (fromUser?.isVip) {
-      feePercentage = Math.max(0, feePercentage * 0.5);
-    }
-    const feeAmount = amount * feePercentage;
-    const netAmount = amount - feeAmount;
-    const fees = { amount: feeAmount, percentage: feePercentage, netAmount };
-
-    // Créer la transaction de transfert
-    const transaction = await createTransaction({
-      walletId: fromWallet.id,
-      fromUserId,
-      toUserId,
-      amount: amount.toString(),
-      fees: fees.amount.toString(),
-      netAmount: netAmount.toString(),
-      balanceAfter: (fromBalance - amount).toFixed(2),
-      type: 'TRANSFER',
-      status: 'COMPLETED',
+    // Exécution du transfert atomique via le moteur autoritaire
+    const result = await executeTransaction({
+      fromAccountId: fromWallet.financialAccountId,
+      toAccountId: toWallet.financialAccountId,
+      amount,
+      type: "TRANSFER",
       description: description || `Transfert vers ${toUserId}`,
-      metadata: {
-        transferType: 'user_to_user',
-        recipientWalletId: toWallet.id,
-        fees: fees,
-      },
-    });
-
-    // Créer une transaction de réception pour le destinataire
-    let toBalance = 0;
-    if (toWallet.financialAccountId) {
-      const [bal] = await db
-        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
-        .from(ledgerEntries)
-        .where(eq(ledgerEntries.accountId, toWallet.financialAccountId));
-      toBalance = parseFloat(bal?.balance || '0');
-    }
-    await createTransaction({
-      walletId: toWallet.id,
-      fromUserId,
-      toUserId,
-      amount: netAmount.toString(),
-      fees: '0',
-      netAmount: netAmount.toString(),
-      balanceAfter: (toBalance + netAmount).toFixed(2),
-      type: 'TRANSFER',
-      status: 'COMPLETED',
-      description: `Transfert reçu de ${fromUserId}`,
-      metadata: {
-        transferType: 'user_to_user',
-        senderWalletId: fromWallet.id,
-        originalTransactionId: transaction.id,
-      },
-    });
-
-    // Journalisation
-    await createUserTrace({
       userId: fromUserId,
-      type: 'TRANSFER',
-      entityId: transaction.id,
-      payload: {
-        action: 'MONEY_TRANSFER',
+      walletId: fromWallet.id,
+      metadata: {
+        transferType: "user_to_user",
+        recipientWalletId: toWallet.id,
         toUserId,
-        amount,
-        fees: fees.amount,
       },
     });
 
-    return { success: true, transaction };
+    // Journalisation de la trace utilisateur
+    try {
+      await createUserTrace({
+        userId: fromUserId,
+        type: "TRANSFER",
+        entityId: result.transaction.id,
+        payload: {
+          action: "MONEY_TRANSFER",
+          toUserId,
+          amount,
+          fees: result.fees,
+        },
+      });
+    } catch (traceErr) {
+      console.warn("Could not create user trace for transfer:", traceErr);
+    }
+
+    return { success: true, transaction: result.transaction };
   } catch (error: any) {
-    console.error('Error transferring money:', error);
-    return { success: false, error: error.message || 'Erreur lors du transfert' };
+    console.error("Error transferring money:", error);
+    return { success: false, error: error.message || "Erreur lors du transfert" };
   }
 }
 
-/**
- * Transfert entre identités appartenant au même utilisateur (ex: Retrait Shop -> Wallet)
- */
 export async function transferBetweenIdentities(params: {
   fromIdentityId: string;
   fromType: 'USER' | 'SHOP' | 'TOURNAMENT';
@@ -1039,7 +906,8 @@ export async function transferBetweenIdentities(params: {
 }
 
 /**
- * Déposer de l'argent sur un wallet
+ * Déposer de l'argent sur un wallet (Action d'administration sécurisée)
+ * Utilise executeTransaction avec contrepartie autoritaire SYSTEM_ADJUSTMENT
  */
 export async function depositToWallet(
   walletId: string,
@@ -1047,55 +915,46 @@ export async function depositToWallet(
   method: string = 'MANUAL'
 ): Promise<{ success: boolean; transaction?: WalletTransaction; error?: string }> {
   try {
-    if (amount <= 0) {
+    const currentUser = await getCurrentUser();
+    const isAdmin = currentUser && (currentUser.role === 'admin' || (currentUser as any).isAdmin === true);
+    if (!isAdmin) {
+      return { success: false, error: "UNAUTHORIZED: Seuls les administrateurs peuvent créditer manuellement un compte." };
+    }
+
+    if (amount <= 0 || isNaN(amount)) {
       return { success: false, error: 'Montant invalide' };
     }
 
     const wallet = await getUserWalletById(walletId);
-    if (!wallet) {
-      return { success: false, error: 'Wallet non trouvé' };
+    if (!wallet || !wallet.financialAccountId) {
+      return { success: false, error: 'Wallet non trouvé ou compte financier manquant' };
     }
 
-    // Calculer le nouveau solde via ledger
-    let currentBalance = 0;
-    if (wallet.financialAccountId) {
-      const [bal] = await db
-        .select({ balance: sql<string>`coalesce(sum(${ledgerEntries.credit}) - sum(${ledgerEntries.debit}), '0')` })
-        .from(ledgerEntries)
-        .where(eq(ledgerEntries.accountId, wallet.financialAccountId));
-      currentBalance = parseFloat(bal?.balance || '0');
-    }
-    const newBalance = currentBalance + amount;
-
-    // Créer la transaction
-    const transaction = await createTransaction({
-      walletId,
-      amount: amount.toString(),
-      netAmount: amount.toString(),
-      balanceAfter: newBalance.toString(),
-      type: 'DEPOSIT',
-      status: 'COMPLETED',
-      description: `Dépôt via ${method}`,
-      metadata: {
-        depositMethod: method,
-        previousBalance: currentBalance,
-      },
+    const result = await db.transaction(async (tx) => {
+      const systemAccount = await getOrCreatePlatformAccount(tx, 'SYSTEM_ADJUSTMENT');
+      return await executeTransaction({
+        fromAccountId: systemAccount.id,
+        toAccountId: wallet.financialAccountId!,
+        amount,
+        type: 'DEPOSIT',
+        description: `Dépôt manuel admin via ${method}`,
+        userId: wallet.userId,
+        walletId: wallet.id,
+        tx,
+        metadata: {
+          depositMethod: method,
+          adminId: currentUser.id,
+        },
+      });
     });
 
-    return { success: true, transaction };
+    return { success: true, transaction: result.transaction };
   } catch (error: any) {
     console.error('Error depositing to wallet:', error);
     return { success: false, error: error.message || 'Erreur lors du dépôt' };
   }
 }
 
-// ============================================================================
-// STATISTIQUES
-// ============================================================================
-
-/**
- * Récupère les statistiques des wallets
- */
 export async function getWalletStats(filters?: UserWalletFilters) {
   try {
     const conditions = buildWalletConditions(filters || {});
