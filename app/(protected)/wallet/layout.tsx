@@ -52,7 +52,7 @@ export default function WalletLayout({ children }: WalletLayoutProps) {
       if (!completeData || loading) return;
 
       const wallet = completeData.wallet;
-      const hasWallet = !!wallet;
+      const hasWallet = !!wallet || !!(completeData as any)?.hasWallet;
 
       setWalletStatus({
         hasWallet,

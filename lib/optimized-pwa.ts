@@ -96,6 +96,12 @@ export function usePWA() {
         console.log("✅ Service Worker enregistré:", registration.scope);
         setState((prev) => ({ ...prev, registration }));
 
+        // Détecter si un SW est déjà en attente (waiting)
+        if (registration.waiting) {
+          setWaitingSW(registration.waiting);
+          setState((prev) => ({ ...prev, isUpdateAvailable: true }));
+        }
+
         // Vérification des mises à jour
         registration.addEventListener("updatefound", () => {
           const newSW = registration.installing;

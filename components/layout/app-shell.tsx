@@ -162,9 +162,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       isAdmin,
       isVip,
       userId: user?.id,
-      hasWallet: !!profile?.wallet?.id || (user as any)?.hasWallet || false,
+      hasWallet: !!profile?.wallet?.id || !!(profile as any)?.hasWallet || (user as any)?.hasWallet || false,
     }),
-    [isAuthenticated, isAdmin, isVip, user?.id, profile?.wallet?.id],
+    [isAuthenticated, isAdmin, isVip, user?.id, profile?.wallet?.id, (profile as any)?.hasWallet],
   );
 
   // Résolution synchrone de la route

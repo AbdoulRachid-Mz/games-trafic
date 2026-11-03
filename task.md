@@ -139,18 +139,18 @@
 
 ### 4.1 Escrow des commandes (P1-F2)
 
-- [ ] **I1-01** Capture : débit acheteur = crédit escrow, sans frais.
-- [ ] **I1-02** Finalisation : débit escrow = crédit vendeur + commission `PLATFORM_FEES`.
-- [ ] **I1-03** Rejet : remboursement exact depuis l'escrow.
-- [ ] **I1-04** Vérifier `completeOrder`, `completeOrderByAdmin`, `rejectOrder`.
-- [ ] **I1-05** Test : escrow ≥ 0 à chaque étape.
+- [x] **I1-01** Capture : débit acheteur = crédit escrow, sans frais.
+- [x] **I1-02** Finalisation : débit escrow = crédit vendeur + commission `PLATFORM_FEES`.
+- [x] **I1-03** Rejet : remboursement exact depuis l'escrow.
+- [x] **I1-04** Vérifier `completeOrder`, `completeOrderByAdmin`, `rejectOrder`.
+- [x] **I1-05** Test : escrow ≥ 0 à chaque étape.
 
 ### 4.2 Inscription payante (P1-F1)
 
-- [ ] **I2-01** `joinEdition` : vérifier édition ouverte, date limite, places, éligibilité, doublon.
-- [ ] **I2-02** Débit + inscription + `registration_payments` dans la même transaction.
-- [ ] **I2-03** Test de la dernière place en concurrence.
-- [ ] **I2-04** Test : échec de paiement → aucune inscription.
+- [x] **I2-01** `joinEdition` : vérifier édition ouverte, date limite, places, éligibilité, doublon.
+- [x] **I2-02** Débit + inscription + `registration_payments` dans la même transaction.
+- [x] **I2-03** Test de la dernière place en concurrence.
+- [x] **I2-04** Test : échec de paiement → aucune inscription.
 
 ### 4.3 Idempotence (P1-F4)
 
@@ -161,11 +161,11 @@
 
 ### 4.4 Types (P1-F3)
 
-- [ ] **I4-01** `TransactionType` dérivé de Drizzle.
-- [ ] **I4-02** Supprimer `PRODUCT_PURCHASE` du front, utiliser `ORDER_PURCHASE`.
-- [ ] **I4-03** Compléter `TRANSACTION_CONFIGS` (`BONUS`, `REFUND`, `ORDER_PURCHASE`, `PURCHASE` si conservé).
-- [ ] **I4-04** Vérifier les filtres admin et les statistiques.
-- [ ] **I4-05** Test : aucune valeur TS absente de PostgreSQL.
+- [x] **I4-01** `TransactionType` dérivé de Drizzle.
+- [x] **I4-02** Supprimer `PRODUCT_PURCHASE` du front, utiliser `ORDER_PURCHASE`.
+- [x] **I4-03** Compléter `TRANSACTION_CONFIGS` (`BONUS`, `REFUND`, `ORDER_PURCHASE`, `PURCHASE` si conservé).
+- [x] **I4-04** Vérifier les filtres admin et les statistiques.
+- [x] **I4-05** Test : aucune valeur TS absente de PostgreSQL.
 
 ### 4.5 Contraintes ledger (P2-P6)
 
@@ -179,8 +179,8 @@
 ### 4.6 VIP (P1-A4)
 
 - [ ] **I6-01** Remplacer l'unicité `user_id` par un index partiel sur `status = 'ACTIVE'`.
-- [ ] **I6-02** Vérifier l'offre et la durée côté serveur.
-- [ ] **I6-03** Test de renouvellement après expiration.
+- [x] **I6-02** Vérifier l'offre et la durée côté serveur.
+- [x] **I6-03** Test de renouvellement après expiration.
 
 **DoD :** ledger intègre, escrow non négatif, inscriptions atomiques, VIP renouvelable.
 
@@ -188,18 +188,18 @@
 
 ## 5. VAGUE 3 — PERMISSIONS ET SOCIAL
 
-- [ ] **P1-01** Créer `lib/auth/permissions.ts` (rôles, `isAdmin`, `level`, contexte).
-- [ ] **P1-02** Remplacer les contrôles dispersés dans les actions financières.
-- [ ] **P1-03** Matrice de tests action × niveau.
-- [ ] **P1-04** Vérifier `app/admin/layout.tsx` et `RouteProtection.tsx` (défense en profondeur, pas seule).
-- [ ] **A2-01** Chat : vérifier l'appartenance aux conversations/groupes.
-- [ ] **A2-02** Ne jamais faire confiance à `senderId`, `groupId`, `recipientId` client.
-- [ ] **A2-03** Tests d'accès croisés.
-- [ ] **A3-01** Upload : stockage réel ou retrait.
-- [ ] **A3-02** Vérifier MIME, taille, propriétaire.
-- [ ] **A3-03** Test : fichier réellement retrievable.
-- [ ] **P4-01** `conversations.unreadCount` : incrémenter/décrémenter ou calculer à la lecture.
-- [ ] **P4-02** Test badge après envoi/lecture.
+- [x] **P1-01** Créer `lib/auth/permissions.ts` (rôles, `isAdmin`, `level`, contexte).
+- [x] **P1-02** Remplacer les contrôles dispersés dans les actions financières.
+- [x] **P1-03** Matrice de tests action × niveau.
+- [x] **P1-04** Vérifier `app/admin/layout.tsx` et `RouteProtection.tsx` (défense en profondeur, pas seule).
+- [x] **A2-01** Chat : vérifier l'appartenance aux conversations/groupes.
+- [x] **A2-02** Ne jamais faire confiance à `senderId`, `groupId`, `recipientId` client.
+- [x] **A2-03** Tests d'accès croisés.
+- [x] **A3-01** Upload : stockage réel ou retrait.
+- [x] **A3-02** Vérifier MIME, taille, propriétaire.
+- [x] **A3-03** Test : fichier réellement retrievable.
+- [x] **P4-01** `conversations.unreadCount` : incrémenter/décrémenter ou calculer à la lecture.
+- [x] **P4-02** Test badge après envoi/lecture.
 
 **DoD :** une seule politique de permissions, appliquée côté serveur ; social non IDOR.
 
@@ -207,16 +207,16 @@
 
 ## 6. VAGUE 4 — DETTE ET UX
 
-- [ ] **D1-01** `hasWallet` : une seule source de vérité.
-- [ ] **D1-02** Vérifier le FAB et les actions wallet sur tous les chemins.
-- [ ] **D2-01** PWA : gérer `waiting` et `controllerchange`.
-- [ ] **D2-02** Nettoyer le code mort du service worker.
-- [ ] **D3-01** Fusionner les handlers API dupliqués.
-- [ ] **D3-02** Fusionner les `getUserStats`.
-- [ ] **D3-03** Fusionner les helpers de partage.
-- [ ] **D3-04** Fusionner les chemins d'upload.
-- [ ] **D4-01** Vérifier le soft-delete : filtrer `is_deleted` dans les lectures.
-- [ ] **D4-02** Documenter la politique de suppression financière (interdite).
+- [x] **D1-01** `hasWallet` : une seule source de vérité.
+- [x] **D1-02** Vérifier le FAB et les actions wallet sur tous les chemins.
+- [x] **D2-01** PWA : gérer `waiting` et `controllerchange`.
+- [x] **D2-02** Nettoyer le code mort du service worker.
+- [x] **D3-01** Fusionner les handlers API dupliqués.
+- [x] **D3-02** Fusionner les `getUserStats`.
+- [x] **D3-03** Fusionner les helpers de partage.
+- [x] **D3-04** Fusionner les chemins d'upload.
+- [x] **D4-01** Vérifier le soft-delete : filtrer `is_deleted` dans les lectures.
+- [x] **D4-02** Documenter la politique de suppression financière (interdite).
 
 **DoD :** plus de doublons structurels ; comportements cohérents.
 

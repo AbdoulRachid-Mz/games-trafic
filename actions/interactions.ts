@@ -770,10 +770,30 @@ export async function toggleInteraction(
       .limit(1);
 
     if (existingInteraction.length > 0) {
-      // Supprimer l'interaction existante
+      // Supprimer l'interaction existante (soft delete)
       const deleted = await deleteInteraction(existingInteraction[0].id);
       return { interaction: deleted, action: "deleted" };
     } else {
+      // Vérifier si une interaction supprimée existe pour la restaurer (évite les doublons)
+      const softDeleted = await db
+        .select()
+        .from(interactions)
+        .where(
+          and(
+            eq(interactions.userId, interactionData.userId),
+            eq(interactions.entityId, interactionData.entityId),
+            eq(interactions.entityType, interactionData.entityType),
+            eq(interactions.type, interactionData.type),
+            eq(interactions.isDeleted, true)
+          )
+        )
+        .limit(1);
+
+      if (softDeleted.length > 0) {
+        const restored = await restoreInteraction(softDeleted[0].id);
+        return { interaction: restored, action: "created" };
+      }
+
       // Créer une nouvelle interaction
       const created = await createInteraction(interactionData);
       return { interaction: created, action: "created" };

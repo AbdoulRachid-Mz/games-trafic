@@ -58,7 +58,7 @@ export default function CreateShopPage() {
   // Vérifier si l'utilisateur a un wallet
   useEffect(() => {
     const checkWallet = async () => {
-      if (completeData?.wallet) {
+      if (completeData?.wallet || (completeData as any)?.hasWallet) {
         setHasWallet(true);
       } else {
         const wallet = await getCurrentUserWallet();

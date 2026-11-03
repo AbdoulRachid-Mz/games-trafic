@@ -888,6 +888,8 @@ export async function getUserStats(
   }
 }
 
+export const getAdminUserStats = getUserStats;
+
 export async function getShopStats(
   filters: StatsFilters = {},
 ): Promise<StatsResponse> {

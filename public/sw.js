@@ -466,17 +466,14 @@ async function syncOfflineData() {
   }
 }
 
-// Helper: Récupérer les requêtes en attente (simulé avec localStorage)
+// Helper: Récupérer les requêtes en attente (Service Worker n'a pas accès à localStorage)
 async function getPendingRequests() {
-  const data = localStorage.getItem('offlineRequests');
-  return data ? JSON.parse(data) : [];
+  return [];
 }
 
 // Helper: Supprimer une requête synchronisée
 async function removePendingRequest(id) {
-  const requests = await getPendingRequests();
-  const updated = requests.filter(req => req.id !== id);
-  localStorage.setItem('offlineRequests', JSON.stringify(updated));
+  // no-op en l'absence de file persistante
 }
 
 self.addEventListener("periodicsync", (event) => {

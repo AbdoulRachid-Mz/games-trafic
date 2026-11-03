@@ -77,12 +77,12 @@ export const FloatingActionButton = ({
         isAuthenticated: !!isAuthenticated,
         isAdmin: !!isAdmin,
         isVip: false,
-        hasWallet: !!profile?.wallet?.id,
+        hasWallet: !!profile?.wallet?.id || !!(profile as any)?.hasWallet,
       } as any);
     } catch {
       return { pathname: pathname || "/" } as any;
     }
-  }, [pathname, isAuthenticated, isAdmin, profile?.wallet?.id]);
+  }, [pathname, isAuthenticated, isAdmin, profile?.wallet?.id, (profile as any)?.hasWallet]);
 
   // Default nav items if none provided
   const defaultNavItems: NavItem[] = [

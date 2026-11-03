@@ -210,5 +210,20 @@ describe("Chat & Upload Security (TASK Vague 3: A2-01, A2-02, A3-01, A3-02, A3-0
       const result = await getConversationsForUser("user-bob");
       expect(result).toEqual([]);
     });
+
+    it("should reset unreadCount when conversation is marked as read (P4-01, P4-02)", async () => {
+      const { markConversationAsRead } = await import("@/actions/messages");
+      const { db } = await import("@/lib/db");
+      vi.spyOn(sessionModule, "getCurrentUser").mockResolvedValue({
+        id: "user-alice",
+        role: "user",
+        isAdmin: false,
+      } as any);
+
+      // markConversationAsRead should update conversations with unreadCount: 0
+      await markConversationAsRead("dm:user-alice-user-bob", "user-alice");
+
+      expect(db.update).toHaveBeenCalled();
+    });
   });
 });

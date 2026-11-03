@@ -906,9 +906,9 @@ export async function getUsers(
 }
 
 /**
- * Récupère les statistiques des utilisateurs
+ * Récupère les totaux et moyennes agrégés des utilisateurs
  */
-export async function getUserStats(filters?: UserFilters) {
+export async function getUserAggregateCounts(filters?: UserFilters) {
   try {
     const whereConditions = buildUserWhereConditions(filters || {});
 
@@ -980,6 +980,11 @@ export async function getUserStats(filters?: UserFilters) {
     throw new Error("Failed to fetch user statistics");
   }
 }
+
+/**
+ * @deprecated Utilisez getUserAggregateCounts pour les comptages agrégés ou getUserStats de @/actions/user-stats pour les stats de profil
+ */
+export const getUserStats = getUserAggregateCounts;
 
 // ============================================================================
 // MUTATIONS - Écriture des données

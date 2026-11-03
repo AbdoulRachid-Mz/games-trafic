@@ -774,6 +774,7 @@ function buildGameWhereConditions(filters: GameFilters, options: QueryOptions = 
   const conditions = [];
 
   if (!options.includeDeleted) {
+    conditions.push(eq(games.isDeleted, false));
     conditions.push(eq(games.isActive, true));
   }
 

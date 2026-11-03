@@ -38,10 +38,37 @@ export default function PWAProvider({
     if (!('serviceWorker' in navigator)) return;
 
     let interval: NodeJS.Timeout;
+    let refreshing = false;
+
+    // 🔄 Gérer controllerchange : recharger automatiquement la page quand le nouveau SW prend le contrôle
+    const handleControllerChange = () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
     navigator.serviceWorker
       .register('/sw.js', { scope: '/', updateViaCache: 'none' })
       .then(registration => {
+        // 🔄 Détecter si un SW est déjà en attente (waiting)
+        if (registration.waiting) {
+          window.dispatchEvent(new CustomEvent('sw-waiting', { detail: registration.waiting }));
+        }
+
+        // 🔄 Écouter l'arrivée d'une mise à jour
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.addEventListener('statechange', () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(new CustomEvent('sw-waiting', { detail: installingWorker }));
+              }
+            });
+          }
+        });
+
         interval = setInterval(() => {
           registration.update().catch(console.error);
         }, 60 * 60 * 1000);
@@ -52,6 +79,7 @@ export default function PWAProvider({
 
     return () => {
       if (interval) clearInterval(interval);
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
     };
   }, []);
 

@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     // 🔒 A1-02: Strict relation filtering
     let allowedRelations: string[];
     if (isSelf || isCurrentUserAdmin) {
-      allowedRelations = rawRelations.filter((r) => !SENSITIVE_RELATIONS.includes(r));
+      // Owner or admin can access requested sensitive relations (e.g. wallet, transactions)
+      allowedRelations = rawRelations;
     } else {
       // Non-owner, non-admin: strictly limited to public relations
       allowedRelations = rawRelations.filter((r) => ALLOWED_PUBLIC_RELATIONS.includes(r));
@@ -85,7 +86,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      user: userData,
+      user: {
+        ...userData,
+        hasWallet: (userData as any).hasWallet ?? !!(userData as any).wallet,
+      },
     });
   } catch (error) {
     console.error("Error fetching profile:", error);
