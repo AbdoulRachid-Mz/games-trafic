@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/session";
+import { calculateTransactionFees } from "@/lib/finance";
 
+// POST /api/transactions/calculate-fees (S5-01, S5-02)
 export async function POST(request: NextRequest) {
   try {
-    const contentType = request.headers.get("content-type");
+    // 🛡️ S5-01: Authentication required
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) {
+      return NextResponse.json(
+        { error: "Unauthorized: Authentification requise pour calculer les frais" },
+        { status: 401 }
+      );
+    }
 
+    const contentType = request.headers.get("content-type");
     if (!contentType?.includes("application/json")) {
       return NextResponse.json(
-        { error: "Content-Type invalide" },
+        { error: "Content-Type invalide (application/json attendu)" },
         { status: 415 }
       );
     }
@@ -21,72 +31,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const settings = await db.query.appSettings.findFirst();
-
-    if (!settings) {
-      return NextResponse.json(
-        { error: "Paramètres de l'application introuvables" },
-        { status: 500 }
-      );
-    }
-
-    let feePercentage = 0;
     const amount = Number(data.amount);
-
     if (isNaN(amount) || amount <= 0) {
       return NextResponse.json(
-        { error: "Montant invalide" },
+        { error: "Le montant doit être un nombre strictement positif" },
         { status: 400 }
       );
     }
 
-    switch (data.type) {
-      case "THEME_PURCHASE":
-      case "PRODUCT_PURCHASE":
-      case "GAME_ITEM_PURCHASE":
-      case "ORDER_PURCHASE":
-        feePercentage = Number(settings.purchaseFeePercentage ?? 0);
-        break;
+    // 💡 S5-01: Use canonical financial engine with user's VIP status
+    const feeCalculation = await calculateTransactionFees(data.type, amount, {
+      isVip: !!sessionUser.isVip,
+    });
 
-      case "VIP_SUBSCRIPTION":
-        feePercentage = Number(settings.transactionFeePercentage ?? 0);
-        break;
-
-      case "TOURNAMENT_PARTICIPATION":
-        feePercentage = Number(settings.tournamentParticipationFeePercentage ?? 0);
-        break;
-
-      case "DEPOSIT":
-        feePercentage = Number(settings.depositFeePercentage ?? 0);
-        break;
-
-      case "WITHDRAWAL":
-        feePercentage = Number(settings.withdrawalFeePercentage ?? 0);
-        break;
-
-      case "TRANSFER":
-        feePercentage = Number(settings.transferFeePercentage ?? 0);
-        break;
-
-      default:
-        return NextResponse.json(
-          { error: "Type de transaction invalide" },
-          { status: 400 }
-        );
-    }
-
-    const fees = Number((amount * feePercentage).toFixed(2));
-    const totalAmount = Number(amount.toFixed(2));
-
+    // 🎯 S5-02: Consistent payload: { fees, totalDebit, netAmount, ... }
     return NextResponse.json({
-      feePercentage,
-      fees,
-      totalAmount,
+      feePercentage: feeCalculation.feePercentage,
+      fees: feeCalculation.fees,
+      totalDebit: feeCalculation.totalAmount,
+      netAmount: feeCalculation.netAmount,
       currency: "GTC",
     });
   } catch (error) {
-    console.error("Error calculating fees:", error);
-
+    console.error("Error in /api/transactions/calculate-fees:", error);
     return NextResponse.json(
       {
         error: "Erreur lors du calcul des frais",

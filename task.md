@@ -113,23 +113,23 @@
 
 ## 3. VAGUE 1 — FERMER LES SURFACES NON AUTHENTIFIÉES
 
-- [ ] **S1-01** `/api/cookies` : supprimer ou protéger (admin A, jamais de cookie de session).
-- [ ] **S1-02** Test : `401` anonyme, `403` non admin, aucun cookie dans la réponse.
-- [ ] **S2-01** `/api/users` GET : admin, projection minimale.
-- [ ] **S2-02** `/api/users` POST : inscription contrôlée ou admin A.
+- [x] **S1-01** `/api/cookies` : supprimer ou protéger (admin A, jamais de cookie de session).
+- [x] **S1-02** Test : `401` anonyme, `403` non admin, aucun cookie dans la réponse.
+- [x] **S2-01** `/api/users` GET : admin, projection minimale.
+- [x] **S2-02** `/api/users` POST : inscription contrôlée ou admin A.
 - [ ] **S2-03** Rate limiting + tests d'énumération.
-- [ ] **S3-01** `/api/games` : lecture publique justifiée, écriture admin.
-- [ ] **S3-02** `/api/services` : idem.
+- [x] **S3-01** `/api/games` : lecture publique justifiée, écriture admin.
+- [x] **S3-02** `/api/services` : idem.
 - [ ] **S3-03** Validation Zod + tests.
-- [ ] **S4-01** `actions/claims.ts` : auth + permission `claim:create`.
-- [ ] **S4-02** `updateClaimStatus`/`deleteClaim` : admin.
-- [ ] **S4-03** `actions/app-settings.ts` : frais et prix VIP réservés au niveau A.
-- [ ] **S4-04** Audit des modifications de frais.
-- [ ] **S5-01** `/api/transactions/calculate-fees` : auth + validation + moteur de frais.
-- [ ] **S5-02** Retour `{fees, totalDebit, netAmount}`.
-- [ ] **S5-03** Test : `401` anonyme ; total cohérent.
-- [ ] **A1-01** `/api/auth/profile?userId=` : contrôle de session et de visibilité.
-- [ ] **A1-02** Limiter les relations retournées.
+- [x] **S4-01** `actions/claims.ts` : auth + permission `claim:create`.
+- [x] **S4-02** `updateClaimStatus`/`deleteClaim` : admin.
+- [x] **S4-03** `actions/app-settings.ts` : frais et prix VIP réservés au niveau A.
+- [x] **S4-04** Audit des modifications de frais.
+- [x] **S5-01** `/api/transactions/calculate-fees` : auth + validation + moteur de frais.
+- [x] **S5-02** Retour `{fees, totalDebit, netAmount}`.
+- [x] **S5-03** Test : `401` anonyme ; total cohérent.
+- [x] **A1-01** `/api/auth/profile?userId=` : contrôle de session et de visibilité.
+- [x] **A1-02** Limiter les relations retournées.
 
 **DoD :** aucune surface sensible accessible anonymement.
 

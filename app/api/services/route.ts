@@ -10,8 +10,21 @@ import {
   toggleServiceActive,
   type ServiceFilters,
 } from '@/actions/services';
+import { getCurrentUser } from '@/lib/auth/session';
 
-// GET /api/services – list or stats
+async function verifyAdmin() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { authorized: false, status: 401, error: "Authentication required" };
+  }
+  const isAdmin = user.role === "admin" || (user as any).isAdmin === true;
+  if (!isAdmin) {
+    return { authorized: false, status: 403, error: "Admin access required" };
+  }
+  return { authorized: true, user };
+}
+
+// GET /api/services – list or stats (Public catalog)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
@@ -44,7 +57,7 @@ export async function GET(req: NextRequest) {
 
   // Otherwise, list services
   const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '50', 10);
+  const limit = Math.min(100, parseInt(searchParams.get('limit') || '50', 10));
   const sortBy = searchParams.get('sortBy') || undefined;
   const sortOrder = searchParams.get('sortOrder') || 'desc';
   const populate = searchParams.get('populate')?.split(',') || undefined;
@@ -87,8 +100,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/services – create
+// POST /api/services – create (Admin only)
 export async function POST(req: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   try {
     const body = await req.json();
     const created = await createService(body);
@@ -98,8 +116,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT /api/services?id=... – update
+// PUT /api/services?id=... – update (Admin only)
 export async function PUT(req: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) {
@@ -115,8 +138,13 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-// DELETE /api/services?id=... – soft delete
+// DELETE /api/services?id=... – soft delete (Admin only)
 export async function DELETE(req: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) {
@@ -131,8 +159,13 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-// PATCH /api/services/restore?id=... – restore
+// PATCH /api/services/restore?id=... – restore / toggle (Admin only)
 export async function PATCH(req: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) {

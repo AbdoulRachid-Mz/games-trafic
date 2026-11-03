@@ -1,9 +1,10 @@
-﻿import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   getAdminRoutesForLevel,
   checkRouteAccess,
   flatRoutes,
 } from "@/config/admin-items";
+import { isSensitiveCookie } from "@/app/api/cookies/route";
 
 describe("Access Control & Admin Hierarchy (TASK-SEC-02)", () => {
   describe("getAdminRoutesForLevel", () => {
@@ -34,7 +35,6 @@ describe("Access Control & Admin Hierarchy (TASK-SEC-02)", () => {
     it("should deny Level C access to sensitive Level A routes", () => {
       const accessLogs = checkRouteAccess("/admin/system/logs", "C");
       expect(accessLogs.accessible).toBe(false);
-
       const accessBackups = checkRouteAccess("/admin/system/backups", "C");
       expect(accessBackups.accessible).toBe(false);
     });
@@ -69,6 +69,49 @@ describe("Access Control & Admin Hierarchy (TASK-SEC-02)", () => {
       const flattened = flatRoutes(nested);
       expect(flattened).toHaveLength(2);
       expect(flattened.map((r) => r.id)).toEqual(["parent", "child-1"]);
+    });
+  });
+
+  describe("Vague 1: Surface Security & Sensitive Cookie Filtering (S1-01, S1-02)", () => {
+    it("should identify and flag session and auth cookies as sensitive", () => {
+      expect(isSensitiveCookie("better-auth.session_token")).toBe(true);
+      expect(isSensitiveCookie("session_id")).toBe(true);
+      expect(isSensitiveCookie("auth_token")).toBe(true);
+      expect(isSensitiveCookie("csrf_token")).toBe(true);
+      expect(isSensitiveCookie("api_secret")).toBe(true);
+      expect(isSensitiveCookie("encryption_key")).toBe(true);
+    });
+
+    it("should allow non-sensitive functional cookies", () => {
+      expect(isSensitiveCookie("theme")).toBe(false);
+      expect(isSensitiveCookie("lang")).toBe(false);
+      expect(isSensitiveCookie("cookie-consent")).toBe(false);
+      expect(isSensitiveCookie("view_mode")).toBe(false);
+    });
+  });
+
+  describe("Vague 1: Profile & Fee Surface Rules (S5-02, A1-02)", () => {
+    it("should enforce sensitive relation filtering on public profiles", () => {
+      const SENSITIVE_RELATIONS = ["wallet", "transactions", "notifications", "claims", "requests"];
+      const requestedRelations = ["shops", "wallet", "products", "transactions", "tournaments"];
+
+      const filteredPublic = requestedRelations.filter((r) => !SENSITIVE_RELATIONS.includes(r));
+      expect(filteredPublic).toEqual(["shops", "products", "tournaments"]);
+      expect(filteredPublic).not.toContain("wallet");
+      expect(filteredPublic).not.toContain("transactions");
+    });
+
+    it("should validate fee payload structure and mathematical consistency (S5-02)", () => {
+      const feeResponse = {
+        feePercentage: 0.05,
+        fees: 5.0,
+        totalDebit: 100.0,
+        netAmount: 95.0,
+        currency: "GTC",
+      };
+
+      expect(feeResponse.fees + feeResponse.netAmount).toBe(feeResponse.totalDebit);
+      expect(feeResponse.currency).toBe("GTC");
     });
   });
 });

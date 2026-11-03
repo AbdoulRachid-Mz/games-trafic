@@ -3,68 +3,74 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProfile, getMyProfile } from "@/actions/users";
 import { getServerSession } from "@/lib/auth/session";
 
+const SENSITIVE_RELATIONS = ["wallet", "transactions", "notifications", "claims", "requests"];
+const ALLOWED_PUBLIC_RELATIONS = ["shops", "tournaments", "products"];
+
 export async function GET(request: NextRequest) {
   try {
+    // 🛡️ A1-01: Session authentication required on all profile endpoints
+    const session = await getServerSession();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not authenticated",
+        },
+        { status: 401 }
+      );
+    }
+
+    const currentUserId = session.user.id;
+    const currentUserRole = (session.user as any).role;
+    const isCurrentUserAdmin =
+      currentUserRole === "admin" || (session.user as any).isAdmin === true;
+
     const searchParams = request.nextUrl.searchParams;
     const me = searchParams.get("me") === "true";
-    const relations = searchParams.get("relations")?.split(",") || [];
+    const requestedUserId = searchParams.get("userId");
+    const rawRelations = searchParams.get("relations")?.split(",") || [];
     const isMinimal = searchParams.get("minimal") === "true";
-    const mode =
-      (searchParams.get("mode") as any) || (isMinimal ? "minimal" : "partial");
+    const mode = (searchParams.get("mode") as any) || (isMinimal ? "minimal" : "partial");
+
+    const targetUserId = !me && requestedUserId ? requestedUserId : currentUserId;
+    const isSelf = targetUserId === currentUserId;
+
+    // 🔒 A1-02: Strict relation filtering
+    let allowedRelations: string[];
+    if (isSelf || isCurrentUserAdmin) {
+      allowedRelations = rawRelations.filter((r) => !SENSITIVE_RELATIONS.includes(r));
+    } else {
+      // Non-owner, non-admin: strictly limited to public relations
+      allowedRelations = rawRelations.filter((r) => ALLOWED_PUBLIC_RELATIONS.includes(r));
+    }
 
     let userData;
-    const userId = searchParams.get("userId");
-    const relationsToInclude = relations.filter((relation) => {
-      return relation !== "wallet";
-    });
-    
-    if (me) {
-      // Vérifier la session d'abord
-      const session = await getServerSession();
-      if (!session?.user?.id) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Not authenticated",
-          },
-          { status: 401 },
-        );
-      }
 
+    if (isSelf && me) {
       userData = await getMyProfile({
         mode: mode || "full",
-        includeRelations:
-          relationsToInclude.length > 0
-            ? (relationsToInclude as any)
-            : undefined,
+        includeRelations: allowedRelations.length > 0 ? (allowedRelations as any) : undefined,
         limitPerRelation: mode === "minimal" ? 0 : 20,
       });
-    } else if (userId) {
-      userData = await getProfile(userId, {
-        mode: mode || "partial",
-        includeRelations: relationsToInclude.length > 0 ? relationsToInclude : undefined,
+    } else {
+      userData = await getProfile(targetUserId, {
+        mode: isSelf || isCurrentUserAdmin ? mode : "minimal",
+        includeRelations: allowedRelations.length > 0 ? allowedRelations : undefined,
         limitPerRelation: 10,
       });
-    } else {
-      const session = await getServerSession();
-      if (!session?.user?.id) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Not authenticated",
-          },
-          { status: 401 },
-        );
-      }
 
-      userData = await getProfile(session.user.id, {
-        mode: mode || "partial",
-        includeRelations:
-          relationsToInclude.length > 0
-            ? relationsToInclude
-            : ["shops", "tournaments", "products"],
-        limitPerRelation: 20,
-      });
+      // Visiblity check for other users (A1-01)
+      if (userData && !isSelf && !isCurrentUserAdmin && !userData.isPublicProfile) {
+        // Return minimal public projection
+        userData = {
+          id: userData.id,
+          username: userData.username,
+          fullName: userData.fullName,
+          image: userData.image,
+          profileImage: userData.profileImage,
+          isPublicProfile: false,
+        } as any;
+      }
     }
 
     if (!userData) {
@@ -73,7 +79,7 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "User not found",
         },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -88,7 +94,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: "Internal server error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

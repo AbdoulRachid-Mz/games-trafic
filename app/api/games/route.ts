@@ -6,10 +6,22 @@ import {
   getGameStats,
   createGame,
   updateGame,
-  deleteGame,
 } from '@/actions/games';
+import { getCurrentUser } from '@/lib/auth/session';
 
-// GET /api/games?...
+async function verifyAdmin() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { authorized: false, status: 401, error: "Authentication required" };
+  }
+  const isAdmin = user.role === "admin" || (user as any).isAdmin === true;
+  if (!isAdmin) {
+    return { authorized: false, status: 403, error: "Admin access required" };
+  }
+  return { authorized: true, user };
+}
+
+// GET /api/games?... (Public catalog read)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -41,7 +53,7 @@ export async function GET(request: NextRequest) {
 
   // List with pagination / filters
   const page = Number(searchParams.get('page') || 1);
-  const limit = Number(searchParams.get('limit') || 50);
+  const limit = Math.min(100, Number(searchParams.get('limit') || 50));
   const sortBy = searchParams.get('sortBy') || undefined;
   const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
   const includeDeleted = searchParams.has('includeDeleted');
@@ -68,10 +80,18 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result);
 }
 
-// POST /api/games
+// POST /api/games (Admin only)
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   try {
     const body = await request.json();
+    if (!body?.name) {
+      return NextResponse.json({ error: 'Game name is required' }, { status: 400 });
+    }
     const game = await createGame(body);
     return NextResponse.json(game, { status: 201 });
   } catch (err: any) {
@@ -82,8 +102,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/games?id=...
+// PATCH /api/games?id=... (Admin only)
 export async function PATCH(request: NextRequest) {
+  const auth = await verifyAdmin();
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
@@ -98,26 +123,6 @@ export async function PATCH(request: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Failed to update game' },
-      { status: 400 }
-    );
-  }
-}
-
-// DELETE /api/games?id=...
-export async function DELETE(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-  }
-
-  try {
-    const game = await deleteGame(id);
-    return NextResponse.json(game);
-  } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || 'Failed to delete game' },
       { status: 400 }
     );
   }

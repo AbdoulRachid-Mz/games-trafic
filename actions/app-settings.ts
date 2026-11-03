@@ -3,6 +3,8 @@
 import { appSettings, type AppSettings, type NewAppSettings } from '@/database/schema';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth/session';
+import { createUserTrace } from '@/actions/user-traces';
 import type { AppSettingsUpdate } from '@/config/app-config';
 import { cacheTag, cacheLife } from 'next/cache';
 import { revalidateTag } from 'next/cache';
@@ -117,6 +119,12 @@ export async function updateAppSettings(
   updates: AppSettingsUpdate
 ): Promise<NewAppSettings> {
   try {
+    const sessionUser = await getCurrentUser();
+    const isAdmin = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true);
+    if (!isAdmin) {
+      throw new Error("UNAUTHORIZED: Seuls les administrateurs peuvent modifier les paramètres.");
+    }
+
     const existing = await getAppSettings();
     if (!existing) throw new Error('App settings not found');
 
@@ -215,10 +223,32 @@ export async function updateVipPricing(pricing: {
   yearly?: string;
 }): Promise<NewAppSettings> {
   try {
+    const sessionUser = await getCurrentUser();
+    const isLevelA = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true) && (sessionUser as any).level === 'A';
+    if (!isLevelA) {
+      throw new Error("UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent modifier la tarification VIP.");
+    }
+
     const updates: AppSettingsUpdate = {};
     if (pricing.monthly !== undefined) updates.vipMonthlyPrice = pricing.monthly;
     if (pricing.yearly !== undefined) updates.vipYearlyPrice = pricing.yearly;
-    return await updateAppSettings(updates);
+
+    const result = await updateAppSettings(updates);
+
+    try {
+      await createUserTrace({
+        userId: sessionUser.id,
+        type: "OTHER",
+        payload: {
+          action: "UPDATE_VIP_PRICING",
+          pricing,
+        },
+      });
+    } catch (traceErr) {
+      console.warn("Could not log trace for VIP pricing update:", traceErr);
+    }
+
+    return result;
   } catch (error) {
     console.error('Error updating VIP pricing:', error);
     throw new Error('Failed to update VIP pricing');
@@ -237,6 +267,12 @@ export async function updateTransactionFees(fees: {
   tournamentParticipation?: string;
 }): Promise<NewAppSettings> {
   try {
+    const sessionUser = await getCurrentUser();
+    const isLevelA = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true) && (sessionUser as any).level === 'A';
+    if (!isLevelA) {
+      throw new Error("UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent modifier les frais de transaction.");
+    }
+
     const updates: AppSettingsUpdate = {};
     if (fees.transaction !== undefined) updates.transactionFeePercentage = fees.transaction;
     if (fees.purchase !== undefined) updates.purchaseFeePercentage = fees.purchase;
@@ -244,7 +280,23 @@ export async function updateTransactionFees(fees: {
     if (fees.withdrawal !== undefined) updates.withdrawalFeePercentage = fees.withdrawal;
     if (fees.transfer !== undefined) updates.transferFeePercentage = fees.transfer;
     if (fees.tournamentParticipation !== undefined) updates.tournamentParticipationFeePercentage = fees.tournamentParticipation;
-    return await updateAppSettings(updates);
+
+    const result = await updateAppSettings(updates);
+
+    try {
+      await createUserTrace({
+        userId: sessionUser.id,
+        type: "OTHER",
+        payload: {
+          action: "UPDATE_TRANSACTION_FEES",
+          fees,
+        },
+      });
+    } catch (traceErr) {
+      console.warn("Could not log trace for fee update:", traceErr);
+    }
+
+    return result;
   } catch (error) {
     console.error('Error updating transaction fees:', error);
     throw new Error('Failed to update transaction fees');
@@ -327,6 +379,11 @@ export async function updateRoutes(routes: {
  */
 export async function resetAppSettings(): Promise<void> {
   try {
+    const sessionUser = await getCurrentUser();
+    const isLevelA = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true) && (sessionUser as any).level === 'A';
+    if (!isLevelA) {
+      throw new Error("UNAUTHORIZED: Seuls les administrateurs de niveau A peuvent réinitialiser les paramètres.");
+    }
     await db.delete(appSettings);
   } catch (error) {
     console.error('Error resetting app settings:', error);

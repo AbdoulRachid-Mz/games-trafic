@@ -4,6 +4,7 @@ import { claims, type Claim, type NewClaim, users, walletTransactions } from '@/
 import { eq, and, or, like, ilike, desc, asc, sql, count, inArray, isNull, isNotNull } from 'drizzle-orm';
 import { type ClaimFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth/session';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -194,8 +195,15 @@ export async function getUserClaims(
  */
 export async function createClaim(claimData: NewClaim): Promise<Claim> {
   try {
-    if (!claimData.userId || !claimData.type || !claimData.title || !claimData.description) {
-      throw new Error('userId, type, title and description are required');
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) {
+      throw new Error('UNAUTHORIZED: Connexion requise pour créer une réclamation.');
+    }
+    // Enforce authenticated user ID (S4-01)
+    claimData.userId = sessionUser.id;
+
+    if (!claimData.type || !claimData.title || !claimData.description) {
+      throw new Error('type, title and description are required');
     }
 
     // Vérification de la transaction si elle est fournie
@@ -247,9 +255,19 @@ export async function updateClaim(
   claimData: Partial<NewClaim>
 ): Promise<Claim> {
   try {
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) {
+      throw new Error('UNAUTHORIZED: Connexion requise.');
+    }
+
     const existingClaim = await getClaimById(id);
     if (!existingClaim) {
       throw new Error('Claim not found');
+    }
+
+    const isAdmin = sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true;
+    if (existingClaim.userId !== sessionUser.id && !isAdmin) {
+      throw new Error('FORBIDDEN: Vous ne pouvez modifier que vos propres réclamations.');
     }
 
     // Vérification de la transaction si elle est fournie
@@ -301,6 +319,11 @@ export async function updateClaimStatus(
   resolution?: string
 ): Promise<Claim> {
   try {
+    const sessionUser = await getCurrentUser();
+    const isAdmin = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true);
+    if (!isAdmin) {
+      throw new Error('FORBIDDEN: Seuls les administrateurs peuvent modifier le statut d\'une réclamation.');
+    }
     const result = await db
       .update(claims)
       .set({
@@ -330,6 +353,11 @@ export async function updateClaimStatus(
  */
 export async function deleteClaim(id: string): Promise<Claim> {
   try {
+    const sessionUser = await getCurrentUser();
+    const isAdmin = sessionUser && (sessionUser.role === 'admin' || (sessionUser as any).isAdmin === true);
+    if (!isAdmin) {
+      throw new Error('FORBIDDEN: Seuls les administrateurs peuvent supprimer une réclamation.');
+    }
     const result = await db
       .update(claims)
       .set({
