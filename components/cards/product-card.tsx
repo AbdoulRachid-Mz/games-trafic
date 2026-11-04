@@ -132,7 +132,7 @@ export function ProductCard({
     } else {
       const entryFee = typeof product.price === "number" ? product.price : parseFloat(product.price as string);
       const encodedData = encodeTransactionQR({
-        t: "PRODUCT_PURCHASE",
+        t: "ORDER_PURCHASE",
         id: product.id,
         a: entryFee,
         i: images[0] || "/placeholder-game.jpg",
@@ -151,7 +151,7 @@ export function ProductCard({
       onClick: () => {
         const entryFee = typeof product.price === "number" ? product.price : parseFloat(product.price as string);
         const encodedData = encodeTransactionQR({
-          t: "PRODUCT_PURCHASE",
+          t: "ORDER_PURCHASE",
           id: product.id,
           a: entryFee,
           i: images[0] || "/placeholder-game.jpg",

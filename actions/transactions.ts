@@ -28,10 +28,14 @@ import { getUserWalletById, verifyWalletPin } from "./wallets";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isAdmin, assertAuthenticated } from "@/lib/auth/permissions";
 import {
-  executeTransaction,
-  getOrCreatePlatformAccount
-} from "@/lib/ledger/ledger-utils";
-import { calculateTransactionFees, executeRefund } from "@/lib/finance";
+  calculateTransactionFees,
+  executeRefund,
+  executeFinancialOperation,
+  getOrCreateSystemAccount,
+  type FinancialOperation,
+  type LedgerPosting,
+  TransactionType,
+} from "@/lib/finance";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -249,7 +253,8 @@ export async function getTransactionStats(filters?: WalletTransactionFilters) {
 // ============================================================================
 /**
  * Crée une transaction wallet
- * ⚠️ REFACTORÉ: Utilise maintenant executeTransaction pour garantir la comptabilité double-entry
+ * ⚠️ REFACTORÉ: Utilise le moteur unique `executeFinancialOperation` pour
+ * garantir la comptabilité double-entry, l'idempotence et le verrouillage.
  */
 export async function createTransaction(
   data: {
@@ -386,7 +391,7 @@ export async function createTransaction(
 
   if (
     !options?.allowDuplicate &&
-    ["GAME_ITEM_PURCHASE", "DEPOSIT", "WITHDRAWAL", "PRODUCT_PURCHASE", "ORDER_PURCHASE"].includes(data.type)
+    ["GAME_ITEM_PURCHASE", "DEPOSIT", "WITHDRAWAL", "ORDER_PURCHASE"].includes(data.type)
   ) {
     const existing = await db
       .select({ id: walletTransactions.id })
@@ -404,67 +409,162 @@ export async function createTransaction(
     }
   }
 
-  // Déterminer le compte destination selon le type de transaction
-  const escrowDebitTypes = [
-    "PURCHASE",
-    "VIP_SUBSCRIPTION",
-    "THEME_PURCHASE",
-    "PRODUCT_PURCHASE",
-    "ORDER_PURCHASE",
-    "GAME_ITEM_PURCHASE",
-    "TOURNAMENT_PARTICIPATION",
-    "WITHDRAWAL",
-  ];
+  // Déterminer les écritures et comptes selon le type de transaction
+  const canonicalType: TransactionType = data.type as TransactionType;
 
-  let fromAccountId: string;
-  let toAccountId: string;
+  const pendingTypes = ["ORDER_PURCHASE", "TOURNAMENT_PARTICIPATION"];
+  const initialStatus: "PENDING" | "COMPLETED" = pendingTypes.includes(
+    canonicalType
+  )
+    ? "PENDING"
+    : "COMPLETED";
 
-  if (data.type === "TRANSFER") {
-    // TRANSFER direct wallet-to-wallet, pas via escrow
+  const idempotencyKey =
+    typeof data.metadata?.idempotencyKey === "string"
+      ? data.metadata.idempotencyKey
+      : undefined;
+
+  const metadata = {
+    ...(data.metadata ?? {}),
+    originalType: data.type,
+  };
+
+  const feeCalc = await calculateTransactionFees(canonicalType, amount);
+  const fees = feeCalc.fees;
+
+  let operation: FinancialOperation;
+
+  if (canonicalType === "TRANSFER") {
     const recipientWalletId = data.metadata?.recipientWalletId;
     if (!recipientWalletId) throw new Error("Wallet destinataire requis");
 
     const recipientWallet = await getUserWalletById(recipientWalletId);
     if (!recipientWallet) throw new Error("Wallet destinataire introuvable");
-    if (!recipientWallet.financialAccountId) throw new Error("Compte financier destinataire non lié");
+    if (!recipientWallet.financialAccountId)
+      throw new Error("Compte financier destinataire non lié");
+    if (recipientWallet.id === wallet.id)
+      throw new Error("Transfert vers soi interdit");
 
-    fromAccountId = wallet.financialAccountId;
-    toAccountId = recipientWallet.financialAccountId;
-  } else if (escrowDebitTypes.includes(data.type)) {
-    // User paye → argent va vers plateforme
-    fromAccountId = wallet.financialAccountId;
-    // On récupère ou crée le compte plateforme
-    const platformAccount = await db.transaction(async (tx) => {
-      return await getOrCreatePlatformAccount(tx, "PLATFORM_ESCROW");
-    });
-    toAccountId = platformAccount.id;
-  } else if (creditTypes.includes(data.type)) {
-    // Plateforme crédite user
-    const platformAccount = await db.transaction(async (tx) => {
-      return await getOrCreatePlatformAccount(tx, "SYSTEM_ADJUSTMENT");
-    });
-    fromAccountId = platformAccount.id;
-    toAccountId = wallet.financialAccountId;
+    operation = {
+      kind: "TRANSFER",
+      type: "TRANSFER",
+      status: initialStatus,
+      amount,
+      fromAccountId: wallet.financialAccountId,
+      toAccountId: recipientWallet.financialAccountId,
+      walletId: wallet.id,
+      walletAccountId: wallet.financialAccountId,
+      fromUserId: user.id,
+      toUserId: recipientWallet.userId,
+      description: data.description,
+      metadata,
+      createdByUserId: user.id,
+      idempotencyKey,
+      idempotencyScope: "transaction:transfer",
+    };
+  } else if (canonicalType === "BONUS") {
+    operation = {
+      kind: "ISSUANCE",
+      type: "BONUS",
+      status: initialStatus,
+      amount,
+      toAccountId: wallet.financialAccountId,
+      toUserId: user.id,
+      walletId: wallet.id,
+      walletAccountId: wallet.financialAccountId,
+      fromUserId: null,
+      description: data.description,
+      reason: data.description || "Bonus administrateur",
+      metadata,
+      createdByUserId: user.id,
+      idempotencyKey,
+      idempotencyScope: "transaction:bonus",
+    };
   } else {
-    throw new Error(`Type de transaction non supporté: ${data.type}`);
+    const postings: LedgerPosting[] = [];
+    let netAmount = amount;
+    let journalFees = 0;
+    let fromUserId: string | null = user.id;
+    let toUserId: string | null = null;
+
+    if (canonicalType === "DEPOSIT" || canonicalType === "REFUND") {
+      // Entrée externe : contrepartie SYSTEM_EXTERNAL_CLEARING.
+      const clearing = await getOrCreateSystemAccount(db, "EXTERNAL_CLEARING");
+      netAmount = Math.round((amount - fees) * 100) / 100;
+      journalFees = fees;
+      postings.push({ accountId: clearing.id, debit: amount });
+      postings.push({
+        accountId: wallet.financialAccountId,
+        credit: netAmount,
+      });
+      if (fees > 0) {
+        const feeAccount = await getOrCreateSystemAccount(db, "FEES");
+        postings.push({ accountId: feeAccount.id, credit: fees });
+      }
+      fromUserId = null;
+      toUserId = user.id;
+    } else if (canonicalType === "VIP_SUBSCRIPTION") {
+      // L'abonnement VIP est une recette plateforme.
+      const feeAccount = await getOrCreateSystemAccount(db, "FEES");
+      postings.push({ accountId: wallet.financialAccountId, debit: amount });
+      postings.push({ accountId: feeAccount.id, credit: amount });
+      netAmount = 0;
+    } else if (
+      canonicalType === "TOURNAMENT_PARTICIPATION" ||
+      canonicalType === "WITHDRAWAL"
+    ) {
+      const escrow = await getOrCreateSystemAccount(db, "ESCROW");
+      journalFees = fees;
+      postings.push({
+        accountId: wallet.financialAccountId,
+        debit: Math.round((amount + fees) * 100) / 100,
+      });
+      postings.push({ accountId: escrow.id, credit: amount });
+      if (fees > 0) {
+        const feeAccount = await getOrCreateSystemAccount(db, "FEES");
+        postings.push({ accountId: feeAccount.id, credit: fees });
+      }
+      netAmount = 0;
+    } else if (
+      [
+        "ORDER_PURCHASE",
+        "GAME_ITEM_PURCHASE",
+        "THEME_PURCHASE",
+        "PURCHASE",
+      ].includes(canonicalType)
+    ) {
+      // Achat : débit du payeur, mise sous séquestre du brut.
+      const escrow = await getOrCreateSystemAccount(db, "ESCROW");
+      postings.push({ accountId: wallet.financialAccountId, debit: amount });
+      postings.push({ accountId: escrow.id, credit: amount });
+      netAmount = 0;
+    } else {
+      throw new Error(`Type de transaction non supporté: ${canonicalType}`);
+    }
+
+    operation = {
+      kind: "POST",
+      type: canonicalType,
+      status: initialStatus,
+      amount,
+      walletId: wallet.id,
+      walletAccountId: wallet.financialAccountId,
+      fromUserId,
+      toUserId,
+      description: data.description,
+      reason: data.description,
+      metadata,
+      postings,
+      fees: journalFees,
+      netAmount,
+      createdByUserId: user.id,
+      idempotencyKey,
+      idempotencyScope: `transaction:${canonicalType.toLowerCase()}`,
+    };
   }
 
-  const canonicalType = (data.type === "PRODUCT_PURCHASE" ? "ORDER_PURCHASE" : data.type) as any;
-  const pendingTypes = ["PRODUCT_PURCHASE", "ORDER_PURCHASE", "TOURNAMENT_PARTICIPATION"];
-  const initialStatus = pendingTypes.includes(data.type) ? "PENDING" : "COMPLETED";
-
-  // 🚀 Utiliser executeTransaction pour garantir la double-entry
-  const result = await executeTransaction({
-    fromAccountId,
-    toAccountId,
-    amount,
-    type: canonicalType,
-    status: initialStatus,
-    description: data.description,
-    metadata: data.metadata,
-    userId: user.id,
-    walletId: wallet.id,
-  });
+  // 🚀 Moteur unique : écritures équilibrées, idempotence et verrouillage
+  const result = await executeFinancialOperation(operation);
 
   // 🎯 Actions spécifiques selon le type
   await db.transaction(async (tx) => {
@@ -661,10 +761,11 @@ export async function updateTransactionStatus(
  */
 export async function refundTransaction(
   id: string,
-  reason?: string
+  reason?: string,
+  amount?: number
 ): Promise<WalletTransaction> {
   try {
-    return await executeRefund(id, { reason });
+    return await executeRefund(id, { reason, amount });
   } catch (error) {
     console.error("Erreur lors du remboursement de la transaction:", error);
     if (error instanceof Error) {

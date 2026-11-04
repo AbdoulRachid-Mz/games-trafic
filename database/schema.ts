@@ -2,7 +2,7 @@
 import {
   pgTable, uuid, text, timestamp, boolean, jsonb,
   numeric, integer, uniqueIndex, index, foreignKey,
-  primaryKey, pgEnum, real
+  primaryKey, pgEnum, real, type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import {
@@ -25,6 +25,7 @@ export const tournamentStatusEnum = pgEnum('tournament_status', ['UPCOMING', 'LI
 export const tournamentFormatEnum = pgEnum('tournament_format', ['ELIMINATION', 'GROUP_STAGE', 'ROUND_ROBIN', 'SWISS', 'KNOCKOUT', 'CUSTOM']);
 export const matchStatusEnum = pgEnum('match_status', ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'PENDING_REVIEW', 'AWAITING_ADMIN_CONFIRMATION', 'DISPUTED']);
 export const transactionStatusEnum = pgEnum('transaction_status', ['PENDING', 'COMPLETED', 'PROCESSING', 'FAILED', 'REFUNDED']);
+export const creditRequestStatusEnum = pgEnum('credit_request_status', ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED']);
 export const transactionTypeEnum = pgEnum('transaction_type', [
   'PURCHASE', 'VIP_SUBSCRIPTION', 'GAME_ITEM_PURCHASE', 'THEME_PURCHASE',
   'DEPOSIT', 'WITHDRAWAL', 'REFUND', 'TRANSFER', 'ORDER_PURCHASE', 'TOURNAMENT_PARTICIPATION', 'BONUS'
@@ -269,6 +270,16 @@ export const walletTransactions = pgTable('wallet_transactions', {
   status: transactionStatusEnum('status').default('PENDING'),
   isDeleted: boolean('is_deleted').default(false),
 
+  // Traçabilité et idempotence (finance V2)
+  reference: text('reference').unique(),
+  idempotencyKey: text('idempotency_key'),
+  createdByUserId: text('created_by_user_id').references(() => users.id),
+  actorLevel: userLevelEnum('actor_level'),
+  reason: text('reason'),
+  reversalOf: text('reversal_of').references((): AnyPgColumn => walletTransactions.id),
+  reversedBy: text('reversed_by').references((): AnyPgColumn => walletTransactions.id),
+  completedAt: timestamp('completed_at'),
+
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => [
@@ -277,17 +288,24 @@ export const walletTransactions = pgTable('wallet_transactions', {
   index('transactions_type_status_idx').on(table.type, table.status),
   index('transactions_created_at_idx').on(table.createdAt),
   index('transactions_from_user_idx').on(table.fromUserId),
-  index('transactions_to_user_idx').on(table.toUserId)
+  index('transactions_to_user_idx').on(table.toUserId),
+  uniqueIndex('transactions_wallet_idempotency_unique')
+    .on(table.walletId, table.idempotencyKey)
+    .where(sql`${table.idempotencyKey} IS NOT NULL`)
 ]);
 
 export const financialAccountTypeEnum = pgEnum("financial_account_type", [
-  "USER_WALLET",        // Wallet d'un utilisateur individuel
-  "SHOP_WALLET",        // Wallet d'une boutique
-  "PLATFORM_ESCROW",    // Compte escrow de la plateforme (pour les transactions en cours)
-  "PLATFORM_FEES",      // Compte des frais de la plateforme
-  "TOURNAMENT_POOL",    // Pool de prix d'un tournoi
-  "SYSTEM_ADJUSTMENT"   // Ajustements système (bonus, corrections, etc.)
+  "USER_WALLET",              // Wallet d'un utilisateur individuel
+  "SHOP_WALLET",              // Wallet d'une boutique
+  "PLATFORM_ESCROW",          // Compte escrow de la plateforme (pour les transactions en cours)
+  "PLATFORM_FEES",            // Compte des frais de la plateforme
+  "TOURNAMENT_POOL",          // Pool de prix d'un tournoi
+  "SYSTEM_ADJUSTMENT",        // Ajustements système (bonus, corrections, etc.)
+  "SYSTEM_GTC_ISSUANCE",      // Émission monétaire GTC (solde négatif autorisé)
+  "SYSTEM_EXTERNAL_CLEARING"  // Contrepartie des dépôts/retraits externes
 ]);
+
+export type FinancialAccountType = (typeof financialAccountTypeEnum.enumValues)[number];
 
 // ============================================================================
 // FINANCIAL ACCOUNTS - Source de vérité pour tous les wallets
@@ -308,6 +326,11 @@ export const financialAccounts = pgTable("financial_accounts", {
 
   isActive: boolean("is_active").default(true),
   isLocked: boolean("is_locked").default(false),
+
+  // Clé stable des comptes système (idempotence de création)
+  systemKey: text("system_key").unique(),
+  // Autorise un solde négatif (uniquement pour les comptes d'émission)
+  allowNegativeBalance: boolean("allow_negative_balance").default(false),
 
   metadata: jsonb("metadata").default({}),
 
@@ -356,6 +379,86 @@ export const ledgerEntries = pgTable("ledger_entries", {
   index("ledger_account_idx").on(t.accountId),
   index("ledger_transaction_idx").on(t.transactionId),
   index("ledger_created_at_idx").on(t.createdAt),
+]);
+
+// ============================================================================
+// IDEMPOTENCY KEYS - Anti-doublon des opérations financières
+// ============================================================================
+export const idempotencyKeys = pgTable('idempotency_keys', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  scope: text('scope').notNull(),
+  key: text('key').notNull(),
+  requestHash: text('request_hash').notNull(),
+  status: text('status').notNull().default('IN_PROGRESS'), // IN_PROGRESS | COMPLETED | FAILED
+  response: jsonb('response'),
+  transactionId: text('transaction_id').references(() => walletTransactions.id, {
+    onDelete: 'set null',
+  }),
+  expiresAt: timestamp('expires_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (t) => [
+  uniqueIndex('idempotency_scope_key_unique').on(t.scope, t.key),
+  index('idempotency_created_at_idx').on(t.createdAt),
+]);
+
+// ============================================================================
+// FINANCIAL AUDIT LOGS - Journal append-only des opérations sensibles
+// ============================================================================
+export const financialAuditLogs = pgTable('financial_audit_logs', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  actorId: text('actor_id').references(() => users.id),
+  actorLevel: userLevelEnum('actor_level'),
+  action: text('action').notNull(),
+  transactionId: text('transaction_id').references(() => walletTransactions.id, {
+    onDelete: 'set null',
+  }),
+  requestId: text('request_id'),
+  accountId: text('account_id').references(() => financialAccounts.id),
+  amount: numeric('amount', { precision: 15, scale: 2 }),
+  currency: text('currency').default('GTC'),
+  reason: text('reason'),
+  ip: text('ip'),
+  userAgent: text('user_agent'),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => [
+  index('financial_audit_actor_idx').on(t.actorId),
+  index('financial_audit_action_idx').on(t.action),
+  index('financial_audit_transaction_idx').on(t.transactionId),
+  index('financial_audit_created_at_idx').on(t.createdAt),
+]);
+
+// ============================================================================
+// TRANSACTION CREDIT REQUESTS - Demandes d'émission GTC des administrateurs
+// ============================================================================
+export const transactionCreditRequests = pgTable('transaction_credit_requests', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()`),
+  requesterId: text('requester_id').notNull().references(() => users.id),
+  requesterLevel: userLevelEnum('requester_level').notNull(),
+  recipientUserId: text('recipient_user_id').notNull().references(() => users.id),
+  recipientWalletId: text('recipient_wallet_id').notNull().references(() => userWallets.id),
+  amount: numeric('amount', { precision: 15, scale: 2 }).notNull(),
+  currency: text('currency').default('GTC'),
+  reason: text('reason').notNull(),
+  status: creditRequestStatusEnum('status').notNull().default('PENDING'),
+  decidedBy: text('decided_by').references(() => users.id),
+  decidedAt: timestamp('decided_at'),
+  rejectionReason: text('rejection_reason'),
+  transactionId: text('transaction_id').references(() => walletTransactions.id, {
+    onDelete: 'set null',
+  }),
+  idempotencyKey: text('idempotency_key'),
+  secondApproverId: text('second_approver_id').references(() => users.id),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (t) => [
+  index('credit_requests_status_created_idx').on(t.status, t.createdAt),
+  index('credit_requests_requester_status_idx').on(t.requesterId, t.status),
+  uniqueIndex('credit_requests_requester_idempotency_unique')
+    .on(t.requesterId, t.idempotencyKey)
+    .where(sql`${t.idempotencyKey} IS NOT NULL`),
 ]);
 
 
@@ -424,7 +527,9 @@ export const vipSubscriptions = pgTable('vip_subscriptions', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => [
-  uniqueIndex('vip_user_unique').on(table.userId),
+  uniqueIndex('vip_user_active_unique')
+    .on(table.userId)
+    .where(sql`${table.status} = 'ACTIVE'`),
   index('vip_user_status_idx').on(table.userId, table.status)
 ]);
 
@@ -1609,6 +1714,10 @@ export const requests = pgTable('requests', {
   rejectedAt: timestamp('rejected_at'),
   rejectedBy: text('rejected_by').references(() => users.id),
 
+  // Approval fields (source serveur, jamais le client)
+  approvedBy: text('approved_by').references(() => users.id),
+  approvedAt: timestamp('approved_at'),
+
   // Moyen de paiement pour dépôt/retrait
   paymentMethod: text('payment_method'), // ex: 'BANK_TRANSFER', 'PAYPAL', 'STRIPE', 'CRYPTO', 'MOBILE_MONEY'
   paymentProvider: text('payment_provider'), // ex: 'MTN', 'ORANGE', 'WAVE', 'PAYPAL', 'STRIPE', 'BTC', 'ETH'
@@ -2103,6 +2212,9 @@ export const appSettings = pgTable('app_settings', {
   withdrawalFeePercentage: numeric('withdrawal_fee_percentage', { precision: 5, scale: 4 }).default('0.02'),
   transferFeePercentage: numeric('transfer_fee_percentage', { precision: 5, scale: 4 }).default('0.005'),
   tournamentParticipationFeePercentage: numeric('tournament_participation_fee_percentage', { precision: 5, scale: 4 }).default('0.01'),
+
+  // Politique financière (plafonds A/B/C, double approbation, etc.)
+  financePolicy: jsonb('finance_policy').default({}),
 
   // Taux de change
   gtcToFcfaRate: numeric('gtc_to_fcfa_rate', { precision: 10, scale: 2 }).default('500.0'),

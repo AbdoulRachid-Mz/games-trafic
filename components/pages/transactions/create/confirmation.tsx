@@ -60,7 +60,7 @@ export function TransactionConfirmation({
         return Palette;
       case "VIP_SUBSCRIPTION":
         return Star;
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return ShoppingBag;
       case "TOURNAMENT_PARTICIPATION":
         return Trophy;
@@ -83,7 +83,7 @@ export function TransactionConfirmation({
         return "Achat de thème";
       case "VIP_SUBSCRIPTION":
         return "Abonnement VIP";
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return "Achat de produit";
       case "TOURNAMENT_PARTICIPATION":
         return "Participation tournoi";

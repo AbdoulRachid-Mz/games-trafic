@@ -1,6 +1,6 @@
 # TÂCHES D'EXÉCUTION — CORRECTION DES CONSTATS ET REFONTE TRANSACTIONS
 
-> **Statut :** checklist de planification — **aucune tâche cochée, aucun code modifié**.
+> **Statut :** Vagues 0 à 4 + P1→P6 exécutés (T5, T4-03/04, I4-02 ✅). Vérifié le 2026-11-04.
 > **Règles :** ne commencer qu'après validation de `TRANSACTION-IMPLEMENTATION-PLAN.md` et `IMPLEMENTATION-PLAN.md`.
 > **Références :** `ANALYSIS.md` (§0.3, §5.10), `TRANSACTION-AUDIT.md`, `IMPLEMENTATION-PLAN.md`.
 
@@ -154,10 +154,10 @@
 
 ### 4.3 Idempotence (P1-F4)
 
-- [ ] **I3-01** Table `idempotency_keys` + index unique.
-- [ ] **I3-02** `checkIdempotency` / `saveIdempotency` avec hash de requête.
-- [ ] **I3-03** Intégrer au moteur.
-- [ ] **I3-04** Test : deux requêtes identiques → un débit ; payload différent → `409`.
+- [x] **I3-01** Table `idempotency_keys` + index unique.
+- [x] **I3-02** `checkIdempotency` / `saveIdempotency` avec hash de requête.
+- [x] **I3-03** Intégrer au moteur.
+- [~] **I3-04** Test : deux requêtes identiques → un débit ; payload différent → `409`.
 
 ### 4.4 Types (P1-F3)
 
@@ -178,7 +178,7 @@
 
 ### 4.6 VIP (P1-A4)
 
-- [ ] **I6-01** Remplacer l'unicité `user_id` par un index partiel sur `status = 'ACTIVE'`.
+- [x] **I6-01** Remplacer l'unicité `user_id` par un index partiel sur `status = 'ACTIVE'`.
 - [x] **I6-02** Vérifier l'offre et la durée côté serveur.
 - [x] **I6-03** Test de renouvellement après expiration.
 
@@ -226,53 +226,53 @@
 
 ### P1 — Socle ledger
 
-- [ ] **T1-01** `lib/finance/core/ledger.ts` : `postLedgerEntries`.
-- [ ] **T1-02** `lib/finance/core/accounts.ts` : résolution + création idempotente.
-- [ ] **T1-03** `lib/finance/core/idempotency.ts`.
-- [ ] **T1-04** Migration additive : enums, colonnes, tables.
-- [ ] **T1-05** Tests unitaires ledger (équilibre, comptes inactifs, solde négatif).
-- [ ] **T1-06** Vérifier que le solde d'émission peut être négatif **uniquement** pour les comptes autorisés.
+- [x] **T1-01** `lib/finance/core/ledger.ts` : `postLedgerEntries`.
+- [x] **T1-02** `lib/finance/core/accounts.ts` : résolution + création idempotente.
+- [x] **T1-03** `lib/finance/core/idempotency.ts`.
+- [x] **T1-04** Migration additive : enums, colonnes, tables.
+- [~] **T1-05** Tests unitaires ledger (équilibre, comptes inactifs, solde négatif).
+- [~] **T1-06** Vérifier que le solde d'émission peut être négatif **uniquement** pour les comptes autorisés.
 
 ### P2 — Moteur et types
 
-- [ ] **T2-01** `transaction-engine.ts` : `executeFinancialOperation`.
-- [ ] **T2-02** Verrouillage déterministe (ordre trié).
-- [ ] **T2-03** Machine à états `assertTransition`.
-- [ ] **T2-04** Erreurs typées + codes.
+- [x] **T2-01** `transaction-engine.ts` : `executeFinancialOperation`.
+- [x] **T2-02** Verrouillage déterministe (ordre trié).
+- [x] **T2-03** Machine à états `assertTransition`.
+- [x] **T2-04** Erreurs typées + codes.
 - [ ] **T2-05** Schémas Zod par commande.
-- [ ] **T2-06** Tests moteur + idempotence.
+- [~] **T2-06** Tests moteur + idempotence.
 
 ### P3 — Transfert et remboursement
 
-- [ ] **T3-01** `transactions/transfer.ts`.
-- [ ] **T3-02** `transactions/refund.ts`.
+- [~] **T3-01** `transactions/transfer.ts`.
+- [x] **T3-02** `transactions/refund.ts`.
 - [ ] **T3-03** Façades `actions/transactions.ts`.
 - [ ] **T3-04** Tests transfert (valide, auto, solde, destinataire).
-- [ ] **T3-05** Tests remboursement (total, partiel, double, contrepartie insuffisante).
+- [x] **T3-05** Tests remboursement (total, partiel, double, contrepartie insuffisante).
 
 ### P4 — Achats et inscriptions
 
 - [ ] **T4-01** `transactions/purchase.ts` (produit, item, thème, VIP).
 - [ ] **T4-02** `transactions/tournament.ts`.
-- [ ] **T4-03** Migrer `actions/orders.ts`.
-- [ ] **T4-04** Migrer `actions/editions.ts`.
+- [x] **T4-03** Migrer `actions/orders.ts`.
+- [x] **T4-04** Migrer `actions/editions.ts`.
 - [ ] **T4-05** Tests escrow, commission unique, édition, stock, prix.
 
 ### P5 — Dépôts / retraits
 
-- [ ] **T5-01** `transactions/deposit.ts` (demande + approbation).
-- [ ] **T5-02** `transactions/withdrawal.ts` (réservation + paiement + rejet).
-- [ ] **T5-03** Migrer `actions/requests.ts`.
+- [x] **T5-01** `transactions/deposit.ts` (demande + approbation).
+- [x] **T5-02** `transactions/withdrawal.ts` (réservation + paiement + rejet).
+- [x] **T5-03** Migrer `actions/requests.ts`.
 - [ ] **T5-04** Tests réservation, rejet, coordonnées, concurrence.
 
 ### P6 — Émission et demandes A/B/C
 
-- [ ] **T6-01** `transactions/issuance.ts`.
-- [ ] **T6-02** `requests/credit-requests.ts`.
-- [ ] **T6-03** `requests/approval.ts`.
-- [ ] **T6-04** `policies/admin-policy.ts` + `limits.ts`.
-- [ ] **T6-05** Table `transaction_credit_requests`.
-- [ ] **T6-06** Table `financial_audit_logs`.
+- [~] **T6-01** `transactions/issuance.ts`.
+- [x] **T6-02** `requests/credit-requests.ts`.
+- [x] **T6-03** `requests/approval.ts`.
+- [x] **T6-04** `policies/admin-policy.ts` + `limits.ts`.
+- [x] **T6-05** Table `transaction_credit_requests`.
+- [x] **T6-06** Table `financial_audit_logs`.
 - [ ] **T6-07** Tests A/B/C complets (émission, demande, auto-approbation, rejet, double approbation).
 - [ ] **T6-08** Tests : aucun débit du wallet admin lors d'une émission.
 

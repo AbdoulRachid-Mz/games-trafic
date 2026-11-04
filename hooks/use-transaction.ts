@@ -131,7 +131,7 @@ export function useTransaction({ walletId, userId }: UseTransactionProps) {
         description: "Devenir membre VIP",
       },
       {
-        id: "PRODUCT_PURCHASE",
+        id: "ORDER_PURCHASE",
         label: "Achat produit",
         description: "Acheter un produit",
       },

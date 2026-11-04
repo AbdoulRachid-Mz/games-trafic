@@ -223,6 +223,9 @@ export async function updateVipPricing(pricing: {
   try {
     const sessionUser = await getCurrentUser();
     assertCanManageFees(sessionUser);
+    if (!sessionUser) {
+      throw new Error('Non autorisé : aucune session active trouvée');
+    }
 
     const updates: AppSettingsUpdate = {};
     if (pricing.monthly !== undefined) updates.vipMonthlyPrice = pricing.monthly;
@@ -264,7 +267,10 @@ export async function updateTransactionFees(fees: {
   try {
     const sessionUser = await getCurrentUser();
     assertCanManageFees(sessionUser);
-
+    if (!sessionUser) {
+      throw new Error('Non autorisé : aucune session active trouvée');
+    }
+    
     const updates: AppSettingsUpdate = {};
     if (fees.transaction !== undefined) updates.transactionFeePercentage = fees.transaction;
     if (fees.purchase !== undefined) updates.purchaseFeePercentage = fees.purchase;

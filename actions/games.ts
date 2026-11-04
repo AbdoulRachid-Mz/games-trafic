@@ -774,7 +774,8 @@ function buildGameWhereConditions(filters: GameFilters, options: QueryOptions = 
   const conditions = [];
 
   if (!options.includeDeleted) {
-    conditions.push(eq(games.isDeleted, false));
+    // `games` ne possède pas de colonne `is_deleted` : le soft-delete
+    // est porté par `is_active`.
     conditions.push(eq(games.isActive, true));
   }
 

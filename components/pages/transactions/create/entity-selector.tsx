@@ -54,13 +54,17 @@ export function TransactionEntitySelector({
   // Mapper les types de transactions vers les EntityType
   const entityTypeMap: Record<TransactionType, EntityType | null> = {
     THEME_PURCHASE: "themes",
-    PRODUCT_PURCHASE: "products",
+    ORDER_PURCHASE: "products",
     TOURNAMENT_PARTICIPATION: "tournament-editions",
     GAME_ITEM_PURCHASE: "game-items",
     VIP_SUBSCRIPTION: null,
     DEPOSIT: null,
     WITHDRAWAL: null,
     TRANSFER: null,
+    PURCHASE: null,
+    REFUND: null,
+    ORDER_PURCHASE: null,
+    BONUS: null,
   };
 
   const entityType = entityTypeMap[type];
@@ -73,15 +77,15 @@ export function TransactionEntitySelector({
     setSearchTerm,
   } = useEntityList<any>({
     entityType: (entityType || "products") as any, // Fallback to products
-    defaultLimit: (type === "PRODUCT_PURCHASE" || type === "GAME_ITEM_PURCHASE") ? 20 : 50,
+    defaultLimit: (type === "ORDER_PURCHASE" || type === "GAME_ITEM_PURCHASE") ? 20 : 50,
     enabled: !!entityType,
     defaultFilters: {
       isActive: true, 
       isVisible: true,
       // Filtres spécifiques selon le type
-      ...(type === "PRODUCT_PURCHASE" && { status: "NON_VENDU" }),
+      ...(type === "ORDER_PURCHASE" && { status: "NON_VENDU" }),
       ...(type === "THEME_PURCHASE" && { isPremium: true }),
-      ...(type === "PRODUCT_PURCHASE" && user?.id ? { excludeUserId: user.id } : {}),
+      ...(type === "ORDER_PURCHASE" && user?.id ? { excludeUserId: user.id } : {}),
     },
     fetchFunction:
       type === "TOURNAMENT_PARTICIPATION"
@@ -113,7 +117,7 @@ export function TransactionEntitySelector({
     switch (type) {
       case "THEME_PURCHASE":
         return Palette;
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return ShoppingCart;
       case "TOURNAMENT_PARTICIPATION":
         return Trophy;
@@ -128,7 +132,7 @@ export function TransactionEntitySelector({
     switch (type) {
       case "THEME_PURCHASE":
         return "thème";
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return "produit";
       case "TOURNAMENT_PARTICIPATION":
         return "tournoi";
@@ -146,7 +150,7 @@ export function TransactionEntitySelector({
       const idMatch = entity.id?.toLowerCase() === search.toLowerCase();
       // Exclusions supplémentaires pour produits: ne pas retourner ses propres items
       const notOwnProduct =
-        type !== "PRODUCT_PURCHASE" || (entity.userId && user?.id ? entity.userId !== user.id : true);
+        type !== "ORDER_PURCHASE" || (entity.userId && user?.id ? entity.userId !== user.id : true);
       return (
         (name.includes(search.toLowerCase()) ||
           desc.includes(search.toLowerCase()) ||
@@ -161,7 +165,7 @@ export function TransactionEntitySelector({
       const image =
         type === "THEME_PURCHASE"
           ? entity.thumbnail || entity.image
-          : type === "PRODUCT_PURCHASE"
+          : type === "ORDER_PURCHASE"
             ? entity.featuredImage || entity.images?.[0] || entity.image
             : type === "GAME_ITEM_PURCHASE"
               ? entity.icon || entity.image
@@ -417,13 +421,13 @@ export function TransactionEntitySelector({
             </div>
 
             <div className="pt-4 border-t border-border/50 flex flex-col gap-3">
-              {(type === "PRODUCT_PURCHASE" || type === "GAME_ITEM_PURCHASE") && (
+              {(type === "ORDER_PURCHASE" || type === "GAME_ITEM_PURCHASE") && (
                 <Button
                   variant="ghost"
                   className="w-full text-primary hover:text-primary hover:bg-primary/10 font-bold h-12 rounded-xl border border-primary/20"
-                  onClick={() => router.push(type === "PRODUCT_PURCHASE" ? "/marketplace" : "/games")}
+                  onClick={() => router.push(type === "ORDER_PURCHASE" ? "/marketplace" : "/games")}
                 >
-                  Voir tous les {type === "PRODUCT_PURCHASE" ? "produits" : "items"}
+                  Voir tous les {type === "ORDER_PURCHASE" ? "produits" : "items"}
                 </Button>
               )}
               <Button

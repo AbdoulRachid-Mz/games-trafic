@@ -69,7 +69,7 @@ const actions: QuickAction[] = [
     id: "Achat comptes",
     icon: ShoppingBag,
     label: "Achat de comptes",
-    path: "/wallet/transactions/create?type=PRODUCT_PURCHASE",
+    path: "/wallet/transactions/create?type=ORDER_PURCHASE",
     description: "Achat de comptes ",
     color: "from-purple-500 to-violet-700",
     iconColor: "text-purple-400",

@@ -72,7 +72,7 @@ export function TransactionSuccess({
         return Palette;
       case "VIP_SUBSCRIPTION":
         return Star;
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return ShoppingBag;
       case "TOURNAMENT_PARTICIPATION":
         return Trophy;
@@ -99,7 +99,7 @@ export function TransactionSuccess({
     }
 
     switch (transactionData.type) {
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return [
           "Le vendeur vous contactera pour la livraison",
           "Vous pouvez suivre l'état dans vos commandes",

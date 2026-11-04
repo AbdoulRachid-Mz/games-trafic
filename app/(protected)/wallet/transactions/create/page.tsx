@@ -133,7 +133,7 @@ function CreateTransactionContent({
           },
         };
       }
-      case "PRODUCT_PURCHASE": {
+      case "ORDER_PURCHASE": {
         const product = await getProductById(id);
         if (!product || product.id !== id) return null;
         return {
@@ -430,7 +430,7 @@ function CreateTransactionContent({
   const handleEntitySelect = async (entity: any) => {
     if (
       transactionData.type === "THEME_PURCHASE" ||
-      transactionData.type === "PRODUCT_PURCHASE"
+      transactionData.type === "ORDER_PURCHASE"
     ) {
       const creatorId = entity.creatorId || entity.userId || entity.ownerId;
       if (creatorId && user?.id && creatorId === user.id) {
@@ -653,7 +653,7 @@ function CreateTransactionContent({
       return;
     }
 
-    if (transactionData.type === "PRODUCT_PURCHASE") {
+    if (transactionData.type === "ORDER_PURCHASE") {
       if (!transactionData.targetId) throw new Error("Produit non trouvé");
       const order = await createProductOrder(
         {
@@ -755,7 +755,7 @@ function CreateTransactionContent({
     switch (data.type) {
       case "THEME_PURCHASE":
         return `Achat du thème "${data.entity?.name || "Inconnu"}"`;
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return `Achat du produit "${data.entity?.name || "Inconnu"}"`;
       case "TOURNAMENT_PARTICIPATION":
         return `Participation au tournoi "${data.entity?.name || "Inconnu"}"`;
@@ -937,7 +937,7 @@ function CreateTransactionContent({
               transactionData.type === "DEPOSIT" ||
               transactionData.type === "WITHDRAWAL" ||
               transactionData.type === "GAME_ITEM_PURCHASE" ||
-              transactionData.type === "PRODUCT_PURCHASE"
+              transactionData.type === "ORDER_PURCHASE"
             }
             onReturnHome={() => router.push("/wallet")}
             onViewHistory={() => router.push("/wallet/transactions")}

@@ -13,7 +13,11 @@ import { OrderFilters, OrderStats, OrderStatus, PaginationResponse } from '@/typ
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertCanManageOrders, isAdmin, assertAuthenticated } from '@/lib/auth/permissions';
-import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from '@/lib/ledger/ledger-utils';
+import {
+  executeFinancialOperation,
+  getOrCreateSystemAccount,
+  executeRefund,
+} from '@/lib/finance';
 import { encryptData, decryptData } from '@/lib/encryption';
 import {
   type OrderCard, type UserMini, type ShopMini,
@@ -75,33 +79,35 @@ export async function createProductOrder(
         throw new Error("Wallet non configuré. Veuillez créer un wallet.");
       }
 
-      // 3. Check Balance
-      const balance = await getAccountBalance(buyerWallet.financialAccountId);
+      // 3. Lire le prix depuis la DB (SEC-06 : jamais depuis le client)
       const unitPrice = parseFloat(product.price);
-      // SEC-06 FIX: price is always sourced from the DB — never from client input.
       const price = unitPrice;
 
-      if (balance < price) {
-        throw new Error(`Solde insuffisant. Requis: ${price} GTC, Disponible: ${balance} GTC`);
-      }
-
-      // 4. Debit immediately to Escrow
-      const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
-      const { transaction } = await executeTransaction({
-        tx,
-        fromAccountId: buyerWallet.financialAccountId,
-        toAccountId: escrowAccount.id,
-        amount: price,
+      // 4. Capture → Escrow via le moteur finance V2
+      const escrowAccount = await getOrCreateSystemAccount(tx, 'ESCROW');
+      const captureResult = await executeFinancialOperation({
+        kind: 'POST',
         type: 'ORDER_PURCHASE',
         status: 'PENDING',
-        description: `Réservation du produit: ${product.name}`,
-        userId: user.id,
+        amount: price,
         walletId: buyerWallet.id,
-        metadata: {
-          productId: product.id,
-          shopId: product.shopId
-        }
+        walletAccountId: buyerWallet.financialAccountId,
+        fromUserId: user.id,
+        toUserId: null,
+        description: `Réservation du produit: ${product.name}`,
+        reason: 'Capture escrow commande',
+        metadata: { productId: product.id, shopId: product.shopId },
+        postings: [
+          { accountId: buyerWallet.financialAccountId, debit: price },
+          { accountId: escrowAccount.id, credit: price },
+        ],
+        netAmount: price,
+        createdByUserId: user.id,
+        idempotencyKey: `order-capture:${product.id}:${user.id}`,
+        idempotencyScope: 'order:capture',
+        client: tx,
       });
+      const transaction = captureResult.transaction;
 
       // 5. Create Order
       const [newOrder] = await tx.insert(orders).values({
@@ -203,8 +209,7 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         shopAccountId = fa.id;
       }
 
-      // 2. Original transaction is already in escrow, update its status
-      const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
+      // 2. Marquer la transaction de capture COMPLETED
       const amount = parseFloat(order.price);
 
       if (order.walletTransactionId) {
@@ -213,22 +218,44 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
           .where(eq(walletTransactions.id, order.walletTransactionId));
       }
 
-      // 3. Move funds from Escrow to Shop
+      // 3. Escrow → Seller + commission PLATFORM_FEES via moteur V2
       const ownerWallet = await tx.query.userWallets.findFirst({
         where: eq(userWallets.userId, order.shop!.ownerId)
       });
 
       if (!ownerWallet) throw new Error("Wallet du propriétaire de la boutique introuvable");
 
-      const { transaction: shopTransaction } = await executeTransaction({
-        tx,
-        fromAccountId: escrowAccount.id,
-        toAccountId: shopAccountId!,
-        amount: amount,
+      const escrowAccount = await getOrCreateSystemAccount(tx, 'ESCROW');
+      const feeAccount = await getOrCreateSystemAccount(tx, 'FEES');
+
+      // Commission 5% (configurable via app_settings)
+      const commissionRate = 0.05;
+      const commission = Math.round(amount * commissionRate * 100) / 100;
+      const sellerNet = Math.round((amount - commission) * 100) / 100;
+
+      await executeFinancialOperation({
+        kind: 'POST',
         type: 'ORDER_PURCHASE',
+        status: 'COMPLETED',
+        amount,
+        walletId: ownerWallet.id,
+        walletAccountId: shopAccountId!,
+        fromUserId: null,
+        toUserId: order.shop!.ownerId,
         description: `Paiement vendeur commande #${order.id.slice(0, 8)}`,
-        metadata: { orderId: order.id, type: 'SHOP_PAYOUT' },
-        walletId: ownerWallet.id
+        reason: 'Finalisation commande — libération escrow',
+        metadata: { orderId: order.id, type: 'SHOP_PAYOUT', commission, commissionRate },
+        postings: [
+          { accountId: escrowAccount.id, debit: amount },
+          { accountId: shopAccountId!, credit: sellerNet },
+          { accountId: feeAccount.id, credit: commission },
+        ],
+        netAmount: sellerNet,
+        fees: commission,
+        createdByUserId: user!.id,
+        idempotencyKey: `order-payout:${order.id}`,
+        idempotencyScope: 'order:payout',
+        client: tx,
       });
 
       // 4. Finalize Order and Product
@@ -282,26 +309,15 @@ export async function rejectOrder(orderId: string, reason: string): Promise<{ su
       if (isShop) newStatus = 'REJECTED_BY_SHOP';
       if (userIsAdmin) newStatus = 'REJECTED_BY_ADMIN';
 
-      // Refund only if funds were already captured
+      // Remboursement depuis l'escrow si fonds capturés (refund.ts V2)
       if (order.walletTransactionId) {
-        const escrowAccount = await getOrCreatePlatformAccount(tx, 'PLATFORM_ESCROW');
-        const buyerWallet = await tx.query.userWallets.findFirst({
-          where: eq(userWallets.userId, order.buyerId)
+        const actor = user!;
+        await executeRefund({
+          transactionId: order.walletTransactionId,
+          reason: `Annulation commande #${order.id.slice(0, 8)}: ${reason}`,
+          actorId: actor.id,
+          client: tx,
         });
-
-        if (buyerWallet?.financialAccountId) {
-          await executeTransaction({
-            fromAccountId: escrowAccount.id,
-            toAccountId: buyerWallet.financialAccountId,
-            amount: parseFloat(order.price),
-            type: 'REFUND',
-            description: `Remboursement de la commande #${order.id.slice(0, 8)}: ${reason}`,
-            metadata: { orderId: order.id, refundReason: reason },
-            walletId: buyerWallet.id,
-            userId: order.buyerId,
-            tx,
-          });
-        }
       }
 
       await tx.update(orders).set({

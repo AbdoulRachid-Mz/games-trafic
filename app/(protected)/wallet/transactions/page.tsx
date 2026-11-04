@@ -146,7 +146,7 @@ export default function TransactionsPage() {
     switch (type) {
       case "THEME_PURCHASE": return Palette;
       case "VIP_SUBSCRIPTION": return Star;
-      case "PRODUCT_PURCHASE": return ShoppingCart;
+      case "ORDER_PURCHASE": return ShoppingCart;
       case "TOURNAMENT_PARTICIPATION": return Trophy;
       case "GAME_ITEM_PURCHASE": return GamepadIcon;
       case "DEPOSIT": return Wallet;
@@ -169,7 +169,7 @@ export default function TransactionsPage() {
     switch (type) {
       case "THEME_PURCHASE": return "Achat thème";
       case "VIP_SUBSCRIPTION": return "Abonnement VIP";
-      case "PRODUCT_PURCHASE": return "Achat produit";
+      case "ORDER_PURCHASE": return "Achat produit";
       case "TOURNAMENT_PARTICIPATION": return "Participation";
       case "GAME_ITEM_PURCHASE": return "Item jeu";
       case "DEPOSIT": return "Dépôt";
@@ -402,7 +402,7 @@ export default function TransactionsPage() {
                       <SelectItem value="DEPOSIT">Dépôts</SelectItem>
                       <SelectItem value="WITHDRAWAL">Retraits</SelectItem>
                       <SelectItem value="TRANSFER">Transferts</SelectItem>
-                      <SelectItem value="PRODUCT_PURCHASE">Achats produits</SelectItem>
+                      <SelectItem value="ORDER_PURCHASE">Achats produits</SelectItem>
                       <SelectItem value="THEME_PURCHASE">Achats thèmes</SelectItem>
                       <SelectItem value="VIP_SUBSCRIPTION">Abonnements VIP</SelectItem>
                       <SelectItem value="TOURNAMENT_PARTICIPATION">Participations</SelectItem>
@@ -482,7 +482,7 @@ export default function TransactionsPage() {
                     <SelectItem value="DEPOSIT">Dépôts</SelectItem>
                     <SelectItem value="WITHDRAWAL">Retraits</SelectItem>
                     <SelectItem value="TRANSFER">Transferts</SelectItem>
-                    <SelectItem value="PRODUCT_PURCHASE">Achats produits</SelectItem>
+                    <SelectItem value="ORDER_PURCHASE">Achats produits</SelectItem>
                     <SelectItem value="THEME_PURCHASE">Achats thèmes</SelectItem>
                     <SelectItem value="VIP_SUBSCRIPTION">Abonnements VIP</SelectItem>
                     <SelectItem value="TOURNAMENT_PARTICIPATION">Participations</SelectItem>

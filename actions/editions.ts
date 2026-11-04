@@ -14,7 +14,10 @@ import {
 import { db } from "@/lib/db";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { executeTransaction, getOrCreatePlatformAccount, getAccountBalance } from "@/lib/ledger/ledger-utils";
+import {
+  executeFinancialOperation,
+  getOrCreateSystemAccount,
+} from "@/lib/finance";
 import { verifyWalletPin } from "./wallets";
 import { getMatchesWithParticipants } from "./phases";
 
@@ -283,27 +286,38 @@ export async function joinEdition(
           }
         }
 
-        // Destination account: edition prize pool or platform escrow
-        const targetAccountId =
-          edition.financialAccountId ||
-          (await getOrCreatePlatformAccount(tx, "PLATFORM_ESCROW")).id;
+        // Compte destination : prize pool de l'édition ou escrow plateforme
+        const targetAccount =
+          edition.financialAccountId
+            ? { id: edition.financialAccountId }
+            : await getOrCreateSystemAccount(tx, "ESCROW");
 
-        // Execute atomic double-entry transfer (I2-02, I2-04)
-        const transferRes = await executeTransaction({
-          fromAccountId: userWallet.financialAccountId,
-          toAccountId: targetAccountId,
-          amount: entryFee,
+        // Paiement atomique via moteur finance V2 (I2-02, I2-04, §3.2 frais tournoi)
+        const transferRes = await executeFinancialOperation({
+          kind: "POST",
           type: "TOURNAMENT_PARTICIPATION",
           status: "COMPLETED",
-          description: `Frais d'inscription tournoi: ${edition.name || edition.id}`,
-          userId,
+          amount: entryFee,
           walletId: userWallet.id,
-          tx,
+          walletAccountId: userWallet.financialAccountId,
+          fromUserId: userId,
+          toUserId: null,
+          description: `Frais d'inscription tournoi: ${edition.name || edition.id}`,
+          reason: "Paiement frais d'inscription tournoi",
           metadata: {
             editionId,
             tournamentId: edition.tournamentId,
             entryFee: entryFee.toString(),
           },
+          postings: [
+            { accountId: userWallet.financialAccountId, debit: entryFee },
+            { accountId: targetAccount.id, credit: entryFee },
+          ],
+          netAmount: entryFee,
+          createdByUserId: userId,
+          idempotencyKey: `tournament-join:${editionId}:${userId}`,
+          idempotencyScope: "tournament:join",
+          client: tx,
         });
 
         paidTransactionId = transferRes.transaction.id;

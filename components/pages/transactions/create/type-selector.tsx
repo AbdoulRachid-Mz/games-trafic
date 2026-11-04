@@ -92,7 +92,7 @@ const transactionTypes = [
     bg: "bg-cyan-500/10",
   },
   {
-    id: "PRODUCT_PURCHASE" as TransactionType,
+    id: "ORDER_PURCHASE" as TransactionType,
     label: "Boutique",
     icon: ShoppingCart,
     description: "Produits physiques",

@@ -449,7 +449,7 @@ export function ProductCard({
                   <div className="flex justify-center">
                     <TransactionQRCode
                       data={encodeTransactionQR({
-                        t: "PRODUCT_PURCHASE",
+                        t: "ORDER_PURCHASE",
                         id: product.id,
                         a: typeof product.price === "number" ? product.price : parseFloat(product.price as string),
                         m: { name: product.name }

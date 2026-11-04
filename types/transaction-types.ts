@@ -4,8 +4,7 @@ export type PostgresTransactionType = (typeof transactionTypeEnum.enumValues)[nu
 
 // Includes canonical PostgreSQL enum values + backwards-compatible UI aliases (I4-01, I4-02)
 export type TransactionType =
-  | PostgresTransactionType
-  | 'PRODUCT_PURCHASE';
+  | PostgresTransactionType;
 
 
 
@@ -58,15 +57,6 @@ export const TRANSACTION_CONFIGS: Record<TransactionType, TransactionConfig> = {
     needsTargetId: false,
     feeType: 'subscription',
     steps: ['AMOUNT_INPUT', 'PIN_VERIFICATION', 'CONFIRMATION', 'SUCCESS']
-  },
-  PRODUCT_PURCHASE: {
-    type: 'PRODUCT_PURCHASE',
-    label: 'Achat de produit',
-    requiresEntity: true,
-    entityType: 'product',
-    needsTargetId: true,
-    feeType: 'purchase',
-    steps: ['ENTITY_SELECTION', 'AMOUNT_INPUT', 'PIN_VERIFICATION', 'CONFIRMATION', 'SUCCESS']
   },
   TOURNAMENT_PARTICIPATION: {
     type: 'TOURNAMENT_PARTICIPATION',

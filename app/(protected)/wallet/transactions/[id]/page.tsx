@@ -109,7 +109,7 @@ export default function TransactionDetailPage() {
           label: "Achat thème",
           color: "text-purple-500",
         };
-      case "PRODUCT_PURCHASE":
+      case "ORDER_PURCHASE":
         return {
           icon: ShoppingBag,
           label: "Achat produit",

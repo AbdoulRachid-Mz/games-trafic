@@ -7,7 +7,7 @@ export function getEntityIcon(type: string) {
     switch (type) {
         case "THEME_PURCHASE":
             return Palette;
-        case "PRODUCT_PURCHASE":
+        case "ORDER_PURCHASE":
             return ShoppingCart;
         case "TOURNAMENT_PARTICIPATION":
             return Trophy;
@@ -37,7 +37,7 @@ export function getEntityLabel(type: string) {
     switch (type) {
         case "THEME_PURCHASE":
             return "Thème";
-        case "PRODUCT_PURCHASE":
+        case "ORDER_PURCHASE":
             return "Produit";
         case "TOURNAMENT_PARTICIPATION":
             return "Tournoi";

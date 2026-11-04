@@ -118,7 +118,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
     }
 
     const params = new URLSearchParams({
-      type: "PRODUCT_PURCHASE",
+      type: "ORDER_PURCHASE",
       id: currentProduct.id,
       amount: currentProduct.price.toString(),
       image: currentProduct.featuredImage || currentProduct.images?.[0] || "",
@@ -449,7 +449,7 @@ export function ProductDetail({ productId, initialProduct, initialRelated }: Pro
                       </Typography>
                       <TransactionQRCode
                         data={encodeTransactionQR({
-                          t: "PRODUCT_PURCHASE",
+                          t: "ORDER_PURCHASE",
                           id: currentProduct.id,
                           a: typeof currentProduct.price === "number" ? currentProduct.price : parseFloat(currentProduct.price as string),
                           i: currentProduct.featuredImage || currentProduct.images?.[0] || "",

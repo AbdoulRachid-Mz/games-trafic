@@ -50,6 +50,7 @@ import {
   getOrCreatePlatformAccount,
   getAccountBalance
 } from '@/lib/ledger/ledger-utils';
+import { executeTransfer } from '@/lib/finance';
 import { createTransaction as createWalletTransaction } from '@/actions/transactions';
 import { revalidatePath } from 'next/cache';
 
@@ -781,15 +782,17 @@ export async function transferMoney(
       return { success: false, error: "Compte financier introuvable pour l'un des portefeuilles" };
     }
 
-    // Exécution du transfert atomique via le moteur autoritaire
-    const result = await executeTransaction({
+    // Exécution du transfert atomique via le moteur autoritaire V2
+    const result = await executeTransfer({
       fromAccountId: fromWallet.financialAccountId,
       toAccountId: toWallet.financialAccountId,
       amount,
-      type: "TRANSFER",
-      description: description || `Transfert vers ${toUserId}`,
-      userId: fromUserId,
       walletId: fromWallet.id,
+      walletAccountId: fromWallet.financialAccountId,
+      fromUserId,
+      toUserId,
+      description: description || `Transfert vers ${toUserId}`,
+      createdByUserId: currentUser!.id,
       metadata: {
         transferType: "user_to_user",
         recipientWalletId: toWallet.id,
@@ -885,15 +888,17 @@ export async function transferBetweenIdentities(params: {
       const userWallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, user.id) });
       if (!userWallet) throw new Error("Wallet utilisateur introuvable");
 
-      await executeTransaction({
+      await executeTransfer({
         fromAccountId: fromAccount.id,
         toAccountId: toAccount.id,
         amount: params.amount,
-        type: 'TRANSFER',
-        description: params.description || `Transfert interne entre ${params.fromType} et ${params.toType}`,
-        userId: user.id,
         walletId: userWallet.id,
-        tx,
+        walletAccountId: fromAccount.id,
+        fromUserId: user.id,
+        toUserId: params.toType === 'USER' ? params.toIdentityId : null,
+        description: params.description || `Transfert interne entre ${params.fromType} et ${params.toType}`,
+        createdByUserId: user.id,
+        client: tx,
         metadata: { transferType: 'internal_identity_transfer' }
       });
 
@@ -944,7 +949,7 @@ export async function depositToWallet(
         tx,
         metadata: {
           depositMethod: method,
-          adminId: currentUser.id,
+          adminId: currentUser!.id,
         },
       });
     });

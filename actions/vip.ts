@@ -1,7 +1,7 @@
 'use server';
 
 import { getCurrentUser } from '@/lib/auth/session';
-import { assertAdmin, assertOwnerOrAdmin } from '@/lib/auth/permissions';
+import { assertAdmin, assertAuthenticated, assertOwnerOrAdmin } from '@/lib/auth/permissions';
 import { 
   vipSubscriptions, 
   type VipSubscription, 

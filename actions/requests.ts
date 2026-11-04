@@ -37,7 +37,14 @@ import {
 } from '@/types/api';
 import { db } from '@/lib/db';
 import { encryptData, decryptData } from '@/lib/encryption';
-import { executeTransaction, getOrCreatePlatformAccount } from '@/lib/ledger/ledger-utils';
+import {
+  executeDepositApproval,
+  executeFinancialOperation,
+  executeWithdrawalApproval,
+  executeWithdrawalRejection,
+  getOrCreateSystemAccount,
+  reserveWithdrawal,
+} from '@/lib/finance';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertCanApproveRequests, getAdminLevel } from '@/lib/auth/permissions';
 
@@ -343,18 +350,48 @@ export async function createRequest(
       ? encryptData(requestData.encryptedPassword)
       : undefined;
 
-    const result = await db
-      .insert(requests)
-      .values({
-        ...requestData,
-        encryptedPassword: encryptedPassword || requestData.encryptedPassword,
-        status: 'PENDING',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
+    const result = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(requests)
+        .values({
+          ...requestData,
+          encryptedPassword: encryptedPassword || requestData.encryptedPassword,
+          status: 'PENDING',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-    return result[0];
+      // Un retrait réserve immédiatement montant + frais (wallet → escrow)
+      // afin d'empêcher tout double spend avant l'approbation.
+      if (created.type === 'WITHDRAWAL') {
+        const actor = await getCurrentUser();
+        const [wallet] = await tx
+          .select()
+          .from(userWallets)
+          .where(eq(userWallets.userId, created.userId))
+          .limit(1);
+
+        if (!wallet?.financialAccountId) {
+          throw new Error('Wallet financier introuvable pour le retrait');
+        }
+
+        await reserveWithdrawal({
+          requestId: created.id,
+          userId: created.userId,
+          walletId: wallet.id,
+          walletAccountId: wallet.financialAccountId,
+          amount: Number(created.amount),
+          actorId: actor?.id ?? created.userId,
+          actorLevel: actor ? getAdminLevel(actor) : undefined,
+          client: tx,
+        });
+      }
+
+      return created;
+    });
+
+    return result;
   } catch (error) {
     console.error('Error creating request:', error);
     if (error instanceof Error) {
@@ -430,6 +467,9 @@ export async function approveRequest(
   const sessionUser = await getCurrentUser();
   assertCanApproveRequests(sessionUser);
 
+  if (!sessionUser) {
+    throw new Error('Non autorisé : aucune session active trouvée');
+  }
   const effectiveAdminId = sessionUser.id;
   const adminLevel = getAdminLevel(sessionUser);
 
@@ -457,59 +497,87 @@ export async function approveRequest(
     if (!wallet?.financialAccountId)
       throw new Error("User financial account missing");
 
-    let fromAccountId: string;
-    let toAccountId: string;
+    const amount = Number(request.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Montant de demande invalide");
+    }
+
+    const description = `Approbation de la demande ${request.type} ${request.id}`;
+    let transaction;
 
     // ====================================================
-    // 💰 DEPOSIT
+    // 💰 DEPOSIT — crédit depuis SYSTEM_EXTERNAL_CLEARING
     // ====================================================
     if (request.type === "DEPOSIT") {
-      const systemAccount = await getOrCreatePlatformAccount(
-        tx,
-        "SYSTEM_ADJUSTMENT"
-      );
-
-      fromAccountId = systemAccount.id;
-      toAccountId = wallet.financialAccountId;
+      const result = await executeDepositApproval({
+        requestId: request.id,
+        userId: request.userId,
+        walletId: wallet.id,
+        walletAccountId: wallet.financialAccountId,
+        amount,
+        actorId: effectiveAdminId,
+        actorLevel: adminLevel,
+        description,
+        client: tx,
+      });
+      transaction = result.transaction;
     }
 
     // ====================================================
-    // 💸 WITHDRAWAL
+    // 💸 WITHDRAWAL — réservation → clearing externe
     // ====================================================
     else if (request.type === "WITHDRAWAL") {
-      const escrow = await getOrCreatePlatformAccount(tx, "PLATFORM_ESCROW");
-
-      fromAccountId = wallet.financialAccountId;
-      toAccountId = escrow.id;
+      const result = await executeWithdrawalApproval({
+        requestId: request.id,
+        userId: request.userId,
+        walletId: wallet.id,
+        walletAccountId: wallet.financialAccountId,
+        amount,
+        actorId: effectiveAdminId,
+        actorLevel: adminLevel,
+        description,
+        client: tx,
+      });
+      transaction = result.transaction;
     }
     // ====================================================
-    // 🎮 GAME ITEMS (Purchase)
+    // 🎮 GAME ITEMS — achat, recette plateforme
     // ====================================================
     else if (request.type === "GAME_ITEMS") {
-      const platformFees = await getOrCreatePlatformAccount(tx, "PLATFORM_FEES");
+      const feeAccount = await getOrCreateSystemAccount(tx, "FEES");
 
-      fromAccountId = wallet.financialAccountId;
-      toAccountId = platformFees.id;
+      const result = await executeFinancialOperation({
+        kind: "POST",
+        type: "GAME_ITEM_PURCHASE",
+        status: "COMPLETED",
+        amount,
+        walletId: wallet.id,
+        walletAccountId: wallet.financialAccountId,
+        fromUserId: request.userId,
+        toUserId: null,
+        description,
+        reason: description,
+        metadata: {
+          requestId: request.id,
+          gameItemId: request.gameItemId,
+          approvedBy: effectiveAdminId,
+          approverLevel: adminLevel,
+        },
+        postings: [
+          { accountId: wallet.financialAccountId, debit: amount },
+          { accountId: feeAccount.id, credit: amount },
+        ],
+        netAmount: 0,
+        createdByUserId: effectiveAdminId,
+        actorLevel: adminLevel,
+        idempotencyKey: `request-approval:${request.id}`,
+        idempotencyScope: "request:approval",
+        client: tx,
+      });
+      transaction = result.transaction;
     } else {
       throw new Error("Unsupported request type");
     }
-
-    // 🚀 EXECUTE DOUBLE ENTRY
-    const result = await executeTransaction({
-      fromAccountId,
-      toAccountId,
-      amount: Number(request.amount),
-      type: request.type as ("PURCHASE" | "VIP_SUBSCRIPTION" | "GAME_ITEM_PURCHASE" | "THEME_PURCHASE" | "DEPOSIT" | "WITHDRAWAL" | "REFUND" | "TRANSFER" | "ORDER_PURCHASE" | "TOURNAMENT_PARTICIPATION" | "BONUS"),
-      description: `Approved ${request.type} request ${request.id}`,
-      metadata: {
-        requestId: request.id,
-        approvedBy: effectiveAdminId,
-        approverLevel: adminLevel,
-      },
-      walletId: wallet.id,
-      userId: request.userId,
-      tx, // Pass the transaction context
-    });
 
     // 📝 Update request
     await tx
@@ -517,17 +585,61 @@ export async function approveRequest(
       .set({
         status: "COMPLETED",
         processedByUserId: effectiveAdminId,
+        approvedBy: effectiveAdminId,
+        approvedAt: new Date(),
         processedAt: new Date(),
         completedAt: new Date(),
-        transactionId: result.transaction.id,
+        transactionId: transaction.id,
         updatedAt: new Date(),
       })
       .where(eq(requests.id, id));
 
-    return result.transaction;
+    return transaction;
   });
 }
 
+
+/**
+ * Libère la réservation d'un retrait encore PENDING (rejet ou annulation).
+ * Sans réservation (demande historique), aucun mouvement financier.
+ */
+async function releaseWithdrawalReservation(
+  requestId: string,
+  reason: string,
+  actorId: string,
+  actorLevel?: 'A' | 'B' | 'C'
+): Promise<void> {
+  const [request] = await db
+    .select()
+    .from(requests)
+    .where(eq(requests.id, requestId))
+    .limit(1);
+
+  if (
+    !request ||
+    request.type !== 'WITHDRAWAL' ||
+    request.status !== 'PENDING'
+  ) {
+    return;
+  }
+
+  const [wallet] = await db
+    .select()
+    .from(userWallets)
+    .where(eq(userWallets.userId, request.userId))
+    .limit(1);
+
+  if (!wallet?.financialAccountId) return;
+
+  await executeWithdrawalRejection({
+    requestId,
+    walletId: wallet.id,
+    walletAccountId: wallet.financialAccountId,
+    actorId,
+    actorLevel,
+    reason,
+  });
+}
 
 /**
  * Reject a request
@@ -541,11 +653,22 @@ export async function rejectRequest(
     const sessionUser = await getCurrentUser();
     assertCanApproveRequests(sessionUser);
 
+    if (!sessionUser) {
+      throw new Error('Non autorisé : aucune session active trouvée');
+    }
+    
     const effectiveAdminId = sessionUser.id;
     // Support both signatures: rejectRequest(id, reason) and legacy rejectRequest(id, adminUserId, reason)
     const effectiveReason = reasonParam !== undefined
       ? reasonParam
       : (reasonOrAdminId || "Demande rejetée par l'administrateur");
+
+    await releaseWithdrawalReservation(
+      id,
+      effectiveReason,
+      effectiveAdminId,
+      getAdminLevel(sessionUser)
+    );
 
     return await updateRequestStatus(id, 'REJECTED', effectiveAdminId, effectiveReason);
   } catch (error) {
@@ -579,6 +702,12 @@ export async function cancelRequest(
     if (request.status !== 'PENDING') {
       throw new Error('Only pending requests can be cancelled');
     }
+
+    await releaseWithdrawalReservation(
+      id,
+      reason || 'Annulation par le demandeur',
+      request.userId
+    );
 
     const result = await db
       .update(requests)

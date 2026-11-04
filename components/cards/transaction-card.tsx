@@ -37,7 +37,7 @@ function getTypeIcon(type: string, isIncome: boolean) {
   switch (type) {
     case "THEME_PURCHASE": return Palette;
     case "VIP_SUBSCRIPTION": return Star;
-    case "PRODUCT_PURCHASE": return ShoppingCart;
+    case "ORDER_PURCHASE": return ShoppingCart;
     case "TOURNAMENT_PARTICIPATION": return Trophy;
     case "GAME_ITEM_PURCHASE": return GamepadIcon;
     case "DEPOSIT": return ArrowDownLeft;

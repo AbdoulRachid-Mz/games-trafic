@@ -102,7 +102,7 @@ function getTransactionLabel(type: string): string {
   const labels: Record<string, string> = {
     THEME_PURCHASE: "Achat de thème",
     VIP_SUBSCRIPTION: "Abonnement VIP",
-    PRODUCT_PURCHASE: "Achat de produit",
+    ORDER_PURCHASE: "Achat de produit",
     TOURNAMENT_PARTICIPATION: "Participation tournoi",
     GAME_ITEM_PURCHASE: "Achat d'item de jeu",
     DEPOSIT: "Dépôt",

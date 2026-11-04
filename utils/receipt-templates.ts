@@ -25,7 +25,7 @@ const templates: Record<TransactionType, ReceiptTemplate> = {
       addPurchaseDetails(doc, data, "Thème");
     }
   },
-  PRODUCT_PURCHASE: {
+  ORDER_PURCHASE: {
     generate: (doc, data) => {
       addPurchaseDetails(doc, data, "Produit");
     }
@@ -111,6 +111,58 @@ const templates: Record<TransactionType, ReceiptTemplate> = {
         doc.text(`Compte: ${data.metadata.paymentAccountId}`, 20, 120);
       }
       doc.text("Statut: En attente de traitement", 20, 130);
+    }
+  },
+  // Generic purchase template
+  PURCHASE: {
+    generate: (doc, data) => {
+      addPurchaseDetails(doc, data, "Article");
+    }
+  },
+  // Refund template
+  REFUND: {
+    generate: (doc, data) => {
+      doc.setFontSize(11);
+      doc.text("Type: Remboursement", 20, 90);
+      if (data.metadata?.originalTransactionId) {
+        doc.text(`Transaction d'origine: ${data.metadata.originalTransactionId}`, 20, 100);
+      }
+      if (data.metadata?.refundReason) {
+        doc.text(`Motif: ${data.metadata.refundReason}`, 20, 110);
+      }
+      doc.text("Statut: Remboursement traité", 20, 120);
+    }
+  },
+  // Order purchase template
+  ORDER_PURCHASE: {
+    generate: (doc, data) => {
+      doc.setFontSize(11);
+      doc.text("Type: Commande", 20, 90);
+      if (data.metadata?.orderNumber) {
+        doc.text(`Numéro de commande: ${data.metadata.orderNumber}`, 30, 100);
+      }
+      if (data.metadata?.orderItems) {
+        doc.text("Articles inclus:", 30, 110);
+        let orderY = 120;
+        data.metadata.orderItems.forEach((item: string) => {
+          doc.text(`- ${item}`, 40, orderY);
+          orderY += 10;
+        });
+      }
+    }
+  },
+  // Bonus template
+  BONUS: {
+    generate: (doc, data) => {
+      doc.setFontSize(11);
+      doc.text("Type: Bonus reçu", 20, 90);
+      if (data.metadata?.bonusSource) {
+        doc.text(`Source: ${data.metadata.bonusSource}`, 20, 100);
+      }
+      if (data.metadata?.bonusType) {
+        doc.text(`Type de bonus: ${data.metadata.bonusType}`, 20, 110);
+      }
+      doc.text("Statut: Bonus ajouté au solde", 20, 120);
     }
   }
 };
@@ -255,12 +307,16 @@ export function getTransactionLabel(type: TransactionType): string {
   const labels: Record<TransactionType, string> = {
     THEME_PURCHASE: "Achat de thème",
     VIP_SUBSCRIPTION: "Abonnement VIP",
-    PRODUCT_PURCHASE: "Achat de produit",
+    ORDER_PURCHASE: "Achat de produit",
     TOURNAMENT_PARTICIPATION: "Participation tournoi",
     GAME_ITEM_PURCHASE: "Achat d'item de jeu",
     DEPOSIT: "Dépôt",
     WITHDRAWAL: "Retrait",
     TRANSFER: "Transfert",
+    PURCHASE: "Achat",
+    REFUND: "Remboursement",
+    ORDER_PURCHASE: "Achat de commande",
+    BONUS: "Bonus",
   };
   return labels[type] || type;
 }

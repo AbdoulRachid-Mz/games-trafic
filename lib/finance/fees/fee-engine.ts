@@ -1,6 +1,4 @@
 import type { FeeCalculation, FeeOptions, TransactionType } from "../types";
-import { getAppSettings } from "@/actions/app-settings";
-import { getCurrentUser } from "@/lib/auth/session";
 
 /**
  * Calcule purement les frais d'une transaction à partir d'un taux et d'options.
@@ -84,7 +82,14 @@ export async function calculateTransactionFees(
   options?: { isVip?: boolean; settings?: any }
 ): Promise<FeeCalculation> {
   try {
-    const settings = options?.settings !== undefined ? options.settings : (await getAppSettings());
+    // Imports dynamiques : les fonctions pures ne doivent pas charger la session
+    // ni les Server Actions (important pour les tests et le tree-shaking).
+    const settings =
+      options?.settings !== undefined
+        ? options.settings
+        : await (
+            await import("@/actions/app-settings")
+          ).getAppSettings();
     if (settings === null || settings === undefined) {
       throw new Error("FEE_POLICY_UNAVAILABLE: Impossible de récupérer les paramètres de politique de frais.");
     }
@@ -93,6 +98,7 @@ export async function calculateTransactionFees(
 
     let isVip = options?.isVip;
     if (isVip === undefined) {
+      const { getCurrentUser } = await import("@/lib/auth/session");
       const user = await getCurrentUser();
       isVip = !!user?.isVip;
     }

@@ -77,7 +77,7 @@ export default async function ProductPage({ params }: PageProps) {
           </Typography>
           <TransactionQRCode
             data={encodeTransactionQR({
-              t: "PRODUCT_PURCHASE",
+              t: "ORDER_PURCHASE",
               id: product.id,
               a: parseFloat(product.price || "0"),
               m: { name: product.name }
