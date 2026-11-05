@@ -17,6 +17,10 @@ import {
   executeFinancialOperation,
   getOrCreateSystemAccount,
   executeRefund,
+  calculateTransactionFees,
+  buildOrderCapturePostings,
+  buildOrderPayoutPostings,
+  splitOrderAmount,
 } from '@/lib/finance';
 import { encryptData, decryptData } from '@/lib/encryption';
 import {
@@ -41,6 +45,17 @@ export async function createProductOrder(
   try {
     const user = await getCurrentUser();
     if (!user) throw new Error("Non authentifié");
+
+    // F5-05 : un produit est un exemplaire unique (statut NON_VENDU). Aucune
+    // quantité client n'est acceptée : le total reste 1 × prix lu en base.
+    const requestedQuantity = (data as { quantity?: unknown }).quantity;
+    if (
+      requestedQuantity !== undefined &&
+      (!Number.isInteger(Number(requestedQuantity)) ||
+        Number(requestedQuantity) !== 1)
+    ) {
+      throw new Error("Chaque commande porte sur un seul exemplaire");
+    }
 
     return await db.transaction(async (tx) => {
       // 1. Fetch product and shop info
@@ -97,10 +112,11 @@ export async function createProductOrder(
         description: `Réservation du produit: ${product.name}`,
         reason: 'Capture escrow commande',
         metadata: { productId: product.id, shopId: product.shopId },
-        postings: [
-          { accountId: buyerWallet.financialAccountId, debit: price },
-          { accountId: escrowAccount.id, credit: price },
-        ],
+        postings: buildOrderCapturePostings({
+          buyerAccountId: buyerWallet.financialAccountId,
+          escrowAccountId: escrowAccount.id,
+          amount: price,
+        }),
         netAmount: price,
         createdByUserId: user.id,
         idempotencyKey: `order-capture:${product.id}:${user.id}`,
@@ -228,10 +244,26 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
       const escrowAccount = await getOrCreateSystemAccount(tx, 'ESCROW');
       const feeAccount = await getOrCreateSystemAccount(tx, 'FEES');
 
-      // Commission 5% (configurable via app_settings)
-      const commissionRate = 0.05;
-      const commission = Math.round(amount * commissionRate * 100) / 100;
-      const sellerNet = Math.round((amount - commission) * 100) / 100;
+      // Commission vendeur : taux unique lu depuis la politique de frais
+      // (`purchaseFeePercentage`), jamais codé en dur.
+      const feeCalc = await calculateTransactionFees('ORDER_PURCHASE', amount, {
+        isVip: false,
+      });
+      const commission = feeCalc.fees;
+      const { sellerNet } = splitOrderAmount(amount, commission);
+      const commissionRate = feeCalc.feePercentage;
+
+      if (sellerNet <= 0) {
+        throw new Error("Commission invalide : le vendeur ne recevrait aucun montant");
+      }
+
+      const payoutPostings = buildOrderPayoutPostings({
+        escrowAccountId: escrowAccount.id,
+        sellerAccountId: shopAccountId!,
+        feeAccountId: feeAccount.id,
+        amount,
+        commission,
+      });
 
       await executeFinancialOperation({
         kind: 'POST',
@@ -245,11 +277,7 @@ export async function completeOrderAdmin(orderId: string): Promise<{ success: bo
         description: `Paiement vendeur commande #${order.id.slice(0, 8)}`,
         reason: 'Finalisation commande — libération escrow',
         metadata: { orderId: order.id, type: 'SHOP_PAYOUT', commission, commissionRate },
-        postings: [
-          { accountId: escrowAccount.id, debit: amount },
-          { accountId: shopAccountId!, credit: sellerNet },
-          { accountId: feeAccount.id, credit: commission },
-        ],
+        postings: payoutPostings,
         netAmount: sellerNet,
         fees: commission,
         createdByUserId: user!.id,
@@ -311,11 +339,9 @@ export async function rejectOrder(orderId: string, reason: string): Promise<{ su
 
       // Remboursement depuis l'escrow si fonds capturés (refund.ts V2)
       if (order.walletTransactionId) {
-        const actor = user!;
-        await executeRefund({
-          transactionId: order.walletTransactionId,
+        await executeRefund(order.walletTransactionId, {
           reason: `Annulation commande #${order.id.slice(0, 8)}: ${reason}`,
-          actorId: actor.id,
+          internalActorId: user!.id,
           client: tx,
         });
       }

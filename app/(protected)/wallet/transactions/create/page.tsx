@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fireConfettiPreset } from "@/utils/confetti";
 import { generateEnhancedReceipt } from "@/utils/receipt-templates";
 import { TransactionStepper } from "@/components/pages/transactions/create/transaction-stepper";
+import { resolveTransactionIntent } from "@/lib/transactions/resolve-intent";
 import { TransactionTypeSelector } from "@/components/pages/transactions/create/type-selector";
 import { TransactionEntitySelector } from "@/components/pages/transactions/create/entity-selector";
 import { TransactionAmountInput } from "@/components/pages/transactions/create/amount-input";
@@ -192,30 +193,25 @@ function CreateTransactionContent({
 
   useEffect(() => {
     const loadTransactionFromParams = async () => {
-      const type = searchParams.get("type") as TransactionType;
-      const amount = searchParams.get("amount");
-      const entityId = searchParams.get("entityId");
-      const targetId = searchParams.get("targetId");
-      const itemId = searchParams.get("itemId");
-      const idParam = searchParams.get("id");
-      const imageUrl = searchParams.get("image");
+      const intent = resolveTransactionIntent(searchParams);
+      const type = intent.type;
 
-      if (type && TRANSACTION_CONFIGS[type]) {
-        const config = TRANSACTION_CONFIGS[type];
-        const actualEntityId = entityId || targetId || itemId || idParam;
+      if (type) {
+        const config = TRANSACTION_CONFIGS[type as TransactionType];
+        const actualEntityId = intent.entityId;
 
         const newData: TransactionData = {
           type,
-          amount: amount ? parseFloat(amount) : 0,
+          amount: intent.amount ?? 0,
           metadata: {
-            ...(imageUrl && { image: imageUrl }),
+            ...(intent.imageUrl && { image: intent.imageUrl }),
           },
         };
 
         const hasPaymentDetails =
-          searchParams.get("paymentMethod") ||
-          searchParams.get("paymentProvider") ||
-          searchParams.get("paymentAccountId");
+          intent.paymentMethod ||
+          intent.paymentProvider ||
+          intent.paymentAccountId;
 
         if (
           (type === "DEPOSIT" || type === "WITHDRAWAL") &&
@@ -223,9 +219,9 @@ function CreateTransactionContent({
         ) {
           newData.metadata = {
             ...newData.metadata,
-            paymentMethod: searchParams.get("paymentMethod") || "",
-            paymentProvider: searchParams.get("paymentProvider") || "",
-            paymentAccountId: searchParams.get("paymentAccountId") || "",
+            paymentMethod: intent.paymentMethod || "",
+            paymentProvider: intent.paymentProvider || "",
+            paymentAccountId: intent.paymentAccountId || "",
           };
         }
 
@@ -251,11 +247,11 @@ function CreateTransactionContent({
               if (!newData.amount && entity.price) {
                 newData.amount = entity.price;
               }
-              if (imageUrl) {
-                entity.image = imageUrl;
+              if (intent.imageUrl) {
+                entity.image = intent.imageUrl;
               }
               newData.entity = entity as any;
-              
+
               if (type === "GAME_ITEM_PURCHASE" && entity.price) {
                 if (
                   newData.amount &&
@@ -268,12 +264,22 @@ function CreateTransactionContent({
                 }
               }
             } else {
-               newData.targetId = undefined;
+              newData.targetId = undefined;
             }
           } catch (error) {
             console.error("Error fetching entity:", error);
             newData.targetId = undefined;
           }
+        }
+
+        if (intent.issues.includes("CONTRADICTORY_ENTITIES")) {
+          toast.error("Paramètres contradictoires : plusieurs entités ont été fournies.");
+        }
+        if (intent.issues.includes("INVALID_AMOUNT")) {
+          toast.error("Montant invalide dans le lien.");
+        }
+        if (intent.issues.includes("MISSING_ENTITY")) {
+          toast.error("Entité manquante : sélectionnez-la pour continuer.");
         }
 
         setTransactionData(newData);
@@ -293,6 +299,8 @@ function CreateTransactionContent({
           }
         }
         setCurrentStep(initialStepIndex >= 0 ? initialStepIndex : 0);
+      } else if (intent.issues.includes("INVALID_TYPE")) {
+        toast.error("Type de transaction inconnu.");
       }
 
       if (completeData && !completeData?.wallet) {

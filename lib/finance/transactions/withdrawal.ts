@@ -63,6 +63,59 @@ const assertPositive = (amount: number, label: string): void => {
   }
 };
 
+export interface WithdrawalPosting {
+  accountId: string;
+  debit?: number;
+  credit?: number;
+}
+
+export interface WithdrawalPostingPlan {
+  walletAccountId: string;
+  escrowAccountId: string;
+  feeAccountId?: string | null;
+  amount: number;
+  fees: number;
+}
+
+const roundMoney = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
+/**
+ * Réservation : wallet débité de `montant + frais`, escrow crédité du brut,
+ * frais crédités à PLATFORM_FEES. Fonction pure pour testabilité.
+ */
+export function buildWithdrawalReservationPostings(
+  plan: WithdrawalPostingPlan
+): WithdrawalPosting[] {
+  const amount = roundMoney(plan.amount);
+  const fees = roundMoney(plan.fees);
+
+  const postings: WithdrawalPosting[] = [
+    { accountId: plan.walletAccountId, debit: roundMoney(amount + fees) },
+    { accountId: plan.escrowAccountId, credit: amount },
+  ];
+
+  if (fees > 0 && plan.feeAccountId) {
+    postings.push({ accountId: plan.feeAccountId, credit: fees });
+  }
+
+  return postings;
+}
+
+/**
+ * Libération (rejet) : inverse exact de la réservation — escrow et frais
+ * re-débités, wallet recrédité de `montant + frais`.
+ */
+export function buildWithdrawalReleasePostings(
+  plan: WithdrawalPostingPlan
+): WithdrawalPosting[] {
+  return buildWithdrawalReservationPostings(plan).map((posting) => ({
+    accountId: posting.accountId,
+    debit: posting.credit,
+    credit: posting.debit,
+  }));
+}
+
 async function resolveFees(
   client: DbClient,
   userId: string,
@@ -96,19 +149,16 @@ export async function reserveWithdrawal(
     const amountCents = toCents(input.amount);
 
     const escrow = await getOrCreateSystemAccount(tx, "ESCROW");
+    const feeAccount =
+      feesCents > 0 ? await getOrCreateSystemAccount(tx, "FEES") : null;
 
-    const postings = [
-      {
-        accountId: input.walletAccountId,
-        debit: fromCents(amountCents + feesCents),
-      },
-      { accountId: escrow.id, credit: fromCents(amountCents) },
-    ];
-
-    if (feesCents > 0) {
-      const feeAccount = await getOrCreateSystemAccount(tx, "FEES");
-      postings.push({ accountId: feeAccount.id, credit: fromCents(feesCents) });
-    }
+    const postings = buildWithdrawalReservationPostings({
+      walletAccountId: input.walletAccountId,
+      escrowAccountId: escrow.id,
+      feeAccountId: feeAccount?.id ?? null,
+      amount: amountCents / 100,
+      fees: feesCents / 100,
+    });
 
     return executeFinancialOperation({
       kind: "POST",
@@ -191,8 +241,10 @@ export async function executeWithdrawalApproval(
       }
 
       const reservedFees = toCents(
-        (reservation.metadata as Record<string, unknown> | null)
-          ?.reservedFees ?? 0
+        Number(
+          (reservation.metadata as Record<string, unknown> | null)
+            ?.reservedFees ?? 0
+        )
       );
 
       const escrow = await getOrCreateSystemAccount(tx, "ESCROW");
@@ -321,23 +373,23 @@ export async function executeWithdrawalRejection(input: {
 
     const amountCents = toCents(reservation.amount);
     const feesCents = toCents(
-      (reservation.metadata as Record<string, unknown> | null)
-        ?.reservedFees ?? 0
+      Number(
+        (reservation.metadata as Record<string, unknown> | null)
+          ?.reservedFees ?? 0
+      )
     );
 
     const escrow = await getOrCreateSystemAccount(tx, "ESCROW");
-    const postings = [
-      { accountId: escrow.id, debit: fromCents(amountCents) },
-      {
-        accountId: input.walletAccountId,
-        credit: fromCents(amountCents + feesCents),
-      },
-    ];
+    const feeAccount =
+      feesCents > 0 ? await getOrCreateSystemAccount(tx, "FEES") : null;
 
-    if (feesCents > 0) {
-      const feeAccount = await getOrCreateSystemAccount(tx, "FEES");
-      postings.push({ accountId: feeAccount.id, debit: fromCents(feesCents) });
-    }
+    const postings = buildWithdrawalReleasePostings({
+      walletAccountId: input.walletAccountId,
+      escrowAccountId: escrow.id,
+      feeAccountId: feeAccount?.id ?? null,
+      amount: amountCents / 100,
+      fees: feesCents / 100,
+    });
 
     const result = await executeFinancialOperation({
       kind: "POST",

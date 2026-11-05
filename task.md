@@ -53,7 +53,7 @@
 - [x] **F2-01** Supprimer les deux transactions et l'usage de `SYSTEM_ADJUSTMENT`.
 - [x] **F2-02** Créer un transfert unique `wallet → wallet` + frais `PLATFORM_FEES`.
 - [x] **F2-03** Test : une seule transaction, ledger équilibré, escrow inchangé.
-- [ ] **F2-04** Vérifier les appelants (`app/shops`, `app/tournaments`, `components/tournaments`).
+- [x] **F2-04** Vérifier les appelants (`app/shops`, `app/tournaments`, `components/tournaments`).
 
 **DoD :** un transfert = une transaction = deux/trois écritures équilibrées.
 
@@ -73,7 +73,7 @@
 
 - [x] **F4-01** Retirer le bouton « Transfert » admin ou le remplacer par « Émission GTC ».
 - [x] **F4-02** Supprimer l'usage de `completeData.wallet.id` comme source implicite.
-- [ ] **F4-03** Afficher la source réelle et le fait que le wallet admin n'est pas débité.
+- [x] **F4-03** Afficher la source réelle et le fait que le wallet admin n'est pas débité.
 - [ ] **F4-04** Test : aucune écriture sur le wallet de l'admin.
 
 **DoD :** aucune action admin ne débite le wallet personnel de l'admin.
@@ -84,7 +84,7 @@
 - [x] **F5-02** Tournoi : relire `tournament_editions.entryFee` ; ignorer le montant client.
 - [x] **F5-03** Thème : relire `themes.price` ; vérifier la propriété.
 - [x] **F5-04** VIP : relire l'offre et la durée ; ignorer le prix client.
-- [ ] **F5-05** Produit : conserver `createProductOrder` mais vérifier la quantité.
+- [x] **F5-05** Produit : conserver `createProductOrder` mais vérifier la quantité.
 - [x] **F5-06** Retourner `PRICE_CHANGED` si le prix a changé entre affichage et confirmation.
 - [ ] **F5-07** Tests : modification du montant client sans effet.
 
@@ -117,10 +117,10 @@
 - [x] **S1-02** Test : `401` anonyme, `403` non admin, aucun cookie dans la réponse.
 - [x] **S2-01** `/api/users` GET : admin, projection minimale.
 - [x] **S2-02** `/api/users` POST : inscription contrôlée ou admin A.
-- [ ] **S2-03** Rate limiting + tests d'énumération.
+- [x] **S2-03** Rate limiting + tests d'énumération.
 - [x] **S3-01** `/api/games` : lecture publique justifiée, écriture admin.
 - [x] **S3-02** `/api/services` : idem.
-- [ ] **S3-03** Validation Zod + tests.
+- [x] **S3-03** Validation Zod + tests.
 - [x] **S4-01** `actions/claims.ts` : auth + permission `claim:create`.
 - [x] **S4-02** `updateClaimStatus`/`deleteClaim` : admin.
 - [x] **S4-03** `actions/app-settings.ts` : frais et prix VIP réservés au niveau A.
@@ -170,10 +170,10 @@
 ### 4.5 Contraintes ledger (P2-P6)
 
 - [ ] **I5-01** Nettoyer/archiver les écritures orphelines.
-- [ ] **I5-02** Ajouter la FK `ledger_entries.transaction_id`.
-- [ ] **I5-03** Ajouter `system_key` unique + `allow_negative_balance`.
-- [ ] **I5-04** Ajouter les checks débit/crédit.
-- [ ] **I5-05** Ajouter les index manquants.
+- [~] **I5-02** Ajouter la FK `ledger_entries.transaction_id`.
+- [x] **I5-03** Ajouter `system_key` unique + `allow_negative_balance`.
+- [~] **I5-04** Ajouter les checks débit/crédit.
+- [x] **I5-05** Ajouter les index manquants.
 - [ ] **I5-06** Test de migration sur copie de la base.
 
 ### 4.6 VIP (P1-A4)
@@ -244,54 +244,54 @@
 
 ### P3 — Transfert et remboursement
 
-- [~] **T3-01** `transactions/transfer.ts`.
+- [x] **T3-01** `transactions/transfer.ts`.
 - [x] **T3-02** `transactions/refund.ts`.
-- [ ] **T3-03** Façades `actions/transactions.ts`.
+- [x] **T3-03** Façades `actions/transactions.ts`.
 - [ ] **T3-04** Tests transfert (valide, auto, solde, destinataire).
 - [x] **T3-05** Tests remboursement (total, partiel, double, contrepartie insuffisante).
 
 ### P4 — Achats et inscriptions
 
-- [ ] **T4-01** `transactions/purchase.ts` (produit, item, thème, VIP).
-- [ ] **T4-02** `transactions/tournament.ts`.
+- [x] **T4-01** `transactions/purchase.ts` (produit, item, thème, VIP).
+- [x] **T4-02** `transactions/tournament.ts`.
 - [x] **T4-03** Migrer `actions/orders.ts`.
 - [x] **T4-04** Migrer `actions/editions.ts`.
-- [ ] **T4-05** Tests escrow, commission unique, édition, stock, prix.
+- [~] **T4-05** Tests escrow, commission unique, édition, stock, prix.
 
 ### P5 — Dépôts / retraits
 
 - [x] **T5-01** `transactions/deposit.ts` (demande + approbation).
 - [x] **T5-02** `transactions/withdrawal.ts` (réservation + paiement + rejet).
 - [x] **T5-03** Migrer `actions/requests.ts`.
-- [ ] **T5-04** Tests réservation, rejet, coordonnées, concurrence.
+- [~] **T5-04** Tests réservation, rejet, coordonnées, concurrence.
 
 ### P6 — Émission et demandes A/B/C
 
-- [~] **T6-01** `transactions/issuance.ts`.
+- [x] **T6-01** `transactions/issuance.ts`.
 - [x] **T6-02** `requests/credit-requests.ts`.
 - [x] **T6-03** `requests/approval.ts`.
 - [x] **T6-04** `policies/admin-policy.ts` + `limits.ts`.
 - [x] **T6-05** Table `transaction_credit_requests`.
 - [x] **T6-06** Table `financial_audit_logs`.
-- [ ] **T6-07** Tests A/B/C complets (émission, demande, auto-approbation, rejet, double approbation).
-- [ ] **T6-08** Tests : aucun débit du wallet admin lors d'une émission.
+- [~] **T6-07** Tests A/B/C complets (émission, demande, auto-approbation, rejet, double approbation).
+- [x] **T6-08** Tests : aucun débit du wallet admin lors d'une émission.
 
 ### P7 — UI admin
 
-- [ ] **T7-01** Onglets : Vue d'ensemble, Historique, Émissions, Demandes, Dépôts, Retraits, Remboursements.
-- [ ] **T7-02** `AdminGtcIssuanceForm`.
-- [ ] **T7-03** `AdminGtcRequestForm`.
-- [ ] **T7-04** `TransactionRequestTable` + `TransactionRequestDetails`.
-- [ ] **T7-05** `TransactionApprovalDialog` + `TransactionRejectionDialog`.
+- [~] **T7-01** Onglets : Vue d'ensemble, Historique, Émissions, Demandes, Dépôts, Retraits, Remboursements.
+- [x] **T7-02** `AdminGtcIssuanceForm`.
+- [x] **T7-03** `AdminGtcRequestForm`.
+- [~] **T7-04** `TransactionRequestTable` + `TransactionRequestDetails`.
+- [x] **T7-05** `TransactionApprovalDialog` + `TransactionRejectionDialog`.
 - [ ] **T7-06** `TransactionAuditDetails`.
-- [ ] **T7-07** Boutons conditionnés par la politique serveur.
-- [ ] **T7-08** Message explicite : l'émission ne débite pas le wallet admin.
-- [ ] **T7-09** Responsive + états de chargement/erreur.
+- [~] **T7-07** Boutons conditionnés par la politique serveur.
+- [x] **T7-08** Message explicite : l'émission ne débite pas le wallet admin.
+- [x] **T7-09** Responsive + états de chargement/erreur.
 
 ### P8 — UI utilisateur
 
-- [ ] **T8-01** `resolveTransactionIntent(searchParams)`.
-- [ ] **T8-02** Priorité `editionId` pour les tournois.
+- [x] **T8-01** `resolveTransactionIntent(searchParams)`.
+- [x] **T8-02** Priorité `editionId` pour les tournois.
 - [ ] **T8-03** Parcours TRANSFER.
 - [ ] **T8-04** Parcours TOURNAMENT_PARTICIPATION.
 - [ ] **T8-05** Parcours GAME_ITEM_PURCHASE.

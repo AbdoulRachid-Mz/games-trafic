@@ -9,6 +9,16 @@ import {
   stableStringify,
 } from "@/lib/finance/core/hash";
 import { computeRefundReversal } from "@/lib/finance/transactions/refund-math";
+import {
+  canApproveCreditRequest,
+  canIssueDirectly,
+  canRefund,
+  requiresSecondApproval,
+} from "@/lib/finance/policies/admin-policy";
+import {
+  DEFAULT_FINANCE_POLICY,
+  resolveFinancePolicy,
+} from "@/lib/finance/policies/limits";
 
 describe("lib/finance/core/ledger - Postings invariants (T1-05)", () => {
   it("normalise des écritures équilibrées", () => {
@@ -207,5 +217,140 @@ describe("lib/finance/transactions/refund - Reversal computation (T3-05)", () =>
         requested: 10,
       })
     ).toThrow(/REFUND_EXCEEDS_REMAINING/);
+  });
+});
+
+describe("lib/finance/policies - A/B/C (T6-04, T6-07)", () => {
+  it("charge la politique par défaut quand aucune valeur n'est stockée", () => {
+    expect(resolveFinancePolicy(undefined)).toEqual(DEFAULT_FINANCE_POLICY);
+    expect(resolveFinancePolicy({})).toEqual(DEFAULT_FINANCE_POLICY);
+  });
+
+  it("fusionne les plafonds stockés sans perdre les défauts", () => {
+    const policy = resolveFinancePolicy({
+      issuance: { max: { B: 12_345 } },
+    });
+
+    expect(policy.issuance.max.B).toBe(12_345);
+    expect(policy.issuance.max.A).toBe(DEFAULT_FINANCE_POLICY.issuance.max.A);
+    expect(policy.issuance.daily).toEqual(
+      DEFAULT_FINANCE_POLICY.issuance.daily
+    );
+  });
+
+  it("interdit toute émission directe au niveau C", () => {
+    const result = canIssueDirectly(
+      "C",
+      5_000,
+      0,
+      DEFAULT_FINANCE_POLICY
+    );
+    expect(result.allowed).toBe(false);
+  });
+
+  it("applique le plafond par opération et le plafond quotidien", () => {
+    expect(
+      canIssueDirectly("B", 25_000, 0, DEFAULT_FINANCE_POLICY).allowed
+    ).toBe(true);
+    expect(
+      canIssueDirectly("B", 25_001, 0, DEFAULT_FINANCE_POLICY).allowed
+    ).toBe(false);
+    expect(
+      canIssueDirectly("B", 10_000, 95_000, DEFAULT_FINANCE_POLICY).allowed
+    ).toBe(false);
+  });
+
+  it("interdit l'auto-approbation et l'approbation par un C", () => {
+    const base = {
+      requesterId: "requester",
+      requesterLevel: "B" as const,
+      amount: 10_000,
+      policy: DEFAULT_FINANCE_POLICY,
+    };
+
+    expect(
+      canApproveCreditRequest({
+        ...base,
+        approverId: "requester",
+        approverLevel: "A",
+      }).allowed
+    ).toBe(false);
+
+    expect(
+      canApproveCreditRequest({
+        ...base,
+        approverId: "admin-c",
+        approverLevel: "C",
+      }).allowed
+    ).toBe(false);
+  });
+
+  it("n'autorise B que sur les demandes d'un C sous le seuil", () => {
+    const underThreshold = {
+      approverId: "admin-b",
+      approverLevel: "B" as const,
+      requesterId: "requester",
+      amount: 10_000,
+      policy: DEFAULT_FINANCE_POLICY,
+    };
+
+    expect(
+      canApproveCreditRequest({
+        ...underThreshold,
+        requesterLevel: "C",
+      }).allowed
+    ).toBe(true);
+    expect(
+      canApproveCreditRequest({
+        ...underThreshold,
+        requesterLevel: "B",
+      }).allowed
+    ).toBe(false);
+  });
+
+  it("exige deux approbateurs distincts au-dessus du seuil", () => {
+    expect(requiresSecondApproval(50_001, DEFAULT_FINANCE_POLICY)).toBe(true);
+    expect(requiresSecondApproval(50_000, DEFAULT_FINANCE_POLICY)).toBe(false);
+
+    const base = {
+      approverLevel: "A" as const,
+      requesterId: "requester",
+      requesterLevel: "B" as const,
+      amount: 80_000,
+      policy: DEFAULT_FINANCE_POLICY,
+      firstApproverId: "admin-a",
+      firstApproverLevel: "A" as const,
+    };
+
+    expect(
+      canApproveCreditRequest({ ...base, approverId: "admin-a" }).allowed
+    ).toBe(false);
+    expect(
+      canApproveCreditRequest({
+        ...base,
+        approverId: "admin-b",
+        approverLevel: "B",
+      }).allowed
+    ).toBe(true);
+    expect(
+      canApproveCreditRequest({
+        ...base,
+        approverId: "admin-b2",
+        approverLevel: "B",
+        firstApproverLevel: "B",
+      }).allowed
+    ).toBe(false);
+  });
+
+  it("interdit le remboursement au niveau C", () => {
+    expect(
+      canRefund("C", 100, DEFAULT_FINANCE_POLICY).allowed
+    ).toBe(false);
+    expect(
+      canRefund("B", 25_000, DEFAULT_FINANCE_POLICY).allowed
+    ).toBe(true);
+    expect(
+      canRefund("B", 25_001, DEFAULT_FINANCE_POLICY).allowed
+    ).toBe(false);
   });
 });

@@ -203,4 +203,39 @@ END $$;--> statement-breakpoint
 DROP INDEX IF EXISTS "vip_user_unique";--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "vip_user_active_unique"
   ON "vip_subscriptions" ("user_id")
-  WHERE "status" = 'ACTIVE';
+  WHERE "status" = 'ACTIVE';--> statement-breakpoint
+
+-- 10. Intégrité ledger (I5-02, I5-04)
+-- Les contraintes sont ajoutées `NOT VALID` : elles s'appliquent à toutes les
+-- nouvelles écritures sans bloquer la migration sur des données historiques.
+-- Après nettoyage (I5-01), exécuter `VALIDATE CONSTRAINT` sur chacune.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ledger_entries_transaction_id_wallet_transactions_id_fk'
+  ) THEN
+    ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_transaction_id_wallet_transactions_id_fk"
+      FOREIGN KEY ("transaction_id") REFERENCES "wallet_transactions"("id")
+      ON DELETE no action ON UPDATE no action NOT VALID;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ledger_entries_amounts_non_negative_check'
+  ) THEN
+    ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_amounts_non_negative_check"
+      CHECK ("debit" >= 0 AND "credit" >= 0) NOT VALID;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ledger_entries_single_side_check'
+  ) THEN
+    ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_single_side_check"
+      CHECK (NOT ("debit" > 0 AND "credit" > 0)) NOT VALID;
+  END IF;
+END $$;--> statement-breakpoint
+
+-- 11. Index manquants (I5-05)
+CREATE INDEX IF NOT EXISTS "ledger_account_created_idx"
+  ON "ledger_entries" ("account_id", "created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "transactions_type_status_idx"
+  ON "wallet_transactions" ("type", "status");

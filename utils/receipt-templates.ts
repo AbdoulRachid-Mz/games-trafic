@@ -133,24 +133,6 @@ const templates: Record<TransactionType, ReceiptTemplate> = {
       doc.text("Statut: Remboursement traité", 20, 120);
     }
   },
-  // Order purchase template
-  ORDER_PURCHASE: {
-    generate: (doc, data) => {
-      doc.setFontSize(11);
-      doc.text("Type: Commande", 20, 90);
-      if (data.metadata?.orderNumber) {
-        doc.text(`Numéro de commande: ${data.metadata.orderNumber}`, 30, 100);
-      }
-      if (data.metadata?.orderItems) {
-        doc.text("Articles inclus:", 30, 110);
-        let orderY = 120;
-        data.metadata.orderItems.forEach((item: string) => {
-          doc.text(`- ${item}`, 40, orderY);
-          orderY += 10;
-        });
-      }
-    }
-  },
   // Bonus template
   BONUS: {
     generate: (doc, data) => {
@@ -315,7 +297,6 @@ export function getTransactionLabel(type: TransactionType): string {
     TRANSFER: "Transfert",
     PURCHASE: "Achat",
     REFUND: "Remboursement",
-    ORDER_PURCHASE: "Achat de commande",
     BONUS: "Bonus",
   };
   return labels[type] || type;

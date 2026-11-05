@@ -20,6 +20,7 @@ import { eq } from "drizzle-orm";
 import { calculateTransactionFees } from "../fees/fee-engine";
 import type { TransactionType } from "../types";
 import { getOrCreateSystemAccount } from "./accounts";
+import { buildIssuancePostings } from "../transactions/issuance";
 import {
   beginIdempotency,
   completeIdempotency,
@@ -189,16 +190,16 @@ async function buildOperationPostings(
     const issuanceAccount = await getOrCreateSystemAccount(client, "GTC_ISSUANCE");
 
     return {
-      postings: [
-        {
-          accountId: issuanceAccount.id,
-          debit: fromCents(amountCents),
-        },
-        {
-          accountId: operation.toAccountId,
-          credit: fromCents(amountCents),
-        },
-      ],
+      postings: buildIssuancePostings({
+        issuanceAccountId: issuanceAccount.id,
+        recipientAccountId: operation.toAccountId,
+        amount: amountCents / 100,
+      }).map((posting) => ({
+        accountId: posting.accountId,
+        debit: posting.debit,
+        credit: posting.credit,
+        currency: "GTC",
+      })) as LedgerPosting[],
       fees: 0,
       netAmount: amount,
       totalDebit: amount,

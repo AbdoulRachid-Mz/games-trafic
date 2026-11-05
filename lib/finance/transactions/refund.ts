@@ -11,6 +11,8 @@ import { getAccountBalance } from "../ledger/ledger-engine";
 import { fromCents, toCents } from "../core/postings";
 import { computeRefundReversal } from "./refund-math";
 import { writeFinancialAuditLog } from "../audit/audit-log";
+import { loadFinancePolicy } from "../policies/limits";
+import { canRefund, assertPolicyAllowed } from "../policies/admin-policy";
 
 export { computeRefundReversal };
 export type {
@@ -25,6 +27,17 @@ export interface RefundOptions {
    * Ne jamais fournir un montant supérieur au reliquat : REFUND_EXCEEDS_REMAINING.
    */
   amount?: number;
+  /**
+   * Transaction Drizzle existante (composition atomique avec l'annulation
+   * métier, par exemple une commande).
+   */
+  client?: any;
+  /**
+   * Acteur interne (annulation métier : commande, inscription). Contourne
+   * volontairement les plafonds admin : ce n'est pas un remboursement
+   * discrétionnaire. Usage interne au serveur uniquement.
+   */
+  internalActorId?: string;
 }
 
 /**
@@ -40,10 +53,12 @@ export async function executeRefund(
   options: RefundOptions = {}
 ): Promise<WalletTransaction> {
   const currentUser = await getCurrentUser();
-  assertCanRefund(currentUser);
-  const processedBy = currentUser!.id;
+  if (!options.internalActorId) {
+    assertCanRefund(currentUser);
+  }
+  const processedBy = options.internalActorId ?? currentUser!.id;
 
-  return await db.transaction(async (tx) => {
+  const run = async (tx: any): Promise<WalletTransaction> => {
     // 1. Verrouiller la transaction d'origine
     const [originalTx] = await tx
       .select()
@@ -70,9 +85,18 @@ export async function executeRefund(
     }
 
     if (originalTx.status !== "COMPLETED") {
-      throw new Error(
-        `INVALID_STATUS: Seules les transactions terminées peuvent être remboursées (statut actuel: ${originalTx.status}).`
-      );
+      // Une capture escrow (ORDER_PURCHASE) est PENDING tant que la commande
+      // n'est pas finalisée : l'annulation doit pouvoir la contre-passer.
+      const isReversibleReservation =
+        (originalTx.type === "ORDER_PURCHASE" ||
+          originalTx.type === "TOURNAMENT_PARTICIPATION") &&
+        (originalTx.status === "PENDING" || originalTx.status === "PROCESSING");
+
+      if (!isReversibleReservation) {
+        throw new Error(
+          `INVALID_STATUS: Seules les transactions terminées peuvent être remboursées (statut actuel: ${originalTx.status}).`
+        );
+      }
     }
 
     // 2. Écritures d'origine
@@ -88,7 +112,7 @@ export async function executeRefund(
     }
 
     // 3. Remboursements déjà effectués
-    const priorRefunds = await tx
+    const priorRefunds: Array<{ id: string; amount: string }> = await tx
       .select({
         id: walletTransactions.id,
         amount: walletTransactions.amount,
@@ -131,6 +155,15 @@ export async function executeRefund(
     if (requested > remaining) {
       throw new Error(
         `REFUND_EXCEEDS_REMAINING: Montant demandé ${fromCents(requested)} GTC, reliquat ${fromCents(remaining)} GTC.`
+      );
+    }
+
+    // Plafond de remboursement selon le niveau A/B/C (jamais C).
+    // Les annulations métier internes ne sont pas plafonnées.
+    if (!options.internalActorId) {
+      const policy = await loadFinancePolicy();
+      assertPolicyAllowed(
+        canRefund(getAdminLevel(currentUser), requested / 100, policy)
       );
     }
 
@@ -274,5 +307,7 @@ export async function executeRefund(
     });
 
     return { ...refundTx, balanceAfter: balanceAfterRefund.toFixed(2) };
-  });
+  };
+
+  return options.client ? run(options.client) : db.transaction(run);
 }

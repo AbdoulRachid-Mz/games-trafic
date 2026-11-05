@@ -46,7 +46,8 @@ import {
   reserveWithdrawal,
 } from '@/lib/finance';
 import { getCurrentUser } from '@/lib/auth/session';
-import { assertCanApproveRequests, getAdminLevel } from '@/lib/auth/permissions';
+import { assertCanApproveRequests, getAdminLevel, isAdmin } from '@/lib/auth/permissions';
+import { loadAdminActor } from '@/lib/finance/requests/credit-requests';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -281,6 +282,15 @@ export async function createRequest(
       throw new Error('userId, type and amount are required');
     }
 
+    // Un utilisateur ne peut créer une demande que pour lui-même.
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) {
+      throw new Error('Non autorisé : aucune session active trouvée');
+    }
+    if (requestData.userId !== sessionUser.id && !isAdmin(sessionUser)) {
+      throw new Error("Non autorisé à créer une demande pour un autre utilisateur");
+    }
+
     if (!options?.allowDuplicate) {
       const existing = await db
         .select({ id: requests.id })
@@ -365,7 +375,6 @@ export async function createRequest(
       // Un retrait réserve immédiatement montant + frais (wallet → escrow)
       // afin d'empêcher tout double spend avant l'approbation.
       if (created.type === 'WITHDRAWAL') {
-        const actor = await getCurrentUser();
         const [wallet] = await tx
           .select()
           .from(userWallets)
@@ -382,8 +391,8 @@ export async function createRequest(
           walletId: wallet.id,
           walletAccountId: wallet.financialAccountId,
           amount: Number(created.amount),
-          actorId: actor?.id ?? created.userId,
-          actorLevel: actor ? getAdminLevel(actor) : undefined,
+          actorId: sessionUser.id,
+          actorLevel: getAdminLevel(sessionUser),
           client: tx,
         });
       }
@@ -471,9 +480,12 @@ export async function approveRequest(
     throw new Error('Non autorisé : aucune session active trouvée');
   }
   const effectiveAdminId = sessionUser.id;
-  const adminLevel = getAdminLevel(sessionUser);
 
   return await db.transaction(async (tx) => {
+    // Autorité relue en base : le niveau de session n'est jamais utilisé.
+    const actor = await loadAdminActor(tx, effectiveAdminId);
+    const adminLevel = actor.level;
+
     const request = await tx
       .select()
       .from(requests)
@@ -663,6 +675,19 @@ export async function rejectRequest(
       ? reasonParam
       : (reasonOrAdminId || "Demande rejetée par l'administrateur");
 
+    const [pendingRequest] = await db
+      .select({ id: requests.id, status: requests.status })
+      .from(requests)
+      .where(eq(requests.id, id))
+      .limit(1);
+
+    if (!pendingRequest) {
+      throw new Error('Request not found');
+    }
+    if (pendingRequest.status !== 'PENDING') {
+      throw new Error('Seule une demande en attente peut être rejetée');
+    }
+
     await releaseWithdrawalReservation(
       id,
       effectiveReason,
@@ -689,13 +714,21 @@ export async function cancelRequest(
   reason?: string
 ): Promise<Request> {
   try {
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) {
+      throw new Error('Non autorisé : aucune session active trouvée');
+    }
+
     // Verify that the user is the owner
     const request = await getRequestById(id);
     if (!request) {
       throw new Error('Request not found');
     }
 
-    if (request.userId !== userId) {
+    if (
+      request.userId !== userId ||
+      (request.userId !== sessionUser.id && !isAdmin(sessionUser))
+    ) {
       throw new Error('Unauthorized: You can only cancel your own requests');
     }
 

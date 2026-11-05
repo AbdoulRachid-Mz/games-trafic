@@ -70,6 +70,17 @@ export const commonAdminRoutes: AdminRoute[] = [
     requiredLevel: "C",
   },
 
+  // Finance : émission GTC et demandes de crédit (A/B/C)
+  {
+    id: "finance",
+    label: "Finance",
+    path: "/admin/finance",
+    icon: CreditCard,
+    description: "Émission GTC et demandes de crédit",
+    requiredLevel: "C",
+    isFinancial: true,
+  },
+
   // Utilisateurs (accessible à tous les admins)
   {
     id: "users",

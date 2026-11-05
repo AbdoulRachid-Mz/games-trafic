@@ -11,6 +11,12 @@ import {
   type ServiceFilters,
 } from '@/actions/services';
 import { getCurrentUser } from '@/lib/auth/session';
+import {
+  formatValidationError,
+  serviceCreateSchema,
+  serviceUpdateSchema,
+  servicesListQuerySchema,
+} from '@/lib/api/validation';
 
 async function verifyAdmin() {
   const user = await getCurrentUser();
@@ -56,13 +62,26 @@ export async function GET(req: NextRequest) {
   }
 
   // Otherwise, list services
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = Math.min(100, parseInt(searchParams.get('limit') || '50', 10));
-  const sortBy = searchParams.get('sortBy') || undefined;
-  const sortOrder = searchParams.get('sortOrder') || 'desc';
+  const parsedQuery = servicesListQuerySchema.safeParse({
+    page: searchParams.get('page') ?? undefined,
+    limit: searchParams.get('limit') ?? undefined,
+    sortBy: searchParams.get('sortBy') ?? undefined,
+    sortOrder: searchParams.get('sortOrder') ?? undefined,
+    includeDeleted: searchParams.get('includeDeleted') ?? undefined,
+    includeInactive: searchParams.get('includeInactive') ?? undefined,
+  });
+
+  if (!parsedQuery.success) {
+    return NextResponse.json(
+      { error: formatValidationError(parsedQuery.error) },
+      { status: 400 }
+    );
+  }
+
+  const { page, limit, sortBy, includeDeleted, includeInactive } =
+    parsedQuery.data;
+  const sortOrder = parsedQuery.data.sortOrder ?? 'desc';
   const populate = searchParams.get('populate')?.split(',') || undefined;
-  const includeDeleted = searchParams.get('includeDeleted') === 'true';
-  const includeInactive = searchParams.get('includeInactive') === 'true';
 
   const filters: ServiceFilters = {
     id: searchParams.get('id') || undefined,
@@ -109,7 +128,23 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const created = await createService(body);
+    const parsed = serviceCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatValidationError(parsed.error) },
+        { status: 400 }
+      );
+    }
+    // L'auteur est imposé par la session, jamais par le client.
+    const adminId = (auth as { user?: { id?: string } }).user?.id;
+    if (!adminId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const created = await createService({
+      ...(parsed.data as any),
+      adminId,
+    });
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -131,7 +166,14 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const updated = await updateService(id, body);
+    const parsed = serviceUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatValidationError(parsed.error) },
+        { status: 400 }
+      );
+    }
+    const updated = await updateService(id, parsed.data as any);
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

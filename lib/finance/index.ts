@@ -11,6 +11,8 @@ export * from "./transactions/issuance";
 export * from "./transactions/refund";
 export * from "./transactions/deposit";
 export * from "./transactions/withdrawal";
+export * from "./transactions/purchase";
+export * from "./transactions/tournament";
 export * from "./policies/limits";
 export * from "./policies/admin-policy";
 export * from "./audit/audit-log";

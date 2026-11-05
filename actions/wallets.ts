@@ -44,13 +44,16 @@ import { WalletUtils } from '@/lib/wallet/wallet-utils';
 import { getAppSettings } from '@/actions/app-settings';
 import { createUserTrace } from '@/actions/user-traces';
 import { getCurrentUser } from '@/lib/auth/session';
+import { executeIssuance, getOrCreateSystemAccount } from '@/lib/finance';
+
 import { assertCanDeposit, assertOwnerOrAdmin, isAdmin } from '@/lib/auth/permissions';
 import {
-  executeTransaction,
-  getOrCreatePlatformAccount,
   getAccountBalance
 } from '@/lib/ledger/ledger-utils';
-import { executeTransfer } from '@/lib/finance';
+import {
+  executeFinancialOperation,
+  executeTransfer,
+} from '@/lib/finance';
 import { createTransaction as createWalletTransaction } from '@/actions/transactions';
 import { revalidatePath } from 'next/cache';
 
@@ -241,7 +244,7 @@ export async function getUserWallets(
  */
 /**
  * Crée un nouveau wallet utilisateur
- * ⚠️ REFACTORÉ: Crée d'abord le financial_account, puis utilise executeTransaction pour le bonus
+ * ⚠️ REFACTORÉ: Crée d'abord le financial_account, puis émet le bonus via executeIssuance (moteur V2)
  */
 export async function createUserWallet(
   walletData: NewUserWallet,
@@ -299,55 +302,20 @@ export async function createUserWallet(
         })
         .returning();
 
-      // 3️⃣ Créer le bonus de bienvenue via executeTransaction
-      // Le bonus vient du compte SYSTEM_ADJUSTMENT vers le compte user
-      const systemAccount = await getOrCreatePlatformAccount(tx, 'SYSTEM_ADJUSTMENT');
-
-      // Créer les ledger entries pour le bonus
-      const transactionId = crypto.randomUUID();
-
-      // Transaction wallet pour l'historique
-      const [welcomeTransaction] = await tx
-        .insert(walletTransactions)
-        .values({
-          id: transactionId,
-          walletId: newWallet.id,
-          financialAccountId: account.id,
-          amount: defaultBalance.toFixed(2),
-          fees: '0',
-          netAmount: defaultBalance.toFixed(2),
-          balanceAfter: defaultBalance.toFixed(2),
-          type: 'BONUS',
-          status: 'COMPLETED',
-          description: 'Bonus de bienvenue - Création de wallet',
-          metadata: {
-            type: 'WELCOME_BONUS',
-            walletCreation: true,
-          },
-          createdAt: new Date(),
-        })
-        .returning();
-
-      // Ledger entries (double-entry)
-      // Débit du compte système
-      await tx.insert(ledgerEntries).values({
-        transactionId,
-        accountId: systemAccount.id,
-        debit: defaultBalance.toFixed(2),
-        credit: '0',
-        currency: 'GTC',
-        createdAt: new Date(),
+      // 3️⃣ Bonus de bienvenue via moteur V2 — émission depuis SYSTEM_GTC_ISSUANCE
+      const welcomeIssue = await executeIssuance({
+        toAccountId: account.id,
+        toUserId: walletData.userId,
+        amount: defaultBalance,
+        walletId: newWallet.id,
+        walletAccountId: account.id,
+        actorId: walletData.userId,
+        reason: 'Bonus de bienvenue — Création de wallet',
+        metadata: { type: 'WELCOME_BONUS', walletCreation: true },
+        client: tx,
       });
+      const welcomeTransaction = welcomeIssue.transaction;
 
-      // Crédit du compte user
-      await tx.insert(ledgerEntries).values({
-        transactionId,
-        accountId: account.id,
-        debit: '0',
-        credit: defaultBalance.toFixed(2),
-        currency: 'GTC',
-        createdAt: new Date(),
-      });
 
       // Journalisation
       await createUserTrace({
@@ -702,7 +670,7 @@ export async function getWalletTransactions(
 /**
  * @deprecated NE PAS UTILISER.
  * Cette action non sécurisée est dépréciée pour des raisons de sécurité comptable.
- * Utiliser actions/transactions.ts::createTransaction ou lib/ledger/ledger-utils.ts::executeTransaction.
+ * @deprecated Utiliser les services lib/finance/transactions/ directement.
  */
 export async function createTransaction(
   transactionData: NewWalletTransaction
@@ -912,7 +880,7 @@ export async function transferBetweenIdentities(params: {
 
 /**
  * Déposer de l'argent sur un wallet (Action d'administration sécurisée)
- * Utilise executeTransaction avec contrepartie autoritaire SYSTEM_ADJUSTMENT
+ * Utilise executeFinancialOperation avec contrepartie SYSTEM_EXTERNAL_CLEARING (moteur V2)
  */
 export async function depositToWallet(
   walletId: string,
@@ -937,20 +905,28 @@ export async function depositToWallet(
     }
 
     const result = await db.transaction(async (tx) => {
-      const systemAccount = await getOrCreatePlatformAccount(tx, 'SYSTEM_ADJUSTMENT');
-      return await executeTransaction({
-        fromAccountId: systemAccount.id,
-        toAccountId: wallet.financialAccountId!,
-        amount,
+      const clearing = await getOrCreateSystemAccount(tx, 'EXTERNAL_CLEARING');
+      return executeFinancialOperation({
+        kind: 'POST',
         type: 'DEPOSIT',
-        description: `Dépôt manuel admin via ${method}`,
-        userId: wallet.userId,
+        status: 'COMPLETED',
+        amount,
         walletId: wallet.id,
-        tx,
-        metadata: {
-          depositMethod: method,
-          adminId: currentUser!.id,
-        },
+        walletAccountId: wallet.financialAccountId!,
+        fromUserId: null,
+        toUserId: wallet.userId,
+        description: `Dépôt manuel admin via ${method}`,
+        reason: 'Dépôt manuel administrateur',
+        metadata: { depositMethod: method, approvedBy: currentUser!.id },
+        postings: [
+          { accountId: clearing.id, debit: amount },
+          { accountId: wallet.financialAccountId!, credit: amount },
+        ],
+        netAmount: amount,
+        createdByUserId: currentUser!.id,
+        idempotencyKey: `admin-deposit:${wallet.id}:${Date.now()}`,
+        idempotencyScope: 'admin:deposit',
+        client: tx,
       });
     });
 

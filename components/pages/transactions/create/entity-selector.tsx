@@ -63,7 +63,6 @@ export function TransactionEntitySelector({
     TRANSFER: null,
     PURCHASE: null,
     REFUND: null,
-    ORDER_PURCHASE: null,
     BONUS: null,
   };
 

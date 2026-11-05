@@ -27,6 +27,39 @@ import { loadFinancePolicy } from "../policies/limits";
 import { writeFinancialAuditLog } from "../audit/audit-log";
 import { loadAdminActor } from "../requests/credit-requests";
 
+export interface IssuancePosting {
+  accountId: string;
+  debit?: number;
+  credit?: number;
+}
+
+export interface IssuancePostingPlan {
+  issuanceAccountId: string;
+  recipientAccountId: string;
+  amount: number;
+}
+
+const roundMoney = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
+/**
+ * Décomposition comptable d'une émission GTC :
+ * - le compte système `SYSTEM_GTC_ISSUANCE` est débité du montant ;
+ * - le compte du bénéficiaire est crédité du même montant.
+ *
+ * Aucun wallet administrateur n'apparaît : la contrepartie est exclusivement
+ * le compte d'émission. Fonction pure, testable sans base de données.
+ */
+export function buildIssuancePostings(
+  plan: IssuancePostingPlan
+): IssuancePosting[] {
+  const amount = roundMoney(plan.amount);
+  return [
+    { accountId: plan.issuanceAccountId, debit: amount },
+    { accountId: plan.recipientAccountId, credit: amount },
+  ];
+}
+
 export interface IssuanceInput {
   /** Compte financier du bénéficiaire. */
   toAccountId: string;

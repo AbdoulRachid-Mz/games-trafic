@@ -361,7 +361,9 @@ export const ledgerEntries = pgTable("ledger_entries", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
 
   // Référence à la transaction wallet (pour traçabilité)
-  transactionId: text("transaction_id").notNull(),
+  transactionId: text("transaction_id")
+    .notNull()
+    .references(() => walletTransactions.id),
 
   // Compte concerné par cette entrée
   accountId: text("account_id")
@@ -377,6 +379,7 @@ export const ledgerEntries = pgTable("ledger_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("ledger_account_idx").on(t.accountId),
+  index("ledger_account_created_idx").on(t.accountId, t.createdAt),
   index("ledger_transaction_idx").on(t.transactionId),
   index("ledger_created_at_idx").on(t.createdAt),
 ]);

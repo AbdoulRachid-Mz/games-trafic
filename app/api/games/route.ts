@@ -8,6 +8,12 @@ import {
   updateGame,
 } from '@/actions/games';
 import { getCurrentUser } from '@/lib/auth/session';
+import {
+  formatValidationError,
+  gameCreateSchema,
+  gameUpdateSchema,
+  gamesListQuerySchema,
+} from '@/lib/api/validation';
 
 async function verifyAdmin() {
   const user = await getCurrentUser();
@@ -52,11 +58,29 @@ export async function GET(request: NextRequest) {
   }
 
   // List with pagination / filters
-  const page = Number(searchParams.get('page') || 1);
-  const limit = Math.min(100, Number(searchParams.get('limit') || 50));
-  const sortBy = searchParams.get('sortBy') || undefined;
-  const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
-  const includeDeleted = searchParams.has('includeDeleted');
+  const parsedQuery = gamesListQuerySchema.safeParse({
+    page: searchParams.get('page') ?? undefined,
+    limit: searchParams.get('limit') ?? undefined,
+    sortBy: searchParams.get('sortBy') ?? undefined,
+    sortOrder: searchParams.get('sortOrder') ?? undefined,
+    includeDeleted: searchParams.get('includeDeleted') ?? undefined,
+  });
+
+  if (!parsedQuery.success) {
+    return NextResponse.json(
+      { error: formatValidationError(parsedQuery.error) },
+      { status: 400 }
+    );
+  }
+
+  const {
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    includeDeleted: includeDeletedFlag,
+  } = parsedQuery.data;
+  const includeDeleted = includeDeletedFlag === true;
 
   // Build filters object compatible with GameFilters
   const filters: Record<string, unknown> = {};
@@ -89,10 +113,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    if (!body?.name) {
-      return NextResponse.json({ error: 'Game name is required' }, { status: 400 });
+    const parsed = gameCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatValidationError(parsed.error) },
+        { status: 400 }
+      );
     }
-    const game = await createGame(body);
+    const game = await createGame(parsed.data as any);
     return NextResponse.json(game, { status: 201 });
   } catch (err: any) {
     return NextResponse.json(
@@ -118,7 +146,14 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const game = await updateGame(id, body);
+    const parsed = gameUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: formatValidationError(parsed.error) },
+        { status: 400 }
+      );
+    }
+    const game = await updateGame(id, parsed.data as any);
     return NextResponse.json(game);
   } catch (err: any) {
     return NextResponse.json(

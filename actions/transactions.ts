@@ -714,7 +714,26 @@ async function handleTransactionTypeSafe(
 
 
 export async function getTransactionFees(type: string, amount: number) {
-  return calculateTransactionFees(type, amount);
+  const calculation = await calculateTransactionFees(type, amount);
+
+  // Convention §3.2 : pour les opérations où les frais sont ajoutés au
+  // payeur, le total débité est `montant + frais`. Pour les achats, les frais
+  // sont retenus sur le vendeur et le payeur est débité du montant seul.
+  const feesAddedToPayer = [
+    "TRANSFER",
+    "WITHDRAWAL",
+    "TOURNAMENT_PARTICIPATION",
+  ].includes(type);
+
+  const totalDebit = feesAddedToPayer
+    ? Math.round((Number(amount) + calculation.fees) * 100) / 100
+    : Number(amount);
+
+  return {
+    ...calculation,
+    totalAmount: totalDebit,
+    totalDebit,
+  };
 }
 
 /**

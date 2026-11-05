@@ -15,8 +15,10 @@ import { db } from "@/lib/db";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
+  calculateTransactionFees,
   executeFinancialOperation,
   getOrCreateSystemAccount,
+  buildTournamentEntryPostings,
 } from "@/lib/finance";
 import { verifyWalletPin } from "./wallets";
 import { getMatchesWithParticipants } from "./phases";
@@ -292,6 +294,26 @@ export async function joinEdition(
             ? { id: edition.financialAccountId }
             : await getOrCreateSystemAccount(tx, "ESCROW");
 
+        // Convention §3.2 : le payeur est débité de `entryFee + frais`,
+        // le pool reçoit le brut, les frais vont à PLATFORM_FEES.
+        const feeCalc = await calculateTransactionFees(
+          "TOURNAMENT_PARTICIPATION",
+          entryFee
+        );
+        const fees = feeCalc.fees;
+        const totalDebit = Math.round((entryFee + fees) * 100) / 100;
+
+        const feeAccount =
+          fees > 0 ? await getOrCreateSystemAccount(tx, "FEES") : null;
+
+        const paymentPostings = buildTournamentEntryPostings({
+          participantAccountId: userWallet.financialAccountId,
+          poolAccountId: targetAccount.id,
+          feeAccountId: feeAccount?.id ?? null,
+          entryFee,
+          fees,
+        });
+
         // Paiement atomique via moteur finance V2 (I2-02, I2-04, §3.2 frais tournoi)
         const transferRes = await executeFinancialOperation({
           kind: "POST",
@@ -308,11 +330,11 @@ export async function joinEdition(
             editionId,
             tournamentId: edition.tournamentId,
             entryFee: entryFee.toString(),
+            fees: fees.toString(),
+            totalDebit: totalDebit.toString(),
           },
-          postings: [
-            { accountId: userWallet.financialAccountId, debit: entryFee },
-            { accountId: targetAccount.id, credit: entryFee },
-          ],
+          postings: paymentPostings,
+          fees,
           netAmount: entryFee,
           createdByUserId: userId,
           idempotencyKey: `tournament-join:${editionId}:${userId}`,
