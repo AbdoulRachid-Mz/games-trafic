@@ -12,6 +12,7 @@ import {
   type PartnerFilters,
 } from "@/validations/partners";
 import { eq, and, or, like, desc, asc, sql, count } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
 import {
   type PartnerCard,
   type PartnerDetail,
@@ -59,6 +60,7 @@ export async function createPartner(
       })
       .returning();
 
+    revalidateTag("partners", "max");
     return { success: true, data: partner };
   } catch (error) {
     console.error("Error creating partner:", error);
@@ -100,6 +102,7 @@ export async function updatePartner(
       return { success: false, error: "Partner not found" };
     }
 
+    revalidateTag("partners", "max");
     return { success: true, data: partner };
   } catch (error) {
     console.error("Error updating partner:", error);
@@ -133,6 +136,7 @@ export async function deletePartner(
       })
       .where(eq(partners.id, id));
 
+    revalidateTag("partners", "max");
     return { success: true };
   } catch (error) {
     console.error("Error deleting partner:", error);

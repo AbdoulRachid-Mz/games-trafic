@@ -12,17 +12,19 @@ import { PartnerCard } from "@/components/cards/partner-card";
 //mise en cache des partenaires
 
 
-// La page dépend de données dynamiques et d'un rendu non déterministe :
-// on force le rendu dynamique pour éviter l'erreur de prerendering.
-export const dynamic = "force-dynamic";
+import { cacheLife, cacheTag } from "next/cache";
 
 export const metadata: Metadata = {
   title: "Nos Partenaires | Plateforme de Tournois Gaming",
   description: "Découvrez nos partenaires de confiance dans le gaming et l'esport",
 };
 
-export default async function PartnersPage() {
-  const result = await getPartners({
+async function getPublicPartners() {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("partners");
+
+  return getPartners({
     isActive: true,
     isVisible: true,
     verified: true,
@@ -32,6 +34,10 @@ export default async function PartnersPage() {
     sortBy: "name",
     sortOrder: "asc",
   });
+}
+
+export default async function PartnersPage() {
+  const result = await getPublicPartners();
 
   const partners = result.data || [];
 

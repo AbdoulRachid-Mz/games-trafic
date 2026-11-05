@@ -26,9 +26,13 @@ export async function getServerSession() {
     });
     return session;
   } catch (error) {
-    if (!isPrerenderError(error)) {
-      console.error("Erreur lors de la récupération de la session:", error);
+    // Les erreurs de prerendering sont propagées pour être gérées par la
+    // frontière `connection()` de l'appelant, plutôt que masquées en
+    // "absence de session".
+    if (isPrerenderError(error)) {
+      throw error;
     }
+    console.error("Erreur lors de la récupération de la session:", error);
     return null;
   }
 }
@@ -40,9 +44,10 @@ export async function getServerSession2(headersObj: Headers) {
     });
     return session;
   } catch (error) {
-    if (!isPrerenderError(error)) {
-      console.error("Erreur session:", error);
+    if (isPrerenderError(error)) {
+      throw error;
     }
+    console.error("Erreur session:", error);
     return null;
   }
 }
