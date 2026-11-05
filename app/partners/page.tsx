@@ -12,6 +12,10 @@ import { PartnerCard } from "@/components/cards/partner-card";
 //mise en cache des partenaires
 
 
+// La page dépend de données dynamiques et d'un rendu non déterministe :
+// on force le rendu dynamique pour éviter l'erreur de prerendering.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Nos Partenaires | Plateforme de Tournois Gaming",
   description: "Découvrez nos partenaires de confiance dans le gaming et l'esport",

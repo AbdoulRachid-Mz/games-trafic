@@ -1,5 +1,9 @@
 import React from "react";
 import { getCurrentUser } from "@/lib/auth/session";
+
+// Les pages protégées dépendent de la session (cookies/headers) : on force
+// le rendu dynamique pour éviter le prerendering qui casse `headers()`.
+export const dynamic = "force-dynamic";
 import { getUserWalletByUserId, initializeUserWallet } from "@/actions/wallets";
 import { redirect } from "next/navigation";
 
