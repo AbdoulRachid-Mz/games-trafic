@@ -1,18 +1,18 @@
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { unstable_rethrow } from 'next/navigation';
 
 // export const dynamic = 'force-dynamic';
 import { unifiedSearch, recordSearchTrend } from '@/actions/search';
 import { getCurrentUser2 } from '@/lib/auth/session';
-import { headers } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
     // Authentification
-    const user = await getCurrentUser2(await headers());
+    const user = await getCurrentUser2(request.headers);
 
     // Paramètres
-    const searchParams = request.nextUrl.searchParams;
+    const searchParams = new URL(request.url).searchParams;
     const term = searchParams.get('term') || '';
     const entity = searchParams.get('entity') || '';
 
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(results, { status: 200 });
 
   } catch (error) {
+    unstable_rethrow(error);
     console.error('Search API error:', error);
     return NextResponse.json(
       { error: 'Failed to perform search' },

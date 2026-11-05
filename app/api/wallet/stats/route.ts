@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import { getTransactionStats } from "@/actions/transactions";
 
 // export const dynamic = 'force-dynamic';
@@ -6,16 +7,15 @@ import { getCurrentUser2 } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { userWallets } from "@/database/schema";
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentUser2(await headers());
+    const session = await getCurrentUser2(request.headers);
     if (!session) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const searchParams = request.nextUrl.searchParams;
+    const searchParams = new URL(request.url).searchParams;
     const walletId = searchParams.get("walletId");
 
     // Si walletId n'est pas fourni, utiliser le wallet de l'utilisateur
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         : 100,
     });
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Error fetching wallet stats:", error);
     return NextResponse.json(
       { error: "Erreur lors de la récupération des statistiques" },

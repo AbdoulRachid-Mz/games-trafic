@@ -1,7 +1,8 @@
 // app/api/auth/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import { getProfile, getMyProfile } from "@/actions/users";
-import { getServerSession } from "@/lib/auth/session";
+import { getServerSession2 } from "@/lib/auth/session";
 
 const SENSITIVE_RELATIONS = ["wallet", "transactions", "notifications", "claims", "requests"];
 const ALLOWED_PUBLIC_RELATIONS = ["shops", "tournaments", "products"];
@@ -9,7 +10,7 @@ const ALLOWED_PUBLIC_RELATIONS = ["shops", "tournaments", "products"];
 export async function GET(request: NextRequest) {
   try {
     // 🛡️ A1-01: Session authentication required on all profile endpoints
-    const session = await getServerSession();
+    const session = await getServerSession2(request.headers);
     if (!session?.user?.id) {
       return NextResponse.json(
         {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     const isCurrentUserAdmin =
       currentUserRole === "admin" || (session.user as any).isAdmin === true;
 
-    const searchParams = request.nextUrl.searchParams;
+    const searchParams = new URL(request.url).searchParams;
     const me = searchParams.get("me") === "true";
     const requestedUserId = searchParams.get("userId");
     const rawRelations = searchParams.get("relations")?.split(",") || [];
@@ -92,6 +93,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    unstable_rethrow(error);
     console.error("Error fetching profile:", error);
     return NextResponse.json(
       {

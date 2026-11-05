@@ -1,5 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -86,7 +87,7 @@ class ApiError extends Error {
 
 export async function GET(request: NextRequest) {
   try {
-    const params = request.nextUrl.searchParams;
+    const params = new URL(request.url).searchParams;
 
     const folder = validateFolder(params.get("folder") || "images");
     const action = validateAction(params.get("action") || "categories");
@@ -137,6 +138,7 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (error) {
+    unstable_rethrow(error);
     if (error instanceof ApiError) {
       return NextResponse.json(
         { error: error.message },

@@ -47,4 +47,4 @@
 
 - Typecheck : `EXIT:0`.
 - Tests unitaires : 197/197 verts.
-- Build de production : en cours de vérification.
+- Build de production : **réussi** (EXIT:0) avec Cache Components et Partial Prefetching activés. Aucune erreur de prerendering.

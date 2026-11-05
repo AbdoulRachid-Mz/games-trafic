@@ -1,40 +1,47 @@
 import React, { Suspense } from "react";
 import { Metadata } from "next";
-import { db } from "@/lib/db";
-import { appSettings } from "@/database/schema";
+import { connection } from "next/server";
 import { VipPageContent } from "@/components/pages/vip/vip-page-content";
 import { Typography } from "@/components/ui/typography";
 import { Sparkles, Crown } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Devenir VIP | GT-V2",
+  title: "Devenir VIP | Games - Trafics",
   description:
-    "Débloquez tout le potentiel de GT-V2 avec nos abonnements VIP exclusifs.",
+    "Débloquez tout le potentiel de Games - Trafics avec nos abonnements VIP exclusifs.",
 };
 
-async function getVipPrices() {
+async function VipPricingSection() {
+  // Opt-in au rendu dynamique : la tarification dépend de la base de données.
+  await connection();
+
+  // Import dynamique pour éviter l'initialisation du Pool Neon pendant le prerendering.
+  const { db } = await import("@/lib/db");
+  const { appSettings } = await import("@/database/schema");
+
+  let prices = {
+    monthly: 999,
+    yearly: 9999,
+    lifetime: 25000,
+  };
+
   try {
     const settings = await db.select().from(appSettings).limit(1);
     const config = settings[0];
 
-    return {
+    prices = {
       monthly: config?.vipMonthlyPrice ? parseInt(config.vipMonthlyPrice) : 999,
       yearly: config?.vipYearlyPrice ? parseInt(config.vipYearlyPrice) : 9999,
-      lifetime: 25000, // Prix fixe ou à ajouter dans la DB plus tard
+      lifetime: 25000,
     };
   } catch (error) {
     console.error("Failed to fetch VIP prices:", error);
-    return {
-      monthly: 999,
-      yearly: 9999,
-      lifetime: 25000,
-    };
   }
+
+  return <VipPageContent prices={prices} />;
 }
 
 export default async function VipPage() {
-  const prices = await getVipPrices();
-
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Background Elements */}
@@ -74,7 +81,7 @@ export default async function VipPage() {
             </div>
           }
         >
-          <VipPageContent prices={prices} />
+          <VipPricingSection />
         </Suspense>
 
         {/* FAQ Section */}
