@@ -17,19 +17,19 @@ import { type ClaimFilters, type ListQuery } from "@/types/api";
 
 // ---------- Schemas de validation ----------
 const createClaimSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().uuid().optional(),
   transactionId: z.string().uuid().optional(),
-  type: z.enum(["PAYMENT", "ACCOUNT", "TECHNICAL", "OTHER"]),
-  title: z.string().min(1),
-  description: z.string().min(1),
+  type: z.string().min(1),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(5000),
   evidence: z.string().optional(),
   image: z.string().url().optional(),
 });
 
 const updateClaimSchema = z.object({
-  type: z.enum(["PAYMENT", "ACCOUNT", "TECHNICAL", "OTHER"]).optional(),
-  title: z.string().min(1).optional(),
-  description: z.string().min(1).optional(),
+  type: z.string().min(1).optional(),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().min(1).max(5000).optional(),
   evidence: z.string().optional(),
   image: z.string().url().optional(),
 });
@@ -83,32 +83,42 @@ export async function GET(req: NextRequest) {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const isAdminUser =
+      user.role === "admin" || (user as { isAdmin?: boolean }).isAdmin === true;
+
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     const stats = url.searchParams.has("stats");
-    const userId = url.searchParams.get("userId");
+    const requestedUserId = url.searchParams.get("userId");
+    // Un non-admin ne peut accéder qu'à ses propres réclamations.
+    const userId = isAdminUser ? requestedUserId : user.id;
 
     if (id) {
       const populate = url.searchParams.getAll("populate");
       const claim = await getClaimById(id, { populate });
       if (!claim)
         return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+      if (!isAdminUser && claim.userId !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       return NextResponse.json(claim);
     }
 
     if (stats) {
       const filters = buildListQuery(url).filters;
-      const statistics = await getClaimStats(filters);
+      const statistics = await getClaimStats(
+        isAdminUser ? filters : { ...filters, userId: user.id }
+      );
       return NextResponse.json(statistics);
     }
 
+    const query = buildListQuery(url);
     if (userId) {
-      const query = buildListQuery(url);
       const result = await getUserClaims(userId, query);
       return NextResponse.json(result);
     }
 
-    const query = buildListQuery(url);
+    // Admin sans filtre utilisateur : liste complète.
     const result = await getClaims(query);
     return NextResponse.json(result);
   } catch (err: any) {
@@ -128,7 +138,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const data = createClaimSchema.parse(body);
-    const claim = await createClaim(data);
+    const claim = await createClaim({ ...data, userId: user.id });
     return NextResponse.json(claim, { status: 201 });
   } catch (err: any) {
     console.error("[POST] /api/claims error:", err);

@@ -474,12 +474,19 @@ export function TransactionRecipientSelector({
                     )}
                   >
                     <div className="flex items-center gap-4">
-                      <Avatar className="h-10 w-10 border border-border/50">
-                        <AvatarImage src={recipient.user.avatar} />
-                        <AvatarFallback className="text-xs">
-                          {recipient.user.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="relative">
+                        <Avatar className="h-10 w-10 border border-border/50">
+                          <AvatarImage src={recipient.user.avatar} />
+                          <AvatarFallback className="text-xs">
+                            {recipient.user.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        {!search && (recipient as any).count > 1 && (
+                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-5 min-w-5 px-1 flex items-center justify-center border-2 border-background">
+                            {(recipient as any).count}
+                          </span>
+                        )}
+                      </div>
                       <div>
                         <Typography
                           variant="body-sm"

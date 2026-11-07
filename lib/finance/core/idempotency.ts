@@ -89,7 +89,9 @@ export async function beginIdempotency(
   const existing = await checkIdempotency(client, request);
   if (existing.state !== "NEW") return existing;
 
-  await client
+  // `returning` distingue une réservation obtenue par nous-même (réponse NEW)
+  // d'une course perdue (le concurrent a déjà réservé la clé).
+  const inserted = await client
     .insert(idempotencyKeys)
     .values({
       scope: request.scope,
@@ -100,10 +102,20 @@ export async function beginIdempotency(
     })
     .onConflictDoNothing({
       target: [idempotencyKeys.scope, idempotencyKeys.key],
-    });
+    })
+    .returning({ id: idempotencyKeys.id });
 
-  // Relit pour couvrir une course concurrente.
-  return checkIdempotency(client, request);
+  if (inserted.length > 0) {
+    return { state: "NEW" };
+  }
+
+  // Race perdue : relit pour connaître l'état du détenteur (COMPLETED / IN_PROGRESS / FAILED).
+  const refetched = await checkIdempotency(client, request);
+  if (refetched.state === "NEW") {
+    // Incohérence théorique (row supprimée entre-temps) : traiter comme occupé.
+    return { state: "IN_PROGRESS" };
+  }
+  return refetched;
 }
 
 /**

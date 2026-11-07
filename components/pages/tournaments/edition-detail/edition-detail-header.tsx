@@ -186,10 +186,12 @@ export function EditionDetailHeader({
     }
   };
 
+  // console.log(tournament.coverImage);
+
   return (
     <div className="relative border-b border-white/10 bg-gradient-to-b from-background via-card/20 to-background">
       {/* 1. HERO BANNER ESPORTS */}
-      <div className="relative w-full overflow-hidden min-h-[220px] md:min-h-[300px] lg:min-h-[340px] flex flex-col justify-end">
+      <div className={cn(`relative w-full overflow-hidden flex flex-col justify-end`, tournament.coverImage ? "min-h-[220px] md:min-h-[300px] lg:min-h-[340px]" : "min-h-6")}>
         {/* Arrière-plan avec Image de Couverture & Mesh Gradient */}
         <div className="absolute inset-0 -z-10">
           {tournament.coverImage ? (

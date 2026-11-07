@@ -80,6 +80,13 @@ function CreateTransactionContent({
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  // Clé d'idempotence : stable pendant un cycle de soumission (double-click,
+  // refresh, erreur réseau) pour éviter une double exécution côté serveur.
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
   const [transactionData, setTransactionData] = useState<TransactionData>({
     type: null as unknown as TransactionType,
     amount: 0,
@@ -698,6 +705,7 @@ function CreateTransactionContent({
           feesAmount: feesObj.amount,
           feesPercentage: feesObj.percentage,
           totalCalculated: feesObj.totalAmount,
+          idempotencyKey,
         },
         pin: verifiedPin || undefined,
       },
@@ -705,6 +713,12 @@ function CreateTransactionContent({
     );
 
     setTransactionId(transaction.id);
+    // Nouvelle clé pour la prochaine soumission (après succès).
+    setIdempotencyKey(
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
 
     await fireConfettiPreset("success");
 
@@ -739,6 +753,14 @@ function CreateTransactionContent({
   } catch (error: any) {
     if (error?.message?.includes("déjà en cours")) {
       setDuplicateDialogOpen(true);
+    } else if (error?.message?.includes("nouvelle clé")) {
+      // Clé d'idempotence consommée par une tentative échouée : régénérer.
+      setIdempotencyKey(
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
+      toast.error(error.message);
     } else {
       toast.error(error.message);
     }
@@ -914,6 +936,8 @@ function CreateTransactionContent({
               amount: transactionData.amount,
               fees: feesObj.amount,
               totalAmount: feesObj.totalAmount,
+              walletId: completeData?.wallet?.id || "",
+              recipientId: transactionData.recipientWalletId ?? null,
             }}
           />
         );

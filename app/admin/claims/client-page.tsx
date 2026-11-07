@@ -34,6 +34,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ResultDialog } from "@/components/shared/result-dialog";
+import { claimTypeLabel } from "@/lib/claims/claim-types";
+import { ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StatCard } from "@/components/admin/stat-card";
@@ -136,21 +138,16 @@ export default function ClientClaimsPage() {
   };
 
   const getTypeLabel = (type: string) => {
-    const types: Record<string, string> = {
-      PAYMENT: "Paiement",
-      DELIVERY: "Livraison",
-      PRODUCT: "Produit",
-      SERVICE: "Service",
-      ACCOUNT: "Compte",
-      OTHER: "Autre",
-    };
-    return types[type] || type;
+    return claimTypeLabel(type);
   };
 
   const handleProcess = async () => {
     if (!selectedClaim || !newStatus) return;
-    if (!resolution.trim() && newStatus !== "IN_PROGRESS") {
-      toast.error("Veuillez fournir une résolution");
+    if (
+      !resolution.trim() &&
+      (newStatus === "RESOLVED" || newStatus === "REJECTED")
+    ) {
+      toast.error("Une résolution écrite est obligatoire pour résoudre ou rejeter");
       return;
     }
 
@@ -269,12 +266,18 @@ export default function ClientClaimsPage() {
             label: "Type",
             type: "select",
             options: [
+              { label: "Problème de transaction", value: "TRANSACTION_ISSUE" },
+              { label: "Wallet bloqué", value: "WALLET_LOCKED" },
+              { label: "Problème de vérification", value: "VERIFICATION_ISSUE" },
+              { label: "Problème de sécurité", value: "SECURITY_CONCERN" },
+              { label: "Autre", value: "OTHER" },
+              // Anciens types (historique)
               { label: "Paiement", value: "PAYMENT" },
               { label: "Livraison", value: "DELIVERY" },
               { label: "Produit", value: "PRODUCT" },
               { label: "Service", value: "SERVICE" },
               { label: "Compte", value: "ACCOUNT" },
-              { label: "Autre", value: "OTHER" },
+              { label: "Technique", value: "TECHNICAL" },
             ],
           },
         ]}
@@ -384,10 +387,54 @@ export default function ClientClaimsPage() {
                 <div className="flex justify-between">
                   <span className="text-sm font-medium">Utilisateur:</span>
                   <span className="text-sm">
-                    {selectedClaim.user?.username}
+                    {selectedClaim.user?.username ||
+                      selectedClaim.user?.fullName ||
+                      "—"}
                   </span>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <div className="p-3 bg-background/60 rounded-lg text-sm text-muted-foreground whitespace-pre-wrap max-h-32 overflow-y-auto">
+                  {selectedClaim.description}
+                </div>
+              </div>
+
+              {selectedClaim.transactionId && (
+                <div className="space-y-2">
+                  <Label>Transaction concernée</Label>
+                  <span className="block text-xs font-mono break-all text-muted-foreground">
+                    {selectedClaim.transactionId}
+                  </span>
+                </div>
+              )}
+
+              {selectedClaim.image && (
+                <div className="space-y-2">
+                  <Label>Preuve visuelle</Label>
+                  <img
+                    src={selectedClaim.image}
+                    alt="Preuve"
+                    className="rounded-lg border border-border max-h-64 w-full object-contain"
+                  />
+                </div>
+              )}
+
+              {selectedClaim.evidence && (
+                <div className="space-y-2">
+                  <Label>Lien de preuve</Label>
+                  <a
+                    href={selectedClaim.evidence}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary hover:underline break-all"
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                    {selectedClaim.evidence}
+                  </a>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Nouveau statut</Label>
@@ -405,11 +452,18 @@ export default function ClientClaimsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Résolution {newStatus !== "IN_PROGRESS" && "*"}</Label>
+                <Label>
+                  Résolution
+                  {(newStatus === "RESOLVED" || newStatus === "REJECTED") && " *"}
+                </Label>
                 <Textarea
                   value={resolution}
                   onChange={(e) => setResolution(e.target.value)}
-                  placeholder="Décrivez la résolution ou la raison du rejet..."
+                  placeholder={
+                    newStatus === "REJECTED"
+                      ? "Expliquez la raison du rejet (visible par l'utilisateur)..."
+                      : "Décrit la résolution ou les actions prises (visible par l'utilisateur)..."
+                  }
                   rows={4}
                 />
               </div>

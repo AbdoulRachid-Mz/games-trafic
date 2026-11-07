@@ -241,6 +241,26 @@ export function TransactionAmountInput({
                 </div>
               </div>
 
+              {requiresAmountInput && !requiresQuantity && !isFixedPrice && (
+                <div className="flex justify-center gap-2">
+                  {[-1000, -100, 100, 1000].map((step) => (
+                    <Button
+                      key={step}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const next = Math.max(0, (amount || 0) + step);
+                        onChange(next);
+                      }}
+                      className="h-9 px-3 text-xs font-bold"
+                    >
+                      {step > 0 ? `+${step}` : step} GTC
+                    </Button>
+                  ))}
+                </div>
+              )}
+
               {quickAmounts.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-3">
                   {quickAmounts.map((quickAmount) => (

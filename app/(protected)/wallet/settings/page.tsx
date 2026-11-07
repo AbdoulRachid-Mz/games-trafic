@@ -10,11 +10,12 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Lock, Unlock, Eye, EyeOff, Shield, CreditCard, DollarSign, History, Settings } from 'lucide-react'
+import { Loader2, Lock, Unlock, Eye, EyeOff, Shield, CreditCard, DollarSign, History, Settings, KeyRound } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { getCurrentUserWallet, updateUserWallet, verifyWalletPin, toggleWalletLock, updateWalletPinAction } from '@/actions/wallets'
 import { UserWallet } from '@/database/schema'
 import { AutoSyncField } from '@/components/shared/auto-sync-field'
+import { PinResetDialog } from '@/components/wallet/pin-reset-dialog'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
@@ -28,10 +29,16 @@ const WalletSettingsPage = () => {
   const [confirmPin, setConfirmPin] = useState('')
   const [updatingPin, setUpdatingPin] = useState(false)
   const [updatingLock, setUpdatingLock] = useState(false)
+  const [pinResetOpen, setPinResetOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
     loadWallet()
+    if (new URLSearchParams(window.location.search).get('action') === 'recover-pin') {
+      setPinResetOpen(true)
+      router.replace('/wallet/settings')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadWallet = async () => {
@@ -270,6 +277,15 @@ const WalletSettingsPage = () => {
               {updatingPin && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Mettre à jour le PIN
             </Button>
+
+            <Button
+              variant="ghost"
+              onClick={() => setPinResetOpen(true)}
+              className="w-full text-primary"
+            >
+              <KeyRound className="mr-2 h-4 w-4" />
+              PIN oublié ? Réinitialiser via code
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -305,6 +321,13 @@ const WalletSettingsPage = () => {
           )}
         </CardContent>
       </Card>
+
+      <PinResetDialog
+        open={pinResetOpen}
+        onOpenChange={setPinResetOpen}
+        walletId={wallet?.id}
+        onSuccess={loadWallet}
+      />
     </div>
   )
 }

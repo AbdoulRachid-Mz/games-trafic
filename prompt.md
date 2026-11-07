@@ -1,982 +1,779 @@
-# MASTER PROMPT — REFACTORING COMPLET DU SYSTÈME DE TRANSACTIONS
-## Games Trafic — Architecture financière, administration et portefeuille utilisateur
+# GAMES-TRAFICS — AUDIT ET REFONTE DU WALLET, DES TRANSACTIONS ET DE LA SÉCURITÉ
 
-Tu interviens sur le projet **Games Trafic**, une plateforme gaming avec un système de portefeuille GTC, des transactions entre utilisateurs, des achats, des inscriptions aux tournois, des dépôts, des retraits et des opérations administratives.
+## 1. CONTEXTE DU PROJET
 
-Repository : https://github.com/AbdoulRachid-Mz/games-trafic
+Projet : Games-Trafics
 
-Ta mission est de réaliser une **refonte complète, cohérente, sécurisée et maintenable du système de transactions**, aussi bien côté administration que côté utilisateurs.
+Dépôt : https://github.com/AbdoulRachid-Mz/games-trafic
 
-Il ne s'agit pas simplement de modifier quelques composants ou de refaire le design. Tu dois comprendre le fonctionnement financier actuel, identifier les incohérences, consolider les règles métier et reconstruire les parcours nécessaires sans casser les fonctionnalités existantes.
+Stack :
+- Next.js 16.4.3 — App Router
+- React 19
+- TypeScript strict
+- PostgreSQL / Neon
+- Drizzle ORM
+- Better Auth
+- Better Auth Passkey
+- Tailwind CSS 4
+- Framer Motion
+- Bun
+- Vercel
 
----
+Architecture financière :
+- user_wallets
+- wallet_transactions
+- financial_accounts
+- ledger_entries
+- idempotency_keys
+- Moteur financier centralisé dans lib/finance/
 
-# PHASE 0 — RÈGLES DE TRAVAIL OBLIGATOIRES
+IMPORTANT : Le ledger en partie double est la source de vérité des soldes. Il ne faut jamais réintroduire un système de modification directe des soldes des wallets.
+
+L'objectif est de corriger les problèmes actuels et d'améliorer considérablement l'expérience de transaction sans compromettre la sécurité financière.
+
+## 2. RÈGLES DE TRAVAIL
 
 Avant toute modification :
 
-1. Explore le projet réel et son architecture.
-2. Identifie les technologies, conventions et patterns déjà utilisés.
-3. Lis les schémas de base de données, les types, les actions serveur, les services, les API, les hooks et les composants concernés.
-4. Recherche toutes les références aux transactions et aux opérations financières.
-5. Trace les flux depuis l'interface jusqu'à la base de données.
-6. Identifie les dépendances entre les pages, les composants, les actions et les tables.
-7. Ne suppose jamais qu'une fonctionnalité existe uniquement parce qu'un type ou un composant porte son nom.
-8. Ne crée pas une deuxième implémentation d'une logique métier déjà présente sans avoir justifié cette décision.
-9. Ne supprime aucune fonctionnalité sans analyser ses dépendances et proposer une migration.
-10. Ne modifie pas le schéma de données avant d'avoir identifié les conséquences sur les données existantes.
+1. Examiner le dépôt et son architecture réelle.
+2. Lire les fichiers concernés dans leur intégralité.
+3. Examiner les migrations Drizzle existantes.
+4. Examiner les services financiers et les contrats des Server Actions.
+5. Identifier les relations entre le frontend, Better Auth, les wallets et le ledger.
+6. Identifier les fonctionnalités existantes à préserver.
 
-**Interdiction de commencer par le code.** La première étape est obligatoirement l'audit.
+Ne pas remplacer des composants existants sans comprendre leurs dépendances.
 
-Ne te limite pas aux fichiers mentionnés dans ce prompt. Utilise la recherche globale du dépôt pour découvrir tous les fichiers qui participent réellement au système.
+Ne pas créer une deuxième implémentation d'une fonctionnalité déjà disponible.
 
-Ne fais pas de refonte superficielle : chaque décision doit être fondée sur le code réellement trouvé.
+Ne pas multiplier les Server Actions similaires.
+
+Privilégier les services réutilisables et les contrats TypeScript cohérents.
 
 ---
 
-# PHASE 1 — AUDIT COMPLET DU SYSTÈME EXISTANT
+# PHASE 1 — CORRECTION DU SCHÉMA ET DES REQUÊTES SQL
 
-## 1.1 Cartographie des transactions
+## 1.1. Erreur actuelle
 
-Explore notamment, sans te limiter à :
+Erreur PostgreSQL :
 
-- `actions/transactions.ts`
-- `actions/wallets.ts`
-- `types/transaction-types.ts`
-- `database/schema.ts`
-- `database/db.sql`
-- `app/admin/transactions/`
-- `app/(protected)/wallet/transactions/`
-- `components/pages/transactions/`
-- `components/pages/admin/transactions/`
-- `lib/finance/`
-- `validations/`
-- `hooks/`
-- `config/`
+column "reference" does not exist
 
-Vérifie les véritables chemins dans le projet et adapte-toi à leur organisation actuelle.
+Localisation :
+actions/wallets.ts
+actions/transactions.ts
 
-Identifie :
+Le schéma Drizzle déclare notamment :
 
-- Toutes les catégories de transactions.
-- Tous les statuts possibles.
-- Les types de comptes financiers.
-- Les comptes de portefeuille.
-- Les écritures comptables.
-- Les mécanismes de débit et de crédit.
-- Les commissions et frais éventuels.
-- Les remboursements.
-- Les annulations.
-- Les demandes de transaction.
-- Les opérations administratives.
-- Les notifications associées.
-- Les historiques et reçus.
-- Les limites et règles de validation.
+- reference
+- idempotencyKey
+- createdByUserId
+- actorLevel
+- reason
+- reversalOf
+- reversedBy
+- completedAt
 
-## 1.2 Traçage de chaque opération
+Mais la base Neon ne semble pas contenir toutes ces colonnes.
 
-Pour chaque type de transaction, documente le parcours complet :
+## 1.2. Audit obligatoire
 
-`Page → Composant → Hook → Action/API → Service métier → Base de données → Résultat → Notification`
+Comparer automatiquement :
 
-Vérifie notamment :
+- database/schema.ts
+- Toutes les migrations du dossier drizzle/
+- La structure réelle de PostgreSQL via information_schema.columns.
+- Les index, contraintes uniques et clés étrangères.
 
-- Où le montant est calculé.
-- Où le solde est vérifié.
-- Où le destinataire est récupéré.
-- Où les autorisations sont vérifiées.
-- Où les écritures comptables sont créées.
-- Où le statut est modifié.
-- Comment les erreurs sont retournées.
-- Comment les doublons sont évités.
-- Comment les transactions concurrentes sont gérées.
+Examiner particulièrement wallet_transactions.
 
-Signale toutes les divergences entre le frontend et le backend.
+Identifier toutes les colonnes absentes, les types différents et les index manquants.
 
-## 1.3 Audit des autorisations administratives
+## 1.3. Migration
 
-Le projet possède des administrateurs de niveaux A, B et C.
+Créer une migration SQL versionnée et sécurisée.
 
-Recherche précisément :
+Exigences :
 
-- La définition des rôles.
-- Le champ `users.level` et son enum.
-- Les permissions existantes.
-- Les contrôles dans les actions serveur.
-- Les contrôles dans les pages et composants.
-- Les éventuelles différences entre `role`, `isAdmin` et `level`.
+- Ajouter les colonnes manquantes sans supprimer les données.
+- Créer les index et contraintes nécessaires.
+- Préserver les transactions historiques.
+- Éviter les doublons de références.
+- Ne pas recréer les tables existantes.
+- Prévoir une migration compatible avec les données de production.
 
-Ne considère jamais qu'un simple contrôle `isAdmin` suffit à autoriser une opération financière.
+Ne pas utiliser db:push aveuglément sur la production.
 
-Documente les permissions réellement appliquées et les éventuelles failles.
+Tester la migration sur une base de staging avant application.
 
-## 1.4 Audit de la création des transactions utilisateur
+Vérifier ensuite que les requêtes Drizzle utilisant select() fonctionnent correctement.
 
-Analyse intégralement le parcours de création dans le portefeuille.
+## 1.4. Requêtes de transactions
 
-Vérifie :
+Auditer les deux implémentations :
 
-- Les paramètres URL.
-- La récupération des entités.
-- Les configurations par type.
-- Les étapes du formulaire.
-- Les composants conditionnels.
-- Les validations.
-- Les calculs de montant.
-- La confirmation.
-- L'exécution.
-- Les retours d'erreur.
-- La navigation après transaction.
+- getWalletTransactions dans actions/wallets.ts
+- getWalletTransactions dans actions/transactions.ts
 
-Vérifie particulièrement les paramètres :
+Éviter les divergences de comportement.
 
-- `editionId`
-- `tournamentId`
-- `itemId`
-- `productId`
-- `userId`
-- `targetId`
-- `entityId`
-- `id`
+Créer une implémentation canonique si cela est pertinent, en conservant les contrats utilisés par les pages existantes.
 
-Chaque paramètre doit être interprété selon le type de transaction. Ne te contente pas de récupérer un identifiant générique si cela risque de charger la mauvaise entité.
+Vérifier :
+- Pagination.
+- Filtres.
+- Statuts.
+- Dates.
+- Types de transactions.
+- Tri.
+- Transactions entrantes et sortantes.
+- Exclusion des transactions supprimées.
+
+Toutes les lectures doivent vérifier que le wallet appartient à l'utilisateur connecté, sauf autorisation administrative explicite.
 
 ---
 
-# PHASE 2 — DOCUMENTATION ET PROPOSITION D'ARCHITECTURE
+# PHASE 2 — REFONTE DES STATISTIQUES DU WALLET
 
-Avant d'implémenter, crée deux fichiers à la racine :
+Fichiers principaux :
 
-## `TRANSACTION-AUDIT.md`
+- app/(protected)/wallet/client-page.tsx
+- components/pages/wallet/stats-overview.tsx
+- components/pages/wallet/transaction-list.tsx
+- actions/wallets.ts
 
-Il doit contenir :
+## 2.1. Problème actuel
 
-1. Architecture financière actuelle.
-2. Cartographie des fichiers concernés.
-3. Liste des types et statuts existants.
-4. Fonctionnement du ledger.
-5. Flux de chaque transaction.
-6. Fonctionnement administratif actuel.
-7. Fonctionnement utilisateur actuel.
-8. Problèmes de sécurité.
-9. Incohérences entre types, enums et schémas.
-10. Problèmes UX/UI.
-11. Doublons et logiques dispersées.
-12. Risques de régression.
-13. Éléments fonctionnels à préserver.
+Dans client-page.tsx, le chargement des transactions précède celui des statistiques dans le même try.
 
-Chaque constat doit mentionner les fichiers concernés et, lorsque possible, les fonctions responsables.
+Si la récupération des transactions échoue, les statistiques ne sont jamais chargées.
 
-Ne présente pas une hypothèse comme un problème confirmé.
+Séparer les chargements pour qu'une erreur indépendante ne bloque pas l'autre.
 
-## `TRANSACTION-IMPLEMENTATION-PLAN.md`
+## 2.2. Source des statistiques
 
-Il doit contenir :
+Utiliser financial_accounts et ledger_entries comme source de vérité des mouvements financiers.
 
-1. Architecture cible.
-2. Organisation des modules.
-3. Modèle financier proposé.
-4. Permissions A/B/C.
-5. Fonctionnement des demandes administratives.
-6. Parcours utilisateur par type.
-7. Modifications du schéma.
-8. Modifications des types.
-9. Modifications des actions et services.
-10. Modifications des interfaces.
-11. Stratégie de migration.
-12. Tests nécessaires.
-13. Plan d'implémentation par phases.
-14. Risques et mesures de protection.
+Calculer :
 
-**Arrête-toi après ces deux documents et présente le bilan de l'audit ainsi que les décisions architecturales proposées.** Ne commence l'implémentation qu'après validation du plan.
+- Nombre total de transactions.
+- Nombre de transactions terminées.
+- Transactions en attente.
+- Revenus totaux.
+- Dépenses totales.
+- Volume financier.
+- Évolution mensuelle.
+- Activité quotidienne ou hebdomadaire.
 
----
+Les mouvements doivent être calculés pour le compte financier du wallet.
 
-# PHASE 3 — NOUVELLE ARCHITECTURE FINANCIÈRE
+Ne pas assimiler systématiquement TRANSFER à un revenu ou à une dépense : déterminer le sens du mouvement.
 
-Après validation du plan, refactorise le système autour d'un moteur financier centralisé.
+## 2.3. Transactions entrantes et sortantes
 
-## 3.1 Principe fondamental
+Une transaction de transfert possède :
+- fromUserId
+- toUserId
+- walletId
+- financialAccountId
 
-Il doit exister une seule source de vérité pour les opérations financières.
+Le walletId est actuellement principalement associé au wallet expéditeur.
 
-Les opérations doivent passer par des services métier communs qui garantissent :
+Ne pas compter uniquement walletTransactions.walletId pour déterminer toute l'activité du bénéficiaire.
 
-- La cohérence du ledger.
-- L'atomicité.
-- La validation des montants.
-- Les autorisations.
-- L'idempotence.
-- La traçabilité.
-- La gestion des erreurs.
-- La cohérence des statuts.
+Utiliser les relations entre ledger_entries et financial_accounts pour déterminer les mouvements réellement associés au compte.
 
-Les Server Actions et API routes doivent rester des points d'entrée. Elles ne doivent pas contenir toute la logique comptable.
+Pour le nombre de transactions, utiliser un comptage distinct afin d'éviter les doublons.
 
-## 3.2 Architecture indicative
+Intégrer les transactions en attente lorsqu'elles ne possèdent pas encore d'écritures de ledger, sans les compter deux fois.
 
-Propose une organisation adaptée au projet, par exemple :
+## 2.4. Sécurité
 
-```text
-lib/
-  finance/
-    core/
-      ledger.ts
-      accounts.ts
-      transaction-engine.ts
-      transaction-context.ts
-      idempotency.ts
-    transactions/
-      transfer.ts
-      issuance.ts
-      deposit.ts
-      withdrawal.ts
-      purchase.ts
-      refund.ts
-    requests/
-      transaction-requests.ts
-      approval.ts
-    policies/
-      admin-transaction-policy.ts
-      transaction-limits.ts
-    validations/
-      transaction-validation.ts
-    utils/
-      transaction-reference.ts
-      transaction-errors.ts
+getWalletLedgerStats et getWalletLedgerDailyFlow doivent vérifier l'appartenance du wallet à l'utilisateur connecté.
 
-actions/
-  transactions/
-    transfer.ts
-    purchase.ts
-    deposit.ts
-    withdrawal.ts
-    requests.ts
-  admin/
-    transactions/
-      issuance.ts
-      requests.ts
-      history.ts
-      refund.ts
+Un utilisateur ne doit jamais pouvoir fournir arbitrairement le walletId d'un autre utilisateur pour consulter ses statistiques.
 
-components/
-  pages/
-    transactions/
-      create/
-    admin/
-      transactions/
-```
+Les erreurs SQL ne doivent pas être silencieusement transformées en statistiques à zéro.
 
-Cette structure est indicative. Ne la reproduis pas aveuglément si l'organisation actuelle du projet justifie une meilleure solution.
+Retourner un résultat exploitable par le frontend avec gestion explicite des erreurs.
 
-Évite les fichiers géants et les dépendances circulaires.
+## 2.5. Interface
+
+Conserver le design existant.
+
+Améliorer :
+- Les états de chargement.
+- Les skeletons.
+- Les états vides.
+- L'actualisation.
+- Les graphiques.
+- Les montants entrants et sortants.
+- Les indicateurs de variation.
+
+Corriger également le useEffect de StatsOverview : sa dépendance doit tenir compte de walletId pour éviter de conserver des données associées à un ancien wallet.
 
 ---
 
-# PHASE 4 — SYSTÈME DE CRÉDIT GTC ADMINISTRATEUR
+# PHASE 3 — REFONTE DU PARCOURS DE CRÉATION DE TRANSACTIONS
 
-C'est une fonctionnalité prioritaire.
+Fichiers principaux :
 
-Nous devons créer un véritable système d'émission contrôlée de GTC, distinct d'un transfert classique.
+- app/(protected)/wallet/transactions/create/page.tsx
+- types/transaction-types.ts
+- components/pages/transactions/create/
+- actions/transactions.ts
 
-## 4.1 Règles métier
+Conserver l'architecture par étapes et les configurations TRANSACTION_CONFIGS.
 
-### Administrateurs A et B
+Types à préserver :
 
-Les administrateurs de niveau A et B peuvent :
+- TRANSFER
+- DEPOSIT
+- WITHDRAWAL
+- VIP_SUBSCRIPTION
+- GAME_ITEM_PURCHASE
+- ORDER_PURCHASE
+- THEME_PURCHASE
+- TOURNAMENT_PARTICIPATION
+- PURCHASE
+- REFUND
+- BONUS
 
-- Créer une opération de crédit GTC.
-- Choisir un destinataire.
-- Créditer un utilisateur ordinaire.
-- Créditer un administrateur C.
-- Indiquer un montant.
-- Ajouter un motif obligatoire.
-- Consulter leurs opérations.
-- Consulter les détails et le statut des opérations.
+Chaque type conserve ses propres règles métier.
 
-Ils ne doivent pas avoir besoin de posséder eux-mêmes les GTC envoyés.
+## 3.1. Fluidité
 
-**Important :** le système ne doit pas débiter leur portefeuille personnel.
+Améliorer le passage entre les étapes.
 
-### Administrateurs C
+- Transitions visuelles rapides.
+- Éviter les rechargements inutiles.
+- Conserver les informations déjà saisies lors d'un retour en arrière.
+- Éviter les doubles soumissions.
+- Désactiver uniquement les contrôles concernés pendant les opérations.
+- Afficher clairement les frais et le montant final.
+- Éviter les redirections prématurées.
 
-Les administrateurs C ne peuvent pas émettre directement des GTC.
+Après une authentification réussie, l'utilisateur doit rester dans son parcours de transaction.
 
-Ils peuvent :
+Après confirmation, afficher TransactionSuccess et permettre à l'utilisateur de choisir entre le wallet et l'historique.
 
-- Créer une demande de crédit.
-- Sélectionner le destinataire.
-- Indiquer le montant.
-- Fournir un motif obligatoire.
-- Consulter leurs demandes.
-- Consulter le statut de chaque demande.
-- Voir les informations de validation ou de rejet.
+Conserver les reçus et les notifications existants.
 
-Aucun GTC ne doit être crédité lors de la soumission.
+Ne pas rediriger automatiquement vers les produits.
 
-### Approbateurs
+## 3.2. Contrôle des étapes
 
-Les administrateurs autorisés, selon la politique définie, peuvent :
+Auditer les appels à nextStep(), executeConfirm() et handleConfirm().
 
-- Consulter les demandes en attente.
-- Examiner le demandeur.
-- Examiner le destinataire.
-- Vérifier le montant.
-- Consulter le motif.
-- Approuver.
-- Rejeter avec une justification obligatoire.
+Garantir qu'une étape n'est pas sautée et qu'une opération n'est pas exécutée deux fois.
 
-Une approbation déclenche le mouvement comptable réel.
+Préserver les cas particuliers :
+- Dépôt : création d'une demande.
+- Retrait : création d'une demande.
+- Achat d'item : création de demande.
+- Achat produit : création de commande.
+- Transfert : exécution financière.
+- Abonnement : exécution selon les règles existantes.
 
-Un rejet ne doit jamais modifier le solde.
-
-Le demandeur ne peut pas approuver sa propre demande.
-
-## 4.2 Modèle comptable recommandé
-
-Étudie le ledger existant avant de créer de nouvelles tables.
-
-Le modèle recommandé est un compte de contrepartie système dédié à l'émission, par exemple :
-
-`SYSTEM_GTC_ISSUANCE`
-
-Lors d'une émission de 500 GTC :
-
-- Débit du compte système d'émission : 500 GTC.
-- Crédit du compte portefeuille destinataire : 500 GTC.
-
-Le mouvement doit être équilibré et enregistré atomiquement.
-
-Le compte système doit être clairement identifié comme un compte technique de contrepartie, pas comme le portefeuille d'un utilisateur.
-
-Ne crée pas de solde système fictif ou de mécanisme qui permettrait d'émettre sans aucune trace comptable.
-
-Si le modèle de ledger actuel n'est pas compatible, propose et documente la migration nécessaire.
-
-## 4.3 Limites et contrôle
-
-Prévoir une architecture permettant de configurer :
-
-- Le montant minimal.
-- Le montant maximal par opération.
-- Le plafond journalier.
-- Les limites par niveau.
-- Les opérations nécessitant une deuxième approbation.
-
-Ces limites doivent être validées côté serveur.
-
-Ne fixe pas arbitrairement des montants métier sans justification. Utilise une configuration documentée et des valeurs adaptées à la politique actuelle du projet.
-
-## 4.4 Traçabilité
-
-Chaque émission doit conserver :
-
-- Identifiant de transaction.
-- Administrateur émetteur.
-- Niveau administratif au moment de l'opération.
-- Destinataire.
-- Montant.
-- Motif.
-- Date.
-- Type d'émission.
-- Compte de contrepartie.
-- Statut.
-- Référence comptable.
-
-Pour les demandes :
-
-- Demandeur.
-- Destinataire.
-- Montant.
-- Motif.
-- Date de soumission.
-- Statut.
-- Approbateur.
-- Date de décision.
-- Justification de rejet éventuelle.
-- Transaction réellement générée après approbation.
-
-L'historique ne doit pas être modifiable par les utilisateurs ordinaires.
+Ne pas transformer une demande en transaction terminée prématurément.
 
 ---
 
-# PHASE 5 — REFONTE COMPLÈTE DE L'INTERFACE ADMINISTRATEUR
+# PHASE 4 — CORRECTION ET REFONTE DU PASSKEY
 
-La page `/admin/transactions` doit disposer de son propre système d'interface.
+Fichier actuel :
 
-**Ne réutilise pas directement les formulaires de création utilisateur.**
+components/pages/transactions/create/pin-verification.tsx
 
-Les composants peuvent partager des éléments UI génériques, mais les parcours et les règles métier doivent être distincts.
+Problème :
 
-## 5.1 Tableau de bord
+authClient.signIn.passkey() lance une authentification Better Auth avec un mécanisme de redirection.
 
-Organise l'interface autour de :
+Ce comportement ne convient pas à la validation d'une transaction déjà initiée par un utilisateur connecté.
 
-- Vue générale des transactions.
-- Historique.
-- Émissions GTC.
-- Demandes de crédit.
-- Dépôts.
-- Retraits.
-- Remboursements.
-- Filtres et recherches.
+## 4.1. Objectif
 
-N'affiche que les catégories réellement supportées par le backend.
+Créer une validation Passkey spécifique aux transactions.
 
-## 5.2 Formulaire d'émission
+Elle doit fonctionner sans déconnecter l'utilisateur, sans modifier sa session et sans déclencher la navigation vers la page de produits.
 
-Créer un formulaire spécifique avec :
+## 4.2. Audit technique
 
-1. Sélection du destinataire.
-2. Recherche par pseudo, nom ou identifiant.
-3. Identification claire du destinataire.
-4. Affichage de son portefeuille.
-5. Saisie du montant GTC.
-6. Motif obligatoire.
-7. Récapitulatif.
-8. Confirmation.
-9. Résultat de l'opération.
+Examiner :
 
-Le formulaire doit afficher explicitement que l'émission ne débite pas le portefeuille personnel de l'administrateur.
+- lib/auth.ts
+- lib/auth-client.ts
+- @better-auth/passkey
+- Les credentials enregistrés dans la table passkey.
+- Les API WebAuthn compatibles avec les credentials existants.
 
-Prévoir un état de chargement, les erreurs, les validations et la confirmation de réussite.
+Ne pas confondre connexion à l'application et autorisation d'une transaction.
 
-## 5.3 Formulaire de demande
+Ne pas considérer le simple retour success de signIn.passkey() comme une autorisation financière.
 
-Pour un administrateur C :
+## 4.3. Architecture attendue
 
-1. Sélection du destinataire.
-2. Saisie du montant.
-3. Motif.
-4. Récapitulatif.
-5. Soumission de la demande.
+Mettre en place un challenge WebAuthn spécifique :
 
-Afficher clairement que la demande n'est pas encore un crédit et que le portefeuille ne sera modifié qu'après approbation.
+1. Le client demande une autorisation pour la transaction en cours.
+2. Le serveur vérifie l'utilisateur et le wallet.
+3. Le serveur génère un challenge cryptographiquement sécurisé.
+4. Le challenge est lié à l'utilisateur, au wallet, au type, au montant, au destinataire et aux frais applicables.
+5. Le navigateur déclenche navigator.credentials.get() via une implémentation compatible.
+6. Le serveur vérifie la signature et le credential enregistré.
+7. Le serveur vérifie l'expiration et l'absence de réutilisation.
+8. Le serveur autorise une seule exécution de la transaction.
 
-## 5.4 Gestion des demandes
+L'autorisation doit être à usage unique et être consommée de manière atomique avec l'opération financière, autant que possible.
 
-Créer une interface adaptée aux approbateurs :
+Une preuve valable pour un montant ou un destinataire ne doit pas pouvoir être réutilisée pour un autre.
 
-- Liste des demandes.
-- Filtres par statut.
-- Détails complets.
-- Bouton approuver.
-- Bouton rejeter.
-- Champ de justification du rejet.
-- Confirmation avant décision.
-- Historique des décisions.
+Ne jamais faire confiance à une simple variable React ou à un booléen envoyé par le navigateur.
 
-Les boutons doivent être conditionnés par les permissions réelles.
+## 4.4. Compatibilité PIN
 
-## 5.5 Composants
+Conserver le PIN comme méthode alternative.
 
-Créer des composants spécialisés et réutilisables :
+Les deux méthodes doivent aboutir à une autorisation vérifiée côté serveur :
 
-- `AdminTransactionTable`
-- `AdminTransactionFilters`
-- `AdminGtcIssuanceForm`
-- `AdminGtcRequestForm`
-- `TransactionRequestTable`
-- `TransactionRequestDetails`
-- `TransactionApprovalDialog`
-- `TransactionRejectionDialog`
-- `TransactionAuditDetails`
+- PIN validé.
+- Passkey validé.
 
-Adapte les noms et l'organisation aux conventions du projet.
+Adapter createTransaction dans actions/transactions.ts pour accepter les deux mécanismes de façon sécurisée.
+
+Conserver les règles d'autorisation propres aux types de transactions.
+
+Ne pas supprimer la vérification PIN obligatoire pour les transferts et les retraits sans mécanisme de remplacement équivalent.
 
 ---
 
-# PHASE 6 — REFONTE DU PARCOURS UTILISATEUR / WALLET
+# PHASE 5 — REFONTE DE LA SAISIE DU PIN
 
-Le parcours de création de transaction côté utilisateur doit être repensé pour être entièrement piloté par le type de transaction.
+Composant :
 
-Objectif : ne plus afficher un formulaire générique avec des champs qui ne correspondent pas à l'opération.
+components/pages/transactions/create/pin-verification.tsx
 
-Chaque type doit disposer de ses propres données, composants, validations et étapes.
+Le pavé numérique actuel présente des problèmes d'affichage.
 
-## 6.1 Architecture du parcours
+## Objectif
 
-Le parcours doit suivre une logique commune, mais avec des étapes conditionnelles :
+Privilégier un champ PIN natif et contrôlé.
 
-```text
-Identification du type
-       ↓
-Chargement des données nécessaires
-       ↓
-Formulaire spécifique au type
-       ↓
-Validation
-       ↓
-Récapitulatif
-       ↓
-Confirmation
-       ↓
-Exécution serveur
-       ↓
-Résultat
-```
+Caractéristiques :
 
-Ne force pas tous les types à utiliser exactement le même nombre d'étapes.
+- inputMode="numeric".
+- Saisie numérique uniquement.
+- Type password avec possibilité d'afficher/masquer.
+- Longueur conforme à WalletUtils.validatePinStrength().
+- Retour visuel instantané.
+- Clavier mobile natif.
+- Clavier physique.
+- Gestion correcte du focus.
+- Désactivation pendant la validation.
+- Messages d'erreur explicites.
 
-Les composants génériques doivent se limiter aux éléments réellement communs : progression, navigation, récapitulatif, erreurs et confirmation.
+Si un pavé numérique personnalisé est conservé, corriger les variables CSS incompatibles et afficher correctement toutes les positions du PIN.
 
-## 6.2 TRANSFER — Transfert entre utilisateurs
+Le composant ne doit jamais afficher le PIN dans les logs.
 
-Le formulaire doit proposer :
+Ajouter un lien « PIN oublié ? » redirigeant vers :
 
-- Recherche du destinataire.
-- Sélection du destinataire.
-- Vérification du destinataire.
-- Affichage de son identité.
-- Montant à envoyer.
-- Frais éventuels.
-- Total à débiter.
-- Motif facultatif si le modèle le permet.
-- PIN ou confirmation de sécurité si déjà implémenté.
+/wallet/settings?tab=security&action=recover-pin
+
+---
+
+# PHASE 6 — SÉLECTION DES CONTACTS POUR LES TRANSFERTS
+
+Fichiers :
+
+- components/pages/transactions/create/recipient-selector.tsx
+- actions/users.ts
+- actions/transactions.ts
+
+Une fonction getRecentRecipients existe déjà.
+
+Elle doit être améliorée.
+
+## 6.1. Contacts récents
+
+Récupérer les utilisateurs avec lesquels l'utilisateur connecté a déjà effectué ou reçu un transfert.
+
+Utiliser :
+- fromUserId
+- toUserId
+- type TRANSFER
+- createdAt
+
+Prendre en compte les deux directions.
+
+Dédupliquer les contacts.
+
+Ne pas inclure l'utilisateur connecté.
+
+Exclure les wallets supprimés, inactifs et verrouillés.
+
+Limiter la liste à 10 ou 20 résultats.
+
+## 6.2. Interface
+
+Ajouter un bouton :
+
+« Mes contacts récents »
+
+Au clic, afficher les contacts précédemment associés aux transferts.
+
+Pour chaque contact afficher :
+- Avatar.
+- Nom ou pseudonyme.
+- Numéro de wallet masqué.
+- Éventuellement la date du dernier transfert.
+
+Permettre la sélection immédiate.
+
+Conserver les recherches existantes :
+- Par nom.
+- Par numéro de téléphone.
+- Par numéro de wallet.
+- Par QR Code.
+
+## 6.3. Sécurité
+
+Ne jamais permettre un transfert vers soi-même.
+
+Vérifier côté serveur :
+- L'identité du destinataire.
+- L'existence du wallet.
+- Son état actif.
+- Son verrouillage.
+- La disponibilité de son compte financier.
+
+Ne jamais considérer la liste des contacts du frontend comme une autorisation.
+
+---
+
+# PHASE 7 — AMÉLIORATION DE LA SAISIE DU MONTANT
+
+Composant :
+
+components/pages/transactions/create/amount-input.tsx
+
+Ajouter quatre boutons d'incrémentation :
+
+- -1000 GTC
+- -100 GTC
+- +100 GTC
+- +1000 GTC
+
+Les boutons doivent modifier directement le montant contrôlé.
+
+Règles :
+- Montant minimal : zéro pendant la saisie.
+- Ne jamais produire de montant négatif.
+- Respecter le montant minimum configuré pour la transaction.
+- Recalculer les frais après chaque modification.
+- Actualiser le montant total à débiter.
+- Respecter le solde disponible.
+- Préserver la validation serveur.
+
+Ne pas afficher ces boutons pour les éléments à prix fixe ou les sélections de quantité lorsqu'ils sont inappropriés.
+
+Conserver les boutons de montants rapides existants.
+
+---
+
+# PHASE 8 — RÉINITIALISATION DU PIN OUBLIÉ
+
+Emplacement principal :
+
+app/(protected)/wallet/settings/page.tsx
+
+Ne pas créer une nouvelle page de paramètres.
+
+La récupération du PIN doit être intégrée à la page existante.
+
+## 8.1. Interface
+
+Ajouter une section « Sécurité du wallet ».
+
+Proposer :
+- Modifier mon PIN.
+- PIN oublié ?
+- Récupérer mon accès.
+
+Le lien présent dans l'étape de validation d'une transaction doit conduire directement à cette section.
+
+## 8.2. Canaux disponibles
+
+Proposer :
+- Email vérifié.
+- WhatsApp sur numéro vérifié.
+
+Les moyens disponibles doivent dépendre des coordonnées réellement vérifiées.
+
+Le schéma actuel possède :
+- users.email
+- users.emailVerified
+- users.phoneNumber
+
+Il ne possède pas de champ explicite phoneVerifiedAt dans la définition consultée.
+
+Étudier le mécanisme de vérification existant avant d'introduire un nouveau champ.
+
+Ne jamais considérer automatiquement un numéro simplement renseigné comme un numéro vérifié.
+
+## 8.3. Génération OTP
+
+Créer un code à six chiffres.
+
+Utiliser un générateur cryptographique tel que :
+
+crypto.randomInt(100000, 1000000)
+
+Durée de validité : 5 minutes.
+
+Limiter :
+- Tentatives de validation : 5 maximum.
+- Renvoi du code : délai minimum de 60 secondes.
+- Nombre de demandes par compte et par période.
+- Tentatives par IP et par compte.
+
+Ne jamais stocker le code en clair.
+
+Stocker un hash/HMAC sécurisé, lié à un challenge spécifique.
+
+Ne jamais exposer le code dans la réponse de l'action serveur, les logs ou les messages d'erreur.
+
+## 8.4. Modèle de données
+
+Examiner la table verification de Better Auth.
+
+Si elle ne convient pas à ce besoin, créer une table dédiée, par exemple :
+
+wallet_pin_reset_challenges
+
+Champs indicatifs :
+
+- id
+- userId
+- walletId
+- codeHash
+- deliveryChannel
+- destination
+- expiresAt
+- attempts
+- consumedAt
+- createdAt
+
+Ajouter les index nécessaires.
+
+Les champs et relations définitifs doivent être adaptés au schéma existant.
+
+## 8.5. Services d'envoi
+
+Examiner d'abord les services email existants.
+
+Pour WhatsApp, prévoir un adaptateur compatible avec WhatsApp Business Cloud API ou un fournisseur autorisé.
+
+Ne pas simuler un envoi réussi si aucun fournisseur n'est configuré.
+
+Prévoir des variables d'environnement documentées et une gestion des erreurs du fournisseur.
+
+## 8.6. Parcours de récupération
+
+Étape 1 : sélection du canal.
+
+Étape 2 : demande et envoi du code.
+
+Étape 3 : saisie et validation du code.
+
+Étape 4 : définition du nouveau PIN.
+
+Étape 5 : confirmation du nouveau PIN.
+
+Étape 6 : validation et enregistrement.
+
+Le serveur doit vérifier :
+- Le propriétaire du wallet.
+- L'identité du challenge.
+- Son expiration.
+- Son nombre de tentatives.
+- Son caractère non consommé.
+- La validité du nouveau PIN.
+
+La consommation du challenge et la modification du PIN doivent être atomiques.
+
+Hasher le nouveau PIN avec WalletUtils.hashPin().
+
+Réinitialiser les tentatives échouées.
+
+Ne pas déverrouiller automatiquement un wallet verrouillé volontairement. Distinguer si nécessaire le verrouillage manuel du verrouillage consécutif aux tentatives PIN échouées.
+
+Conserver la procédure de réclamation/support existante pour les cas qui nécessitent une intervention administrative.
+
+---
+
+# PHASE 9 — SÉCURISATION DU MOTEUR FINANCIER
+
+Fichiers :
+
+- actions/transactions.ts
+- actions/wallets.ts
+- lib/finance/core/transaction-engine.ts
+- lib/finance/transactions/transfer.ts
+- lib/finance/core/idempotency.ts
+- lib/ledger/ledger-utils.ts
+
+Effectuer un audit de sécurité complet.
 
 Vérifier :
 
-- Solde suffisant.
-- Destinataire existant et autorisé.
-- Absence d'auto-transfert.
-- Limites applicables.
-- Frais.
-- Idempotence.
+1. Authentification obligatoire.
+2. Propriété du wallet source.
+3. Propriété des comptes financiers.
+4. Validation du destinataire.
+5. Vérification du solde réel.
+6. Frais calculés côté serveur.
+7. Prix des produits et articles recalculés côté serveur.
+8. Idempotence.
+9. Atomicité.
+10. Prévention des doubles soumissions.
+11. Verrouillage et concurrence.
+12. Journalisation.
+13. Transactions inversées et remboursements.
 
-## 6.3 TOURNAMENT_PARTICIPATION — Inscription à un tournoi
+Les paramètres transmis par le client ne sont jamais une source de vérité financière.
 
-Le formulaire doit récupérer les informations du tournoi et surtout de son édition.
+Pour les transferts :
+- Débit de l'expéditeur.
+- Crédit du destinataire.
+- Comptabilisation des frais.
+- Écritures équilibrées.
+- Référence de transaction unique.
 
-Si l'URL contient `editionId`, ce paramètre doit être prioritaire pour charger l'édition.
+Ne pas créer de crédit ou de débit directement sur user_wallets.
 
-Afficher :
+Ne pas modifier manuellement les soldes dérivés du ledger.
 
-- Image et nom du tournoi.
-- Nom de l'édition.
-- Dates.
-- Jeu concerné.
-- Format.
-- Frais d'inscription.
-- Informations du participant.
-- Conditions de participation.
-- Montant final.
-
-Ne jamais se contenter de récupérer le tournoi parent si l'opération concerne une édition.
-
-Vérifier côté serveur :
-
-- Édition existante.
-- Édition ouverte aux inscriptions.
-- Date limite.
-- Places disponibles.
-- Éligibilité du participant.
-- Inscription déjà existante.
-- Frais réels définis en base.
-- Cohérence entre édition et tournoi.
-
-La transaction et l'inscription doivent être cohérentes : aucune inscription payée ne doit exister sans mouvement comptable valide, et aucun débit ne doit rester sans inscription correspondante en cas d'échec.
-
-## 6.4 GAME_ITEM_PURCHASE — Achat d'items de jeu
-
-Récupérer l'item exact depuis son identifiant.
-
-Afficher :
-
-- Nom de l'item.
-- Image.
-- Jeu associé.
-- Description.
-- Prix GTC.
-- Quantité si autorisée.
-- Total.
-- Informations nécessaires à la livraison.
-
-Valider :
-
-- Item disponible.
-- Prix actuel.
-- Stock éventuel.
-- Quantité.
-- Propriétaire/vendeur.
-- Conditions de vente.
-
-Ne jamais faire confiance au prix envoyé depuis le client.
-
-## 6.5 PRODUCT_PURCHASE — Achat de produits
-
-Afficher :
-
-- Produit.
-- Boutique.
-- Vendeur.
-- Prix.
-- Quantité.
-- Livraison ou retrait selon les fonctionnalités existantes.
-- Total.
-- Informations complémentaires nécessaires.
-
-Vérifier la disponibilité et le prix réel côté serveur.
-
-## 6.6 THEME_PURCHASE — Achat de thème
-
-Afficher :
-
-- Aperçu du thème.
-- Nom.
-- Créateur.
-- Prix.
-- Conditions d'utilisation.
-
-Vérifier que le thème est disponible et que l'utilisateur ne le possède pas déjà si cette règle s'applique.
-
-## 6.7 VIP_SUBSCRIPTION — Abonnement VIP
-
-Afficher :
-
-- Offre.
-- Durée.
-- Prix.
-- Avantages.
-- Date de début et de fin estimée.
-
-Valider l'offre et les règles de renouvellement côté serveur.
-
-## 6.8 DEPOSIT — Dépôt
-
-Afficher uniquement les moyens de dépôt réellement disponibles.
-
-Adapter les champs au fournisseur :
-
-- Montant.
-- Fournisseur.
-- Référence.
-- Numéro ou compte de paiement.
-- Justificatif si nécessaire.
-
-Ne pas mélanger les champs de retrait et de dépôt.
-
-## 6.9 WITHDRAWAL — Retrait
-
-Afficher :
-
-- Montant.
-- Frais.
-- Total débité.
-- Moyen de retrait.
-- Coordonnées du bénéficiaire.
-- Récapitulatif.
-- Confirmation.
-
-Valider les limites et les coordonnées côté serveur.
-
-## 6.10 Cohérence des paramètres URL
-
-Créer une stratégie centralisée de résolution des entités.
-
-Exemples :
-
-- `TOURNAMENT_PARTICIPATION` → `editionId` prioritaire.
-- `GAME_ITEM_PURCHASE` → `itemId`.
-- `PRODUCT_PURCHASE` → `productId`.
-- `TRANSFER` → `userId` ou `targetId`, selon la convention réellement retenue.
-- `THEME_PURCHASE` → identifiant du thème.
-- `VIP_SUBSCRIPTION` → identifiant de l'offre.
-
-Ne pas interpréter arbitrairement un paramètre `id` sans connaître le type.
-
-Gérer les cas :
-
-- Identifiant manquant.
-- Entité inexistante.
-- Entité indisponible.
-- Type incompatible.
-- Paramètres contradictoires.
-- Données de chargement.
-- Erreur réseau.
-- Retour arrière.
-
-Les entités doivent être récupérées depuis la base de données avec les autorisations nécessaires.
+Auditer également la règle actuelle d'attente de 60 secondes entre transactions dans actions/transactions.ts. Vérifier sa pertinence métier et son impact sur l'expérience utilisateur. Ne pas supprimer les protections contre les abus sans les remplacer par une protection adaptée.
 
 ---
 
-# PHASE 7 — SÉCURITÉ ET INTÉGRITÉ COMPTABLE
+# PHASE 10 — QUALITÉ ET TESTS
 
-Cette phase est non négociable.
+Créer ou compléter les tests unitaires et d'intégration.
 
-## 7.1 Ledger
+## Tests financiers
 
-Chaque opération financière doit respecter le principe de partie double.
-
-Pour chaque transaction :
-
-- Somme des débits = somme des crédits.
-- Aucune écriture isolée.
-- Aucun solde négatif non autorisé.
-- Aucune modification manuelle du solde sans écriture correspondante.
-- Aucune suppression d'une transaction financière validée.
-
-## 7.2 Atomicité
-
-Utilise les transactions SQL adaptées au driver réellement utilisé.
-
-Les opérations doivent regrouper dans une même transaction :
-
-- Vérification des conditions.
-- Verrouillage si nécessaire.
-- Écritures comptables.
-- Mise à jour des soldes matérialisés si le projet en utilise.
-- Enregistrement de la transaction.
-- Mise à jour du statut.
-- Création des références nécessaires.
-
-Vérifie les possibilités réelles du driver et de Neon/PostgreSQL. Ne suppose pas qu'une méthode ou un verrouillage existe sans vérifier sa compatibilité.
-
-## 7.3 Idempotence
-
-Chaque opération financière sensible doit être protégée contre les répétitions.
-
-Une même clé d'idempotence ne doit pas générer plusieurs débits ou crédits.
-
-## 7.4 Concurrence
-
-Empêche notamment :
-
-- Deux débits simultanés qui dépassent le solde.
-- Deux approbations de la même demande.
-- Deux inscriptions payantes pour une même place restante.
-- Deux achats du même stock disponible.
-
-Utilise les contraintes et mécanismes PostgreSQL adaptés.
-
-## 7.5 Permissions
-
-Toutes les permissions doivent être vérifiées côté serveur.
-
-Ne fais jamais confiance :
-
-- Au rôle fourni par le client.
-- Au niveau A/B/C envoyé par le client.
-- Au montant calculé dans le frontend.
-- Au statut envoyé par le frontend.
-- À l'identifiant d'un compte financier fourni par le client.
-
-## 7.6 Remboursements
-
-Un remboursement doit créer un véritable mouvement comptable inverse.
-
-Ne transforme pas une transaction en `REFUNDED` sans mouvement financier réel.
-
-Vérifie les remboursements partiels, les remboursements multiples et les opérations déjà compensées.
-
-## 7.7 Journal d'audit
-
-Prévoir une traçabilité fiable des opérations sensibles.
-
-Les journaux doivent permettre de reconstituer qui a fait quoi, sur quel compte, à quel moment, pour quel motif et avec quel résultat.
-
----
-
-# PHASE 8 — TYPES, SCHÉMA ET MIGRATIONS
-
-Analyse toutes les définitions TypeScript et PostgreSQL.
-
-Harmonise :
-
-- Enums.
-- Types de transaction.
-- Statuts.
-- Références.
-- Comptes.
-- Demandes.
-- Écritures comptables.
-- Résultats d'actions.
-- DTO.
-- Schémas de validation.
-
-Ne laisse pas une valeur définie dans TypeScript mais absente de PostgreSQL.
-
-Ne conserve pas des catégories obsolètes uniquement pour faire compiler le projet.
-
-Toute modification de schéma doit inclure :
-
-1. Migration Drizzle adaptée.
-2. Gestion des données existantes.
-3. Valeurs par défaut pertinentes.
-4. Index.
-5. Contraintes.
-6. Relations et clés étrangères.
-7. Vérification des requêtes existantes.
-8. Compatibilité avec le déploiement.
-
-Ne réinitialise jamais la base de données pour simplifier la migration.
-
----
-
-# PHASE 9 — TESTS ET VALIDATION
-
-Ajoute ou adapte des tests couvrant au minimum les scénarios suivants.
-
-## 9.1 Administrateurs
-
-- A émet des GTC vers un utilisateur.
-- A émet des GTC vers un administrateur C.
-- B émet des GTC vers un utilisateur.
-- B émet des GTC vers un administrateur C.
-- C ne peut pas émettre directement.
-- C peut soumettre une demande.
-- Une demande ne crédite aucun portefeuille avant approbation.
-- A/B peuvent approuver selon la politique.
-- Le demandeur ne peut pas approuver sa propre demande.
-- Un rejet ne modifie aucun solde.
-- Une demande ne peut pas être approuvée deux fois.
-- Un utilisateur non autorisé ne peut pas appeler les actions administratives.
-
-## 9.2 Comptabilité
-
-- Chaque émission équilibre les écritures.
-- Le compte système est correctement débité.
-- Le destinataire est correctement crédité.
-- Aucun portefeuille personnel d'administrateur n'est débité pour une émission.
-- Les opérations répétées sont idempotentes.
-- Les échecs SQL ne laissent aucune écriture partielle.
-- Les opérations concurrentes restent cohérentes.
-- Les remboursements génèrent des écritures inverses.
-
-## 9.3 Utilisateurs
-
-- Transfert valide.
-- Transfert vers soi-même refusé.
+- Transfert entre deux utilisateurs.
+- Transfert vers soi-même.
 - Solde insuffisant.
 - Destinataire inexistant.
-- Édition de tournoi récupérée avec `editionId`.
-- Édition fermée aux inscriptions.
-- Inscription déjà existante.
-- Item de jeu indisponible.
-- Prix modifié entre affichage et confirmation.
-- Produit indisponible.
-- Thème déjà possédé.
-- Offre VIP invalide.
-- Dépôt avec paramètres manquants.
-- Retrait avec coordonnées invalides.
+- Wallet destinataire verrouillé.
+- Frais incorrects.
+- Double soumission.
+- Idempotence.
+- Transactions concurrentes.
+- Écritures ledger équilibrées.
 
-## 9.4 Interface
+## Tests Passkey
 
-Vérifie :
+- Challenge valide.
+- Challenge expiré.
+- Signature incorrecte.
+- Mauvais utilisateur.
+- Mauvais wallet.
+- Mauvais montant.
+- Challenge réutilisé.
+- Session conservée après validation.
 
-- Desktop.
-- Mobile.
-- États de chargement.
-- États vides.
-- Erreurs.
-- Confirmations.
-- Navigation.
-- Rafraîchissement.
-- Filtres.
-- Recherche.
-- Accessibilité.
-- Cohérence du thème H³ Infinity Gaming.
+## Tests PIN et récupération
 
----
+- PIN valide.
+- PIN incorrect.
+- Limite de tentatives.
+- OTP valide.
+- OTP expiré.
+- OTP incorrect.
+- OTP réutilisé.
+- Renvoi trop fréquent.
+- Réinitialisation d'un wallet appartenant à un autre utilisateur.
 
-# PHASE 10 — DESIGN ET UX/UI
+## Tests UI
 
-La refonte doit respecter l'identité visuelle actuelle de H³ Infinity Gaming.
+- Sélection d'un contact récent.
+- Modification du montant.
+- Incréments et décréments.
+- Passage entre les étapes.
+- Validation Passkey sans redirection.
+- Validation PIN.
+- Réinitialisation depuis les paramètres.
+- Actualisation des statistiques.
 
-Ne crée pas un design étranger à l'application.
+## Vérifications finales
 
-## Principes
+Exécuter :
 
-- Interface moderne et cohérente.
-- Hiérarchie visuelle claire.
-- Composants spécialisés.
-- Formulaires lisibles.
-- Récapitulatifs financiers explicites.
-- Montants GTC clairement affichés.
-- Statuts immédiatement identifiables.
-- Dialogues de confirmation adaptés au risque.
-- Responsive design.
-- États vides et erreurs soignés.
+bunx tsc --noEmit
 
-Évite les interfaces surchargées.
+bunx eslint
 
-Ne réutilise pas le même formulaire pour toutes les transactions simplement pour réduire le nombre de composants.
+bun run test
 
-Privilégie une composition de composants spécialisés à partir de composants UI génériques.
+bun run build
 
----
-
-# PHASE 11 — QUALITÉ ET NON-RÉGRESSION
-
-Après chaque phase :
-
-1. Vérifie les types TypeScript.
-2. Lance les tests concernés.
-3. Lance le lint si disponible.
-4. Vérifie les imports.
-5. Vérifie les actions serveur.
-6. Vérifie les pages concernées.
-7. Vérifie les migrations.
-8. Contrôle les régressions.
-
-N'ajoute pas de `any` pour contourner les erreurs.
-
-N'utilise pas de `@ts-ignore` ou de désactivation de lint sans justification documentée.
-
-Ne masque pas les erreurs avec des valeurs par défaut artificielles.
-
-Ne duplique pas les validations métier entre frontend et backend : le frontend améliore l'expérience, le backend reste l'autorité.
-
-Ne modifie pas les fonctionnalités hors périmètre sans justification.
+Ne pas déclarer le travail terminé si les vérifications échouent.
 
 ---
 
-# PHASE 12 — RAPPORT FINAL
+# PHASE 11 — LIVRABLES
 
-À la fin, mets à jour ou crée :
+Produire les documents :
 
-- `TRANSACTION-AUDIT.md`
-- `TRANSACTION-IMPLEMENTATION-PLAN.md`
-- `TRANSACTION-IMPLEMENTATION-REPORT.md`
+1. WALLET-AUDIT.md
+   - Problèmes identifiés.
+   - Architecture actuelle.
+   - Risques de sécurité.
+   - Incohérences du schéma.
 
-Le rapport final doit présenter :
+2. WALLET-IMPLEMENTATION.md
+   - Modifications réalisées.
+   - Nouvelles fonctionnalités.
+   - Architecture Passkey.
+   - Architecture OTP.
+   - Migrations.
 
-1. Les problèmes identifiés.
-2. Les problèmes corrigés.
-3. L'architecture finale.
-4. Les fichiers créés.
-5. Les fichiers modifiés.
-6. Les migrations.
-7. Les règles A/B/C effectivement appliquées.
-8. Le fonctionnement du compte d'émission.
-9. Le fonctionnement des demandes.
-10. Les parcours utilisateur par type.
-11. Les tests exécutés.
-12. Les résultats des tests.
-13. Les erreurs restantes.
-14. Les points non implémentés.
-15. Les éventuelles opérations manuelles nécessaires avant déploiement.
+3. WALLET-TESTS.md
+   - Tests exécutés.
+   - Résultats.
+   - Cas restant à tester.
 
-Ne prétends jamais qu'un test a réussi s'il n'a pas été exécuté.
+4. Liste exhaustive des fichiers modifiés.
 
----
+5. Liste des nouvelles variables d'environnement nécessaires.
 
-# DIRECTIVE FINALE
+6. Instructions pour les fournisseurs email et WhatsApp.
 
-Le résultat attendu n'est pas une simple amélioration visuelle.
+7. Résultat final du build.
 
-Nous voulons un système financier cohérent, centralisé, traçable, sécurisé et évolutif.
+## CONTRAINTES ABSOLUES
 
-Les deux espaces doivent être distincts dans leur expérience :
+- Préserver toutes les fonctionnalités financières existantes.
+- Préserver le ledger en partie double.
+- Préserver Better Auth.
+- Réutiliser les Passkeys déjà enregistrés lorsque techniquement possible.
+- Ne pas utiliser signIn.passkey() comme autorisation financière.
+- Ne pas stocker les OTP en clair.
+- Ne pas envoyer les nouveaux PIN par message.
+- Ne pas mettre en cache les données financières privées.
+- Ne pas affaiblir les permissions.
+- Ne pas créer de fausses transactions pour alimenter les statistiques.
+- Ne pas modifier les soldes directement.
+- Ne pas effectuer de migration destructive.
+- Ne pas supprimer les fonctionnalités QR Code.
+- Ne pas casser les demandes de dépôt/retrait, les achats et les paiements de tournois.
+- Conserver le design premium actuel et améliorer la cohérence responsive.
 
-- **Administration :** gestion des transactions, émission de GTC, demandes et approbations, supervision et historique.
-- **Utilisateur :** création guidée de transactions adaptées au type d'opération, avec récupération précise des entités et affichage des informations pertinentes.
+Travailler progressivement, vérifier chaque phase et éviter les réécritures inutiles.
 
-Cependant, ils doivent utiliser le même moteur financier et les mêmes garanties comptables.
-
-**Commence exclusivement par la PHASE 0 et la PHASE 1.** Explore le dépôt, trace les flux réels, puis rédige `TRANSACTION-AUDIT.md` et `TRANSACTION-IMPLEMENTATION-PLAN.md`.
-
-Présente-moi ensuite le bilan et attends ma validation avant toute modification du code.
-
-Ne fais aucune migration, suppression, modification de schéma ou refonte UI pendant cette première étape.
-
-La priorité absolue est la justesse des opérations financières, la sécurité des permissions et l'intégrité du ledger.
+L'objectif final est un wallet fiable, sécurisé, performant et agréable à utiliser, avec une expérience de transaction cohérente sur ordinateur et mobile.

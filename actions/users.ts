@@ -674,25 +674,37 @@ export async function getRecentRecipients(limitSize = 10) {
 
     const transactions = await db
       .select({
+        fromUserId: walletTransactions.fromUserId,
         toUserId: walletTransactions.toUserId,
       })
       .from(walletTransactions)
       .where(
         and(
-          eq(walletTransactions.fromUserId, sessionUser.user.id),
           eq(walletTransactions.type, "TRANSFER"),
-          isNotNull(walletTransactions.toUserId)
+          or(
+            eq(walletTransactions.fromUserId, sessionUser.user.id),
+            eq(walletTransactions.toUserId, sessionUser.user.id)
+          )
         )
       )
       .orderBy(desc(walletTransactions.createdAt))
       .limit(limitSize * 5); // Fetch more to get unique
 
+    // Déduire l'autre partie de chaque transfert (jamais soi-même) + fréquence
+    const counts = new Map<string, number>();
+    const otherUserIds = transactions
+      .map((t) =>
+        t.fromUserId === sessionUser.user.id ? t.toUserId : t.fromUserId
+      )
+      .filter((id): id is string => !!id && id !== sessionUser.user.id);
+    for (const id of otherUserIds) {
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+
     if (!transactions.length) return [];
 
     // Extract unique user ids
-    const uniqueUserIds = Array.from(
-      new Set(transactions.map((t) => t.toUserId).filter(Boolean) as string[])
-    ).slice(0, limitSize);
+    const uniqueUserIds = Array.from(new Set(otherUserIds)).slice(0, limitSize);
 
     if (!uniqueUserIds.length) return [];
 
@@ -715,9 +727,11 @@ export async function getRecentRecipients(limitSize = 10) {
 
     return recentUsers.map((u, idx) => {
       const wallet = wallets[idx];
+      const count = counts.get(u.id) || 1;
       return {
         id: u.id,
         walletId: wallet?.id || "",
+        count,
         user: {
           id: u.id,
           name: (u as any).fullName || (u as any).username || "Utilisateur",
@@ -730,7 +744,11 @@ export async function getRecentRecipients(limitSize = 10) {
           isLocked: !!wallet?.isLocked,
         },
       };
-    }).filter(r => r.walletId !== "");
+    })
+      .sort((a, b) => b.count - a.count)
+      .filter(
+        (r) => r.walletId !== "" && r.wallet.isActive && !r.wallet.isLocked
+      );
   } catch (error) {
     console.error("Error fetching recent recipients:", error);
     return [];

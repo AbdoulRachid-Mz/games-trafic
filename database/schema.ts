@@ -188,6 +188,17 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at"),
 });
 
+export const passkeyTransactionChallenges = pgTable("passkey_transaction_challenges", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  walletId: text("wallet_id").notNull().references(() => userWallets.id, { onDelete: "cascade" }),
+  challenge: text("challenge").notNull(),
+  transactionHash: text("transaction_hash").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const passkey = pgTable("passkey", {
   id: text("id").primaryKey(),
   name: text("name"),
@@ -213,6 +224,23 @@ export const passkey = pgTable("passkey", {
 // 		.notNull()
 // 		.references(() => users.id),
 // });
+
+export const pinResetRequests = pgTable("pin_reset_requests", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  walletId: text("wallet_id").notNull().references(() => userWallets.id, { onDelete: "cascade" }),
+
+  // Code à 6 chiffres hashé (bcrypt) et jeton d'étape de vérification hashé.
+  codeHash: text("code_hash").notNull(),
+  tokenHash: text("token_hash"),
+
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 export const userWallets = pgTable('user_wallets', {
   id: text('id').primaryKey().default(sql`gen_random_uuid()`),

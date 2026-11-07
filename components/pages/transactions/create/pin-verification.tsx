@@ -5,9 +5,15 @@ import { Typography } from "@/components/ui/typography";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Check, Delete, ArrowLeft } from "lucide-react";
+import { Lock, Check, Delete, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
+import { startAuthentication } from "@simplewebauthn/browser";
+import {
+  requestPasskeyChallenge,
+  verifyPasskeyChallenge,
+} from "@/actions/passkey-transaction";
 import { toast } from "sonner";
 
 interface PinVerificationProps {
@@ -21,6 +27,8 @@ interface PinVerificationProps {
     amount: number;
     fees: number;
     totalAmount: number;
+    walletId?: string;
+    recipientId?: string | null;
   };
 }
 
@@ -33,18 +41,52 @@ export function PinVerification({
   transactionDetails,
 }: PinVerificationProps) {
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
 
   const handlePasskeyVerify = async () => {
     if (!onVerifyPasskey) return;
     try {
       setIsPasskeyLoading(true);
-      const { data, error } = await authClient.signIn.passkey();
-      if (error) throw error;
+
+      const challengeResult = await requestPasskeyChallenge({
+        walletId: (transactionDetails as any).walletId || "",
+        transactionType: transactionDetails.type,
+        amount: transactionDetails.amount,
+        recipientId: (transactionDetails as any).recipientId || null,
+        fees: transactionDetails.fees,
+      });
+
+      if (!challengeResult.success || !challengeResult.options || !challengeResult.challengeId) {
+        throw new Error(challengeResult.error || "Impossible de générer le challenge");
+      }
+
+      const assertion = await startAuthentication({
+        optionsJSON: challengeResult.options as any,
+      });
+
+      const verification = await verifyPasskeyChallenge({
+        challengeId: challengeResult.challengeId,
+        assertion,
+        transaction: {
+          walletId: (transactionDetails as any).walletId || "",
+          transactionType: transactionDetails.type,
+          amount: transactionDetails.amount,
+          recipientId: (transactionDetails as any).recipientId || null,
+          fees: transactionDetails.fees,
+        },
+      });
+
+      if (!verification.success) {
+        throw new Error(verification.error || "Vérification Passkey échouée");
+      }
+
       await onVerifyPasskey();
     } catch (error) {
       console.error(error);
-      toast.error("Échec de la vérification par Passkey");
+      toast.error(
+        error instanceof Error ? error.message : "Échec de la vérification par Passkey"
+      );
     } finally {
       setIsPasskeyLoading(false);
     }
@@ -102,6 +144,33 @@ export function PinVerification({
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-xl overflow-hidden">
         <CardContent className="p-8 space-y-6">
+          {/* Saisie native du PIN */}
+          <div className="relative">
+            <input
+              type={showPin ? "text" : "password"}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 8);
+                setPin(v);
+              }}
+              disabled={isLoading || isPasskeyLoading}
+              placeholder="Code PIN"
+              className="w-full h-12 px-4 pr-12 rounded-xl bg-background/50 border border-border/50 text-center text-2xl tracking-[0.5em] font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPin((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              tabIndex={-1}
+            >
+              {showPin ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+
           {/* PIN dots display */}
           <div className="flex justify-center gap-3 mb-2">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -196,6 +265,13 @@ export function PinVerification({
                 + Ajouter un Passkey pour la prochaine fois
               </Button>
             ) : null}
+
+            <Link
+              href="/wallet/settings?tab=security&action=recover-pin"
+              className="text-sm text-primary hover:underline text-center"
+            >
+              PIN oublié ?
+            </Link>
 
             <Button
               variant="ghost"

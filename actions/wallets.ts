@@ -558,25 +558,29 @@ export async function verifyWalletPin(
     const isValid = await WalletUtils.verifyPin(pin, wallet.pinHash);
 
     if (!isValid) {
-      // Incrémenter les tentatives échouées
-      const newAttempts = (wallet.failedAttempts || 0) + 1;
-      const isNowLocked = newAttempts >= 5;
-
-      await db
+      // Incrémenter les tentatives échouées de façon atomique (course-safe)
+      const [updatedWallet] = await db
         .update(userWallets)
         .set({
-          failedAttempts: newAttempts,
+          failedAttempts: sql`COALESCE(${userWallets.failedAttempts}, 0) + 1`,
           lastFailedAttempt: new Date(),
-          isLocked: isNowLocked,
+          isLocked: sql`${userWallets.isLocked} OR COALESCE(${userWallets.failedAttempts}, 0) + 1 >= 5`,
           updatedAt: new Date(),
         })
-        .where(eq(userWallets.id, walletId));
+        .where(eq(userWallets.id, walletId))
+        .returning({
+          failedAttempts: userWallets.failedAttempts,
+          isLocked: userWallets.isLocked,
+        });
+
+      const newAttempts = updatedWallet?.failedAttempts || 0;
+      const lockedNow = updatedWallet?.isLocked || false;
 
       const attemptsRemaining = 5 - newAttempts;
 
       return {
         success: false,
-        error: `PIN incorrect${isNowLocked ? ' - Wallet verrouillé' : ''}`,
+        error: `PIN incorrect${lockedNow ? ' - Wallet verrouillé' : ''}`,
         attemptsRemaining: attemptsRemaining > 0 ? attemptsRemaining : 0,
       };
     }
@@ -1003,8 +1007,20 @@ export async function getWalletLedgerStats(params: {
 }) {
   try {
     const { walletId, startDate, endDate } = params;
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("Non authentifié");
+    }
     const wallet = await getUserWalletById(walletId);
-    if (!wallet?.financialAccountId) {
+    if (!wallet) {
+      throw new Error("Wallet introuvable");
+    }
+    const isOwner = wallet.userId === currentUser.id;
+    const admin = isAdmin(currentUser);
+    if (!isOwner && !admin) {
+      throw new Error("Accès refusé à ce wallet");
+    }
+    if (!wallet.financialAccountId) {
       return { total: 0, pending: 0, income: 0, expense: 0 };
     }
 
@@ -1043,14 +1059,28 @@ export async function getWalletLedgerStats(params: {
     };
   } catch (error) {
     console.error('Error getting wallet ledger stats:', error);
-    return { total: 0, pending: 0, income: 0, expense: 0 };
+    throw new Error(
+      error instanceof Error ? error.message : 'Failed to fetch wallet ledger stats'
+    );
   }
 }
 
 export async function getWalletLedgerDailyFlow(walletId: string, days: number = 7): Promise<number[]> {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error("Non authentifié");
+    }
     const wallet = await getUserWalletById(walletId);
-    if (!wallet?.financialAccountId) {
+    if (!wallet) {
+      throw new Error("Wallet introuvable");
+    }
+    const isOwner = wallet.userId === currentUser.id;
+    const admin = isAdmin(currentUser);
+    if (!isOwner && !admin) {
+      throw new Error("Accès refusé à ce wallet");
+    }
+    if (!wallet.financialAccountId) {
       return Array.from({ length: days }, () => 0);
     }
 

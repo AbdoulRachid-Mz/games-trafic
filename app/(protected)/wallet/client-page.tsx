@@ -65,25 +65,34 @@ export default function ClientWalletPage() {
     try {
       if (!wallet?.id) return;
 
-      // Charger les transactions via actions
-      const transactionsData = await getWalletTransactions({
-        filters: { walletId: wallet.id },
-        pagination: { page: 1, limit: 10 },
-        options: { sortBy: "createdAt", sortOrder: "desc" },
-      });
+      // Charger les transactions via actions (indépendant des stats)
+      try {
+        const transactionsData = await getWalletTransactions({
+          filters: { walletId: wallet.id },
+          pagination: { page: 1, limit: 10 },
+          options: { sortBy: "createdAt", sortOrder: "desc" },
+        });
+        setTransactions(transactionsData.data || []);
+      } catch (error) {
+        console.error("Error loading wallet transactions:", error);
+        toast.error("Erreur lors du chargement des transactions");
+      }
 
-      setTransactions(transactionsData.data || []);
-
-      // Charger les statistiques via ledger
-      const statsData = await getWalletLedgerStats({ walletId: wallet.id });
-      setStats({
-        totalTransactions: statsData.total,
-        totalAmount: statsData.income,
-        income: statsData.income,
-        expense: statsData.expense,
-        monthlyChange: 0,
-        pendingTransactions: statsData.pending,
-      });
+      // Charger les statistiques via ledger (indépendant des transactions)
+      try {
+        const statsData = await getWalletLedgerStats({ walletId: wallet.id });
+        setStats({
+          totalTransactions: statsData.total,
+          totalAmount: statsData.income,
+          income: statsData.income,
+          expense: statsData.expense,
+          monthlyChange: 0,
+          pendingTransactions: statsData.pending,
+        });
+      } catch (error) {
+        console.error("Error loading wallet stats:", error);
+        toast.error("Erreur lors du chargement des statistiques");
+      }
     } catch (error) {
       console.error("Error loading wallet data:", error);
       toast.error("Erreur lors du chargement des données");

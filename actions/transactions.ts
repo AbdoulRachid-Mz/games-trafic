@@ -23,6 +23,7 @@ import {
   type QueryOptions,
 } from "@/types/api";
 import { db } from "@/lib/db";
+import { randomUUID } from "crypto";
 import { getAppSettings } from "./app-settings";
 import { getUserWalletById, verifyWalletPin } from "./wallets";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -381,7 +382,7 @@ export async function createTransaction(
   if (lastTx[0]?.createdAt) {
     const lastDate = new Date(lastTx[0].createdAt as any).getTime();
     const now = Date.now();
-    const minWait = 60_000; // 1 minute interval pour toute opération
+    const minWait = 5_000; // Garde anti double-soumission rapide (5s) // 1 minute interval pour toute opération
     const diff = now - lastDate;
     if (diff < minWait) {
       const remaining = Math.ceil((minWait - diff) / 1000);
@@ -420,9 +421,11 @@ export async function createTransaction(
     : "COMPLETED";
 
   const idempotencyKey =
-    typeof data.metadata?.idempotencyKey === "string"
+    typeof data.metadata?.idempotencyKey === "string" && data.metadata.idempotencyKey.trim().length > 0
       ? data.metadata.idempotencyKey
-      : undefined;
+      : // Fallback : clé aléatoire (jamais de dédoublonnage artificiel entre deux
+        // opérations légitimes identiques, mais traçabilité en base).
+        `auto-${randomUUID()}`;
 
   const metadata = {
     ...(data.metadata ?? {}),
@@ -563,20 +566,30 @@ export async function createTransaction(
     };
   }
 
-  // 🚀 Moteur unique : écritures équilibrées, idempotence et verrouillage
-  const result = await executeFinancialOperation(operation);
-
-  // 🎯 Actions spécifiques selon le type
-  await db.transaction(async (tx) => {
-    await handleTransactionTypeSafe(tx, {
-      type: canonicalType,
-      metadata: result.transaction.metadata as Record<string, any>,
-      userId: user.id,
-      transactionId: result.transaction.id,
-      wallet,
-      amount: Number(result.transaction.amount),
-      netAmount: Number(result.transaction.netAmount),
+  // 🚀 Moteur unique : écritures équilibrées, idempotence, verrouillage
+  //    ET side-effects métier composés dans UNE SEULE transaction —
+  //    plus de débité-sans-livraison possible.
+  const result = await db.transaction(async (tx) => {
+    const opResult = await executeFinancialOperation({
+      ...operation,
+      client: tx,
     });
+
+    // Replay idempotent : les side-effects ont déjà été appliqués lors de
+    // l'exécution initiale — ne jamais les réappliquer (doublons).
+    if (!opResult.idempotentReplay) {
+      await handleTransactionTypeSafe(tx, {
+        type: canonicalType,
+        metadata: opResult.transaction.metadata as Record<string, any>,
+        userId: user.id,
+        transactionId: opResult.transaction.id,
+        wallet,
+        amount: Number(opResult.transaction.amount),
+        netAmount: Number(opResult.transaction.netAmount),
+      });
+    }
+
+    return opResult;
   });
 
   return result.transaction;
@@ -642,7 +655,7 @@ async function handleTransactionTypeSafe(
         status: "ACTIVE",
         startDate: new Date(),
         endDate,
-        pricePaid: metadata.amount,
+        pricePaid: String(amount),
         transactionId,
         activeBenefits: [
           "theme_creation",
@@ -669,12 +682,12 @@ async function handleTransactionTypeSafe(
       await tx.insert(requests).values({
         userId,
         type: "GAME_ITEMS",
-        amount: metadata.amount,
+        amount: String(amount),
         currency: "GTC",
         status: "PENDING",
         gameItemId: metadata.targetId ?? null,
         quantity: metadata.quantity ?? null,
-        totalGtc: metadata.amount,
+        totalGtc: String(amount),
         commission: "0",
         transactionId,
         createdAt: new Date(),

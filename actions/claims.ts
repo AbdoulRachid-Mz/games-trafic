@@ -56,8 +56,18 @@ export async function getClaims(
     const whereConditions = buildClaimWhereConditions(filters, options);
 
     const claimsQuery = db
-      .select()
+      .select({
+        claim: claims,
+        user: {
+          id: users.id,
+          username: users.username,
+          fullName: users.fullName,
+          email: users.email,
+          image: users.profileImage,
+        },
+      })
       .from(claims)
+      .leftJoin(users, eq(claims.userId, users.id))
       .where(whereConditions)
       .limit(pagination.limit)
       .offset(offset);
@@ -84,7 +94,10 @@ export async function getClaims(
     const totalPages = Math.ceil(total / pagination.limit);
 
     return {
-      data: claimsData,
+      data: claimsData.map((row) => ({
+        ...row.claim,
+        user: row.user?.id ? row.user : null,
+      })) as unknown as Claim[],
       pagination: {
         page: pagination.page,
         limit: pagination.limit,
@@ -207,6 +220,23 @@ export async function createClaim(claimData: NewClaim): Promise<Claim> {
       throw new Error('type, title and description are required');
     }
 
+    // Anti-spam : max 3 réclamations ouvertes (PENDING / IN_PROGRESS) par utilisateur
+    const [openClaims] = await db
+      .select({ count: count() })
+      .from(claims)
+      .where(
+        and(
+          eq(claims.userId, sessionUser.id),
+          eq(claims.isDeleted, false),
+          inArray(claims.status, ['PENDING', 'IN_PROGRESS'])
+        )
+      );
+    if ((openClaims?.count ?? 0) >= 3) {
+      throw new Error(
+        'Vous avez déjà 3 réclamations en cours. Attendez leur traitement avant d\'en soumettre une nouvelle.'
+      );
+    }
+
     // Vérification de la transaction si elle est fournie
     if (claimData.transactionId) {
       const transactionExists = await db
@@ -319,6 +349,13 @@ export async function updateClaimStatus(
   try {
     const sessionUser = await getCurrentUser();
     assertAdmin(sessionUser);
+    const allowedStatuses = ['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED', 'CLOSED'];
+    if (!allowedStatuses.includes(status)) {
+      throw new Error('INVALID_STATUS: Statut non supporté.');
+    }
+    if ((status === 'RESOLVED' || status === 'REJECTED') && !resolution?.trim()) {
+      throw new Error('Une résolution écrite est obligatoire pour résoudre ou rejeter.');
+    }
     const result = await db
       .update(claims)
       .set({
@@ -378,6 +415,8 @@ export async function deleteClaim(id: string): Promise<Claim> {
  */
 export async function restoreClaim(id: string): Promise<Claim> {
   try {
+    const sessionUser = await getCurrentUser();
+    assertAdmin(sessionUser);
     const result = await db
       .update(claims)
       .set({
@@ -410,6 +449,15 @@ export async function addClaimEvidence(
   image?: string
 ): Promise<Claim> {
   try {
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) {
+      throw new Error('UNAUTHORIZED: Connexion requise.');
+    }
+    const existingClaim = await getClaimById(id);
+    if (!existingClaim) {
+      throw new Error('Claim not found');
+    }
+    assertOwnerOrAdmin(sessionUser, existingClaim.userId);
     const result = await db
       .update(claims)
       .set({
