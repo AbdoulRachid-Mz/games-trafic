@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, Suspense, useMemo } from "react";
+import React, { useState, useEffect, Suspense, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useApp } from "@/contexts/app-context";
@@ -8,7 +8,6 @@ import { Typography } from "@/components/ui/typography";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { fireConfettiPreset } from "@/utils/confetti";
 import { generateEnhancedReceipt } from "@/utils/receipt-templates";
 import { TransactionStepper } from "@/components/pages/transactions/create/transaction-stepper";
 import { resolveTransactionIntent } from "@/lib/transactions/resolve-intent";
@@ -198,8 +197,19 @@ function CreateTransactionContent({
     }
   };
 
+  // 🔒 Un intent d'URL ne doit être consommé qu'UNE fois : les re-fetch du
+  // profil (completeData change à chaque refreshProfile) recalculaient
+  // l'effet et écrasaient l'état du wizard (étape, montant, entity) à chaque
+  // transition. La key = querystring : si l'utilisateur change réellement
+  // l'URL, le nouvel intent est traité.
+  const consumedIntentRef = useRef<string | null>(null);
+
   useEffect(() => {
     const loadTransactionFromParams = async () => {
+      const intentKey = searchParams.toString();
+      if (consumedIntentRef.current === intentKey) return;
+      consumedIntentRef.current = intentKey;
+
       const intent = resolveTransactionIntent(searchParams);
       const type = intent.type;
 
@@ -251,25 +261,18 @@ function CreateTransactionContent({
             const entity = await fetchEntityByType(type, actualEntityId);
             if (entity) {
               newData.targetId = actualEntityId;
-              if (!newData.amount && entity.price) {
+              // Prix de référence CONNU dès que l'entité le définit — 0
+              // compris (produit/participation gratuite).
+              if (!newData.amount && entity.price != null) {
                 newData.amount = entity.price;
               }
               if (intent.imageUrl) {
                 entity.image = intent.imageUrl;
               }
               newData.entity = entity as any;
-
-              if (type === "GAME_ITEM_PURCHASE" && entity.price) {
-                if (
-                  newData.amount &&
-                  Math.abs(newData.amount - entity.price) > 0.01
-                ) {
-                  newData.metadata = {
-                    ...newData.metadata,
-                    originalAmount: newData.amount,
-                  };
-                }
-              }
+              // metadata.originalAmount : SUPPRIMÉ — jamais lue par le serveur
+              // (zéro consommation), l'écart prix/montant est revalidé côté
+              // serveur de toute façon.
             } else {
               newData.targetId = undefined;
             }
@@ -577,12 +580,27 @@ function CreateTransactionContent({
         }),
       });
 
-      if (!response.ok) throw new Error("PIN incorrect");
+      // Relire le corps de la réponse : le serveur envoie la vraie raison
+      // (PIN erroné, tentative bloquée, session expirée…). Avant, tout
+      // `!response.ok` était déguisé en « PIN incorrect ».
+      if (!response.ok) {
+        let apiMessage = "Code PIN incorrect";
+        try {
+          const body = await response.json();
+          apiMessage = body?.error || body?.message || apiMessage;
+        } catch {
+          // corps non JSON — message générique conservé
+        }
+        throw new Error(apiMessage);
+      }
       setVerifiedPin(pin);
       await refreshProfile();
       nextStep();
-    } catch {
-      toast.error("Code PIN incorrect");
+    } catch (error: any) {
+      toast.error(error?.message || "Code PIN incorrect");
+      // Rethrow : pin-verification réinitialise alors le PIN saisi (les dots
+      // ne restent plus dans un état « plein » fantôme).
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -651,6 +669,10 @@ function CreateTransactionContent({
           type: "GAME_ITEMS",
           amount: transactionData.amount.toString(),
           gameItemId: transactionData.targetId,
+          // quantity EST une colonne top-level de requests — auparavant
+          // seulement dans metadata (jamais lue par le serveur). Le serveur
+          // revalide la quantité et recalcule le total depuis le prix en base.
+          quantity: quantity.toString(),
           gameAccount,
           encryptedPassword,
           additionalInfo,
@@ -720,7 +742,8 @@ function CreateTransactionContent({
         : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`
     );
 
-    await fireConfettiPreset("success");
+    // Confetti : lancé par TransactionSuccess au montage du succès —
+    // ne pas en tirer un second ici.
 
     generateEnhancedReceipt({
       transactionId: transaction.id,
@@ -971,6 +994,8 @@ function CreateTransactionContent({
               transactionData.type === "GAME_ITEM_PURCHASE" ||
               transactionData.type === "ORDER_PURCHASE"
             }
+            fees={feesObj.amount}
+            totalAmount={feesObj.totalAmount}
             onReturnHome={() => router.push("/wallet")}
             onViewHistory={() => router.push("/wallet/transactions")}
           />

@@ -160,10 +160,14 @@ export const ClipMediaController = memo(function ClipMediaController({
     }
   }, [shouldPlay, isVideo, isVideoMuted, isActive, videoError]);
 
-  // Video progress tracking
+  // Video progress tracking (throttled to ~10fps to avoid excessive setState)
+  const lastProgressUpdateRef = useRef(0);
   const handleVideoTimeUpdate = useCallback(() => {
     const video = videoRef.current;
     if (video && video.duration && !isNaN(video.duration)) {
+      const now = performance.now();
+      if (now - lastProgressUpdateRef.current < 100) return;
+      lastProgressUpdateRef.current = now;
       const p = (video.currentTime / video.duration) * 100;
       setVideoProgress(p);
       setProgress(p);
@@ -457,7 +461,7 @@ export const ClipMediaController = memo(function ClipMediaController({
 
       {/* Progress Bars - Stories style */}
       {mediaItems.length > 0 && playbackMode !== "manual" && (
-        <div className="absolute top-3 left-3 right-3 z-30 flex gap-1">
+        <div className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] left-3 right-3 z-30 flex gap-1">
           {mediaItems.map((_, idx) => (
             <div
               key={idx}

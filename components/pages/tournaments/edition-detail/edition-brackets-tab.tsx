@@ -115,7 +115,19 @@ export function EditionBracketsTab({
     .map(Number)
     .sort((a, b) => a - b);
 
-  const getRoundName = (roundIndex: number, totalRounds: number) => {
+  // Round Robin « journées » (nouveau modèle) : chaque match porte
+  // metadata.dayNumber → les sections sont des journées, pas des tours
+  // éliminatoires.
+  const isMatchdayRounds =
+    matches.length > 0 &&
+    matches.every((m: any) => m.metadata?.dayNumber);
+
+  const getRoundName = (
+    roundIndex: number,
+    totalRounds: number,
+    roundNumber: number,
+  ) => {
+    if (isMatchdayRounds) return `Journée ${roundNumber}`;
     const distanceToFinal = totalRounds - roundIndex - 1;
     if (distanceToFinal === 0) return "Grande Finale";
     if (distanceToFinal === 1) return "Demi-finales";
@@ -218,8 +230,9 @@ export function EditionBracketsTab({
           <div className="flex gap-6 min-w-max items-start">
             {rounds.map((round, rIndex) => {
               const roundMatches = matchesByRound[round] || [];
-              const roundName = getRoundName(rIndex, rounds.length);
-              const isFinal = rIndex === rounds.length - 1;
+              const roundName = getRoundName(rIndex, rounds.length, round);
+              const isFinal =
+                !isMatchdayRounds && rIndex === rounds.length - 1;
 
               return (
                 <div

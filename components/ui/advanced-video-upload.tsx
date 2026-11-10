@@ -377,7 +377,7 @@ export function AdvancedVideoUpload({
 
       {/* Modal de prévisualisation plein écran */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="max-w-4xl h-[80vh] bg-black p-0 border-none">
+        <DialogContent className="sm:max-w-4xl h-[80vh] bg-black p-0 border-none">
           <DialogHeader className="sr-only">
             <DialogTitle>Prévisualisation de la vidéo</DialogTitle>
           </DialogHeader>

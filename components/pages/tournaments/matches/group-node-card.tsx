@@ -18,7 +18,14 @@ export function GroupNodeCard({
   const nodeMatches = matchesByNode.get(node.id) || [];
   const metadata = node.metadata || {};
   const participants = metadata.participants || [];
-  const nodeName = metadata.name || node.nodeCode || "Groupe";
+  // Nouveau modèle RR : 1 node = 1 confrontation → jamais de fallback
+  // « Groupe » pour ces nœuds.
+  const nodeName =
+    metadata.name ||
+    node.nodeCode ||
+    (metadata.nodeType === "ROUND_ROBIN" || metadata.dayNumber
+      ? `Confrontation ${node.round}`
+      : "Groupe");
   const { isMobile } = useScreenSize();
 
   // Grouper par round
@@ -78,9 +85,21 @@ export function GroupNodeCard({
                     </div>
                     <span className="text-[9px] md:text-[10px] font-medium uppercase text-muted-foreground">
                       {phase?.phaseType === "ROUND_ROBIN"
-                        ? `Journée ${roundNum}`
+                        ? (metadata.name ||
+                          node.nodeCode ||
+                          (Array.isArray(participants) && participants.length > 2 && !metadata.dayNumber
+                            ? `Journée ${roundNum}`
+                            : `Confrontation ${roundNum}`))
                         : `Round ${roundNum}`}
                     </span>
+                    {typeof metadata.dayNumber === "number" && (
+                      <Badge
+                        variant="outline"
+                        className="text-[7px] md:text-[8px] h-4 shrink-0"
+                      >
+                        J{metadata.dayNumber}
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="text-[7px] md:text-[8px] h-4">
                       {roundMatches.length} match{roundMatches.length > 1 ? "s" : ""}
                     </Badge>

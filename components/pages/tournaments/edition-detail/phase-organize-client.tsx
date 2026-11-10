@@ -35,8 +35,11 @@ import {
   Calendar,
   Info,
   Play,
+  Dices,
 } from "lucide-react";
 import { toast } from "sonner";
+import { resolveScoring } from "@/lib/tournaments/scoring";
+import { getEffectiveAdvanceCount, isMatchdayGroup } from "@/lib/tournaments/config";
 import { useRouter } from "next/navigation";
 import {
   organizeEditionStructure,
@@ -47,6 +50,8 @@ import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 import Link from "next/link";
 import { MatchGenerationDialog } from "./match-generation-dialog";
+import { DrawRevealDialog } from "./draw-reveal-dialog";
+import { drawPhaseGroupsAction, type DrawParticipantsResult } from "@/actions/phases";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -137,7 +142,37 @@ export function PhaseOrganizeClient({
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"draft" | "existing">("draft");
 
-  // Héritage de la configuration parente
+  // Tirage au sort serveur (révélé progressivement ensuite).
+  const [isDrawingGroups, setIsDrawingGroups] = useState(false);
+  const [groupsDrawResult, setGroupsDrawResult] = useState<DrawParticipantsResult | null>(null);
+  const [isGroupsRevealOpen, setIsGroupsRevealOpen] = useState(false);
+  const [isGroupsForceOpen, setIsGroupsForceOpen] = useState(false);
+
+  const handleServeGroupsDraw = async (force = false) => {
+    setIsDrawingGroups(true);
+    try {
+      const result = await drawPhaseGroupsAction(phaseId, {
+        groupsCount,
+        participantsPerGroup,
+        force,
+      } as any);
+      setGroupsDrawResult(result);
+      setIsGroupsRevealOpen(true);
+      setIsGroupsForceOpen(false);
+    } catch (error: any) {
+      const message = error?.message || "Erreur lors du tirage";
+      if (/existe déjà/i.test(message)) {
+        setIsGroupsForceOpen(true);
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsDrawingGroups(false);
+    }
+  };
+
+  // Héritage de la configuration parente — scoring et qualifiés résolus
+  // via les modules purs (aucune valeur 3/1/0 ou top-2 codée en dur).
   const defaultConfig = useMemo(
     () => ({
       participantsPerGroup: inheritedConfig?.participantsPerGroup || 4,
@@ -146,10 +181,10 @@ export function PhaseOrganizeClient({
         Math.ceil(sourceParticipants.length / 4) ||
         1,
       isHomeAway: inheritedConfig?.isHomeAway || false,
-      pointsPerWin: inheritedConfig?.pointsPerWin || 3,
-      pointsPerDraw: inheritedConfig?.pointsPerDraw || 1,
-      pointsPerLoss: inheritedConfig?.pointsPerLoss || 0,
-      advanceCount: inheritedConfig?.advanceCount || 2,
+      ...resolveScoring(inheritedConfig as any),
+      advanceCount: getEffectiveAdvanceCount({
+        config: inheritedConfig,
+      }),
       seedingMethod: inheritedConfig?.seedingMethod || "RANDOM",
       generateNodes: inheritedConfig?.generateNodes !== false,
       generateMatches: inheritedConfig?.generateMatches !== false,
@@ -563,10 +598,18 @@ export function PhaseOrganizeClient({
             {inheritedConfig.isHomeAway && (
               <Badge variant="secondary">Aller-Retour</Badge>
             )}
-            {inheritedConfig.advanceCount && (
+            {/* Qualifiés : PHASE-level (RR) = top-N du classement général ;
+                sinon top-N par groupe. Les journées ne qualifient jamais. */}
+            {phaseType === "ROUND_ROBIN" ? (
               <Badge variant="secondary">
-                {inheritedConfig.advanceCount} qualifiés/groupe
+                {defaultConfig.advanceCount} qualifiés de la phase
               </Badge>
+            ) : (
+              inheritedConfig.advanceCount && (
+                <Badge variant="secondary">
+                  {inheritedConfig.advanceCount} qualifiés/groupe
+                </Badge>
+              )
             )}
             {inheritedConfig.nodesType && (
               <Badge variant="secondary">
@@ -665,7 +708,7 @@ export function PhaseOrganizeClient({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ROUND_ROBIN">
-                          Round Robin (Journées)
+                          Round Robin (Confrontations)
                         </SelectItem>
                         <SelectItem value="ELIMINATION">
                           Élimination directe
@@ -974,6 +1017,19 @@ export function PhaseOrganizeClient({
                   <div className="flex gap-2">
                     <Button
                       size="sm"
+                      onClick={() => handleServeGroupsDraw()}
+                      disabled={isDrawingGroups}
+                      className="h-8 gap-1"
+                    >
+                      {isDrawingGroups ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Dices className="h-3 w-3" />
+                      )}
+                      Tirage au sort
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={handleAddDraftGroup}
                       className="h-8 gap-1"
@@ -1053,6 +1109,7 @@ export function PhaseOrganizeClient({
                           getName={getName}
                           isParticipantAssigned={isParticipantAssigned}
                           onGenerateMatches={handleGenerateMatchesForGroup}
+                          phaseType={phaseType}
                         />
                       ))}
                     </div>
@@ -1114,7 +1171,7 @@ export function PhaseOrganizeClient({
                               asChild
                             >
                               <Link
-                                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}/nodes`}
+                                href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}/organize`}
                               >
                                 Gérer les nœuds{" "}
                                 <ChevronRight className="h-3 w-3 ml-1" />
@@ -1189,6 +1246,56 @@ export function PhaseOrganizeClient({
           )}
         </div>
       </div>
+
+      {/* Révélation progressive du tirage des groupes (résultat déjà
+          persisté côté serveur — l'animation ne décide rien) */}
+      <DrawRevealDialog
+        open={isGroupsRevealOpen && !!groupsDrawResult}
+        onOpenChange={(next) => {
+          setIsGroupsRevealOpen(next);
+          if (!next) {
+            setGroupsDrawResult(null);
+            // L'écran doit refléter la vérité persistée (groupes créés).
+            router.refresh();
+          }
+        }}
+        kind="groups"
+        title="Tirage au sort des groupes"
+        description="Les affectations sont générées et enregistrées côté serveur. L'ordre ci-dessous est l'ordre du tirage réel."
+        names={groupsDrawResult?.names || {}}
+        photos={groupsDrawResult?.photos || {}}
+        groups={groupsDrawResult?.assignments?.map((a) => ({
+          groupId: a.groupId,
+          groupName: a.groupName,
+          participantIds: a.participantIds,
+        })) || []}
+        onRedraw={() => handleServeGroupsDraw(true)}
+        isRedrawing={isDrawingGroups}
+      />
+
+      {/* Remplacement explicite d'un tirage déjà acté (force serveur) */}
+      <AlertDialog
+        open={isGroupsForceOpen}
+        onOpenChange={setIsGroupsForceOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Refaire le tirage ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Des groupes avec participants existent déjà pour cette phase. Un
+              nouveau tirage supprimera ces groupes (et leurs participants) puis
+              redistribuera tous les participants. Cette opération ne pourra pas
+              être annulée depuis ce dialog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleServeGroupsDraw(true)}>
+              Refaire le tirage
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1208,6 +1315,7 @@ function GroupDraftCard({
   getName,
   isParticipantAssigned,
   onGenerateMatches,
+  phaseType,
 }: any) {
   const getParticipantDisplay = (regId: string) => {
     const reg = allParticipants.find((p: any) => p.id === regId);
@@ -1335,24 +1443,35 @@ function GroupDraftCard({
                   }
                 />
               </div>
-              <div>
-                <Label className="text-[9px] text-muted-foreground">
-                  Qualifiés
-                </Label>
-                <Input
-                  type="number"
-                  className="h-7 text-xs"
-                  value={group.config.advanceCount}
-                  onChange={(e) =>
-                    onUpdate({
-                      config: {
-                        ...group.config,
-                        advanceCount: parseInt(e.target.value) || 2,
-                      },
-                    })
-                  }
-                />
-              </div>
+              {phaseType === "ROUND_ROBIN" ? (
+                <div>
+                  <Label className="text-[9px] text-muted-foreground">
+                    Qualifiés (phase)
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground leading-snug pt-1">
+                    Top N du classement général — global, pas par groupe.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-[9px] text-muted-foreground">
+                    Qualifiés
+                  </Label>
+                  <Input
+                    type="number"
+                    className="h-7 text-xs"
+                    value={group.config.advanceCount}
+                    onChange={(e) =>
+                      onUpdate({
+                        config: {
+                          ...group.config,
+                          advanceCount: parseInt(e.target.value) || 2,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">

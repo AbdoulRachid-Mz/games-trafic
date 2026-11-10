@@ -68,6 +68,14 @@ import {
   isNotNull,
   exists,
 } from "drizzle-orm";
+import {
+  syncStandingsWithMatches,
+  rankParticipants,
+} from "@/lib/tournaments/standings.engine";
+import {
+  resolveScoring,
+  isMatchCountable,
+} from "@/lib/tournaments/scoring";
 
 import {
   type TournamentFilters,
@@ -625,10 +633,29 @@ export async function finalizeTournamentEditionAction(
   winnerRegistrationId: string,
 ) {
   try {
+    // 🆕 Phase 1 (PROMPT.md) : le client propose un candidat, le SERVEUR
+    // recalcule/valide. Le vainqueur n'est JAMAIS défini côté client :
+    // - éliminatoires : vainqueur du node racine (sans parent) ;
+    // - RR/GROUP_STAGE : phase.config.qualifiers[0] (validé) ou leader
+    //   du classement serveur recalcule les matches.
+    const candidateRegistrationId = winnerRegistrationId;
+
+    const validatedRegistrationId =
+      await validateEditionWinnerCandidate(editionId, candidateRegistrationId);
+
+    if (!validatedRegistrationId) {
+      return {
+        success: false,
+        error:
+          "Vainqueur non conforme : le candidat ne correspond pas aux résultats recalculés côté serveur.",
+      };
+    }
+    const serverWinnerRegistrationId = validatedRegistrationId;
+
     return await db.transaction(async (tx) => {
-      // 1. Récupérer les infos du gagnant
+      // 1. Récupérer les infos du gagnant (APRÈS validation serveur)
       const winnerReg = await tx.query.editionRegistrations.findFirst({
-        where: eq(editionRegistrations.id, winnerRegistrationId),
+        where: eq(editionRegistrations.id, serverWinnerRegistrationId),
         with: {
           member: {
             with: { user: true },
@@ -669,7 +696,7 @@ export async function finalizeTournamentEditionAction(
         .insert(editionResults)
         .values({
           editionId,
-          registrationId: winnerRegistrationId,
+          registrationId: serverWinnerRegistrationId,
           position: 1,
           tier: "GOLD",
           createdAt: new Date(),
@@ -688,6 +715,130 @@ export async function finalizeTournamentEditionAction(
     console.error("Error finalizing edition:", error);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Recalcule le vainqueur depuis les données de la dernière phase et
+ * vérifie que le candidat proposé par le client correspond. Le vainqueur
+ * est une décision SERVEUR issue du calcul, jamais du client.
+ * Retourne l'ID de registration du vainqueur recalculé, ou null si non
+ * conforme. Recalcule aussi le classement RR par journées si besoin.
+ * Exportée pour designateEditionWinnerAction.
+ */
+export async function validateEditionWinnerCandidate(
+  editionId: string,
+  candidateRegistrationId?: string
+): Promise<string | null> {
+  const phases = await db.query.tournamentPhases.findMany({
+    where: and(
+      eq(tournamentPhases.editionId, editionId),
+      eq(tournamentPhases.isDeleted, false),
+    ),
+    orderBy: asc(tournamentPhases.order),
+  });
+  const lastPhase = phases[phases.length - 1];
+  if (!lastPhase) return null;
+
+  // --- Éliminatoires : vainqueur du node racine (sans parent). ---
+  if (
+    lastPhase.phaseType === "ELIMINATION" ||
+    lastPhase.phaseType === "KNOCKOUT"
+  ) {
+    const rootNode = await db.query.bracketNodes.findFirst({
+      where: and(
+        eq(bracketNodes.phaseId, lastPhase.id),
+        isNull(bracketNodes.parentNodeId),
+      ),
+    });
+    const serverWinner = rootNode?.winnerRegistrationId || null;
+    if (candidateRegistrationId && serverWinner === candidateRegistrationId) {
+      return serverWinner;
+    }
+    // Absence de candidat (appel système) : on prend le résultat serveur.
+    return candidateRegistrationId ? null : serverWinner;
+  }
+
+  // --- Round Robin / GROUP_STAGE ---
+  const phaseConfig = (lastPhase.config as any) || {};
+
+  // 1. Qualifiés validés par la clôture de phase (source autoritaire).
+  if (Array.isArray(phaseConfig.qualifiers) && phaseConfig.qualifiers.length > 0) {
+    const top =
+      typeof phaseConfig.qualifiers[0] === "string"
+        ? phaseConfig.qualifiers[0]
+        : phaseConfig.qualifiers[0]?.registrationId;
+    if (candidateRegistrationId && top && top !== candidateRegistrationId) {
+      return null;
+    }
+    return top || candidateRegistrationId || null;
+  }
+
+  // 2. Recalcul serveur depuis les matches si les qualifiés ne sont pas
+  //    encore écrits : leader du classement recalculé.
+  const groups = await db.query.phaseGroups.findMany({
+    where: and(
+      eq(phaseGroups.phaseId, lastPhase.id),
+      eq(phaseGroups.isDeleted, false),
+    ),
+  });
+  if (groups.length === 0) return candidateRegistrationId || null;
+
+  const isMatchday =
+    lastPhase.phaseType === "ROUND_ROBIN" &&
+    groups.length > 0 &&
+    groups.every((g: any) => ((g.config as any) || {}).isMatchday === true);
+
+  if (isMatchday) {
+    const groupIds = groups.map((g: any) => g.id);
+    const [phaseMatches, rows] = await Promise.all([
+      db.query.matches.findMany({
+        where: and(
+          eq(matches.phaseId, lastPhase.id),
+          eq(matches.isDeleted, false),
+        ),
+      }),
+      db.query.phaseGroupParticipants.findMany({
+        where: and(
+          inArray(phaseGroupParticipants.groupId, groupIds),
+          eq(phaseGroupParticipants.isDeleted, false),
+        ),
+      }),
+    ]);
+    const registrationIds = Array.from(
+      new Set(rows.map((r) => r.registrationId)),
+    );
+    const countable = (phaseMatches as any[]).filter(isMatchCountable);
+    const scoring = resolveScoring(phaseConfig, (groups[0] as any)?.config);
+    const statsMap = syncStandingsWithMatches(
+      registrationIds,
+      countable as any,
+      scoring,
+    );
+    const ranked = rankParticipants(statsMap, {});
+    const leader = ranked[0]?.registrationId || null;
+    if (!leader) return candidateRegistrationId || null;
+    if (candidateRegistrationId && leader !== candidateRegistrationId) {
+      return null;
+    }
+    return leader;
+  }
+
+  // 3. Groupes classiques : leader du/des groupes (position la plus basse
+  //    marquée qualifié, sinon premier du classement persisté).
+  const groupIds = groups.map((g: any) => g.id);
+  const topParticipant = await db.query.phaseGroupParticipants.findFirst({
+    where: and(
+      inArray(phaseGroupParticipants.groupId, groupIds),
+      eq(phaseGroupParticipants.isDeleted, false),
+    ),
+    orderBy: [asc(phaseGroupParticipants.position)],
+  });
+  const serverLeader = topParticipant?.registrationId || null;
+  if (!serverLeader) return candidateRegistrationId || null;
+  if (candidateRegistrationId && serverLeader !== candidateRegistrationId) {
+    return null;
+  }
+  return serverLeader;
 }
 
 // ============================================================================

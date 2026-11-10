@@ -185,7 +185,13 @@ export const GameClipPlayer = memo(function GameClipPlayer({
       setOptimisticLikesCount((prev) => (prev ?? 0) + 1);
       toggleLike.mutate(
         { userId, entityId: clip.id, entityType: "GAMECLIP", type: "LIKE" },
-        { onSuccess: () => onLike?.() },
+        {
+          onSuccess: () => onLike?.(),
+          onError: () => {
+            setOptimisticLiked(false);
+            setOptimisticLikesCount((prev) => Math.max(0, (prev ?? 1) - 1));
+          },
+        },
       );
     }
   }, [userId, optimisticLiked, toggleLike, clip.id, onLike]);
@@ -235,7 +241,15 @@ export const GameClipPlayer = memo(function GameClipPlayer({
       );
       toggleLike.mutate(
         { userId, entityId: clip.id, entityType: "GAMECLIP", type: "LIKE" },
-        { onSuccess: () => onLike?.() },
+        {
+          onSuccess: () => onLike?.(),
+          onError: () => {
+            setOptimisticLiked(!newLiked);
+            setOptimisticLikesCount((prev) =>
+              newLiked ? Math.max(0, (prev ?? 1) - 1) : (prev ?? 0) + 1,
+            );
+          },
+        },
       );
     },
     [userId, optimisticLiked, toggleLike, clip.id, onLike],
@@ -439,7 +453,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
           <button
             onClick={handleLike}
             className={cn(
-              "p-2 rounded-full transition-all active:scale-90",
+              "p-3 rounded-full transition-all active:scale-90",
               "bg-black/40 backdrop-blur-sm border border-white/10",
               localLiked ? "text-red-500" : "text-white",
             )}
@@ -458,7 +472,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
               e.stopPropagation();
               onCommentsToggle?.();
             }}
-            className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
+            className="p-3 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
           >
             <MessageCircle className="h-6 w-6 text-white" />
           </button>
@@ -471,7 +485,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
         <button
           onClick={handleBookmark}
           className={cn(
-            "p-2 rounded-full transition-all active:scale-90",
+            "p-3 rounded-full transition-all active:scale-90",
             "bg-black/40 backdrop-blur-sm border border-white/10",
             localBookmarked && "text-yellow-500",
           )}
@@ -486,7 +500,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
         {/* Share Button */}
         <button
           onClick={handleShare}
-          className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
+          className="p-3 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
         >
           <Share2 className="h-6 w-6 text-white" />
         </button>
@@ -496,7 +510,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
           onClick={handleDownload}
           disabled={isDownloading}
           className={cn(
-            "p-2 rounded-full transition-all active:scale-90",
+            "p-3 rounded-full transition-all active:scale-90",
             "bg-black/40 backdrop-blur-sm border border-white/10",
             isDownloading && "opacity-50",
           )}
@@ -514,7 +528,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
             e.stopPropagation();
             toggleMute();
           }}
-          className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
+          className="p-3 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 transition-all active:scale-90"
         >
           {muted ? (
             <VolumeX className="h-6 w-6 text-white" />
@@ -525,7 +539,7 @@ export const GameClipPlayer = memo(function GameClipPlayer({
       </div>
 
       {/* Bottom Info Overlay - Always visible */}
-      <div className="absolute bottom-0 left-0 right-16 p-4 pb-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none z-20">
+      <div className="absolute bottom-0 left-0 right-16 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none z-20">
         {/* Author */}
         <div
           className="flex items-center gap-2 mb-2 pointer-events-auto cursor-pointer"

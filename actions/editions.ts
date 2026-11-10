@@ -9,11 +9,13 @@ import {
   tournamentPhases,
   phaseGroupParticipants,
   matches,
+  editionResults,
   type NewTournamentEdition,
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { validateEditionWinnerCandidate } from "./tournaments/editions";
 import {
   calculateTransactionFees,
   executeFinancialOperation,
@@ -1068,22 +1070,83 @@ export async function updateTournamentEditionModeAction(
 
 /**
  * Désigne officiellement le vainqueur d'une édition
+ *
+ * Phase 1 (PROMPT.md) : le vainqueur est RECALCULÉ côté serveur depuis la
+ * dernière phase (nationnel racine éliminatoire, qualifiers/leader RR).
+ * Le candidat client n'est qu'un pré-chose : accepté uniquement s'il
+ * correspond (registrationId ou memberId) à la vérité serveur — jamais
+ * stocké tel quel, et winnerMetadata est reconstruit serveur uniquement.
  */
 export async function designateEditionWinnerAction(
   editionId: string,
-  winnerId: string, // memberId
-  winnerMetadata: any,
+  winnerId: string, // memberId OU registrationId (candidat client)
+  _winnerMetadata?: any // DEPRECATED : ignoré, reconstruit côté serveur
 ) {
   try {
+    const serverWinnerRegistrationId =
+      await validateEditionWinnerCandidate(editionId, undefined);
+    if (!serverWinnerRegistrationId) {
+      return {
+        success: false,
+        error: "Aucun vainqueur déterminable depuis les résultats de la dernière phase.",
+      };
+    }
+
+    const serverReg = await db.query.editionRegistrations.findFirst({
+      where: eq(editionRegistrations.id, serverWinnerRegistrationId),
+      with: { member: { with: { user: true } } },
+    });
+    if (!serverReg?.memberId) {
+      return { success: false, error: "Vainqueur recalculé introuvable." };
+    }
+
+    // Candidat accepté seulement s'il désigne le même gagnant.
+    if (
+      winnerId &&
+      winnerId !== serverWinnerRegistrationId &&
+      winnerId !== serverReg.memberId
+    ) {
+      return {
+        success: false,
+        error: "Vainqueur non conforme : ne correspond pas au classement recalculé côté serveur.",
+      };
+    }
+
     await db
       .update(tournamentEditions)
       .set({
-        winnerId,
-        winnerMetadata,
+        winnerId: serverReg.memberId,
+        winnerMetadata: {
+          displayName:
+            serverReg.member?.displayName ||
+            serverReg.member?.user?.username ||
+            "Champion",
+          avatar: serverReg.member?.avatar || serverReg.member?.user?.image || null,
+          gameTag: serverReg.member?.gameTag || null,
+          clubName: serverReg.member?.clubName || null,
+          registrationId: serverReg.id,
+          memberId: serverReg.memberId,
+          confirmedAt: new Date().toISOString(),
+        },
         status: "COMPLETED",
         updatedAt: new Date(),
       })
       .where(eq(tournamentEditions.id, editionId));
+
+    await db
+      .insert(editionResults)
+      .values({
+        editionId,
+        registrationId: serverReg.id,
+        position: 1,
+        tier: "GOLD",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [editionResults.editionId, editionResults.registrationId],
+        set: { position: 1, tier: "GOLD", updatedAt: new Date() },
+      });
 
     const edition = await getTournamentEditionById(editionId);
     if (edition) {

@@ -163,7 +163,7 @@ function GroupDetailContent() {
 
   const handleRemoveMember = async (memberId: string) => {
     try {
-      await removeMemberMutation.mutateAsync(memberId);
+      await removeMemberMutation.mutateAsync({ memberId });
       toast.success("Membre retiré du groupe");
     } catch (error) {
       toast.error("Erreur lors du retrait du membre");

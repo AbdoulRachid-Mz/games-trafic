@@ -2,6 +2,7 @@
 import {
   getPhaseGroupById,
   getPhaseGroupParticipants,
+  getPhaseQualifiedParticipantsAction,
   getBracketNodes,
   recalculateGroupStandings,
   getTournamentPhases,
@@ -70,15 +71,14 @@ export default async function GroupDetailPage({ params }: PageProps) {
   > = {};
 
   for (const phase of previousPhases) {
-    const qParticipants = await getPhaseGroupParticipants({
-      filters: { phaseId: phase.id, qualified: true },
-      pagination: { limit: 1000, page: 1 },
-    });
+    // ROUND ROBIN (groupes = journées) : les lignes phaseGroupParticipants
+    // des phases récentes ne portent rien — les qualifiés officiels sont
+    // dans phase.config.qualifiers (helper central, repli sur les lignes
+    // pour les modèles historiques).
+    const qualifiedRes = await getPhaseQualifiedParticipantsAction(phase.id);
     qualifiedByPhase[phase.id] = {
       name: phase.name || `Phase ${phase.order}`,
-      registrationIds: (qParticipants.data as any[]).map(
-        (p) => p.registrationId,
-      ),
+      registrationIds: qualifiedRes.registrationIds,
     };
   }
 

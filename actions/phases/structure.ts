@@ -81,6 +81,18 @@ export async function generatePhaseMatches(
 
     if (!phase) throw new Error("Phase not found");
 
+    // 🆕 Round Robin refondu : la structure est gérée par journée
+    // (setupLeaguePhase) avec 1 node = 1 confrontation. Une régénération
+    // générique brutale créerait des doublons ; on refuse explicitement,
+    // AVANT toute suppression destructive.
+    if (phase.phaseType === "ROUND_ROBIN") {
+      return {
+        success: false,
+        error:
+          "Les matchs Round Robin sont structurés par confrontation (journées). Utilisez la régénération de phase dédiée.",
+      };
+    }
+
     if (config?.forceRecreate) {
       if (config.groupId) {
         await db

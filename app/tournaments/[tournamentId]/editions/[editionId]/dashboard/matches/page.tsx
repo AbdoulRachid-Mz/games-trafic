@@ -333,7 +333,8 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
     // Reset pagination when filter changes
     if (!updates.page) params.set("page", "1");
     
-    router.push(`${pathname}?${params.toString()}`);
+    // replace: les filtres/onglets ne doivent pas polluer l'historique.
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   // Phase & Group Tabs logic
@@ -478,6 +479,7 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
             phaseId={phaseId}
             groupId={groupId}
             phases={phases}
+            groups={activePhaseGroups}
           />
         </CardContent>
       </Card>

@@ -71,7 +71,7 @@ export function GroupMembers({
     };
 
     return (
-      <Badge variant="outline" className={cn("text-xs", variants[role])}>
+      <Badge variant="outline" className={cn("text-xs shrink-0", variants[role])}>
         {role === "OWNER" && <Crown className="h-3 w-3 mr-1" />}
         {role === "ADMIN" && <Shield className="h-3 w-3 mr-1" />}
         {role === "OWNER" ? "PROPRIÉTAIRE" : role === "ADMIN" ? "ADMIN" : "MEMBRE"}
@@ -118,7 +118,7 @@ export function GroupMembers({
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-medium text-[var(--chat-text)] truncate">
                     {memberName}
                     {isCurrentUser && (
@@ -142,7 +142,7 @@ export function GroupMembers({
                 {canManage && canManageMembers && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-9 w-9">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

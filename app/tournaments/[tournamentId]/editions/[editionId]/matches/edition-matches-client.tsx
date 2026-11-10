@@ -304,7 +304,7 @@ function PublicMatchCard({
   );
 }
 
-// Composant pour un nœud de bracket (journée/round)
+// Composant pour un nœud de bracket (une confrontation entre 2 participants)
 function BracketNodeSection({
   node,
   tournamentId,
@@ -318,9 +318,18 @@ function BracketNodeSection({
 
   if (matches.length === 0) return null;
 
-  // Déterminer le nom du nœud
-  const nodeName =
-    node.metadata?.name || node.name || node.nodeCode || `Round ${node.round}`;
+  // Déterminer le nom du nœud.
+  // Nouveau modèle RR : 1 node = 1 confrontation (2 participants)
+  // → nom metadata/nodeCode. Legacy : node = journée entière
+  // (metadata.participants > 2) → libellé à base de round conservé.
+  const nodeParticipants = node.metadata?.participants;
+  const isLegacyNodeNode =
+    Array.isArray(nodeParticipants) && nodeParticipants.length > 2;
+  const nodeName = isLegacyNodeNode
+    ? node.metadata?.name || node.name || node.nodeCode || `Round ${node.round}`
+    : node.metadata?.name ||
+      node.nodeCode ||
+      `Confrontation ${node.matchNumber}`;
   const nodeType = node.metadata?.nodeType || node.nodeType;
 
   return (
@@ -406,7 +415,13 @@ function GroupSection({
             <div className="flex-1">
               <div className="font-bold">{group.name}</div>
               <div className="text-xs text-muted-foreground">
-                {nodes.length} {nodes.length > 1 ? "journées" : "journée"}
+                {group?.config?.isMatchday === true
+                  ? `${nodes.length} ${
+                      nodes.length > 1 ? "confrontations" : "confrontation"
+                    }`
+                  : `${nodes.length} ${
+                      nodes.length > 1 ? "journées" : "journée"
+                    }`}
               </div>
             </div>
             <Badge variant="secondary">
@@ -426,7 +441,7 @@ function GroupSection({
 
         <CollapsibleContent>
           <div className="pl-4 pt-4 space-y-6">
-            {/* Nodes (journées) */}
+            {/* Nodes (confrontations) */}
             {nodes.map((node: any) => (
               <BracketNodeSection
                 key={node.id}

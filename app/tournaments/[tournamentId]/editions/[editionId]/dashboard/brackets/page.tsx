@@ -1,6 +1,5 @@
 import { Metadata } from "next";
-import { getTournamentPhases, getBracketNodes, getMatchesWithParticipants } from "@/actions/phases";
-import { getMatches } from "@/actions/tournaments";
+import { getTournamentPhases, getBracketNodes, getMatches } from "@/actions/phases";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
@@ -58,11 +57,13 @@ function getRoundLabel(roundIndex: number, totalRounds: number) {
 function phaseTypeLabel(type: string | null | undefined): string {
   switch (type) {
     case "ELIMINATION": return "Élimination directe";
+    case "DOUBLE_ELIMINATION": return "Double élimination";
     case "ROUND_ROBIN": return "Round Robin";
     case "GROUP_STAGE": return "Phase de poules";
     case "SWISS": return "Système suisse";
     case "KNOCKOUT": return "Knockout";
     case "CUSTOM": return "Personnalisé";
+    case "GROUP_ELIMINATION": return "Groupes + Élimination";
     default: return "Inconnu";
   }
 }
@@ -112,36 +113,37 @@ export default async function BracketsDashboardPage({
         options: { sortBy: "round", sortOrder: "asc" },
         pagination: { page: 1, limit: 200 },
       });
-      
-      const nodes = nodesRes.data || [];
-      
-      // Get matches for each node to count them
-      const nodesWithStats = await Promise.all(nodes.map(async (node) => {
-        const matchesRes = await getMatchesWithParticipants({
-          filters: { bracketNodeId: node.id, editionId },
-          pagination: { page: 1, limit: 1 } // Just need total
-        });
-        return {
-          ...node,
-          matchesCount: matchesRes.pagination.total
-        };
-      }));
 
+      const nodes = nodesRes.data || [];
       return {
         ...phase,
-        bracketNodes: nodesWithStats,
+        bracketNodes: nodes,
       };
     }),
   );
 
+  // 🆕 RR refondu (« groupes = journées ») : cette phase n'est PAS un arbre.
+  // Ses nodes sont des confrontations de journée (metadata.dayNumber), gérées
+  // dans l'onglet Groupes/Matchs — on les exclut de la vue brackets. Les
+  // structures RR héritées (groupe « Classement ») n'ont pas de dayNumber et
+  // restent visibles.
+  const bracketPhases = phasesWithNodes.filter(
+    (p) =>
+      !(
+        p.phaseType === "ROUND_ROBIN" &&
+        (p.bracketNodes || []).some((n: any) => n.metadata?.dayNumber)
+      ),
+  );
+
   // Filter nodes by phase if requested
   const targetPhases = phaseId
-    ? phasesWithNodes.filter((p) => p.id === phaseId)
-    : phasesWithNodes;
+    ? bracketPhases.filter((p) => p.id === phaseId)
+    : bracketPhases;
 
-  // Get matches count for each phase to show stats
+  // Stats matchs par phase et par node : UNE seule requête par phase
+  // (avant : une requête par node, N+1 évité).
   const phasesWithStats = await Promise.all(
-    targetPhases.map(async (phase) => {
+    targetPhases.map(async (phase: any) => {
       const matchesRes = await getMatches({
         filters: { phaseId: phase.id, editionId },
         pagination: { page: 1, limit: 1000 },
@@ -151,8 +153,21 @@ export default async function BracketsDashboardPage({
         (m: any) => m.status === "COMPLETED",
       ).length;
 
+      // Comptage matchs par node à partir du même lot (consistent).
+      const matchesPerNode = new Map<string, number>();
+      for (const m of matches) {
+        const nodeId = m.bracketNodeId;
+        if (!nodeId) continue;
+        matchesPerNode.set(nodeId, (matchesPerNode.get(nodeId) || 0) + 1);
+      }
+      const bracketNodes = (phase.bracketNodes || []).map((node: any) => ({
+        ...node,
+        matchesCount: matchesPerNode.get(node.id) ?? 0,
+      }));
+
       return {
         ...phase,
+        bracketNodes,
         matchesCount: matches.length,
         completedMatchesCount: completedMatches,
       };
@@ -206,7 +221,7 @@ export default async function BracketsDashboardPage({
           </div>
 
           <PhaseFilter
-            phases={eliminationPhases}
+            phases={bracketPhases}
             currentPhaseId={phaseId}
             placeholder="Toutes les phases"
             paramName="phaseId"

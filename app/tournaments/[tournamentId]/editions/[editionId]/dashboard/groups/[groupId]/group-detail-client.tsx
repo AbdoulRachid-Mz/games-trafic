@@ -45,6 +45,7 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { GenerateGroupMatchesDialog } from "@/components/pages/tournaments/edition-detail/generate-group-matches-dialog";
+import { getEffectiveAdvanceCount } from "@/lib/tournaments/config";
 import { CreateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/create-bracket-node-dialog";
 import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
 import { UpdatePhaseGroupDialog } from "@/components/pages/tournaments/edition-detail/update-phase-group-dialog";
@@ -288,6 +289,9 @@ export function GroupDetailClient({
                         maxParticipants: group?.participantCount || 8,
                         matchesPerParticipant:
                           (group?.config as any)?.matchesPerParticipant || 1,
+                        isMatchday:
+                          (group?.config as any)?.isMatchday === true,
+                        fixturesCount: (group?.config as any)?.fixturesCount,
                       }}
                       asFormOnly
                     />
@@ -451,7 +455,7 @@ export function GroupDetailClient({
                       </p>
                     </div>
                     {group ? (
-                      <UpdatePhaseGroupDialog group={group} asFormOnly />
+                      <UpdatePhaseGroupDialog group={group} phase={(group as any).phase} asFormOnly />
                     ) : (
                       <></>
                     )}
@@ -484,21 +488,22 @@ export function GroupDetailClient({
         </div>
         <Tabs defaultValue="standings" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="standings" className="gap-2">
-              <Trophy className="h-4 w-4" /> Classement
+            <TabsTrigger value="standings" className="gap-2 max-sm:flex-col max-sm:gap-1" title="Classement">
+              <Trophy className="h-4 w-4" /> <span className="max-sm:hidden">Classement</span>
             </TabsTrigger>
-            <TabsTrigger value="participants" className="gap-2">
-              <Users className="h-4 w-4" /> Participants
+            <TabsTrigger value="participants" className="gap-2 max-sm:flex-col max-sm:gap-1" title="Participants">
+              <Users className="h-4 w-4" /> <span className="max-sm:hidden">Participants</span>
             </TabsTrigger>
-            <TabsTrigger value="matches" className="gap-2">
-              <Swords className="h-4 w-4" /> Matchs
+            <TabsTrigger value="matches" className="gap-2 max-sm:flex-col max-sm:gap-1" title="Matchs">
+              <Swords className="h-4 w-4" /> <span className="max-sm:hidden">Matchs</span>
             </TabsTrigger>
             <TabsTrigger
               value="brackets"
-              className="gap-2"
+              className="gap-2 max-sm:flex-col max-sm:gap-1"
+              title="Brackets"
               disabled={nodes.length === 0}
             >
-              <RefreshCcw className="h-4 w-4" /> Brackets
+              <RefreshCcw className="h-4 w-4" /> <span className="max-sm:hidden">Brackets</span>
             </TabsTrigger>
           </TabsList>
 
@@ -558,8 +563,19 @@ export function GroupDetailClient({
                         standings.map((p, idx) => {
                           const diff =
                             (p.scoreFor ?? 0) - (p.scoreAgainst ?? 0);
+                          // Zone qualificative : uniquement pour les groupes
+                          // qui qualifient réellement. Un groupe-journée (RR
+                          // refondu) se termine sans qualification — le top-N
+                          // est décidé au classement général de la phase.
+                          const groupIsMatchday =
+                            (group?.config as any)?.isMatchday === true;
+                          const effectiveAdvance =
+                            getEffectiveAdvanceCount(
+                              (group?.phase as any) ?? undefined,
+                              group,
+                            );
                           const isTop =
-                            idx < ((group?.config as any)?.advanceCount || 2);
+                            !groupIsMatchday && idx < effectiveAdvance;
                           return (
                             <TableRow
                               key={p.id}

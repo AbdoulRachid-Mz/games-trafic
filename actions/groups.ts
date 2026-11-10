@@ -6,6 +6,7 @@ import { type GroupFilters, type GroupMemberFilters, type ListQuery, type Pagina
 import { db } from '@/lib/db';
 import { createNotification } from '@/actions/notifications';
 import { getUserById } from '@/actions/users';
+import { resolveGroupPermissions } from '@/lib/chats/permissions';
 import { revalidatePath } from 'next/cache';
 
 // ============================================================================
@@ -494,6 +495,7 @@ export async function createGroup(groupData: NewGroup): Promise<Group> {
  */
 export async function updateGroup(
   id: string,
+  userId: string,
   groupData: Partial<NewGroup>
 ): Promise<Group> {
   try {
@@ -501,6 +503,18 @@ export async function updateGroup(
     const existingGroup = await getGroupById(id);
     if (!existingGroup) {
       throw new Error('Group not found');
+    }
+
+    // Lot C : permissions serveur
+    const perms = await getGroupPermissions(id, userId);
+    if (!perms.canEditInfo) {
+      throw new Error('Accès refusé: vous ne pouvez pas modifier ce groupe');
+    }
+    // Seul le OWNER peut changer les permissions / isReadOnly
+    if ((groupData as any).permissions !== undefined || (groupData as any).isReadOnly !== undefined) {
+      if (!perms.canEditPermissions) {
+        throw new Error('Accès refusé: seul le propriétaire peut modifier les permissions');
+      }
     }
 
     // Vérification des doublons de nom si le nom est modifié
@@ -560,13 +574,22 @@ export async function deleteGroup(id: string): Promise<Group> {
 export async function addGroupMember(
   groupId: string,
   userId: string,
-  role: 'OWNER' | 'ADMIN' | 'MEMBER' = 'MEMBER'
+  role: 'OWNER' | 'ADMIN' | 'MEMBER' = 'MEMBER',
+  addedBy?: string
 ): Promise<GroupMember> {
   try {
     // Vérification que le groupe existe
     const group = await getGroupById(groupId);
     if (!group) {
       throw new Error('Group not found');
+    }
+
+    // Lot C : permission d'ajout (si acteur fourni)
+    if (addedBy && addedBy !== group.creatorId) {
+      const canAdd = await hasGroupPermission(addedBy, groupId, 'canAddMembers');
+      if (!canAdd) {
+        throw new Error('Accès refusé: vous ne pouvez pas ajouter de membres');
+      }
     }
 
     // Vérification que l'utilisateur n'est pas déjà membre
@@ -603,9 +626,29 @@ export async function addGroupMember(
  */
 export async function updateGroupMemberRole(
   memberId: string,
-  role: 'OWNER' | 'ADMIN' | 'MEMBER'
+  role: 'OWNER' | 'ADMIN' | 'MEMBER',
+  updatedBy?: string
 ): Promise<GroupMember> {
   try {
+    const existing = await getGroupMemberById(memberId);
+    if (!existing) throw new Error('Group member not found');
+
+    if (updatedBy) {
+      const perms = await getGroupPermissions(existing.groupId, updatedBy);
+      if (!perms.canEditPermissions && existing.role !== 'MEMBER') {
+        // Only owner can touch admins/owners
+        if (existing.role === 'OWNER' || role === 'OWNER') {
+          throw new Error('Accès refusé: seul le propriétaire peut modifier ce rôle');
+        }
+        if (!perms.canPin && role !== 'MEMBER') {
+          // admins can promote to admin? allow admins to set ADMIN/MEMBER
+        }
+      }
+      if (!perms.canEditPermissions && role === 'OWNER') {
+        throw new Error('Accès refusé: seul le propriétaire peut désigner un propriétaire');
+      }
+    }
+
     const result = await db
       .update(groupMembers)
       .set({
@@ -632,8 +675,22 @@ export async function updateGroupMemberRole(
 /**
  * Retire un membre du groupe
  */
-export async function removeGroupMember(memberId: string): Promise<GroupMember> {
+export async function removeGroupMember(memberId: string, removedBy?: string): Promise<GroupMember> {
   try {
+    const existing = await getGroupMemberById(memberId);
+    if (removedBy && existing) {
+      const perms = await getGroupPermissions(existing.groupId, removedBy);
+      // Owner can remove anyone; admin can remove members only
+      if (!perms.canEditPermissions) {
+        if (existing.role !== 'MEMBER') {
+          throw new Error('Accès refusé: vous ne pouvez pas retirer ce membre');
+        }
+        if (!perms.canAddMembers) {
+          throw new Error('Accès refusé: vous ne pouvez pas retirer de membres');
+        }
+      }
+    }
+
     const result = await db
       .delete(groupMembers)
       .where(eq(groupMembers.id, memberId))
@@ -770,6 +827,83 @@ function buildGroupMemberWhereConditions(
 /**
  * Vérifie si un utilisateur a la permission d'effectuer une action sur un groupe
  */
+/**
+ * Permissions effectives d'un utilisateur dans un groupe (Lot C).
+ * Renvoie des flags booléens. Les overrides par membre (groupMembers.permissions)
+ * priment sur la config du groupe et le rôle.
+ */
+export async function getGroupPermissions(
+  groupId: string,
+  userId: string,
+): Promise<{
+  role: 'OWNER' | 'ADMIN' | 'MEMBER' | null;
+  isMember: boolean;
+  isReadOnly: boolean;
+  canSend: boolean;
+  canSendMedia: boolean;
+  canAddMembers: boolean;
+  canEditInfo: boolean;
+  canEditPermissions: boolean;
+  canPin: boolean;
+  canDeleteMessages: boolean;
+}> {
+  const group = await getGroupById(groupId);
+  if (!group) {
+    return {
+      role: null,
+      isMember: false,
+      isReadOnly: false,
+      canSend: false,
+      canSendMedia: false,
+      canAddMembers: false,
+      canEditInfo: false,
+      canEditPermissions: false,
+      canPin: false,
+      canDeleteMessages: false,
+    };
+  }
+
+  const member = await getGroupMemberByUserAndGroup(userId, groupId);
+  if (!member && group.creatorId !== userId) {
+    return {
+      role: null,
+      isMember: false,
+      isReadOnly: (group as any).isReadOnly === true,
+      canSend: false,
+      canSendMedia: false,
+      canAddMembers: false,
+      canEditInfo: false,
+      canEditPermissions: false,
+      canPin: false,
+      canDeleteMessages: false,
+    };
+  }
+
+  const role = (member?.role || (group.creatorId === userId ? "OWNER" : null)) as
+    | "OWNER"
+    | "ADMIN"
+    | "MEMBER"
+    | null;
+
+  return resolveGroupPermissions(
+    role,
+    (group as any).isReadOnly === true,
+    ((group as any).permissions || {}) as any,
+    ((member as any)?.permissions || {}) as any,
+  );
+}
+
+export async function hasGroupPermission(
+  userId: string,
+  groupId: string,
+  permission: keyof Awaited<ReturnType<typeof getGroupPermissions>>,
+): Promise<boolean> {
+  const perms = await getGroupPermissions(groupId, userId);
+  const val = perms[permission];
+  return typeof val === 'boolean' ? val : false;
+}
+
+
 export async function checkGroupPermission(
   userId: string,
   groupId: string,
@@ -777,13 +911,15 @@ export async function checkGroupPermission(
 ): Promise<boolean> {
   try {
     const member = await getGroupMemberByUserAndGroup(userId, groupId);
-    if (!member) return false;
-
+    if (!member) {
+      const group = await getGroupById(groupId);
+      if (group?.creatorId === userId) return true;
+      return false;
+    }
     const roleHierarchy = { OWNER: 3, ADMIN: 2, MEMBER: 1 };
-    const userRoleLevel = roleHierarchy[member.role as keyof typeof roleHierarchy];
-    const requiredRoleLevel = roleHierarchy[requiredRole];
-
-    return userRoleLevel >= requiredRoleLevel;
+    const userLevel = roleHierarchy[member.role as keyof typeof roleHierarchy] || 0;
+    const requiredLevel = roleHierarchy[requiredRole];
+    return userLevel >= requiredLevel;
   } catch (error) {
     console.error('Error checking group permission:', error);
     return false;

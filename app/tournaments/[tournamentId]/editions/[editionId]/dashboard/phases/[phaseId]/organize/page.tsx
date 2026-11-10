@@ -1,11 +1,12 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/[phaseId]/organize/page.tsx
 import { db } from "@/lib/db";
-import { eq, and, exists } from "drizzle-orm";
-import { tournamentPhases, phaseGroups, phaseGroupParticipants, editionRegistrations, tournamentEditions } from "@/database/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import { tournamentPhases, phaseGroups, editionRegistrations, tournamentEditions } from "@/database/schema";
 import { PhaseOrganizeClient } from "@/components/pages/tournaments/edition-detail/phase-organize-client";
 import { Typography } from "@/components/ui/typography";
 import { notFound } from "next/navigation";
 import { getTournamentEditionById } from "@/actions/editions";
+import { getPhaseQualifiedRegistrationIds } from "@/actions/phases/helpers";
 
 interface PageProps {
   params: Promise<{
@@ -32,30 +33,28 @@ export default async function PhaseOrganizePage({ params }: PageProps) {
 
   if (source.startsWith('PHASE_')) {
     const sourcePhaseId = source.replace('PHASE_', '');
-    sourceParticipants = await db.query.phaseGroupParticipants.findMany({
-      where: and(
-        exists(
-          db.select().from(phaseGroups)
-            .where(and(
-              eq(phaseGroups.id, phaseGroupParticipants.groupId),
-              eq(phaseGroups.phaseId, sourcePhaseId)
-            ))
-        ),
-        eq(phaseGroupParticipants.qualified, true)
-      ),
-      with: {
-        registration: {
-          with: {
-            member: {
-              with: {
-                user: true,
-                team: true,
-              },
+    // Qualifiés officiels de la phase source : phase.config.qualifiers
+    // d'abord (modèle « groupes = journées »), lignes de groupe en repli
+    // (modèles historiques). Helper central unique.
+    const qualifiedIds =
+      await getPhaseQualifiedRegistrationIds(sourcePhaseId);
+
+    if (qualifiedIds.length > 0) {
+      const registrations = await db.query.editionRegistrations.findMany({
+        where: inArray(editionRegistrations.id, qualifiedIds),
+        with: {
+          member: {
+            with: {
+              user: true,
+              team: true,
             },
           },
         },
-      },
-    });
+      });
+      sourceParticipants = registrations.map((registration) => ({
+        registration,
+      }));
+    }
   } else {
     sourceParticipants = await db.query.editionRegistrations.findMany({
       where: and(

@@ -3,7 +3,8 @@
 import { ProductGrid } from "./product-grid";
 import { MarketplaceFilters } from "./filters";
 import { MarketplaceHero } from "./marketplace-hero";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Filter, Grid3x3, List, X, SlidersHorizontal } from "lucide-react";
@@ -12,10 +13,40 @@ import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
 
 export function MarketplaceContent() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [totalProducts, setTotalProducts] = useState<number | null>(null);
   const { isSmallScreen, isMediumScreen } = useScreenSize();
+
+  const handleSearch = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value && value.trim() !== "") params.set("q", value.trim());
+      else params.delete("q");
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams],
+  );
+
+  // Badge mobile : nombre réel de facettes actives dans l'URL.
+  const activeFilterKeys = [
+    "q",
+    "games",
+    "platforms",
+    "ranks",
+    "features",
+    "countries",
+    "minPrice",
+    "maxPrice",
+    "minLevel",
+    "maxLevel",
+  ];
+  const activeFilterCount = activeFilterKeys.filter((k) =>
+    searchParams.get(k),
+  ).length;
 
   const toggleFilter = () => setIsFilterOpen(!isFilterOpen);
 
@@ -23,17 +54,17 @@ export function MarketplaceContent() {
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <MarketplaceHero 
-        searchQuery={searchQuery} 
+        searchQuery={searchParams.get("q") || ""} 
         isFilterOpen={isFilterOpen} 
         toggleFilter={toggleFilter} 
-        onSearch={setSearchQuery} 
+        onSearch={handleSearch} 
       />
       
       <div className="mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Filters sidebar - Desktop */}
-          {!isSmallScreen && (
-            <aside className="lg:w-1/4">
+          {/* Filters sidebar - Desktop : masquée SOUS lg (zone 640–1023px
+              couverte par le drawer, pas un empilement de la sidebar) */}
+          <aside className="hidden lg:block lg:w-1/4">
               <div className="sticky top-24 space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -63,27 +94,26 @@ export function MarketplaceContent() {
                 </div>
                 <MarketplaceFilters />
               </div>
-            </aside>
-          )}
+          </aside>
 
           {/* Product grid */}
-          <main className={isSmallScreen ? "w-full" : "lg:w-3/4"}>
+          <main className="w-full flex-1 min-w-0">
             {/* Header avec controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 p-4 bg-card rounded-lg border">
               <div className="flex items-center gap-4">
-                {isSmallScreen && (
-                  <Button
-                    variant="outline"
-                    onClick={toggleFilter}
-                    className="gap-2"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Filtres
-                    <Badge variant="secondary" className="ml-1 h-5 w-5 p-0">
-                      5
+                <Button
+                  variant="outline"
+                  onClick={toggleFilter}
+                  className="gap-2 lg:hidden"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filtres
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 min-w-5 p-0 px-1">
+                      {activeFilterCount}
                     </Badge>
-                  </Button>
-                )}
+                  )}
+                </Button>
                 
                 <div className="hidden sm:flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Affichage:</span>
@@ -112,31 +142,32 @@ export function MarketplaceContent() {
 
               <div className="flex items-center gap-2 sm:gap-4">
                 <div className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">124</span> comptes
+                  <span className="font-semibold text-foreground">
+                    {totalProducts ?? "…"}
+                  </span>{" "}
+                  produit{totalProducts === 1 ? "" : "s"}
                 </div>
-                
-                {!isSmallScreen && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "outline"}
-                      size="icon"
-                      onClick={() => setViewMode("grid")}
-                      className="h-8 w-8 sm:hidden"
-                      title="Vue grille"
-                    >
-                      <Grid3x3 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "outline"}
-                      size="icon"
-                      onClick={() => setViewMode("list")}
-                      className="h-8 w-8 sm:hidden"
-                      title="Vue liste"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "outline"}
+                    size="icon"
+                    onClick={() => setViewMode("grid")}
+                    className="h-8 w-8 sm:hidden"
+                    title="Vue grille"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "outline"}
+                    size="icon"
+                    onClick={() => setViewMode("list")}
+                    className="h-8 w-8 sm:hidden"
+                    title="Vue liste"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -179,7 +210,7 @@ export function MarketplaceContent() {
               </SheetContent>
             </Sheet>
 
-            <ProductGrid searchQuery={searchQuery} viewMode={viewMode} />
+            <ProductGrid viewMode={viewMode} onTotalChange={setTotalProducts} />
           </main>
         </div>
       </div>

@@ -90,7 +90,7 @@ export function TournamentPayoutDialog({
           setStep("AMOUNT");
         }
       }}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Virement vers {recipientName}</DialogTitle>
           </DialogHeader>

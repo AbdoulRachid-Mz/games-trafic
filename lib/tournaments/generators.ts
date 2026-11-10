@@ -8,7 +8,8 @@ import {
 } from "@/database/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
 import { shuffle, chunk, getDefaultScheduledTime } from "./utils";
-import { generateGroupMatches, generateEliminationMatches } from "./match.generator";
+import { buildLeagueCalendar, generateGroupMatches, generateEliminationMatches } from "./match.generator";
+import { inheritScoringToGroup } from "./scoring";
 import { getEliminationRoundName } from "./get-name";
 
 /**
@@ -31,7 +32,21 @@ export interface GeneratorOptions {
 }
 
 /**
- * Set up a League (Round Robin) phase
+ * Set up a League (Round Robin) phase — REFONTE B-2 (Phase 1 PROMPT.md)
+ *
+ * Nouvelle structure :
+ * - groupe = journée (nom configurable, ex. "Journée 1", "Tour 3"…) ;
+ * - node = UNE confrontation précise (2 participants) ;
+ * - match = une manche (par défaut 1 / node) ;
+ * - participants impairs : journée avec un exempt (BYE, aucun node) ;
+ * - aller-retour : n journées aller puis n journées retour (confrontations inversées) ;
+ * - progression locale : une journée terminée ne qualifie RIEN ;
+ *   la qualification n'arrive qu'à la validation de phase
+ *   (markPhaseCompleteAction écrit phase.config.qualifiers).
+ *
+ * Compat : les éditions anciennes (groupe unique « Classement », nodes = journées,
+ * metadata.participants = tous) ne passent PAS ici ; elles sont détectées par
+ * `isLegacyLeagueEdition` (actions/phases/helpers.ts) et restent traitées tel quel.
  */
 export async function setupLeaguePhase(
   tx: any,
@@ -40,28 +55,67 @@ export async function setupLeaguePhase(
   participantRegIds: string[],
   options: GeneratorOptions
 ) {
-  const groupName = "Classement";
-  const [group] = await tx
-    .insert(phaseGroups)
-    .values({
-      phaseId: phase.id,
-      name: groupName,
-      order: 0,
-      participantCount: participantRegIds.length,
-      groupType: 'ROUND_ROBIN',
-      config: {
-        isHomeAway: options.isHomeAway || false,
-        generateMatches: options.generateMatches !== false,
-        nodePrefix: options.nodePrefix || "Journée",
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .returning();
+  // Calendrier déduit (fonction pure, sans accès DB) ; si l'appelant ne veut
+  // PAS de nodes, on ne persiste que le membership phase-échelle.
+  const calendar = buildLeagueCalendar(participantRegIds, {
+    isHomeAway: options.isHomeAway || false,
+  });
 
-  // Assign participants
-  if (participantRegIds.length > 0) {
-    for (const regId of participantRegIds) {
+  // Nom configurable des journées ("Journée", "Matchday", "Tour"…).
+  const dayNamePrefix = options.nodePrefix || "Journée";
+
+  // Scoring hérité phase → groupe (explicite, 3/1/0 par défaut).
+  const phaseConfig = (phase.config as any) || {};
+  const generateMatches = options.generateMatches !== false;
+  const homeAway = options.isHomeAway || false;
+  const firstHalfDayCount = homeAway
+    ? Math.ceil(calendar.length / 2)
+    : calendar.length;
+
+  if (options.generateNodes === false) return;
+
+  for (const day of calendar) {
+    // Confrontés de la journée uniquement (2 par confrontation + exemptés).
+    const members = Array.from(
+      new Set([
+        ...day.fixtures.flatMap((f) =>
+          [f.p1, f.p2].filter((id): id is string => !!id)
+        ),
+        ...day.byeParticipants,
+      ])
+    );
+
+    const groupName = `${dayNamePrefix} ${day.day}`;
+    const isLegTwo = homeAway && day.day > firstHalfDayCount;
+
+    const [group] = await tx
+      .insert(phaseGroups)
+      .values({
+        phaseId: phase.id,
+        name: groupName,
+        // order = index de la journée (0-based) ; le classement de PHASE
+        // est fourni par l'agrégation serveur (matches = source de vérité).
+        order: day.day - 1,
+        participantCount: members.length,
+        groupType: "ROUND_ROBIN",
+        config: inheritScoringToGroup(phaseConfig, {
+          isMatchday: true,
+          dayNumber: day.day,
+          isLegTwo,
+          isHomeAway: homeAway,
+          generateMatches,
+          fixturesCount: day.fixtures.length,
+        }),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    // Participants de la journée (confrontés + exemptés), jamais tous les
+    // participants de la phase : le classement de phase est recalculé
+    // depuis les matches, pas depuis ces lignes de journée.
+    for (const regId of members) {
+      if (isPlaceholder(regId)) continue;
       await tx.insert(phaseGroupParticipants).values({
         groupId: group.id,
         registrationId: regId,
@@ -69,55 +123,52 @@ export async function setupLeaguePhase(
         updatedAt: new Date(),
       });
     }
-  }
 
-  if (options.generateNodes === false) return;
+    // 1 node = 1 confrontation (2 participants, jamais la journée entière).
+    for (const [fixtureIdx, fixtureItem] of day.fixtures.entries()) {
+      const [node] = await tx
+        .insert(bracketNodes)
+        .values({
+          phaseId: phase.id,
+          groupId: group.id,
+          nodeCode: `J${day.day}-C${fixtureIdx + 1}`,
+          round: day.day,
+          matchNumber: fixtureIdx + 1,
+          bracketType: "UPPER",
+          order: day.day * 100 + (fixtureIdx + 1),
+          metadata: {
+            participants: [fixtureItem.p1, fixtureItem.p2].filter(Boolean),
+            name: `${groupName} — Confrontation ${fixtureIdx + 1}`,
+            dayNumber: day.day,
+            fixtureIndex: fixtureIdx + 1,
+            isLegTwo,
+            generateMatches,
+            matchesCount: 1,
+            format: options.matchFormat || "BEST_OF_1",
+            nodeType: "ROUND_ROBIN",
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
 
-  const roundsCount = participantRegIds.length % 2 === 0
-    ? participantRegIds.length - 1
-    : participantRegIds.length;
-
-  const matchesPerRound = Math.floor(participantRegIds.length / 2);
-  const returnType = options.isHomeAway ? 'double' : 'single';
-  const allMatches = generateGroupMatches(participantRegIds.map(id => ({ id })), { returnType });
-
-  for (let round = 1; round <= (options.isHomeAway ? roundsCount * 2 : roundsCount); round++) {
-    const startIdx = (round - 1) * matchesPerRound;
-    const roundMatches = allMatches.slice(startIdx, startIdx + matchesPerRound);
-    const nodePrefix = options.nodePrefix || "Journée";
-
-    const [node] = await tx.insert(bracketNodes).values({
-      phaseId: phase.id,
-      groupId: group.id,
-      nodeCode: `L-R${round}`,
-      round,
-      matchNumber: round,
-      order: round,
-      metadata: {
-        participants: participantRegIds,
-        name: `${nodePrefix} ${round}`,
-        generateMatches: options.generateMatches !== false,
-        matchesCount: roundMatches.length,
-        format: 'BEST_OF_1',
-        nodeType: 'ROUND_ROBIN'
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
-
-    if (options.generateMatches !== false) {
-      for (const [idx, m] of roundMatches.entries()) {
+      if (generateMatches) {
         await tx.insert(matches).values({
           editionId,
           phaseId: phase.id,
           groupId: group.id,
           bracketNodeId: node.id,
-          participant1RegistrationId: m.participant1?.id,
-          participant2RegistrationId: m.participant2?.id,
-          matchCode: `${node.nodeCode}-M${idx + 1}`,
-          status: 'PENDING',
-          round,
-          matchNumber: idx + 1,
+          participant1RegistrationId: fixtureItem.p1,
+          participant2RegistrationId: fixtureItem.p2,
+          matchCode: node.nodeCode,
+          status: "PENDING",
+          round: day.day,
+          matchNumber: fixtureIdx + 1,
+          metadata: {
+            dayNumber: day.day,
+            leg: isLegTwo ? 2 : 1,
+          },
+          scheduledTime: getDefaultScheduledTime(day.day, fixtureIdx + 1),
           createdAt: new Date(),
           updatedAt: new Date(),
         });

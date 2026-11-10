@@ -90,6 +90,8 @@ import { Slider } from "@/components/ui/slider";
 import { useScreenSize } from "@/hooks/use-screen";
 // Dans les imports, ajouter :
 import { getEliminationRoundName } from "@/lib/tournaments/get-name";
+import { DEFAULT_ADVANCE_COUNT, getEffectiveAdvanceCount } from "@/lib/tournaments/config";
+import { SCORING_DEFAULTS } from "@/lib/tournaments/scoring";
 
 // ============================================================================
 // TYPES
@@ -269,18 +271,19 @@ function buildPhasesForApi(
         // Source des participants
         participantSource: p.participantSource,
         sourcePhaseIndex,
-        qualifiedCount: p.qualifiedCount || 2,
+        qualifiedCount: p.qualifiedCount || DEFAULT_ADVANCE_COUNT,
 
         // Structure des groupes
         groupsCount,
         groupsSize: participantsPerGroup > 0 ? participantsPerGroup : undefined,
 
-        // Configuration ROUND_ROBIN
+        // Configuration ROUND_ROBIN (valeurs explicites uniquement :
+        // 0 pour les points est une valeur valide, jamais un défaut)
         isHomeAway: p.config.isHomeAway || false,
-        pointsPerWin: p.config.pointsPerWin || 3,
-        pointsPerDraw: p.config.pointsPerDraw || 1,
-        pointsPerLoss: p.config.pointsPerLoss || 0,
-        advanceCount: p.config.advanceCount || 2,
+        pointsPerWin: p.config.pointsPerWin ?? SCORING_DEFAULTS.pointsPerWin,
+        pointsPerDraw: p.config.pointsPerDraw ?? SCORING_DEFAULTS.pointsPerDraw,
+        pointsPerLoss: p.config.pointsPerLoss ?? SCORING_DEFAULTS.pointsPerLoss,
+        advanceCount: p.config.advanceCount ?? DEFAULT_ADVANCE_COUNT,
 
         // Configuration des nœuds (journées)
         nodePrefix:
@@ -315,9 +318,9 @@ const DEFAULT_PHASE_CONFIGS: Record<
   ROUND_ROBIN: {
     groupsCount: 1,
     isHomeAway: false,
-    pointsPerWin: 3,
-    pointsPerDraw: 1,
-    pointsPerLoss: 0,
+    pointsPerWin: SCORING_DEFAULTS.pointsPerWin,
+    pointsPerDraw: SCORING_DEFAULTS.pointsPerDraw,
+    pointsPerLoss: SCORING_DEFAULTS.pointsPerLoss,
     advanceCount: 4,
     seedingMethod: "RANDOM",
     nodePrefix: "Journée",
@@ -326,10 +329,10 @@ const DEFAULT_PHASE_CONFIGS: Record<
     participantsPerGroup: 4,
     groupsCount: 0,
     isHomeAway: false,
-    pointsPerWin: 3,
-    pointsPerDraw: 1,
-    pointsPerLoss: 0,
-    advanceCount: 2,
+    pointsPerWin: SCORING_DEFAULTS.pointsPerWin,
+    pointsPerDraw: SCORING_DEFAULTS.pointsPerDraw,
+    pointsPerLoss: SCORING_DEFAULTS.pointsPerLoss,
+    advanceCount: DEFAULT_ADVANCE_COUNT,
     seedingMethod: "RANDOM",
     nodePrefix: "Round",
   },
@@ -361,7 +364,7 @@ const PHASE_TYPE_LABELS: Record<
     label: "Championnat (Ligue)",
     description: "Tous les participants s'affrontent en aller simple ou aller-retour",
     icon: GraduationCap,
-    defaultGroupName: "Classement",
+    defaultGroupName: "Journée",
   },
   GROUP_STAGE: {
     label: "Phase de groupes",
@@ -439,7 +442,7 @@ export function OrganizeWizardClient({
     })() as "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM",
     isHomeAwayGroups: edition?.editionConfig?.isHomeAwayGroups ?? edition?.editionConfig?.isHomeAway ?? false,
     isHomeAwayElimination: edition?.editionConfig?.isHomeAwayElimination ?? false,
-    groupsQualifiedCount: edition?.editionConfig?.advanceCount || 2,
+    groupsQualifiedCount: edition?.editionConfig?.advanceCount ?? DEFAULT_ADVANCE_COUNT,
     groupsCount: edition?.editionConfig?.groupsCount || 4,
     nodePrefix: edition?.editionConfig?.nodePrefix || "Journée",
     knockoutStrategy:
@@ -475,7 +478,7 @@ export function OrganizeWizardClient({
         preset,
         isHomeAwayGroups: config.isHomeAwayGroups ?? config.isHomeAway ?? false,
         isHomeAwayElimination: config.isHomeAwayElimination ?? false,
-        groupsQualifiedCount: config.advanceCount || 2,
+        groupsQualifiedCount: config.advanceCount ?? DEFAULT_ADVANCE_COUNT,
         groupsCount: config.groupsCount || 4,
         nodePrefix: config.nodePrefix || "Journée",
         knockoutStrategy: (config.knockoutStrategy as any) || "BARRAGE",
@@ -1733,7 +1736,7 @@ function PhaseConfigCard({
 
   const participantsForPhase = isFirst
     ? currentParticipantsCount
-    : (phase.config.advanceCount || 2) * (phase.config.groupsCount || 1);
+    : getEffectiveAdvanceCount(phase) * (phase.config.groupsCount || 1);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
@@ -2043,32 +2046,37 @@ function RoundRobinConfig({ phase, onUpdate, participantsForPhase }: any) {
     <div className="space-y-3 p-3 rounded-lg bg-muted/20">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-[10px] font-bold uppercase text-muted-foreground">
-            Groupes
-          </Label>
-          <Input
-            type="number"
-            min={1}
-            max={maxGroups}
-            className="h-8 text-xs"
-            value={
-              phase.phaseType === "ROUND_ROBIN"
-                ? 1
-                : phase.config.groupsCount || defaultGroupsCount
-            }
-            onChange={(e) =>
-              onUpdate({
-                config: {
-                  ...phase.config,
-                  groupsCount:
-                    phase.phaseType === "ROUND_ROBIN"
-                      ? 1
-                      : parseInt(e.target.value) || 1,
-                },
-              })
-            }
-            disabled={phase.phaseType === "ROUND_ROBIN"}
-          />
+          {phase.phaseType === "ROUND_ROBIN" ? (
+            <>
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">
+                Groupes
+              </Label>
+              <div className="h-8 px-2 flex items-center text-xs rounded-md border bg-muted/10 text-muted-foreground">
+                Journées automatiques
+              </div>
+            </>
+          ) : (
+            <>
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">
+                Groupes
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={maxGroups}
+                className="h-8 text-xs"
+                value={phase.config.groupsCount || defaultGroupsCount}
+                onChange={(e) =>
+                  onUpdate({
+                    config: {
+                      ...phase.config,
+                      groupsCount: parseInt(e.target.value) || 1,
+                    },
+                  })
+                }
+              />
+            </>
+          )}
         </div>
         <div>
           <Label className="text-[10px] font-bold uppercase text-muted-foreground">
@@ -2079,12 +2087,12 @@ function RoundRobinConfig({ phase, onUpdate, participantsForPhase }: any) {
             min={1}
             max={16}
             className="h-8 text-xs"
-            value={phase.config.advanceCount || 2}
+            value={getEffectiveAdvanceCount(phase)}
             onChange={(e) =>
               onUpdate({
                 config: {
                   ...phase.config,
-                  advanceCount: parseInt(e.target.value) || 2,
+                  advanceCount: parseInt(e.target.value) || getEffectiveAdvanceCount(phase),
                 },
               })
             }
@@ -2129,8 +2137,9 @@ function RoundRobinConfig({ phase, onUpdate, participantsForPhase }: any) {
 
       <div className="text-[10px] text-muted-foreground bg-background/50 p-2 rounded">
         <Info className="h-3 w-3 inline mr-1" />
-        Structure: {structure.rounds} {phase.config.nodePrefix || "journée"}(s),{" "}
-        {structure.totalMatches} match(s) au total
+        Structure: {structure.rounds} journée(s) (1 groupe = 1 journée,{" "}
+        1 nœud = 1 confrontation à 2), {structure.totalMatches} match(s) au
+        total. La qualification se fait à la clôture de la phase.
       </div>
     </div>
   );
@@ -2229,12 +2238,12 @@ function SwissConfig({ phase, onUpdate }: any) {
           min={1}
           max={32}
           className="h-8 text-xs mt-1"
-          value={phase.config.advanceCount || 8}
+          value={getEffectiveAdvanceCount(phase)}
           onChange={(e) =>
             onUpdate({
               config: {
                 ...phase.config,
-                advanceCount: parseInt(e.target.value) || 8,
+                advanceCount: parseInt(e.target.value) || getEffectiveAdvanceCount(phase),
               },
             })
           }
@@ -2694,7 +2703,7 @@ function ConfirmDialog({
 }: any) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-amber-500" />

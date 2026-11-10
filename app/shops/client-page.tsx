@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   Search,
   Filter,
@@ -37,6 +38,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 // import { useShopsFilters } from "@/hooks/use-shops-filters";
 import { useInfiniteShops, useShopsFilters } from "@/hooks/use-shops";
+import { getShopStats } from "@/actions/shops";
 import { useScreenSize } from "@/hooks/use-screen";
 import { useAuthContext } from "@/contexts/auth-context";
 import { ShopsHero } from "@/components/pages/shops/shops-hero";
@@ -47,12 +49,17 @@ import { ShopsGrid } from "@/components/pages/shops/shops-grid";
 export function ShopsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuthContext();
   const { isSmallScreen } = useScreenSize();
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [activeTab, setActiveTab] = useState("all");
+  // L'onglet actif vit dans l'URL (?tab=) — un refresh conserve la vue.
+  const activeTab = searchParams.get("tab") || "all";
+
+  // Pays de l'onglet « local » — cible le vrai filtre pays (URL).
+  const LOCAL_COUNTRIES = ["France", "Belgique", "Suisse"];
 
   // Hook personnalisé pour la gestion des filtres
   const {
@@ -91,27 +98,47 @@ export function ShopsContent() {
   // Toutes les boutiques paginées
   const allShops = data?.pages.flatMap((page) => page.data) || [];
 
+  // Statistiques GLOBALES réelles (agrégées côté serveur sur toutes les
+  // boutiques — pas seulement la page chargée, PROMPT §10.5).
+  const { data: shopStats } = useQuery({
+    queryKey: ["shops-stats", "marketplace"],
+    queryFn: () => getShopStats(),
+  });
+
+  // Total RÉEL de la liste filtrée courante (serveur, toutes pages).
+  const filteredTotal = data?.pages[0]?.pagination.total || 0;
+
   // Statistiques pour les badges
   const stats = {
-    total: allShops.length,
-    verified: allShops.filter((s) => s.verified).length,
-    popular: data?.pages[0]?.pagination.total || 0,
-    local: allShops.filter((s) =>
-      ["France", "Belgique", "Suisse"].includes(s.country || "")
-    ).length,
+    total: shopStats?.total ?? filteredTotal,
+    verified: shopStats?.verified ?? 0,
+    popular: shopStats?.featured ?? 0,
+    local: shopStats?.total ?? 0,
   };
 
   // Gestion des onglets
   const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    // On pourrait ajuster les filtres en fonction de l'onglet
+    // Onglet → URL (partagé/refresh friendly), en préservant les autres params.
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") params.delete("tab");
+    else params.set("tab", value);
+    router.replace(`${pathname}?${params.toString()}`);
+
     if (value === "verified") {
       updateFilter("verified", true);
-    } else if (value === "popular") {
-      // Pas besoin de filtre spécifique, le tri se fait côté serveur
     } else {
-      updateFilter("verified", undefined);
+      // Quitter l'onglet vérifié : retire SEULEMENT le filtre venu de l'onglet.
+      if (searchParams.get("verified") === "true") updateFilter("verified", undefined);
     }
+    if (value === "local") {
+      // Onglet local : filtre réel sur les pays listés dans l'UI.
+      updateFilter("countries", LOCAL_COUNTRIES);
+    } else if (searchParams.get("countries") === LOCAL_COUNTRIES.join(",")) {
+      // Seule la liste posée par l'onglet est retirée — un filtre pays choisi
+      // manuellement est préservé.
+      updateFilter("countries", undefined);
+    }
+    // "popular" n'ajoute pas de filtre : le tri serveur gère la pertinence.
   };
 
   // Recherche avec debounce intégré dans le hook
@@ -138,18 +165,19 @@ export function ShopsContent() {
       />
 
       <div className="container mx-auto px-4 py-6">
+        {/* Grid CSS-driven : la sidebar disparaît SOUS lg (et pas à 640px) ;
+            la zone 640–1023px basculait sur aucune UI de filtres — le drawer
+            n'était pas rendu et la sidebar s'empilait au-dessus de la liste. */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar Desktop */}
-          {!isSmallScreen && (
-            <div className="lg:col-span-1">
-              <ShopsFilterSidebar
-                filters={filters}
-                updateFilter={updateFilter}
-                resetFilters={resetFilters}
-                hasActiveFilters={hasActiveFilters}
-              />
-            </div>
-          )}
+          <div className="hidden lg:block lg:col-span-1">
+            <ShopsFilterSidebar
+              filters={filters}
+              updateFilter={updateFilter}
+              resetFilters={resetFilters}
+              hasActiveFilters={hasActiveFilters}
+            />
+          </div>
 
           {/* Contenu principal */}
           <div className="lg:col-span-3 space-y-6">
@@ -168,7 +196,7 @@ export function ShopsContent() {
                       : "Toutes les boutiques"}
                   </Typography>
                   <Badge variant="secondary" className="text-sm">
-                    {stats.total} boutiques
+                    {filteredTotal} boutique{filteredTotal > 1 ? "s" : ""}
                   </Badge>
                 </div>
 
@@ -193,23 +221,22 @@ export function ShopsContent() {
                     </Button>
                   </div>
 
-                  {/* Bouton filtres mobile */}
-                  {isSmallScreen && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => setShowMobileFilters(true)}
-                    >
-                      <Filter className="h-4 w-4" />
-                      Filtres
-                      {hasActiveFilters && (
-                        <Badge className="ml-1 h-5 w-5 p-0" variant="secondary">
-                          !
-                        </Badge>
-                      )}
-                    </Button>
-                  )}
+                  {/* Bouton filtres drawer — visible dès que la sidebar
+                      est masquée (sous lg, donc 640–1023px inclus) */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 lg:hidden"
+                    onClick={() => setShowMobileFilters(true)}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Filtres
+                    {hasActiveFilters && (
+                      <Badge className="ml-1 h-5 w-5 p-0" variant="secondary">
+                        !
+                      </Badge>
+                    )}
+                  </Button>
                 </div>
               </div>
 

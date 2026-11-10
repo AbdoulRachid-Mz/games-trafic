@@ -60,7 +60,7 @@ export function ExplanationRenderer({
 
   const dialog = (
     <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : null)}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">

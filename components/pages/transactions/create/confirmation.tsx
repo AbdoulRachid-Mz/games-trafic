@@ -115,6 +115,21 @@ export function TransactionConfirmation({
 
   const TypeIcon = getTypeIcon();
 
+  // Sémantique des frais (convention serveur §3.2 — actions/transactions.ts) :
+  // - DEPOSIT/WITHDRAWAL passent par createRequest : AUCUN frais facturé
+  //   dans ce parcours (l'admin valide ensuite) → on ne les affiche pas ci
+  //   dessous (des frais estimés laissaient croire à un prélèvement) ;
+  // - TRANSFER/WITHDRAWAL/TOURNAMENT_PARTICIPATION : frais AJOUTÉS au payeur
+  //   (total débité = montant + frais) et le destinataire reçoit le plein
+  //   montant ;
+  // - achats : le payeur débite le montant seul (frais sur le vendeur) —
+  //   un « montant reçu » n'a donc pas de sens ici.
+  const isRequestFlow =
+    transactionData.type === "DEPOSIT" || transactionData.type === "WITHDRAWAL";
+  const isTransfer = transactionData.type === "TRANSFER";
+  const feesShown = !isRequestFlow && transactionData.fees > 0;
+  const amountReceived = transactionData.amount; // le destinataire reçoit plein montant
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     // Vous pourriez ajouter un toast ici
@@ -138,7 +153,7 @@ export function TransactionConfirmation({
         </Typography>
       </div>
 
-      <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-xl overflow-hidden">
+      <Card className="bg-card border-border/50 shadow-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="p-6 space-y-8">
             {/* Main Summary Card */}
@@ -152,7 +167,7 @@ export function TransactionConfirmation({
               <div className="relative p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-background/50 backdrop-blur-sm border border-white/10 shadow-sm">
+                    <div className="p-3 rounded-xl bg-background/50 border border-border/30 shadow-sm">
                       <TypeIcon className="h-6 w-6" />
                     </div>
                     <div>
@@ -168,13 +183,13 @@ export function TransactionConfirmation({
                   </div>
                   <Badge
                     variant="outline"
-                    className="bg-background/30 backdrop-blur-sm border-white/10"
+                    className="bg-background/30 border-border/30"
                   >
                     {format(new Date(), "dd/MM/yyyy")}
                   </Badge>
                 </div>
 
-                <div className="flex flex-col gap-2 p-4 rounded-xl bg-background/40 backdrop-blur-md border border-white/5">
+                <div className="flex flex-col gap-2 p-4 rounded-xl bg-background/40 border border-border/30">
                   <div className="flex justify-between items-center">
                     <Typography variant="body-sm" theme="muted">
                       Montant brut
@@ -183,36 +198,45 @@ export function TransactionConfirmation({
                       {transactionData.amount.toFixed(2)} GTC
                     </Typography>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <Typography variant="body-sm" theme="muted">
-                      Frais
-                    </Typography>
-                    <Typography variant="body-sm" weight="medium">
-                      {transactionData.fees.toFixed(2)} GTC
-                    </Typography>
-                  </div>
+                  {feesShown && (
+                    <div className="flex justify-between items-center">
+                      <Typography variant="body-sm" theme="muted">
+                        Frais
+                      </Typography>
+                      <Typography variant="body-sm" weight="medium">
+                        {transactionData.fees.toFixed(2)} GTC
+                      </Typography>
+                    </div>
+                  )}
                   <Separator className="bg-white/10 my-1" />
                   <div className="flex justify-between items-center">
                     <Typography variant="body-lg" weight="bold">
-                      Montant débité
+                      {isRequestFlow && transactionData.type === "DEPOSIT"
+                        ? "Montant du dépôt"
+                        : "Montant débité"}
                     </Typography>
                     <Typography
                       variant="h3"
                       weight="extrabold"
                       className="text-primary"
                     >
-                      {transactionData.totalAmount.toFixed(2)}{" "}
+                      {(isRequestFlow
+                        ? transactionData.amount
+                        : transactionData.totalAmount
+                      ).toFixed(2)}{" "}
                       <span className="text-lg font-bold opacity-70">GTC</span>
                     </Typography>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <Typography variant="body-sm" theme="muted">
-                      Montant reçu
-                    </Typography>
-                    <Typography variant="body-sm" weight="medium">
-                      {Math.max(0, transactionData.amount - transactionData.fees).toFixed(2)} GTC
-                    </Typography>
-                  </div>
+                  {isTransfer && (
+                    <div className="flex justify-between items-center">
+                      <Typography variant="body-sm" theme="muted">
+                        Le destinataire reçoit
+                      </Typography>
+                      <Typography variant="body-sm" weight="medium">
+                        {amountReceived.toFixed(2)} GTC
+                      </Typography>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

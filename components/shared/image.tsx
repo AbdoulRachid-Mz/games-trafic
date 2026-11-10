@@ -103,7 +103,7 @@ interface ImageDialogProps {
 function ImageDialog({ open, onOpenChange, src, alt, title, description }: ImageDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-full p-4">
+      <DialogContent className="sm:max-w-3xl w-full p-4">
         {title && <DialogTitle>{title}</DialogTitle>}
         {description && <DialogDescription>{description}</DialogDescription>}
         <div className="mt-4 relative w-full h-[60vh]">

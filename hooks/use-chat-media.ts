@@ -1,7 +1,7 @@
 // hooks/use-chat-media.ts
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
 import type { User } from '@/database/schema';
@@ -25,6 +25,8 @@ export interface UploadProgress {
 export function useChatMedia(user: User | null) {
   const [uploads, setUploads] = useState<Map<string, UploadProgress>>(new Map());
   const [isUploading, setIsUploading] = useState(false);
+  const abortControllers = useRef<Map<string, AbortController>>(new Map());
+  const urlCache = useRef<Map<string, string>>(new Map()); // dedup par signature fichier
 
   const limits = getMediaUploadLimits(user);
 
@@ -82,13 +84,25 @@ export function useChatMedia(user: User | null) {
    */
   const uploadToServer = useCallback(async (
     file: File,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    signal?: AbortSignal,
   ): Promise<string> => {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       formData.append('file', file);
 
       const xhr = new XMLHttpRequest();
+
+      if (signal) {
+        if (signal.aborted) {
+          reject(new Error('Upload annulé'));
+          return;
+        }
+        signal.addEventListener('abort', () => {
+          xhr.abort();
+          reject(new Error('Upload annulé'));
+        });
+      }
 
       if (onProgress) {
         xhr.upload.onprogress = (event) => {
@@ -131,6 +145,13 @@ export function useChatMedia(user: User | null) {
   }, []);
 
   const uploadFile = useCallback(async (file: File): Promise<string> => {
+    // Dedup : si ce fichier a déjà été uploadé, renvoyer l'URL cachée
+    const signature = `${file.name}:${file.size}:${file.lastModified}`;
+    const cachedUrl = urlCache.current.get(signature);
+    if (cachedUrl) {
+      return cachedUrl;
+    }
+
     const fileId = `${Date.now()}-${file.name}`;
 
     // Validate file
@@ -139,6 +160,10 @@ export function useChatMedia(user: User | null) {
       toast.error(validation.error);
       throw new Error(validation.error);
     }
+
+    // AbortController pour l'annulation
+    const controller = new AbortController();
+    abortControllers.current.set(fileId, controller);
 
     // Initialize upload progress
     setUploads((prev) => {
@@ -184,7 +209,7 @@ export function useChatMedia(user: User | null) {
           }
           return next;
         });
-      });
+      }, controller.signal);
 
       // Mark as completed
       setUploads((prev) => {
@@ -198,6 +223,10 @@ export function useChatMedia(user: User | null) {
         });
         return next;
       });
+
+      // Cache l'URL pour éviter les re-uploads identiques
+      urlCache.current.set(signature, url);
+      abortControllers.current.delete(fileId);
 
       return url;
     } catch (error) {
@@ -215,6 +244,7 @@ export function useChatMedia(user: User | null) {
       });
 
       toast.error(errorMessage);
+      abortControllers.current.delete(fileId);
       throw error;
     } finally {
       setIsUploading(false);
@@ -247,6 +277,40 @@ export function useChatMedia(user: User | null) {
   }, [limits, uploadFile]);
 
   /**
+   * Annule un upload en cours (Lot D)
+   */
+  const cancelUpload = useCallback((fileId: string) => {
+    const controller = abortControllers.current.get(fileId);
+    if (controller) {
+      controller.abort();
+      abortControllers.current.delete(fileId);
+    }
+    setUploads((prev) => {
+      const next = new Map(prev);
+      const current = next.get(fileId);
+      if (current) {
+        next.set(fileId, { ...current, status: 'error', error: 'Upload annulé' });
+      }
+      return next;
+    });
+  }, []);
+
+  /**
+   * Nettoie les uploads terminés/erronés (libération des ressources)
+   */
+  const clearCompleted = useCallback(() => {
+    setUploads((prev) => {
+      const next = new Map(prev);
+      for (const [id, up] of next.entries()) {
+        if (up.status === 'completed' || up.status === 'error') {
+          next.delete(id);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  /**
    * Clear upload history
    */
   const clearUploads = useCallback(() => {
@@ -275,6 +339,8 @@ export function useChatMedia(user: User | null) {
     uploadFiles,
     validateFile,
     clearUploads,
+    clearCompleted,
+    cancelUpload,
     removeUpload,
   };
 }

@@ -95,7 +95,7 @@ export function ImageViewer({
           </div>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-screen-lg p-0 border-none bg-transparent">
+      <DialogContent className="sm:max-w-screen-lg p-0 border-none bg-transparent">
         <DialogTitle className="hidden"></DialogTitle>
         <div className="relative flex items-center justify-center w-full h-full min-h-[50vh]">
           <div

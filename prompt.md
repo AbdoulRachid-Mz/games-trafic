@@ -1,779 +1,350 @@
-# GAMES-TRAFICS — AUDIT ET REFONTE DU WALLET, DES TRANSACTIONS ET DE LA SÉCURITÉ
+# AUDIT ET REFONTE COMPLÈTE DES MODULES CHATS, INBOX ET GAME CLIPS — GAMES-TRAFICS
 
-## 1. CONTEXTE DU PROJET
+## 1. Objectif général
 
-Projet : Games-Trafics
+Réaliser un audit approfondi et une amélioration complète des modules Chats, Inbox et Game Clips de Games-Trafics.
 
-Dépôt : https://github.com/AbdoulRachid-Mz/games-trafic
+Le travail doit couvrir :
+- Architecture et organisation des composants.
+- Logique métier et permissions.
+- Actions serveur, API et requêtes SQL.
+- Gestion du cache des données et des médias.
+- Optimisation du chargement des messages et vidéos.
+- Optimisation du rendu React et des animations.
+- Fluidité des interactions.
+- Responsive design et ergonomie mobile.
+- Gestion des erreurs, reprises et états de chargement.
+- Sécurité et validation serveur.
 
-Stack :
-- Next.js 16.4.3 — App Router
-- React 19
-- TypeScript strict
-- PostgreSQL / Neon
-- Drizzle ORM
-- Better Auth
-- Better Auth Passkey
-- Tailwind CSS 4
-- Framer Motion
-- Bun
-- Vercel
+Ne pas effectuer une simple refonte graphique. Corriger les problèmes structurels et fonctionnels identifiés.
 
-Architecture financière :
-- user_wallets
-- wallet_transactions
-- financial_accounts
-- ledger_entries
-- idempotency_keys
-- Moteur financier centralisé dans lib/finance/
+## 2. Module Chats et Inbox
 
-IMPORTANT : Le ledger en partie double est la source de vérité des soldes. Il ne faut jamais réintroduire un système de modification directe des soldes des wallets.
+### 2.1 Architecture des conversations
 
-L'objectif est de corriger les problèmes actuels et d'améliorer considérablement l'expérience de transaction sans compromettre la sécurité financière.
+Auditer et distinguer clairement :
+- Conversations privées entre deux utilisateurs.
+- Discussions de groupes.
+- Discussions associées aux entités : shops, tournaments, editions, produits, clips et autres entités compatibles.
 
-## 2. RÈGLES DE TRAVAIL
+Chaque type de conversation doit conserver ses règles d'accès, ses participants et ses métadonnées.
 
-Avant toute modification :
+Éviter les duplications de conversations, les incohérences entre `messages`, `conversations`, `groups` et `groupMembers`, ainsi que les relations ambiguës.
 
-1. Examiner le dépôt et son architecture réelle.
-2. Lire les fichiers concernés dans leur intégralité.
-3. Examiner les migrations Drizzle existantes.
-4. Examiner les services financiers et les contrats des Server Actions.
-5. Identifier les relations entre le frontend, Better Auth, les wallets et le ledger.
-6. Identifier les fonctionnalités existantes à préserver.
+### 2.2 Envoi local-first
 
-Ne pas remplacer des composants existants sans comprendre leurs dépendances.
+Mettre en place un véritable système d'envoi optimiste :
 
-Ne pas créer une deuxième implémentation d'une fonctionnalité déjà disponible.
+1. Création immédiate d'un message temporaire.
+2. Affichage immédiat dans la conversation.
+3. Statut `sending`.
+4. Envoi asynchrone au serveur.
+5. Confirmation et remplacement par le message persistant.
+6. En cas d'échec, conservation du message et affichage d'une icône de retry à proximité.
+7. Nouvelle tentative avec le même identifiant client/idempotency key.
+8. Éviter absolument les doublons lors des reprises.
 
-Ne pas multiplier les Server Actions similaires.
+Gérer les envois multiples, les interruptions réseau, les changements de conversation, les actualisations et les reprises après reconnexion.
 
-Privilégier les services réutilisables et les contrats TypeScript cohérents.
+Ne jamais perdre silencieusement un message déjà saisi ou affiché.
 
----
+### 2.3 Chargement des messages
 
-# PHASE 1 — CORRECTION DU SCHÉMA ET DES REQUÊTES SQL
+Remplacer les chargements inadaptés par une pagination efficace, idéalement cursor-based, avec TanStack Query.
 
-## 1.1. Erreur actuelle
+Prévoir :
+- Chargement initial rapide des messages récents.
+- Chargement des anciens messages en remontant.
+- Préservation exacte de la position de scroll lors du chargement historique.
+- Insertion des nouveaux messages sans recharger toute la conversation.
+- Déduplication par identifiant.
+- Tri chronologique cohérent.
+- Cache séparé par conversation.
+- Préchargement raisonnable des conversations récemment consultées.
+- Revalidation ciblée.
 
-Erreur PostgreSQL :
+Éviter les refetch globaux trop fréquents et les requêtes inutiles.
 
-column "reference" does not exist
+Évaluer les index SQL nécessaires pour les recherches, les messages privés, les groupes, les discussions d'entités et les tris chronologiques.
 
-Localisation :
-actions/wallets.ts
-actions/transactions.ts
+Ne pas charger inutilement les relations complètes des utilisateurs ou des entités pour chaque message.
 
-Le schéma Drizzle déclare notamment :
+### 2.4 Règles et administration des groupes
 
-- reference
-- idempotencyKey
-- createdByUserId
-- actorLevel
-- reason
-- reversalOf
-- reversedBy
-- completedAt
+Créer un système configurable de permissions :
 
-Mais la base Neon ne semble pas contenir toutes ces colonnes.
+- Qui peut envoyer des messages.
+- Qui peut envoyer des images, vidéos et fichiers.
+- Qui peut ajouter ou retirer des membres.
+- Qui peut modifier les informations du groupe.
+- Qui peut modifier les permissions.
+- Qui peut épingler ou supprimer des messages.
+- Possibilité de passer le groupe en lecture seule.
+- Possibilité d'autoriser certains membres individuellement.
 
-## 1.2. Audit obligatoire
+Prévoir les rôles OWNER, ADMIN et MEMBER ainsi que des permissions complémentaires sans multiplier inutilement les rôles.
 
-Comparer automatiquement :
+Toutes les règles doivent être appliquées côté serveur, y compris lorsque les actions sont appelées directement.
 
-- database/schema.ts
-- Toutes les migrations du dossier drizzle/
-- La structure réelle de PostgreSQL via information_schema.columns.
-- Les index, contraintes uniques et clés étrangères.
+Créer une interface de paramètres du groupe claire et adaptée au mobile.
 
-Examiner particulièrement wallet_transactions.
-
-Identifier toutes les colonnes absentes, les types différents et les index manquants.
-
-## 1.3. Migration
-
-Créer une migration SQL versionnée et sécurisée.
-
-Exigences :
-
-- Ajouter les colonnes manquantes sans supprimer les données.
-- Créer les index et contraintes nécessaires.
-- Préserver les transactions historiques.
-- Éviter les doublons de références.
-- Ne pas recréer les tables existantes.
-- Prévoir une migration compatible avec les données de production.
-
-Ne pas utiliser db:push aveuglément sur la production.
-
-Tester la migration sur une base de staging avant application.
-
-Vérifier ensuite que les requêtes Drizzle utilisant select() fonctionnent correctement.
-
-## 1.4. Requêtes de transactions
-
-Auditer les deux implémentations :
-
-- getWalletTransactions dans actions/wallets.ts
-- getWalletTransactions dans actions/transactions.ts
-
-Éviter les divergences de comportement.
-
-Créer une implémentation canonique si cela est pertinent, en conservant les contrats utilisés par les pages existantes.
-
-Vérifier :
-- Pagination.
-- Filtres.
-- Statuts.
-- Dates.
-- Types de transactions.
-- Tri.
-- Transactions entrantes et sortantes.
-- Exclusion des transactions supprimées.
-
-Toutes les lectures doivent vérifier que le wallet appartient à l'utilisateur connecté, sauf autorisation administrative explicite.
-
----
-
-# PHASE 2 — REFONTE DES STATISTIQUES DU WALLET
-
-Fichiers principaux :
-
-- app/(protected)/wallet/client-page.tsx
-- components/pages/wallet/stats-overview.tsx
-- components/pages/wallet/transaction-list.tsx
-- actions/wallets.ts
-
-## 2.1. Problème actuel
-
-Dans client-page.tsx, le chargement des transactions précède celui des statistiques dans le même try.
-
-Si la récupération des transactions échoue, les statistiques ne sont jamais chargées.
-
-Séparer les chargements pour qu'une erreur indépendante ne bloque pas l'autre.
-
-## 2.2. Source des statistiques
-
-Utiliser financial_accounts et ledger_entries comme source de vérité des mouvements financiers.
-
-Calculer :
-
-- Nombre total de transactions.
-- Nombre de transactions terminées.
-- Transactions en attente.
-- Revenus totaux.
-- Dépenses totales.
-- Volume financier.
-- Évolution mensuelle.
-- Activité quotidienne ou hebdomadaire.
-
-Les mouvements doivent être calculés pour le compte financier du wallet.
-
-Ne pas assimiler systématiquement TRANSFER à un revenu ou à une dépense : déterminer le sens du mouvement.
-
-## 2.3. Transactions entrantes et sortantes
-
-Une transaction de transfert possède :
-- fromUserId
-- toUserId
-- walletId
-- financialAccountId
-
-Le walletId est actuellement principalement associé au wallet expéditeur.
-
-Ne pas compter uniquement walletTransactions.walletId pour déterminer toute l'activité du bénéficiaire.
-
-Utiliser les relations entre ledger_entries et financial_accounts pour déterminer les mouvements réellement associés au compte.
-
-Pour le nombre de transactions, utiliser un comptage distinct afin d'éviter les doublons.
-
-Intégrer les transactions en attente lorsqu'elles ne possèdent pas encore d'écritures de ledger, sans les compter deux fois.
-
-## 2.4. Sécurité
-
-getWalletLedgerStats et getWalletLedgerDailyFlow doivent vérifier l'appartenance du wallet à l'utilisateur connecté.
-
-Un utilisateur ne doit jamais pouvoir fournir arbitrairement le walletId d'un autre utilisateur pour consulter ses statistiques.
-
-Les erreurs SQL ne doivent pas être silencieusement transformées en statistiques à zéro.
-
-Retourner un résultat exploitable par le frontend avec gestion explicite des erreurs.
-
-## 2.5. Interface
-
-Conserver le design existant.
+### 2.5 Gestion des membres
 
 Améliorer :
-- Les états de chargement.
-- Les skeletons.
-- Les états vides.
-- L'actualisation.
-- Les graphiques.
-- Les montants entrants et sortants.
-- Les indicateurs de variation.
+- Liste complète des membres.
+- Recherche et filtres.
+- Affichage des rôles.
+- Gestion des administrateurs.
+- Ajout et retrait de membres.
+- Consultation des profils.
+- Démarrage d'une conversation privée depuis un membre.
+- Gestion des états de chargement et des erreurs.
 
-Corriger également le useEffect de StatsOverview : sa dépendance doit tenir compte de walletId pour éviter de conserver des données associées à un ancien wallet.
+### 2.6 Discussions des entités et Inbox
 
----
+Pour les discussions liées aux shops, tournaments, editions et autres entités :
 
-# PHASE 3 — REFONTE DU PARCOURS DE CRÉATION DE TRANSACTIONS
+- Pouvoir consulter les participants ayant déjà discuté.
+- Afficher leur profil et leur identité.
+- Démarrer une conversation privée directement depuis cette liste.
+- Distinguer participants d'une discussion et membres d'un groupe.
+- Ne pas créer de conversations privées automatiquement sans action explicite.
+- Conserver une navigation cohérente entre la discussion d'entité et l'Inbox.
 
-Fichiers principaux :
+Optimiser `getConversationsForUser()` pour supprimer les effets N+1 et récupérer les entités par lots.
 
-- app/(protected)/wallet/transactions/create/page.tsx
-- types/transaction-types.ts
-- components/pages/transactions/create/
-- actions/transactions.ts
+Implémenter réellement les actions d'épinglage, de masquage, de mise en sourdine, d'archivage et de suppression lorsqu'elles sont proposées dans l'interface.
 
-Conserver l'architecture par étapes et les configurations TRANSACTION_CONFIGS.
+### 2.7 Cache des médias de chat
 
-Types à préserver :
+Auditer les mécanismes existants et mettre en place une stratégie cohérente pour :
+- Images.
+- Miniatures.
+- Audios.
+- Vidéos.
+- Fichiers.
 
-- TRANSFER
-- DEPOSIT
-- WITHDRAWAL
-- VIP_SUBSCRIPTION
-- GAME_ITEM_PURCHASE
-- ORDER_PURCHASE
-- THEME_PURCHASE
-- TOURNAMENT_PARTICIPATION
-- PURCHASE
-- REFUND
-- BONUS
+Utiliser chargement différé, miniatures, cache HTTP/CDN, préchargement conditionnel et cache local maîtrisé.
 
-Chaque type conserve ses propres règles métier.
+Éviter les téléchargements répétés lors des changements de conversation.
 
-## 3.1. Fluidité
+Respecter les paramètres de téléchargement automatique et les contraintes de confidentialité.
 
-Améliorer le passage entre les étapes.
+Prévoir :
+- Compression avant upload.
+- Progression par fichier.
+- Annulation.
+- Reprise lorsque possible.
+- Gestion des erreurs.
+- Nettoyage des ressources temporaires.
+- Limitation de consommation mémoire et réseau.
 
-- Transitions visuelles rapides.
-- Éviter les rechargements inutiles.
-- Conserver les informations déjà saisies lors d'un retour en arrière.
-- Éviter les doubles soumissions.
-- Désactiver uniquement les contrôles concernés pendant les opérations.
-- Afficher clairement les frais et le montant final.
-- Éviter les redirections prématurées.
+Un upload ne doit pas empêcher l'affichage immédiat du message optimiste.
 
-Après une authentification réussie, l'utilisateur doit rester dans son parcours de transaction.
+## 3. Module Game Clips
 
-Après confirmation, afficher TransactionSuccess et permettre à l'utilisateur de choisir entre le wallet et l'historique.
+### 3.1 Feed et pagination
 
-Conserver les reçus et les notifications existants.
+Améliorer le chargement infini :
 
-Ne pas rediriger automatiquement vers les produits.
+- Première page rapide.
+- Préchargement de la prochaine page avant la fin du feed.
+- Déduplication.
+- Conservation de la position active.
+- Pas de duplication artificielle des clips déjà consultés.
+- Gestion correcte de la fin du feed.
+- Gestion des erreurs et retry.
+- Rafraîchissement sans perdre inutilement la position de lecture.
 
-## 3.2. Contrôle des étapes
+### 3.2 Chargement vidéo progressif
 
-Auditer les appels à nextStep(), executeConfirm() et handleConfirm().
+Créer une stratégie de chargement selon la position du clip :
 
-Garantir qu'une étape n'est pas sautée et qu'une opération n'est pas exécutée deux fois.
+- Clips éloignés : miniature uniquement.
+- Clip suivant : préchargement léger.
+- Clip actif : chargement prioritaire et lecture.
+- Clip précédent : conservation temporaire si utile.
+- Clips devenus inutiles : libération des ressources.
 
-Préserver les cas particuliers :
-- Dépôt : création d'une demande.
-- Retrait : création d'une demande.
-- Achat d'item : création de demande.
-- Achat produit : création de commande.
-- Transfert : exécution financière.
-- Abonnement : exécution selon les règles existantes.
+Limiter le nombre de vidéos montées et actives simultanément.
 
-Ne pas transformer une demande en transaction terminée prématurément.
+Ne jamais bloquer le swipe en attendant une vidéo.
 
----
+Afficher immédiatement une miniature ou un placeholder pendant le chargement.
 
-# PHASE 4 — CORRECTION ET REFONTE DU PASSKEY
+Gérer correctement les événements `loadstart`, `loadedmetadata`, `canplay`, `waiting`, `playing`, `pause`, `ended` et `error`.
 
-Fichier actuel :
+### 3.3 Lecteur et progression
 
-components/pages/transactions/create/pin-verification.tsx
+Améliorer la barre de progression :
+- Précision.
+- Fluidité.
+- Faible coût de rendu.
+- Distinction buffering/lecture.
+- Synchronisation avec la vidéo.
+- Gestion pause/reprise.
+- Gestion des médias multiples.
+- Adaptation responsive.
 
-Problème :
+Éviter un `setState` React trop fréquent pour chaque mise à jour de progression si une mise à jour visuelle directe ou un mécanisme plus léger est préférable.
 
-authClient.signIn.passkey() lance une authentification Better Auth avec un mécanisme de redirection.
+### 3.4 Swipe et navigation
 
-Ce comportement ne convient pas à la validation d'une transaction déjà initiée par un utilisateur connecté.
-
-## 4.1. Objectif
-
-Créer une validation Passkey spécifique aux transactions.
-
-Elle doit fonctionner sans déconnecter l'utilisateur, sans modifier sa session et sans déclencher la navigation vers la page de produits.
-
-## 4.2. Audit technique
-
-Examiner :
-
-- lib/auth.ts
-- lib/auth-client.ts
-- @better-auth/passkey
-- Les credentials enregistrés dans la table passkey.
-- Les API WebAuthn compatibles avec les credentials existants.
-
-Ne pas confondre connexion à l'application et autorisation d'une transaction.
-
-Ne pas considérer le simple retour success de signIn.passkey() comme une autorisation financière.
-
-## 4.3. Architecture attendue
-
-Mettre en place un challenge WebAuthn spécifique :
-
-1. Le client demande une autorisation pour la transaction en cours.
-2. Le serveur vérifie l'utilisateur et le wallet.
-3. Le serveur génère un challenge cryptographiquement sécurisé.
-4. Le challenge est lié à l'utilisateur, au wallet, au type, au montant, au destinataire et aux frais applicables.
-5. Le navigateur déclenche navigator.credentials.get() via une implémentation compatible.
-6. Le serveur vérifie la signature et le credential enregistré.
-7. Le serveur vérifie l'expiration et l'absence de réutilisation.
-8. Le serveur autorise une seule exécution de la transaction.
-
-L'autorisation doit être à usage unique et être consommée de manière atomique avec l'opération financière, autant que possible.
-
-Une preuve valable pour un montant ou un destinataire ne doit pas pouvoir être réutilisée pour un autre.
-
-Ne jamais faire confiance à une simple variable React ou à un booléen envoyé par le navigateur.
-
-## 4.4. Compatibilité PIN
-
-Conserver le PIN comme méthode alternative.
-
-Les deux méthodes doivent aboutir à une autorisation vérifiée côté serveur :
-
-- PIN validé.
-- Passkey validé.
-
-Adapter createTransaction dans actions/transactions.ts pour accepter les deux mécanismes de façon sécurisée.
-
-Conserver les règles d'autorisation propres aux types de transactions.
-
-Ne pas supprimer la vérification PIN obligatoire pour les transferts et les retraits sans mécanisme de remplacement équivalent.
-
----
-
-# PHASE 5 — REFONTE DE LA SAISIE DU PIN
-
-Composant :
-
-components/pages/transactions/create/pin-verification.tsx
-
-Le pavé numérique actuel présente des problèmes d'affichage.
-
-## Objectif
-
-Privilégier un champ PIN natif et contrôlé.
-
-Caractéristiques :
-
-- inputMode="numeric".
-- Saisie numérique uniquement.
-- Type password avec possibilité d'afficher/masquer.
-- Longueur conforme à WalletUtils.validatePinStrength().
-- Retour visuel instantané.
-- Clavier mobile natif.
-- Clavier physique.
-- Gestion correcte du focus.
-- Désactivation pendant la validation.
-- Messages d'erreur explicites.
-
-Si un pavé numérique personnalisé est conservé, corriger les variables CSS incompatibles et afficher correctement toutes les positions du PIN.
-
-Le composant ne doit jamais afficher le PIN dans les logs.
-
-Ajouter un lien « PIN oublié ? » redirigeant vers :
-
-/wallet/settings?tab=security&action=recover-pin
-
----
-
-# PHASE 6 — SÉLECTION DES CONTACTS POUR LES TRANSFERTS
-
-Fichiers :
-
-- components/pages/transactions/create/recipient-selector.tsx
-- actions/users.ts
-- actions/transactions.ts
-
-Une fonction getRecentRecipients existe déjà.
-
-Elle doit être améliorée.
-
-## 6.1. Contacts récents
-
-Récupérer les utilisateurs avec lesquels l'utilisateur connecté a déjà effectué ou reçu un transfert.
-
-Utiliser :
-- fromUserId
-- toUserId
-- type TRANSFER
-- createdAt
-
-Prendre en compte les deux directions.
-
-Dédupliquer les contacts.
-
-Ne pas inclure l'utilisateur connecté.
-
-Exclure les wallets supprimés, inactifs et verrouillés.
-
-Limiter la liste à 10 ou 20 résultats.
-
-## 6.2. Interface
-
-Ajouter un bouton :
-
-« Mes contacts récents »
-
-Au clic, afficher les contacts précédemment associés aux transferts.
-
-Pour chaque contact afficher :
-- Avatar.
-- Nom ou pseudonyme.
-- Numéro de wallet masqué.
-- Éventuellement la date du dernier transfert.
-
-Permettre la sélection immédiate.
-
-Conserver les recherches existantes :
-- Par nom.
-- Par numéro de téléphone.
-- Par numéro de wallet.
-- Par QR Code.
-
-## 6.3. Sécurité
-
-Ne jamais permettre un transfert vers soi-même.
-
-Vérifier côté serveur :
-- L'identité du destinataire.
-- L'existence du wallet.
-- Son état actif.
-- Son verrouillage.
-- La disponibilité de son compte financier.
-
-Ne jamais considérer la liste des contacts du frontend comme une autorisation.
-
----
-
-# PHASE 7 — AMÉLIORATION DE LA SAISIE DU MONTANT
-
-Composant :
-
-components/pages/transactions/create/amount-input.tsx
-
-Ajouter quatre boutons d'incrémentation :
-
-- -1000 GTC
-- -100 GTC
-- +100 GTC
-- +1000 GTC
-
-Les boutons doivent modifier directement le montant contrôlé.
-
-Règles :
-- Montant minimal : zéro pendant la saisie.
-- Ne jamais produire de montant négatif.
-- Respecter le montant minimum configuré pour la transaction.
-- Recalculer les frais après chaque modification.
-- Actualiser le montant total à débiter.
-- Respecter le solde disponible.
-- Préserver la validation serveur.
-
-Ne pas afficher ces boutons pour les éléments à prix fixe ou les sélections de quantité lorsqu'ils sont inappropriés.
-
-Conserver les boutons de montants rapides existants.
-
----
-
-# PHASE 8 — RÉINITIALISATION DU PIN OUBLIÉ
-
-Emplacement principal :
-
-app/(protected)/wallet/settings/page.tsx
-
-Ne pas créer une nouvelle page de paramètres.
-
-La récupération du PIN doit être intégrée à la page existante.
-
-## 8.1. Interface
-
-Ajouter une section « Sécurité du wallet ».
-
-Proposer :
-- Modifier mon PIN.
-- PIN oublié ?
-- Récupérer mon accès.
-
-Le lien présent dans l'étape de validation d'une transaction doit conduire directement à cette section.
-
-## 8.2. Canaux disponibles
-
-Proposer :
-- Email vérifié.
-- WhatsApp sur numéro vérifié.
-
-Les moyens disponibles doivent dépendre des coordonnées réellement vérifiées.
-
-Le schéma actuel possède :
-- users.email
-- users.emailVerified
-- users.phoneNumber
-
-Il ne possède pas de champ explicite phoneVerifiedAt dans la définition consultée.
-
-Étudier le mécanisme de vérification existant avant d'introduire un nouveau champ.
-
-Ne jamais considérer automatiquement un numéro simplement renseigné comme un numéro vérifié.
-
-## 8.3. Génération OTP
-
-Créer un code à six chiffres.
-
-Utiliser un générateur cryptographique tel que :
-
-crypto.randomInt(100000, 1000000)
-
-Durée de validité : 5 minutes.
-
-Limiter :
-- Tentatives de validation : 5 maximum.
-- Renvoi du code : délai minimum de 60 secondes.
-- Nombre de demandes par compte et par période.
-- Tentatives par IP et par compte.
-
-Ne jamais stocker le code en clair.
-
-Stocker un hash/HMAC sécurisé, lié à un challenge spécifique.
-
-Ne jamais exposer le code dans la réponse de l'action serveur, les logs ou les messages d'erreur.
-
-## 8.4. Modèle de données
-
-Examiner la table verification de Better Auth.
-
-Si elle ne convient pas à ce besoin, créer une table dédiée, par exemple :
-
-wallet_pin_reset_challenges
-
-Champs indicatifs :
-
-- id
-- userId
-- walletId
-- codeHash
-- deliveryChannel
-- destination
-- expiresAt
-- attempts
-- consumedAt
-- createdAt
-
-Ajouter les index nécessaires.
-
-Les champs et relations définitifs doivent être adaptés au schéma existant.
-
-## 8.5. Services d'envoi
-
-Examiner d'abord les services email existants.
-
-Pour WhatsApp, prévoir un adaptateur compatible avec WhatsApp Business Cloud API ou un fournisseur autorisé.
-
-Ne pas simuler un envoi réussi si aucun fournisseur n'est configuré.
-
-Prévoir des variables d'environnement documentées et une gestion des erreurs du fournisseur.
-
-## 8.6. Parcours de récupération
-
-Étape 1 : sélection du canal.
-
-Étape 2 : demande et envoi du code.
-
-Étape 3 : saisie et validation du code.
-
-Étape 4 : définition du nouveau PIN.
-
-Étape 5 : confirmation du nouveau PIN.
-
-Étape 6 : validation et enregistrement.
-
-Le serveur doit vérifier :
-- Le propriétaire du wallet.
-- L'identité du challenge.
-- Son expiration.
-- Son nombre de tentatives.
-- Son caractère non consommé.
-- La validité du nouveau PIN.
-
-La consommation du challenge et la modification du PIN doivent être atomiques.
-
-Hasher le nouveau PIN avec WalletUtils.hashPin().
-
-Réinitialiser les tentatives échouées.
-
-Ne pas déverrouiller automatiquement un wallet verrouillé volontairement. Distinguer si nécessaire le verrouillage manuel du verrouillage consécutif aux tentatives PIN échouées.
-
-Conserver la procédure de réclamation/support existante pour les cas qui nécessitent une intervention administrative.
-
----
-
-# PHASE 9 — SÉCURISATION DU MOTEUR FINANCIER
-
-Fichiers :
-
-- actions/transactions.ts
-- actions/wallets.ts
-- lib/finance/core/transaction-engine.ts
-- lib/finance/transactions/transfer.ts
-- lib/finance/core/idempotency.ts
-- lib/ledger/ledger-utils.ts
-
-Effectuer un audit de sécurité complet.
-
-Vérifier :
-
-1. Authentification obligatoire.
-2. Propriété du wallet source.
-3. Propriété des comptes financiers.
-4. Validation du destinataire.
-5. Vérification du solde réel.
-6. Frais calculés côté serveur.
-7. Prix des produits et articles recalculés côté serveur.
-8. Idempotence.
-9. Atomicité.
-10. Prévention des doubles soumissions.
-11. Verrouillage et concurrence.
-12. Journalisation.
-13. Transactions inversées et remboursements.
-
-Les paramètres transmis par le client ne sont jamais une source de vérité financière.
-
-Pour les transferts :
-- Débit de l'expéditeur.
-- Crédit du destinataire.
-- Comptabilisation des frais.
-- Écritures équilibrées.
-- Référence de transaction unique.
-
-Ne pas créer de crédit ou de débit directement sur user_wallets.
-
-Ne pas modifier manuellement les soldes dérivés du ledger.
-
-Auditer également la règle actuelle d'attente de 60 secondes entre transactions dans actions/transactions.ts. Vérifier sa pertinence métier et son impact sur l'expérience utilisateur. Ne pas supprimer les protections contre les abus sans les remplacer par une protection adaptée.
-
----
-
-# PHASE 10 — QUALITÉ ET TESTS
-
-Créer ou compléter les tests unitaires et d'intégration.
-
-## Tests financiers
-
-- Transfert entre deux utilisateurs.
-- Transfert vers soi-même.
-- Solde insuffisant.
-- Destinataire inexistant.
-- Wallet destinataire verrouillé.
-- Frais incorrects.
-- Double soumission.
-- Idempotence.
-- Transactions concurrentes.
-- Écritures ledger équilibrées.
-
-## Tests Passkey
-
-- Challenge valide.
-- Challenge expiré.
-- Signature incorrecte.
-- Mauvais utilisateur.
-- Mauvais wallet.
-- Mauvais montant.
-- Challenge réutilisé.
-- Session conservée après validation.
-
-## Tests PIN et récupération
-
-- PIN valide.
-- PIN incorrect.
-- Limite de tentatives.
-- OTP valide.
-- OTP expiré.
-- OTP incorrect.
-- OTP réutilisé.
-- Renvoi trop fréquent.
-- Réinitialisation d'un wallet appartenant à un autre utilisateur.
-
-## Tests UI
-
-- Sélection d'un contact récent.
-- Modification du montant.
-- Incréments et décréments.
-- Passage entre les étapes.
-- Validation Passkey sans redirection.
-- Validation PIN.
-- Réinitialisation depuis les paramètres.
-- Actualisation des statistiques.
-
-## Vérifications finales
-
-Exécuter :
-
-bunx tsc --noEmit
-
-bunx eslint
-
-bun run test
-
-bun run build
-
-Ne pas déclarer le travail terminé si les vérifications échouent.
-
----
-
-# PHASE 11 — LIVRABLES
-
-Produire les documents :
-
-1. WALLET-AUDIT.md
-   - Problèmes identifiés.
-   - Architecture actuelle.
-   - Risques de sécurité.
-   - Incohérences du schéma.
-
-2. WALLET-IMPLEMENTATION.md
-   - Modifications réalisées.
-   - Nouvelles fonctionnalités.
-   - Architecture Passkey.
-   - Architecture OTP.
-   - Migrations.
-
-3. WALLET-TESTS.md
-   - Tests exécutés.
-   - Résultats.
-   - Cas restant à tester.
-
-4. Liste exhaustive des fichiers modifiés.
-
-5. Liste des nouvelles variables d'environnement nécessaires.
-
-6. Instructions pour les fournisseurs email et WhatsApp.
-
-7. Résultat final du build.
-
-## CONTRAINTES ABSOLUES
-
-- Préserver toutes les fonctionnalités financières existantes.
-- Préserver le ledger en partie double.
-- Préserver Better Auth.
-- Réutiliser les Passkeys déjà enregistrés lorsque techniquement possible.
-- Ne pas utiliser signIn.passkey() comme autorisation financière.
-- Ne pas stocker les OTP en clair.
-- Ne pas envoyer les nouveaux PIN par message.
-- Ne pas mettre en cache les données financières privées.
-- Ne pas affaiblir les permissions.
-- Ne pas créer de fausses transactions pour alimenter les statistiques.
-- Ne pas modifier les soldes directement.
-- Ne pas effectuer de migration destructive.
-- Ne pas supprimer les fonctionnalités QR Code.
-- Ne pas casser les demandes de dépôt/retrait, les achats et les paiements de tournois.
-- Conserver le design premium actuel et améliorer la cohérence responsive.
-
-Travailler progressivement, vérifier chaque phase et éviter les réécritures inutiles.
-
-L'objectif final est un wallet fiable, sécurisé, performant et agréable à utiliser, avec une expérience de transaction cohérente sur ordinateur et mobile.
+Auditer :
+- Swipe vertical.
+- Scroll snap.
+- Navigation précédente/suivante.
+- Navigation clavier desktop.
+- IntersectionObserver.
+- Préchargement du prochain clip.
+- Transitions.
+- Gestion des gestes et conflits avec les boutons.
+- Reprise après ouverture des commentaires.
+
+Le clip actif doit être unique et sa lecture doit rester synchronisée avec le moteur.
+
+### 3.5 Interactions
+
+Auditer et finaliser :
+- Likes.
+- Bookmarks.
+- Commentaires.
+- Partage.
+- Téléchargement.
+- Vues.
+- Profil auteur.
+- Informations du jeu.
+- Liste des personnes ayant interagi.
+
+Utiliser des mises à jour optimistes avec rollback en cas d'échec.
+
+Éviter les requêtes séparées et répétées par clip pour récupérer les statistiques lorsque les données peuvent être récupérées en lots.
+
+### 3.6 Gestion des stores
+
+Auditer `useClipEngineStore` et `useGameClipsStore`.
+
+Déterminer clairement la responsabilité de chaque store et supprimer les sources de vérité concurrentes.
+
+Ne pas persister des états transitoires inutiles.
+
+Éviter les états obsolètes lors du changement de clip et les timers non nettoyés.
+
+## 4. Design et responsive
+
+Créer une identité visuelle Games-Trafics inspirée des bonnes conventions de WhatsApp, Messenger, TikTok et Reels, sans reproduire leurs interfaces.
+
+Chats :
+- Bulles modernes.
+- Statuts d'envoi.
+- Actions de message.
+- Réponses et réactions.
+- Inbox lisible.
+- Sidebar adaptée.
+- Groupes et profils cohérents.
+- Composer compact et ergonomique.
+
+Clips :
+- Lecteur immersif.
+- Contrôles discrets.
+- Progression lisible.
+- Actions tactiles accessibles.
+- Panneau commentaires adapté.
+- Transitions fluides.
+
+Tester au minimum 320, 375, 390, 430, 768, 1024 et 1280 px.
+
+Tenir compte de `100dvh`, des safe areas et du clavier mobile.
+
+Éviter les hauteurs fixes inutiles, les débordements et les boutons trop petits.
+
+Respecter le design system existant.
+
+## 5. Performances
+
+Mesurer et optimiser :
+- Nombre de requêtes.
+- Taille des réponses.
+- Temps de première ouverture.
+- Nombre de composants montés.
+- Re-renders.
+- Mémoire vidéo.
+- Cache navigateur.
+- Cache TanStack Query.
+- Chargements réseau.
+- Temps de transition entre clips.
+- Latence d'envoi des messages.
+
+Utiliser la virtualisation lorsque nécessaire, mais préserver les comportements de scroll et de lecture.
+
+Ne pas ajouter une bibliothèque supplémentaire sans justifier sa nécessité.
+
+## 6. Tests obligatoires
+
+Chats :
+- Envoi texte.
+- Envoi image.
+- Envoi audio.
+- Échec réseau et retry.
+- Plusieurs envois rapides.
+- Message reçu pendant le scroll.
+- Chargement historique.
+- Groupe privé.
+- Groupe en lecture seule.
+- Membre autorisé et non autorisé.
+- Promotion/démotion.
+- Retrait d'un membre.
+- Discussion d'entité.
+- Passage d'une discussion d'entité à l'Inbox.
+- Cache média.
+- Reconnexion.
+
+Clips :
+- Feed vide.
+- Feed avec plusieurs pages.
+- Fin de feed.
+- Chargement vidéo lent.
+- Erreur vidéo.
+- Swipe rapide.
+- Retour au clip précédent.
+- Pause/reprise.
+- Ouverture des commentaires.
+- Like/bookmark optimiste.
+- Perte de réseau.
+- Changement d'orientation.
+- Passage en arrière-plan.
+- Mémoire et libération des vidéos.
+
+Responsive :
+- Mobile étroit.
+- Mobile standard.
+- Tablette.
+- Desktop.
+- Clavier mobile ouvert.
+- Safe areas.
+
+## 7. Livrables
+
+Avant de modifier :
+- Cartographie des fichiers concernés.
+- Audit des flux existants.
+- Problèmes confirmés.
+- Problèmes potentiels à vérifier.
+- Plan de correction.
+
+Après modification :
+- Architecture finale.
+- Fichiers modifiés.
+- Corrections réalisées.
+- Éventuelles migrations.
+- Tests exécutés.
+- Résultats des tests.
+- Problèmes restant à résoudre.
+
+Ne pas supprimer une fonctionnalité existante sans raison métier documentée.
+
+Ne pas inventer une nouvelle architecture avant d'avoir compris et vérifié celle qui existe.
+
+Ne pas considérer un composant visuellement terminé si ses actions ne fonctionnent pas réellement.
+
+L'objectif final est d'obtenir des modules Chats et Clips robustes, rapides, maintenables et prêts pour une utilisation intensive en production.

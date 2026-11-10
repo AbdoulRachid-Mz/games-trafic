@@ -965,12 +965,46 @@ function buildShopWhereConditions(
     conditions.push(eq(shops.ownerId, filters.ownerId));
   }
 
+  // Recherche texte : `name` (mapping historique) et `search` (BaseFilters,
+  // utilisé par l'UI mais silencieusement ignoré jusqu'ici) — s'étend à la
+  // description.
+  if (filters.search && filters.search.trim() !== "") {
+    const term = `%${filters.search.trim()}%`;
+    conditions.push(
+      or(ilike(shops.name, term), ilike(shops.description, term)),
+    );
+  }
+
   if (filters.name) {
     conditions.push(ilike(shops.name, `%${filters.name}%`));
   }
 
   if (filters.country) {
     conditions.push(ilike(shops.country, `%${filters.country}%`));
+  }
+
+  // Liste de pays (onglet « local », suggestions). Empty check : une liste
+  // vide ne doit PAS retirer tout pays explicite déjà filtré.
+  if (filters.countries && filters.countries.length > 0) {
+    conditions.push(inArray(shops.country, filters.countries));
+  }
+
+  // Catégorie réelle : jointure entity_categories (entityType SHOP).
+  if (filters.category) {
+    conditions.push(
+      inArray(
+        shops.id,
+        db
+          .select({ entityId: entityCategories.entityId })
+          .from(entityCategories)
+          .where(
+            and(
+              eq(entityCategories.entityType, 'SHOP'),
+              eq(entityCategories.categoryId, filters.category),
+            ),
+          ),
+      ),
+    );
   }
 
   if (typeof filters.verified === 'boolean') {

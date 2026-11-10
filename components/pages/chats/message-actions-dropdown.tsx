@@ -135,8 +135,8 @@ export function MessageActionsDropdown({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-7 w-7 rounded-full",
-            "opacity-0 group-hover:opacity-100 focus:opacity-100",
+            "h-9 w-9 rounded-full",
+            "opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100",
             "bg-[var(--chat-surface)]/80 backdrop-blur-sm border border-[var(--chat-border)]",
             "hover:bg-[var(--chat-surfaceHover)] text-[var(--chat-textMuted)]",
             "transition-all duration-150 shadow-sm",

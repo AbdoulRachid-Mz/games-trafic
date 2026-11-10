@@ -50,9 +50,20 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  size,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  /**
+   * Largeur maximale du dialog :
+   * - sm (par défaut, ~24rem, comportement historique)
+   * - md (~26rem), lg (~32rem), xl (~42rem), 2xl (~56rem)
+   * - full : occupe toute la largeur disponible
+   * `data-slot` est utilisé en CSS pour les tailles de manière à ce que
+   * les classes de largeur passées via `className` par l'appelant
+   * ne soient jamais écrasées par le rendu par défaut.
+   */
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "full";
   showCloseButton?: boolean;
 }) {
   return (
@@ -60,8 +71,11 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        data-size={size}
         className={cn(
-          "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-xl p-4 text-sm ring-1 duration-100 sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2",
+          "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-4 rounded-xl p-4 text-sm ring-1 duration-100 data-[size=md]:sm:max-w-md data-[size=lg]:sm:max-w-lg data-[size=xl]:sm:max-w-2xl data-[size=2xl]:sm:max-w-4xl fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2",
+          size === "full" && "sm:max-w-none",
+          !size && "sm:max-w-sm",
           className
         )}
         {...props}

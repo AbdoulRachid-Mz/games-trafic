@@ -41,6 +41,15 @@ import {
   buildBracketNodeWhereConditions,
   buildMatchWhereConditions,
 } from "./helpers";
+import {
+  syncStandingsWithMatches,
+  rankParticipants,
+} from "@/lib/tournaments/standings.engine";
+import {
+  resolveScoring,
+  isMatchCountable,
+} from "@/lib/tournaments/scoring";
+import { getEffectiveAdvanceCount } from "@/lib/tournaments/config";
 
 
 export async function getTournamentPhaseById(
@@ -427,10 +436,20 @@ export async function getPhaseGroupParticipants(
 /**
  * Récupère les classements complets d'une phase (groupes + participants calculés)
  * Utilisé par EditionStandingsTab pour un affichage performant
+ *
+ * Phase 2 (Round Robin refondu) : pour une phase RR « groupes = journées »
+ * (config.isMatchday), le classement lisible est celui de la PHASE, agrégé
+ * depuis les matches (source de vérité) — exposé comme un groupe virtuel
+ * unique « Classement » pour rester compatible avec l'UI existante.
  */
 
 export async function getPhaseStandings(phaseId: string) {
   try {
+    const phase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, phaseId),
+    });
+    if (!phase) return [];
+
     const groupsWithParticipants = await db.query.phaseGroups.findMany({
       where: and(
         eq(phaseGroups.phaseId, phaseId),
@@ -469,6 +488,43 @@ export async function getPhaseStandings(phaseId: string) {
       },
     });
 
+    // Round Robin refondu : toutes les journées sont des groupes → les
+    // stats par groupe ne sont PAS le classement du championnat.
+    // On expose le classement de phase agrégé (serveur, depuis les matches).
+    const isMatchdayPhase =
+      phase.phaseType === "ROUND_ROBIN" &&
+      groupsWithParticipants.length > 0 &&
+      groupsWithParticipants.every(
+        (g) => ((g.config as any) || {}).isMatchday === true,
+      );
+
+    if (isMatchdayPhase) {
+      const aggregate = await getPhaseLeagueStandings(phaseId);
+      if (aggregate) {
+        // Top-N configuré (résolu une seule fois, serveur) + état de
+        // validation de la phase : le front ne fabrique jamais ces valeurs.
+        const firstGroupConfig = (groupsWithParticipants[0]?.config as any) || {};
+        return [
+          {
+            groupId: `phase:${phaseId}`,
+            groupName: "Classement",
+            aggregated: true,
+            phaseIsCompleted: phase.isCompleted === true,
+            advanceCount: getEffectiveAdvanceCount(
+              phase as any,
+              { config: firstGroupConfig } as any,
+            ),
+            dayGroups: aggregate.days.map((d) => ({
+              groupId: d.groupId,
+              groupName: d.dayName,
+              isCompleted: d.isCompleted,
+            })),
+            rows: aggregate.rows,
+          },
+        ];
+      }
+    }
+
     return groupsWithParticipants.map((group) => ({
       groupId: group.id,
       groupName: group.name,
@@ -498,6 +554,307 @@ export async function getPhaseStandings(phaseId: string) {
     }));
   } catch (error) {
     console.error("Error fetching phase standings:", error);
+    throw error;
+  }
+}
+
+/**
+ * Qualifiés officiels d'une phase, pour les écrans (en-têtes de groupe,
+ * auto-remplissage des phases suivantes en séquence).
+ *
+ * Lit `phase.config.qualifiers` (validés à la fin de la phase) puis, en
+ * repli, les lignes `phaseGroupParticipants.qualified` (modèles historiques :
+ * GROUP_STAGE classique, structure légataire). Retourne toujours des
+ * registrationIds uniques — jamais de doublon inter-journées.
+ */
+export async function getPhaseQualifiedParticipantsAction(
+  phaseId: string,
+): Promise<{
+  registrationIds: string[];
+  entries: Array<{
+    registrationId: string;
+    position?: number | null;
+    points?: number | null;
+  }>;
+}> {
+  try {
+    const phase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, phaseId),
+      columns: { config: true },
+    });
+    const phaseConfig = (phase?.config as any) || {};
+
+    if (
+      Array.isArray(phaseConfig.qualifiers) &&
+      phaseConfig.qualifiers.length > 0
+    ) {
+      const entries = phaseConfig.qualifiers
+        .map((q: any) =>
+          typeof q === "string"
+            ? { registrationId: q as string }
+            : {
+                registrationId: q?.registrationId as string,
+                position: q?.position ?? null,
+                points: q?.points ?? null,
+              },
+        )
+        .filter((e: any) => Boolean(e.registrationId));
+      return {
+        registrationIds: Array.from(
+          new Set(entries.map((e: any) => e.registrationId)),
+        ),
+        entries,
+      };
+    }
+
+    const groups = await db.query.phaseGroups.findMany({
+      where: and(
+        eq(phaseGroups.phaseId, phaseId),
+        eq(phaseGroups.isDeleted, false),
+      ),
+      columns: { id: true },
+    });
+    if (groups.length === 0) {
+      return { registrationIds: [], entries: [] };
+    }
+
+    const rows = await db.query.phaseGroupParticipants.findMany({
+      where: and(
+        inArray(
+          phaseGroupParticipants.groupId,
+          groups.map((g: any) => g.id),
+        ),
+        eq(phaseGroupParticipants.qualified, true),
+        eq(phaseGroupParticipants.isDeleted, false),
+      ),
+      columns: {
+        registrationId: true,
+        position: true,
+        points: true,
+      },
+    });
+
+    // Un registrationId peut apparaître sur plusieurs journées (modèle RR) —
+    // un seul slot.
+    const seen = new Set<string>();
+    const entries: Array<{
+      registrationId: string;
+      position?: number | null;
+      points?: number | null;
+    }> = [];
+    for (const row of rows) {
+      if (seen.has(row.registrationId)) continue;
+      seen.add(row.registrationId);
+      entries.push({
+        registrationId: row.registrationId,
+        position: row.position ?? null,
+        points: row.points ?? null,
+      });
+    }
+    return { registrationIds: Array.from(seen), entries };
+  } catch (error) {
+    console.error("Error fetching phase qualified participants:", error);
+    throw error;
+  }
+}
+
+/**
+ * Classement agrégé d'une phase Round Robin « groupes = journées ».
+ *
+ * - Source de vérité : les matches COMPLETED de la phase (pas les stats
+ *   par ligne de journée, qui ne portent que la journée) ;
+ * - scoring issu de phase.config → group.config (héritage explicite) ;
+ * - les qualifiés officiels viennent de phase.config.qualifiers
+ *   (écrits à la validation de phase) ;
+ * - retourne aussi l'état jour par jour (journée terminée ≠ phase terminée).
+ */
+export interface PhaseLeagueDayStatus {
+  groupId: string;
+  dayNumber: number;
+  dayName: string;
+  totalFixtures: number;
+  completedFixtures: number;
+  isCompleted: boolean;
+}
+
+export async function getPhaseLeagueStandings(phaseId: string): Promise<{
+  phaseId: string;
+  phaseName: string;
+  days: PhaseLeagueDayStatus[];
+  rows: Array<{
+    id: string;
+    registrationId: string;
+    position: number;
+    qualified: boolean;
+    points: number;
+    matchesPlayed: number;
+    matchesWon: number;
+    matchesDrawn: number;
+    matchesLost: number;
+    scoreFor: number;
+    scoreAgainst: number;
+    scoreDifference: number;
+    displayName: string;
+    avatar?: string | null;
+    teamName?: string | null;
+    teamLogo?: string | null;
+  }>;
+} | null> {
+  try {
+    const phase = await db.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, phaseId),
+    });
+    if (!phase) return null;
+
+    const groups = await db.query.phaseGroups.findMany({
+      where: and(
+        eq(phaseGroups.phaseId, phaseId),
+        eq(phaseGroups.isDeleted, false),
+      ),
+      orderBy: [asc(phaseGroups.order)],
+    });
+    if (groups.length === 0) return null;
+
+    const groupIds = groups.map((g: any) => g.id);
+
+    // Annuaire des participants de la phase (union des journées) + infos d'affichage.
+    const participants = await db.query.phaseGroupParticipants.findMany({
+      where: and(
+        inArray(phaseGroupParticipants.groupId, groupIds),
+        eq(phaseGroupParticipants.isDeleted, false),
+      ),
+      with: {
+        registration: {
+          with: {
+            member: {
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  },
+                },
+                team: {
+                  columns: { id: true, name: true, logo: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Un registrationId = une entrée annuaire (le participant joue plusieurs journées).
+    const infoById = new Map<string, (typeof participants)[number]>();
+    for (const p of participants) {
+      if (!infoById.has(p.registrationId)) infoById.set(p.registrationId, p);
+    }
+    const registrationIds = Array.from(infoById.keys());
+    if (registrationIds.length === 0) {
+      return { phaseId, phaseName: phase.name, days: [], rows: [] };
+    }
+
+    // Matches de la phase (décomptables uniquement).
+    const phaseMatches = await db.query.matches.findMany({
+      where: and(
+        eq(matches.phaseId, phaseId),
+        eq(matches.isDeleted, false),
+      ),
+    });
+    const countable = phaseMatches.filter((m: any) => isMatchCountable(m));
+
+    // Scoring : phase.config (hérité) — les groupes-journées portent la même
+    // écriture ; on lit la première pour l'override éventuel.
+    const firstGroupConfig = (groups[0]?.config as any) || {};
+    const scoring = resolveScoring(
+      (phase.config as any) || {},
+      firstGroupConfig,
+    );
+
+    const phaseConfig = (phase.config as any) || {};
+    const qualifyingIds: string[] = Array.isArray(phaseConfig.qualifiers)
+      ? phaseConfig.qualifiers.map((q: any) =>
+          typeof q === "string" ? q : q?.registrationId,
+        )
+      : [];
+
+    // On ne passe tiebreakerRules que s'il existe : un `undefined` écraserait
+    // les défauts de DEFAULT_CONFIG dans le spread interne.
+    const tiebreakerRulesOverride = Array.isArray(phaseConfig.tiebreakerRules)
+      ? { tiebreakerRules: phaseConfig.tiebreakerRules as string[] }
+      : {};
+
+    const statsMap = syncStandingsWithMatches(
+      registrationIds,
+      countable as any,
+      {
+        ...scoring,
+        ...tiebreakerRulesOverride,
+      },
+    );
+    const ranked = rankParticipants(statsMap, tiebreakerRulesOverride);
+
+    const rows = ranked.map((r, index) => {
+      const info = infoById.get(r.registrationId);
+      const memberUser = info?.registration?.member?.user;
+      const team = info?.registration?.member?.team;
+      return {
+        id: info?.id || r.registrationId,
+        registrationId: r.registrationId,
+        position: index + 1,
+        qualified: qualifyingIds.includes(r.registrationId),
+        points: r.stats.points,
+        matchesPlayed: r.stats.matchesPlayed,
+        matchesWon: r.stats.matchesWon,
+        matchesDrawn: r.stats.matchesDrawn,
+        matchesLost: r.stats.matchesLost,
+        scoreFor: r.stats.scoreFor,
+        scoreAgainst: r.stats.scoreAgainst,
+        scoreDifference: r.stats.scoreDifference,
+        displayName:
+          memberUser?.username || memberUser?.fullName || "Anonyme",
+        avatar: memberUser?.profileImage || memberUser?.image,
+        teamName: team?.name,
+        teamLogo: team?.logo,
+      };
+    });
+
+    // État jour par jour : une journée est terminée quand toutes ses
+    // confrontations (nodes) ont plusieurs 0 matches décomptables restants.
+    const days: PhaseLeagueDayStatus[] = groups.map((g: any) => {
+      const config = (g.config as any) || {};
+      const dayMatches = phaseMatches.filter(
+        (m: any) => m.groupId === g.id && !m.isDeleted,
+      );
+      const completed = dayMatches.filter(
+        (m: any) => isMatchCountable(m) || m.status === "CANCELLED" || m.status === "FORFEIT",
+      ).length;
+      return {
+        groupId: g.id,
+        dayNumber: config.dayNumber ?? (g.order ?? 0) + 1,
+        dayName: g.name,
+        totalFixtures: typeof config.fixturesCount === "number" ? config.fixturesCount : dayMatches.length,
+        completedFixtures: completed,
+        isCompleted:
+          dayMatches.length > 0
+            ? completed >= dayMatches.length
+            : config.dayNumber === undefined
+              ? false
+              : true,
+      };
+    });
+
+    return {
+      phaseId,
+      phaseName: phase.name,
+      days,
+      rows,
+    };
+  } catch (error) {
+    console.error("Error computing phase league standings:", error);
     throw error;
   }
 }

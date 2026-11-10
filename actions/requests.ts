@@ -348,11 +348,26 @@ export async function createRequest(
         throw new Error('Game item not found');
       }
 
-      // Calcul du total GTC si quantity est fournie
-      if (requestData.quantity) {
+      // 🛡️ Quantity/total Système de vérité = le serveur (jamais le client) :
+      // - quantity arrive top-level (la colonne requests.quantity) — était
+      //   envoyée dans metadata et donc jamais lue/validation automatisée;
+      // - quantité entière >= 1 ;
+      // - totalGtc recalculé depuis priceGtc en base ;
+      // - amount est ÉCRASÉ par ce total : un client ne peut pas sous-déclarer
+      //   le montant d'un achat en manipulant la quantité ou le montant.
+      if (requestData.quantity != null) {
+        const qty = Math.round(Number(requestData.quantity));
+        if (!Number.isFinite(qty) || qty < 1) {
+          throw new Error('Quantité invalide');
+        }
         const price = parseFloat(item[0].priceGtc);
-        const qty = parseFloat(requestData.quantity);
-        requestData.totalGtc = (price * qty).toFixed(2);
+        if (!Number.isFinite(price) || price <= 0) {
+          throw new Error('Article sans prix valide — commande impossible');
+        }
+        const total = (price * qty).toFixed(2);
+        requestData.totalGtc = total;
+        requestData.quantity = qty.toString();
+        requestData.amount = total;
       }
     }
 

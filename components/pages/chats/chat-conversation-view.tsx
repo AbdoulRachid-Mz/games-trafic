@@ -1,12 +1,13 @@
 // components/pages/chats/chat-conversation-view.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChatHeader } from "@/components/pages/chats/chat-header";
 import { MessageList } from "@/components/pages/chats/message-list";
 import { MessageInput } from "@/components/pages/chats/message-input";
 import { useAuthContext } from "@/contexts/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { useChatContext } from "@/contexts/chat-context";
 import { useGroupById, useGroupMemberByUserAndGroup } from "@/hooks/use-groupes";
 import { useUserById } from "@/hooks/use-users";
@@ -20,6 +21,7 @@ import {
   useMarkMessageAsRead,
   useDeleteMessage,
 } from "@/hooks/use-messages";
+import { messageKeys } from "@/hooks/use-messages";
 import { useToggleInteraction } from "@/hooks/use-interactions";
 import type { ChatId, ChatMessage, Conversation, ChatEntityType } from "@/types/chat";
 import { toast } from "sonner";
@@ -37,6 +39,7 @@ interface ChatConversationViewProps {
 export function ChatConversationView({ entityType, entityId }: ChatConversationViewProps) {
   const router = useRouter();
   const { user } = useAuthContext();
+  const queryClient = useQueryClient();
   const {
     activeConversation,
     setActiveConversation,
@@ -46,6 +49,7 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
   const { pause: pauseAudio } = useChatAudioStore();
 
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const failedPayloadsRef = useRef<Record<string, { content: string; images?: string[]; audioUrl?: string }>>({});
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [likedMessageIds, setLikedMessageIds] = useState<Set<string>>(new Set());
@@ -87,22 +91,20 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
   }, [isGroup, groupData, isLoadingMembership, membership]);
 
   // Fetch messages based on entity type
-  const {
-    data: groupMessagesData,
-    isLoading: isLoadingGroupMessages,
-    refetch: refetchGroupMessages,
-  } = useGroupMessages(isGroup ? entityId : "", undefined, Boolean(isGroup && !!membership));
+  const groupQueryResult = useGroupMessages(isGroup ? entityId : "", undefined, Boolean(isGroup && !!membership));
+  const groupMessagesData = groupQueryResult;
+  const isLoadingGroupMessages = groupQueryResult.isLoading;
+  const refetchGroupMessages = groupQueryResult.refetch;
 
-  const {
-    data: dmMessagesData,
-    isLoading: isLoadingDmMessages,
-    refetch: refetchDmMessages,
-  } = useConversation(
+  const dmQueryResult = useConversation(
     user?.id || "",
     !isGroup && entityType === "user" ? entityId : "",
     undefined,
     Boolean(!isGroup && entityType === "user" && !!user)
   );
+  const dmMessagesData = dmQueryResult;
+  const isLoadingDmMessages = dmQueryResult.isLoading;
+  const refetchDmMessages = dmQueryResult.refetch;
 
   const {
     data: entityMessagesData,
@@ -125,11 +127,27 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
     isLoadingEntityMessages ||
     Boolean(isGroup && isLoadingMembership);
 
-  const messages = isGroup
-    ? groupMessagesData?.data || []
+  // Pagination infinie (cursor) pour DM & groupes
+  const activeInfinite = isGroup ? groupQueryResult : entityType === "user" ? dmQueryResult : null;
+  const hasMore = Boolean(activeInfinite?.hasNextPage);
+  const loadMore = () => {
+    if (activeInfinite?.hasNextPage && !activeInfinite?.isFetchingNextPage) {
+      activeInfinite.fetchNextPage();
+    }
+  };
+
+  const flattenedMessages = isGroup
+    ? (groupMessagesData?.data?.pages?.flatMap((p: any) => p?.data || []) ?? [])
     : entityType === "user"
-      ? dmMessagesData?.data || []
+      ? (dmMessagesData?.data?.pages?.flatMap((p: any) => p?.data || []) ?? [])
       : entityMessagesData?.data || [];
+  const seenIds = new Set<string>();
+  const messages = flattenedMessages.filter((m: any) => {
+    if (!m?.id) return true;
+    if (seenIds.has(m.id)) return false;
+    seenIds.add(m.id);
+    return true;
+  });
 
   const refetch = isGroup
     ? refetchGroupMessages
@@ -195,7 +213,13 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
       }
 
       try {
-        const messageData: any = {
+        const tempId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+       const messageData: any = {
+          id: tempId,
           senderId: user.id,
           content,
           images: images || [],
@@ -216,9 +240,9 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
           messageData.parentMessageId = replyTo.id;
         }
 
+        failedPayloadsRef.current[tempId] = { content, images, audioUrl };
         await createMessageMutation.mutateAsync(messageData);
         setReplyTo(null);
-        refetch();
       } catch (error) {
         console.error("Failed to send message:", error);
         toast.error("Erreur lors de l'envoi du message");
@@ -226,6 +250,26 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
     },
     [user, entityType, entityId, replyTo, createMessageMutation, refetch, isGroup, membership]
   );
+
+  const handleRetryMessage = useCallback(async (messageId: string) => {
+    const payload = failedPayloadsRef.current[messageId];
+    const targetKey =
+      entityType === "group"
+        ? messageKeys.group(entityId)
+        : entityType === "user"
+          ? messageKeys.conversation(user?.id || "", entityId)
+          : messageKeys.entity(entityType, entityId);
+    queryClient.setQueryData(targetKey, (old: any) => {
+      const filter = (a: any[]) => a.filter((m: any) => m.id !== messageId);
+      if (Array.isArray(old)) return filter(old);
+      if (old?.data && Array.isArray(old.data)) return { ...old, data: filter(old.data) };
+      return old;
+    });
+    delete failedPayloadsRef.current[messageId];
+    if (payload) {
+      await handleSendMessage(payload.content, payload.images, payload.audioUrl);
+    }
+  }, [entityType, entityId, user, queryClient, handleSendMessage]);
 
   const handleReply = useCallback((message: ChatMessage) => {
     setReplyTo(message);
@@ -330,7 +374,7 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-[var(--chat-background)] overflow-hidden z-10">
+    <div className="h-[100dvh] flex flex-col bg-[var(--chat-background)] overflow-hidden z-10">
       <div className="flex-none z-10 bg-[var(--chat-background)] border-b border-[var(--chat-border)] shadow-sm">
         <ChatHeader
           conversation={conversation}
@@ -365,13 +409,16 @@ export function ChatConversationView({ entityType, entityId }: ChatConversationV
           onReply={handleReply}
           onDelete={handleDeleteMessage}
           onLike={handleLikeMessage}
+          onRetry={handleRetryMessage}
           likedMessageIds={likedMessageIds}
           likeCounts={likeCounts}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
           className="flex-1 relative z-0"
         />
       )}
 
-      <div className="flex-none z-10 bg-[var(--chat-background)] border-t border-[var(--chat-border)] pb-safe">
+      <div className="flex-none z-10 bg-[var(--chat-background)] border-t border-[var(--chat-border)] pb-[env(safe-area-inset-bottom)]">
         <MessageInput
           user={user}
           onSendMessage={handleSendMessage}

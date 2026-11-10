@@ -36,6 +36,7 @@ import {
   type ShopCard, type UserMini, type ShopMini,
 } from "@/types/view-models";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useDebounce } from "./use-debounce";
 
 // ============================================================================
@@ -502,45 +503,78 @@ export function useRemoveShopCategory(
 }
 
 export function useShopsFilters() {
-  const [filters, setFilters] = useState({
-    search: "",
-    category: undefined as string | undefined,
-    country: undefined as string | undefined,
-    verified: undefined as boolean | undefined,
-  });
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [searchQuery, setSearchQuery] = useState("");
+  // 🔗 Sync URL (pattern MatchesDashboardFilters) : l'URL est la source de
+  // vérité — un refresh/lien partagé reconstruit exactement la même liste.
+  const q = searchParams.get("q") || "";
+  const country = searchParams.get("country") || undefined;
+  const category = searchParams.get("category") || undefined;
+  const countriesParam = searchParams.get("countries");
+  const countries = countriesParam?.split(",").filter(Boolean) || [];
+  const verifiedParam = searchParams.get("verified");
+  const verified = verifiedParam === "true" ? true : undefined;
+
+  const [searchQuery, setSearchQuery] = useState(q);
 
   // Debounce pour la recherche
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   useEffect(() => {
-    setFilters(prev => ({ ...prev, search: debouncedSearch }));
+    if (debouncedSearch === q) return;
+    const params = new URLSearchParams(searchParams.toString());
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    else params.delete("q");
+    router.replace(`${pathname}?${params.toString()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
+  // Filtres dérivés de l'URL — même shape que l'ancien state local.
+  const filters = {
+    search: q,
+    category,
+    country,
+    countries: countries.length > 0 ? countries : undefined,
+    verified,
+  };
+
   // Vérifie s'il y a des filtres actifs
-  const hasActiveFilters = Object.values(filters).some(
-    value => value !== undefined && value !== ""
+  const hasActiveFilters =
+    !!q || !!country || !!category || verifiedParam === "true";
+
+  // Mettre à jour un filtre → écrit dans l'URL.
+  const updateFilter = useCallback(
+    (key: string, value: any) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const urlKey = key === "search" ? "q" : key;
+      const isUndefined = value === "all" || value === "" || value === undefined || value === null;
+      if (isUndefined) {
+        params.delete(urlKey);
+      } else if (Array.isArray(value)) {
+        params.set(urlKey, value.join(","));
+      } else if (typeof value === "boolean") {
+        if (value) params.set(urlKey, "true");
+        else params.delete(urlKey);
+      } else {
+        params.set(urlKey, String(value));
+      }
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [searchParams, router, pathname],
   );
 
-  // Mettre à jour un filtre
-  const updateFilter = useCallback((key: string, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value === "all" || value === "" ? undefined : value
-    }));
-  }, []);
-
-  // Réinitialiser tous les filtres
+  // Réinitialiser tous les filtres (ne touche que les filtres, pas viewMode).
   const resetFilters = useCallback(() => {
-    setFilters({
-      search: "",
-      category: undefined,
-      country: undefined,
-      verified: undefined,
-    });
     setSearchQuery("");
-  }, []);
+    const params = new URLSearchParams(searchParams.toString());
+    ["q", "country", "countries", "category", "verified"].forEach((k) =>
+      params.delete(k),
+    );
+    router.replace(`${pathname}?${params.toString()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, pathname]);
 
   return {
     filters,

@@ -109,3 +109,71 @@ export function generateEliminationMatches(
 
   return matches;
 }
+
+/**
+ * Construit le calendrier d'un championnat (Round Robin) :
+ * UNE journée (matchday) = un groupe = des confrontations indépendantes
+ * (1 node = 1 confrontation à 2 participants).
+ *
+ * Généré par Circle Method ; participants impairs gérés avec un BYE
+ * (la journée concernée a une confrontation de moins et un exempté).
+ * En aller-retour, la seconde moitié du calendrier inverse chaque
+ * confrontation (retour), les journées sont numérotées en continu.
+ *
+ * Résultat pur (aucun accès DB) → testable unitairement.
+ */
+export interface LeagueFixture {
+  /** Numéro de journée (1-based, continu en aller-retour). */
+  day: number;
+  /** Index de la confrontation dans la journée (1-based). */
+  fixture: number;
+  p1: string | null;
+  p2: string | null;
+}
+
+export interface LeagueDay {
+  day: number;
+  fixtures: LeagueFixture[];
+  /** Participants exemptés (impair) ce jour-là. */
+  byeParticipants: string[];
+}
+
+export function buildLeagueCalendar(
+  participantIds: string[],
+  opts?: { isHomeAway?: boolean }
+): LeagueDay[] {
+  const generated = generateGroupMatches(
+    participantIds.map((id) => ({ id })),
+    { returnType: opts?.isHomeAway ? "double" : "single" }
+  );
+
+  const days = new Map<number, LeagueDay>();
+  for (const m of generated) {
+    const day = m.round || 1;
+    let d = days.get(day);
+    if (!d) {
+      d = { day, fixtures: [], byeParticipants: [] };
+      days.set(day, d);
+    }
+    d.fixtures.push({
+      day,
+      fixture: d.fixtures.length + 1,
+      p1: m.participant1?.id ?? null,
+      p2: m.participant2?.id ?? null,
+    });
+  }
+
+  // Les BYE n'arrivent pas jusqu'ici (filtrés dans generateRoundRobinMatches) :
+  // les exemptés d'une journée sont donc déduits (participants absents ce jour).
+  for (const d of days.values()) {
+    if (d.fixtures.length === 0) continue;
+    const playing = new Set<string>();
+    for (const f of d.fixtures) {
+      if (f.p1) playing.add(f.p1);
+      if (f.p2) playing.add(f.p2);
+    }
+    d.byeParticipants = participantIds.filter((id) => !playing.has(id));
+  }
+
+  return Array.from(days.values()).sort((a, b) => a.day - b.day);
+}

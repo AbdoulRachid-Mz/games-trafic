@@ -51,7 +51,7 @@ export function useConversations(userId: string | undefined) {
     queryFn: fetchConversations,
     enabled: !!userId,
     staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds for real-time feel
+    refetchInterval: 60 * 1000, // Polling allégé : 60 s (cache + invalidation ciblée)
   });
 
   /**

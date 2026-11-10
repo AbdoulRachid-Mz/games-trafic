@@ -30,6 +30,7 @@ interface MessageListProps {
   onDelete?: (messageId: string) => void;
   onLike?: (messageId: string) => void;
   onPin?: (messageId: string) => void;
+  onRetry?: (messageId: string) => void;
   /** Map of messageId → likeCount */
   likeCounts?: Record<string, number>;
   /** Set of messageIds liked by the current user */
@@ -49,6 +50,7 @@ export function MessageList({
   onDelete,
   onLike,
   onPin,
+  onRetry,
   likeCounts = {},
   likedMessageIds = new Set(),
   onLoadMore,
@@ -58,6 +60,9 @@ export function MessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isFirstLoad = useRef(true);
+  // Préserve la position de scroll lors du chargement de l'historique
+  // (messages prépendus en haut) — évite le saut vers le haut.
+  const scrollAdjustRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
 
   // ── Selection mode ────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -102,11 +107,19 @@ export function MessageList({
   const groupedMessages = groupMessagesByDate(messages);
 
   useEffect(() => {
+    const scrollElement = scrollRef.current;
+    // Restauration de la position de scroll après chargement historique
+    if (scrollAdjustRef.current && scrollElement) {
+      const { scrollHeight: prevHeight, scrollTop: prevTop } = scrollAdjustRef.current;
+      const delta = scrollElement.scrollHeight - prevHeight;
+      scrollElement.scrollTop = prevTop + delta;
+      scrollAdjustRef.current = null;
+      return;
+    }
     if (isFirstLoad.current && messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: "auto" });
       isFirstLoad.current = false;
     } else if (messages.length > 0) {
-      const scrollElement = scrollRef.current;
       if (scrollElement) {
         const { scrollTop, scrollHeight, clientHeight } = scrollElement;
         const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
@@ -123,6 +136,8 @@ export function MessageList({
       Math.abs(target.scrollTop) + target.clientHeight >=
       target.scrollHeight - 50;
     if (isNearTop && hasMore && !isLoading && onLoadMore) {
+      // Capturer la position AVANT le chargement pour la restaurer après
+      scrollAdjustRef.current = { scrollHeight: target.scrollHeight, scrollTop: target.scrollTop };
       onLoadMore();
     }
   };
@@ -185,7 +200,7 @@ export function MessageList({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full text-white hover:bg-white/20"
+                className="h-9 w-9 rounded-full text-white hover:bg-white/20"
                 onClick={clearSelection}
               >
                 <X className="h-4 w-4" />
@@ -291,6 +306,7 @@ export function MessageList({
                                 onDelete={onDelete}
                                 onLike={onLike}
                                 onPin={onPin}
+                                onRetry={onRetry}
                                 isLiked={likedMessageIds.has(message.id)}
                                 likeCount={likeCounts[message.id] ?? 0}
                                 isSelected={selectedIds.has(message.id)}

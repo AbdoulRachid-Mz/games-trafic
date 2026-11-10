@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -24,12 +24,18 @@ export function PhaseFilter({
 }: PhaseFilterProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const handleChange = (value: string) => {
-    const params = new URLSearchParams();
+    // Préserver les autres params URL (viewMode, page, ...) au lieu de
+    // tout écraser — mais repartir à la page 1.
+    const params = new URLSearchParams(searchParams.toString());
     if (value !== "ALL") {
       params.set(paramName, value);
+    } else {
+      params.delete(paramName);
     }
+    params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
 

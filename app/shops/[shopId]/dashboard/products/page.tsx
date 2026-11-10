@@ -45,6 +45,7 @@ import Image from "next/image";
 import { getProductsByShopId, deleteProduct, updateProductStatus } from "@/actions/products";
 import { AdvancedUpload } from "@/components/ui/advanced-upload";
 import { ProductDialog } from "@/components/pages/shops/products/product-dialog";
+import { ProductCard } from "@/components/cards/product-card";
 
 const statusColors = {
   "NON_VENDU": "bg-gray-500",
@@ -281,154 +282,25 @@ export default function ShopProductsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="group"
-            >
-              <Card className="overflow-hidden h-full hover:shadow-lg transition-shadow">
-                {/* Image du produit */}
-                <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden">
-                  {product.featuredImage ? (
-                    <Image
-                      src={product.featuredImage}
-                      alt={product.name}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : product.images?.[0] ? (
-                    <Image
-                      src={product.images[0]}
-                      alt={product.name}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Package className="h-16 w-16 text-primary/30" />
-                    </div>
-                  )}
-                  
-                  {/* Badges */}
-                  <div className="absolute top-3 right-3 flex gap-2">
-                    <Badge className={`${statusColors[product.status as keyof typeof statusColors]} text-white`}>
-                      {statusLabels[product.status as keyof typeof statusLabels]}
-                    </Badge>
-                    {product.isFeatured && (
-                      <Badge className="bg-amber-500 text-white">
-                        <Star className="h-3 w-3 mr-1" />
-                        Vedette
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <div className="absolute bottom-3 left-3">
-                    <Badge variant="secondary" className="backdrop-blur-sm bg-white/80">
-                      {product.game || "Jeu"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <CardContent className="p-6">
-                  {/* Titre et description */}
-                  <Typography variant="h4" weight="semibold" className="mb-2 line-clamp-1">
-                    {product.name}
-                  </Typography>
-                  
-                  {product.description && (
-                    <Typography variant="body-sm" theme="muted" className="mb-4 line-clamp-2">
-                      {product.description}
-                    </Typography>
-                  )}
-
-                  {/* Infos produit */}
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center justify-between">
-                      <Typography variant="body-sm" theme="muted">
-                        Prix
-                      </Typography>
-                      <Typography variant="body-lg" weight="bold" className="text-primary">
-                        {product.price} {product.currency || "GTC"}
-                      </Typography>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <Typography variant="body-sm" theme="muted">
-                        Vues
-                      </Typography>
-                      <div className="flex items-center gap-1">
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                        <Typography variant="body-sm">{product.viewCount || 0}</Typography>
-                      </div>
-                    </div>
-                    
-                    {product.accountLevel && (
-                      <div className="flex items-center justify-between">
-                        <Typography variant="body-sm" theme="muted">
-                          Niveau
-                        </Typography>
-                        <Badge variant="outline">{product.accountLevel}</Badge>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2"
-                      onClick={() => router.push(`/products/${product.id}`)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Voir
-                    </Button>
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => {
-                          setSelectedProduct(product);
-                          setIsDialogOpen(true);
-                        }}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(product)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Dupliquer
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleStatusChange(
-                            product.id, 
-                            product.status === "VENDU" ? "NON_VENDU" : "VENDU"
-                          )}
-                        >
-                          <ShoppingBag className="h-4 w-4 mr-2" />
-                          {product.status === "VENDU" ? "Remettre en vente" : "Marquer vendu"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleDelete(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+          {filteredProducts.map((product) => {
+            return (
+              <ProductCard
+                key={product.id}
+                item={product}
+                viewMode="grid"
+                onView={() => router.push(`/products/${product.id}`)}
+                onEdit={() => {
+                  setSelectedProduct(product);
+                  setIsDialogOpen(true);
+                }}
+                onDelete={() => handleDelete(product.id)}
+                // extraActions={extraActions}
+                showLikeButton={false}
+                showBookmarkButton={false}
+                showBuyButton={false}
+              />
+            );
+          })}
         </div>
       )}
 

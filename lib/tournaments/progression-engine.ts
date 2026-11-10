@@ -110,6 +110,14 @@ export async function progressTournamentAfterMatch(
         .set({ isCompleted: true })
         .where(eq(phaseGroups.id, match.groupId));
 
+      // 🆕 Round Robin refondu : un « groupe » est une JOURNÉE (matchday).
+      // Une journée terminée ne qualifie aucun participant — la qualification
+      // n'arrive qu'à la validation de la PHASE (markPhaseCompleteAction).
+      const groupConfigAny = (match.group?.config as any) || {};
+      if (groupConfigAny.isMatchday === true) {
+        return result;
+      }
+
       // Calculer les classements
       const groupParticipants = await db.query.phaseGroupParticipants.findMany({
         where: eq(phaseGroupParticipants.groupId, match.groupId),
@@ -124,7 +132,10 @@ export async function progressTournamentAfterMatch(
       );
       const ranked = rankParticipants(statsMap, config);
 
-      const advanceCount = config.advanceCount || 2;
+      const advanceCount =
+        typeof config.advanceCount === "number" && config.advanceCount > 0
+          ? config.advanceCount
+          : 2;
 
       const qualifiers = [];
       for (let i = 0; i < ranked.length; i++) {

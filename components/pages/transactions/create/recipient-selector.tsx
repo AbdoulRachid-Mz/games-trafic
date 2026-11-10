@@ -433,7 +433,7 @@ export function TransactionRecipientSelector({
               )}
             </div>
 
-            <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid gap-3 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
               {loading && recipients.length === 0 ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <div

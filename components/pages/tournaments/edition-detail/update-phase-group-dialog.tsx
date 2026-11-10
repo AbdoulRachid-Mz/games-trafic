@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, Settings } from "lucide-react";
 import { updatePhaseGroup } from "@/actions/phases";
+import { getEffectiveAdvanceCount, isMatchdayGroup } from "@/lib/tournaments/config";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -24,13 +25,20 @@ interface UpdatePhaseGroupDialogProps {
     isLocked: boolean | null;
     config: any;
   };
+  /** Phase parente : sert au champ qualifiés prérempli (héritage). */
+  phase?: { config?: unknown } | null;
   asFormOnly?: boolean;
 }
 
-export function UpdatePhaseGroupDialog({ group, asFormOnly = false }: UpdatePhaseGroupDialogProps) {
+export function UpdatePhaseGroupDialog({ group, phase, asFormOnly = false }: UpdatePhaseGroupDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Un groupe-journée (RR refondu) ne qualifie jamais : pas de champ
+  // « qualifiés » — la qualification est actée à la validation de phase.
+  const isMatchday = isMatchdayGroup((group.config as any) || null);
+  const currentAdvanceCount = getEffectiveAdvanceCount(phase ?? undefined, group);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,7 +47,6 @@ export function UpdatePhaseGroupDialog({ group, asFormOnly = false }: UpdatePhas
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
     const order = Number(formData.get("order") || 1);
-    const advanceCount = Number(formData.get("advanceCount") || 2);
     const isLocked = formData.get("isLocked") === "on";
 
     try {
@@ -49,7 +56,17 @@ export function UpdatePhaseGroupDialog({ group, asFormOnly = false }: UpdatePhas
         isLocked,
         config: {
           ...((group.config as any) || {}),
-          advanceCount,
+          // Champ vide = on retire la valeur : le groupe redevient héritant
+          // de la phase plutôt que figé sur un défaut toute fait.
+          ...(isMatchday
+            ? {}
+            : {
+                advanceCount:
+                  (formData.get("advanceCount") as string)?.trim() !== "" &&
+                  !isNaN(Number(formData.get("advanceCount")))
+                    ? Number(formData.get("advanceCount"))
+                    : undefined,
+              }),
         },
       } as any);
 
@@ -85,16 +102,26 @@ export function UpdatePhaseGroupDialog({ group, asFormOnly = false }: UpdatePhas
             defaultValue={group.order || 1}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="advanceCount">Nb Qualifiés (Q)</Label>
-          <Input
-            id="advanceCount"
-            name="advanceCount"
-            type="number"
-            min={1}
-            defaultValue={(group.config as any)?.advanceCount || 2}
-          />
-        </div>
+        {!isMatchday ? (
+          <div className="space-y-2">
+            <Label htmlFor="advanceCount">Nb Qualifiés (Q)</Label>
+            <Input
+              id="advanceCount"
+              name="advanceCount"
+              type="number"
+              min={1}
+              placeholder={`${currentAdvanceCount} (hérité)`}
+            />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>Journée (pas de qualification ici)</Label>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Les qualifiés sont décidés au classement de la phase, à la
+              validation de la phase.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2 pt-2">

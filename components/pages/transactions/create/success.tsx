@@ -43,6 +43,10 @@ interface TransactionSuccessProps {
   };
   newBalance: number;
   isRequest?: boolean;
+  /** Frais réels calculés côté serveur (reçus hardcodés à 0 avant). */
+  fees?: number;
+  /** Montant total débité (amount + fees). */
+  totalAmount?: number;
   onReturnHome: () => void;
   onViewHistory: () => void;
 }
@@ -52,17 +56,21 @@ export function TransactionSuccess({
   transactionData,
   newBalance,
   isRequest = false,
+  fees = 0,
+  totalAmount,
   onReturnHome,
   onViewHistory,
 }: TransactionSuccessProps) {
+  // Référence déterministe (jamais un id issu de Date.now()).
   const transactionReference = transactionId
-    ? `TX-${transactionId.slice(-8)}`
-    : `REQ-${Date.now().toString().slice(-8)}`;
+    ? `${isRequest ? "REQ" : "TX"}-${transactionId.slice(-8)}`
+    : `${isRequest ? "REQ" : "TX"}`;
 
   const router = useRouter();
 
   useEffect(() => {
-    // Lancer les confettis au montage
+    // Confettis UNE seule fois, ici au montage du succès. (La page appelante
+    // en relançait un à la confirmation → double effet visuel.)
     fireConfettiPreset("success");
   }, []);
 
@@ -139,11 +147,11 @@ export function TransactionSuccess({
 
   const handleDownloadReceipt = () => {
     generateEnhancedReceipt({
-      transactionId: transactionId || Date.now().toString(),
+      transactionId: transactionId || transactionReference,
       amount: transactionData.amount,
       type: transactionData.type,
-      fees: 0,
-      totalAmount: transactionData.amount,
+      fees,
+      totalAmount: totalAmount ?? transactionData.amount + fees,
       date: new Date(),
       reference: transactionReference,
       newBalance,
@@ -162,15 +170,15 @@ export function TransactionSuccess({
             : `J'ai effectué une transaction de ${transactionData.amount} GTC sur Games Trafics!`,
           url: window.location.href,
         });
-      } catch (error) {
-        console.log("Partage annulé");
+      } catch {
+        // Annulation utilisateur — silence volontaire (pas de console.log)
       }
     }
   };
 
   return (
-    <Card className="border-0 shadow-2xl overflow-hidden bg-linear-to-b from-background to-background/50 backdrop-blur-xl">
-      <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 via-emerald-400 to-green-500" />
+    <Card className="bg-card border-border/50 shadow-xl overflow-hidden">
+      <div className="w-full h-1 bg-linear-to-r from-green-500 via-emerald-400 to-green-500" />
       <CardContent className="p-8 pt-12">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -182,11 +190,9 @@ export function TransactionSuccess({
           <div className="relative mb-6">
             <div className="absolute inset-0 bg-green-500 blur-2xl opacity-20 rounded-full" />
             <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0],
-              }}
-              transition={{ repeat: Infinity, duration: 3, repeatDelay: 1 }}
+              initial={{ scale: 0.85, rotate: -4 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", duration: 0.6 }}
               className="relative w-24 h-24 rounded-full bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30"
             >
               <CheckCircle className="h-10 w-10 text-white" strokeWidth={3} />

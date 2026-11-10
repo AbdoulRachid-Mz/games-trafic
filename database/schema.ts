@@ -1890,7 +1890,9 @@ export const messages = pgTable('messages', {
   index('messages_sender_idx').on(table.senderId),
   index('messages_recipient_idx').on(table.recipientId),
   index('messages_entity_idx').on(table.entityId, table.entityType),
-  index('messages_created_at_idx').on(table.createdAt)
+  index('messages_created_at_idx').on(table.createdAt),
+  index('messages_group_created_idx').on(table.groupId, table.createdAt),
+  index('messages_dm_created_idx').on(table.senderId, table.recipientId, table.createdAt),
 ]);
 
 export const groups = pgTable('groups', {
@@ -1901,6 +1903,10 @@ export const groups = pgTable('groups', {
   description: text('description'),
   image: text('image'),
   isPrivate: boolean('is_private').default(false),
+
+  // Permissions configurables (Lot C)
+  isReadOnly: boolean('is_read_only').default(false),
+  permissions: jsonb('permissions').default({}),
 
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -1924,7 +1930,8 @@ export const conversations = pgTable('conversations', {
   index('conversations_participants_idx').on(table.participantIds),
   index('conversations_entity_idx').on(table.entityId, table.entityType),
   index('conversations_chat_id_idx').on(table.chatId),
-  index('conversations_updated_at_idx').on(table.updatedAt)
+  index('conversations_updated_at_idx').on(table.updatedAt),
+  index('conversations_participants_gin_idx').using('gin', table.participantIds),
 ]);
 
 export const groupMembers = pgTable('group_members', {
@@ -1932,6 +1939,9 @@ export const groupMembers = pgTable('group_members', {
   groupId: text('group_id').notNull().references(() => groups.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   role: groupRoleEnum('role').default('MEMBER'),
+
+  // Permissions individuelles (overrides) — Lot C
+  permissions: jsonb('permissions').default({}),
 
   joinedAt: timestamp('joined_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

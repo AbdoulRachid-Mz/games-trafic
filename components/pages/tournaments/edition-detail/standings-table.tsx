@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { exportData, createExportData, type ExportFormat } from "@/utils/export-utils";
+import { DEFAULT_ADVANCE_COUNT } from "@/lib/tournaments/config";
 
 // ============================================================================
 // TYPES
@@ -47,10 +48,27 @@ export interface StandingRow {
   participantImage?: string;
 }
 
+export interface StandingsDayStatus {
+  groupId: string;
+  groupName: string;
+  isCompleted: boolean;
+}
+
 export interface StandingGroup {
   groupId: string;
   groupName: string;
   rows: StandingRow[];
+  /** Groupe virtuel « Classement » d'une phase « groupes = journées » (RR refondu). */
+  aggregated?: boolean;
+  /** État jour par jour, uniquement quand aggregated === true. */
+  dayGroups?: StandingsDayStatus[];
+  /**
+   * Nombre de places qualificatives de la phase (résolu serveur via
+   * getEffectiveAdvanceCount — jamais un top-2 codé en dur côté client).
+   */
+  advanceCount?: number;
+  /** La phase est validée : les `qualified` des rows sont définitifs. */
+  phaseIsCompleted?: boolean;
 }
 
 export interface BracketStandingRow {
@@ -118,7 +136,22 @@ export function StandingsTable({
 
   const sortedGroupRows = useMemo(() => {
     if (!activeGroup) return [];
-    return [...activeGroup.rows].sort((a, b) => {
+    const rows = [...activeGroup.rows];
+    // Groupe agrégé : l'ordre du serveur (positions + départages configurés)
+    // est la vérité — un re-tri client écraserait le tie-break métier.
+    if (activeGroup.aggregated && rows.some((r) => r.position != null)) {
+      return rows.sort(
+        (a, b) =>
+          (a.position ?? Number.MAX_SAFE_INTEGER) -
+          (b.position ?? Number.MAX_SAFE_INTEGER),
+      );
+    }
+    if (rows.some((r) => r.position != null)) {
+      return rows.sort(
+        (a, b) => (a.position ?? 0) - (b.position ?? 0),
+      );
+    }
+    return rows.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.scoreDifference !== a.scoreDifference)
         return b.scoreDifference - a.scoreDifference;
@@ -126,6 +159,15 @@ export function StandingsTable({
       return 0;
     });
   }, [activeGroup]);
+
+  // Places qualificatives visibles (zone provisoire avant validation de phase).
+  const advanceCount = activeGroup?.advanceCount ?? DEFAULT_ADVANCE_COUNT;
+
+  // État des journées (groupe agrégé RR) : journée terminée ≠ phase terminée.
+  const dayGroups = activeGroup?.aggregated
+    ? activeGroup.dayGroups ?? []
+    : [];
+  const completedDays = dayGroups.filter((d) => d.isCompleted).length;
 
   // ---- EDITION MODE ----
   const editionRows = useMemo<StandingRow[]>(() => {
@@ -506,6 +548,45 @@ export function StandingsTable({
         </div>
       </div>
 
+      {/* Bandeau d'état des journées (phase « groupes = journées ») */}
+      {activeGroup.aggregated && dayGroups.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] md:text-xs text-muted-foreground font-medium">
+            {completedDays}/{dayGroups.length} journées terminées
+          </span>
+          <span className="hidden sm:inline text-muted-foreground/60 text-[10px]">·</span>
+          <div className="flex flex-wrap gap-1">
+            {dayGroups.map((day) => (
+              <Badge
+                key={day.groupId}
+                variant="outline"
+                className={cn(
+                  "text-[9px] md:text-[10px] font-medium rounded-full gap-1",
+                  day.isCompleted
+                    ? "border-green-500/30 text-green-600 bg-green-500/[0.04]"
+                    : "border-border text-muted-foreground",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    day.isCompleted ? "bg-green-500" : "bg-muted-foreground/40",
+                  )}
+                />
+                {day.groupName}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeGroup.aggregated && !activeGroup.phaseIsCompleted && (
+        <p className="text-[10px] md:text-xs text-muted-foreground">
+          Classement provisoire — top {advanceCount} qualifié(s) à la validation
+          de la phase.
+        </p>
+      )}
+
       {/* Tableau */}
       <Card className="overflow-hidden border-border/50 shadow-2xl relative">
         <div className="absolute top-0 right-0 p-6 md:p-12 opacity-5 pointer-events-none hidden sm:block">
@@ -585,6 +666,14 @@ export function StandingsTable({
                                 Qualifié
                               </span>
                             )}
+                            {!row.qualified &&
+                              activeGroup.aggregated &&
+                              !activeGroup.phaseIsCompleted &&
+                              (row.position ?? idx + 1) <= advanceCount && (
+                                <span className="text-[7px] md:text-[9px] bg-primary/10 text-primary px-1 md:px-1.5 py-0.5 rounded font-black uppercase tracking-wider border border-primary/20">
+                                  Zone Q
+                                </span>
+                              )}
                             {row.eliminated && (
                               <span className="text-[7px] md:text-[9px] bg-red-500/10 text-red-500 px-1 md:px-1.5 py-0.5 rounded font-black uppercase tracking-wider border border-red-500/20">
                                 Éliminé

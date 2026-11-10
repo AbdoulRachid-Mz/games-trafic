@@ -31,7 +31,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { bulkCreateBracketNodes, deleteBracketNode, generateMatchesAction, getStructurePreviewAction } from "@/actions/phases";
+import { bulkCreateBracketNodes, deleteBracketNode, generateMatchesAction, getStructurePreviewAction, drawGroupMatchesAction, type DrawNodesResult } from "@/actions/phases";
+import { buildLeagueCalendar } from "@/lib/tournaments/match.generator";
+import { DrawRevealDialog } from "./draw-reveal-dialog";
+import { Dices } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -84,6 +87,9 @@ type DraftNode = {
     matchFormat: MatchFormat;
     roundsCount?: number;
     participantsPerNode?: number;
+    /** Round Robin refondu : journée et index de confrontation d'origine. */
+    dayNumber?: number;
+    fixtureIndex?: number;
   };
 };
 
@@ -105,6 +111,14 @@ export function GroupNodesOrganizeClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isAutoMode = editionConfig.competitionMode === "AUTO";
+  const manualMode = !isAutoMode;
+  // Un groupe-journée (RR refondu) bénéficie du tirage serveur des
+  // confrontations : 1 node = 1 confrontation, persisté côté serveur.
+  const isMatchday = groupConfig?.isMatchday === true;
+  const [isDrawingMatchday, setIsDrawingMatchday] = useState(false);
+  const [isForceConfirmOpen, setIsForceConfirmOpen] = useState(false);
+  const [drawResult, setDrawResult] = useState<DrawNodesResult | null>(null);
+  const [isRevealOpen, setIsRevealOpen] = useState(false);
   const [draftNodes, setDraftNodes] = useState<DraftNode[]>([]);
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"draft" | "existing">("draft");
@@ -187,24 +201,42 @@ export function GroupNodesOrganizeClient({
     const newDrafts: DraftNode[] = [];
     
     if (nodeType === "ROUND_ROBIN") {
-      // Créer un nœud par journée
-      const rounds = participantIds.length - 1;
-      for (let r = 1; r <= rounds; r++) {
-        newDrafts.push({
-          id: generateTempId(),
-          nodeCode: `J${r}`,
-          round: r,
-          matchNumber: r,
-          bracketType: "UPPER",
-          order: r,
-          participants: [],
-          nodeType: "ROUND_ROBIN",
-          config: {
-            generateMatches,
-            matchesCount: Math.floor(participantIds.length / 2),
-            matchFormat,
-          },
-        });
+      // 🆕 Refonte RR : 1 nœud = 1 confrontation (2 participants).
+      // Circle Method sur un ordre mélangé (tirage Fisher-Yates local) ;
+      // les journées au-dessus de la structure "allers-retours" sont numérotées
+      // en continu et le retour inverse les confrontations.
+      // Groupe = UNE journée : si le groupe est une journée (modèle refondu),
+      // on scope le calendrier aux confrontations de CETTE journée au lieu de
+      // reconstruire le championnat entier dans un seul groupe.
+      const matchdayNumber =
+        groupConfig?.isMatchday === true
+          ? Number(groupConfig.dayNumber) || null
+          : null;
+      const calendar = buildLeagueCalendar(shuffled, { isHomeAway: groupConfig?.isHomeAway === true });
+      const days = matchdayNumber
+        ? calendar.filter((d) => d.day === matchdayNumber)
+        : calendar;
+      for (const day of days) {
+        for (const f of day.fixtures) {
+          if (!f.p1 || !f.p2) continue;
+          newDrafts.push({
+            id: generateTempId(),
+            nodeCode: `J${day.day}-C${f.fixture}`,
+            round: day.day,
+            matchNumber: f.fixture,
+            bracketType: "UPPER",
+            order: day.day * 100 + f.fixture,
+            participants: [f.p1, f.p2],
+            nodeType: "ROUND_ROBIN",
+            config: {
+              generateMatches,
+              matchesCount: 1,
+              matchFormat,
+              dayNumber: day.day,
+              fixtureIndex: f.fixture,
+            },
+          });
+        }
       }
     } 
     else if (nodeType === "ELIMINATION") {
@@ -279,10 +311,11 @@ export function GroupNodesOrganizeClient({
         const p2 = shuffled[idx * 2 + 1] || "";
         return { ...node, participants: [p1, p2].filter(Boolean) };
       } else {
-        // Distribution cyclique pour round robin / swiss
-        const nodeCount = prev.length;
-        const participantsForNode = shuffled.filter((_, i) => i % nodeCount === idx);
-        return { ...node, participants: participantsForNode };
+        // 🆕 RR (1 nœud = 1 confrontation à 2) : distribution par paires comme
+        // l'élimination — plus de distribution cyclique multi-participants.
+        const p1 = shuffled[idx * 2] || "";
+        const p2 = shuffled[idx * 2 + 1] || "";
+        return { ...node, participants: [p1, p2].filter(Boolean) };
       }
     }));
     
@@ -356,7 +389,13 @@ export function GroupNodesOrganizeClient({
           nodeType: "MATCH",
           metadata: {
             participants: n.participants,
-            name: n.nodeCode,
+            name: n.nodeType === "ROUND_ROBIN" && n.config.dayNumber
+              ? `Journée ${n.config.dayNumber} — Confrontation ${n.config.fixtureIndex ?? n.matchNumber}`
+              : n.nodeCode,
+            // Le calendrier persisté doit rester reconstructible : on ne
+            // perd jamais jour/confrontation (qualification & suffixes).
+            dayNumber: n.config.dayNumber,
+            fixtureIndex: n.config.fixtureIndex,
             generateMatches: n.config.generateMatches,
             matchesCount: n.config.matchesCount,
             format: n.config.matchFormat,
@@ -402,21 +441,33 @@ export function GroupNodesOrganizeClient({
     }
   };
 
-  const isParticipantAssigned = (registrationId: string) => {
-    return draftNodes.some(n => n.participants.includes(registrationId));
+  // ============ TIRAGE SERVEUR DES CONFRONTATIONS (groupe-journée) ============
+  const handleServeDraw = async (force = false) => {
+    setIsDrawingMatchday(true);
+    try {
+      const result = await drawGroupMatchesAction(groupId, { force } as any);
+      setDrawResult(result);
+      setIsRevealOpen(true);
+      setIsForceConfirmOpen(false);
+    } catch (error: any) {
+      const message = error?.message || "Erreur lors du tirage";
+      if (/existe déjà/i.test(message)) {
+        setIsForceConfirmOpen(true);
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsDrawingMatchday(false);
+    }
   };
 
-  const getRoundLabel = (round: number, totalRounds: number, nodeType: NodeType): string => {
-    if (nodeType === "ELIMINATION") {
-      const distanceToFinal = totalRounds - round;
-      if (distanceToFinal === 0) return "Finale";
-      if (distanceToFinal === 1) return "Demi-finale";
-      if (distanceToFinal === 2) return "Quart de finale";
-      if (distanceToFinal === 3) return "Huitième de finale";
-      return `${Math.pow(2, distanceToFinal + 1)}ème de finale`;
-    }
-    if (nodeType === "SWISS") return `Round ${round}`;
-    return `Journée ${round}`;
+  const handleRedrawMatchday = async () => {
+    // Nouveau tirage = réorganisation explicite ; le serveur requiert force.
+    await handleServeDraw(true);
+  };
+
+  const isParticipantAssigned = (registrationId: string) => {
+    return draftNodes.some(n => n.participants.includes(registrationId));
   };
 
   return (
@@ -449,6 +500,11 @@ export function GroupNodesOrganizeClient({
             {phaseConfig?.nodesType && !groupConfig?.nodesType && <Badge variant="secondary">Phase: {phaseConfig.nodesType}</Badge>}
             {groupConfig?.matchFormat && <Badge variant="secondary">Format: {groupConfig.matchFormat}</Badge>}
             {groupConfig?.roundsCount && <Badge variant="secondary">{groupConfig.roundsCount} rounds</Badge>}
+            {groupConfig?.isMatchday === true && (
+              <Badge variant="outline" className="border-primary/40 text-primary">
+                Groupe = Journée {groupConfig.dayNumber ?? "?"} — nœuds limités aux confrontations de cette journée
+              </Badge>
+            )}
           </div>
         </div>
       )}
@@ -497,7 +553,7 @@ export function GroupNodesOrganizeClient({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ROUND_ROBIN">Round Robin (Journées)</SelectItem>
+                        <SelectItem value="ROUND_ROBIN">Round Robin (Confrontations)</SelectItem>
                         <SelectItem value="ELIMINATION">Élimination directe</SelectItem>
                         <SelectItem value="SWISS">Système Suisse</SelectItem>
                       </SelectContent>
@@ -556,6 +612,16 @@ export function GroupNodesOrganizeClient({
               )}
             </CardContent>
             <CardFooter className="pt-4 border-t bg-muted/30 flex flex-col gap-2">
+              {isMatchday && manualMode && (
+                <Button
+                  className="w-full gap-2 font-bold"
+                  onClick={() => handleServeDraw()}
+                  disabled={isPending || isDrawingMatchday || groupParticipants.length === 0}
+                >
+                  {isDrawingMatchday ? <Loader2 className="h-4 w-4 animate-spin" /> : <Dices className="h-4 w-4" />}
+                  Tirage des confrontations (serveur)
+                </Button>
+              )}
               {isAutoMode ? (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -725,12 +791,18 @@ export function GroupNodesOrganizeClient({
                                   {node.nodeCode || node.id.slice(0, 4)}
                                 </div>
                                 <div>
-                                  <div className="font-bold text-sm">{node.nodeCode || "Nœud"}</div>
+                                  <div className="font-bold text-sm">
+                                    {(node.metadata as any)?.name || node.nodeCode || "Nœud"}
+                                  </div>
                                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                    <span>Round {node.round || 1}</span>
+                                    <span>
+                                      {(node.metadata as any)?.dayNumber
+                                        ? `Journée ${(node.metadata as any).dayNumber}`
+                                        : `Round ${node.round || 1}`}
+                                    </span>
                                     <span>•</span>
                                     <span>{nodeParticipants.length} participants</span>
-                                    {metadata?.format && <Badge variant="outline" className="text-[8px]">{metadata.format}</Badge>}
+                                    {(node.metadata as any)?.format && <Badge variant="outline" className="text-[8px]">{(node.metadata as any).format}</Badge>}
                                   </div>
                                 </div>
                               </div>
@@ -817,6 +889,49 @@ export function GroupNodesOrganizeClient({
           )}
         </div>
       </div>
+
+      {/* Révélation du tirage des confrontations (résultat déjà persisté) */}
+      <DrawRevealDialog
+        open={isRevealOpen && !!drawResult}
+        onOpenChange={(next) => {
+          setIsRevealOpen(next);
+          if (!next) {
+            setDrawResult(null);
+            router.refresh();
+          }
+        }}
+        kind="nodes"
+        title={`Tirage des confrontations — ${groupConfig?.name || "Journée"}`}
+        description="Les confrontations sont générées et enregistrées côté serveur. L'ordre ci-dessous est l'ordre du tirage réel."
+        names={drawResult?.names || {}}
+        nodes={drawResult?.nodes || []}
+        byeParticipants={drawResult?.byeMembers || []}
+        onRedraw={handleRedrawMatchday}
+        isRedrawing={isDrawingMatchday}
+      />
+
+      {/* Remplacement explicite d'un tirage déjà acté */}
+      <AlertDialog
+        open={isForceConfirmOpen}
+        onOpenChange={setIsForceConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Refaire le tirage ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Les confrontations actuelles de cette journée seront remplacées
+              (matchs et nœuds supprimés puis re-tirés). Cette opération est
+              explicite et ne pourra pas être annulée depuis ce dialog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleServeDraw(true)}>
+              Refaire le tirage
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -849,7 +964,10 @@ function NodeDraftCard({
       return `${Math.pow(2, distanceToFinal + 1)}ème`;
     }
     if (nodeType === "SWISS") return `Round ${node.round}`;
-    return `Journée ${node.round}`;
+    // 🆕 RR : le nœud est une confrontation, pas une journée entière.
+    return node.config?.dayNumber
+      ? `Journée ${node.config.dayNumber} — Confrontation ${node.config.fixtureIndex ?? node.matchNumber}`
+      : `Confrontation ${index + 1}`;
   };
 
   return (

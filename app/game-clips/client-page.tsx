@@ -55,7 +55,7 @@ function ClientGameClipsContentInner() {
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-[#0a0a0b] overflow-hidden max-h-screen">
+    <div className="fixed inset-0 bg-[#0a0a0b] overflow-hidden max-h-[100dvh]">
       <GameClipReel
         clips={clips}
         initialClipId={initialClipId}

@@ -72,7 +72,7 @@ export function TransactionStepper({
 
               <span
                 className={cn(
-                  "absolute -bottom-8 text-xs font-bold tracking-tight bg-background/80 backdrop-blur px-2 py-0.5 rounded-md transition-all duration-300 pointer-events-none",
+                  "absolute -bottom-8 text-xs font-bold tracking-tight bg-background px-2 py-0.5 rounded-md border border-border/40 transition-all duration-300 pointer-events-none",
                   isCurrent
                     ? "opacity-100 translate-y-0 text-foreground"
                     : "opacity-0 -translate-y-2 text-muted-foreground",

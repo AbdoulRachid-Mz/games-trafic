@@ -32,6 +32,7 @@ import {
   isNotNull,
   gte,
   lte,
+  lt,
   between,
 } from "drizzle-orm";
 import {
@@ -41,6 +42,7 @@ import {
   type QueryOptions,
 } from "@/types/api";
 import { db } from "@/lib/db";
+import { hasGroupPermission } from "@/actions/groups";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -144,66 +146,102 @@ export async function getConversationsForUser(
       lastMessage: conv.lastMessageId ? lastMessagesMap.get(conv.lastMessageId) : null,
     }));
 
-    // 2. Enrichir chaque conversation avec les données de l'entité cible
-    const enrichedConversations = await Promise.all(
-      userConversations.map(async (conv) => {
-        let entityType = conv.entityType.toLowerCase() as any;
-        let entityId = conv.entityId;
-        let entityData: any = null;
+    // 2. Enrichir chaque conversation avec les données de l'entité cible —
+    //    EN BATCH (pas de N+1 : un findFirst par conversation). On collecte
+    //    les identifiants uniques par type, on fetch en 4 requêtes parallèles,
+    //    puis on mappe en mémoire.
+    // --- Collecte des ids uniques par type ---
+    const userIds = new Set<string>();
+    const groupIds = new Set<string>();
+    const shopIds = new Set<string>();
+    const tournamentIds = new Set<string>();
 
-        // Pour un DM, l'entité cible est l'AUTRE participant
-        if (conv.entityType === "USER") {
-          const otherParticipantId = conv.participantIds.find((id) => id !== userId);
-          if (otherParticipantId) {
-            entityId = otherParticipantId;
-            entityData = await db.query.users.findFirst({
-              where: (u, { eq }) => eq(u.id, otherParticipantId),
-              columns: {
-                id: true,
-                username: true,
-                fullName: true,
-                profileImage: true,
-              },
-            });
-          }
-        } else if (conv.entityType === "GROUP") {
-          entityData = await db.query.groups.findFirst({
-            where: (g, { eq }) => eq(g.id, conv.entityId),
-          });
-        } else if (conv.entityType === "SHOP") {
-          entityData = await db.query.shops.findFirst({
-            where: (s, { eq }) => eq(s.id, conv.entityId),
-          });
-        } else if (conv.entityType === "TOURNAMENT") {
-          entityData = await db.query.tournaments.findFirst({
-            where: (t, { eq }) => eq(t.id, conv.entityId),
-          });
+    // Pour un DM, l'entité cible est l'AUTRE participant — on calcule d'abord
+    // l'id cible de chaque conversation USER.
+    const userTargetByConv = new Map<string, string | null>();
+    for (const conv of userConversations) {
+      if (conv.entityType === "USER") {
+        const other = conv.participantIds.find((id) => id !== userId) || null;
+        userTargetByConv.set(conv.id, other);
+        if (other) userIds.add(other);
+      } else if (conv.entityType === "GROUP") {
+        groupIds.add(conv.entityId);
+      } else if (conv.entityType === "SHOP") {
+        shopIds.add(conv.entityId);
+      } else if (conv.entityType === "TOURNAMENT") {
+        tournamentIds.add(conv.entityId);
+      }
+    }
+
+    // --- 4 fetchs parallèles, groupés par type ---
+    const [usersData, groupsData, shopsData, tournamentsData] = await Promise.all([
+      userIds.size > 0
+        ? db.query.users.findMany({
+            where: (u, { inArray }) => inArray(u.id, Array.from(userIds)),
+            columns: { id: true, username: true, fullName: true, profileImage: true },
+          })
+        : Promise.resolve([]),
+      groupIds.size > 0
+        ? db.query.groups.findMany({
+            where: (g, { inArray }) => inArray(g.id, Array.from(groupIds)),
+          })
+        : Promise.resolve([]),
+      shopIds.size > 0
+        ? db.query.shops.findMany({
+            where: (s, { inArray }) => inArray(s.id, Array.from(shopIds)),
+          })
+        : Promise.resolve([]),
+      tournamentIds.size > 0
+        ? db.query.tournaments.findMany({
+            where: (t, { inArray }) => inArray(t.id, Array.from(tournamentIds)),
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const usersMap = new Map(usersData.map((u: any) => [u.id, u]));
+    const groupsMap = new Map(groupsData.map((g: any) => [g.id, g]));
+    const shopsMap = new Map(shopsData.map((s: any) => [s.id, s]));
+    const tournamentsMap = new Map(tournamentsData.map((t: any) => [t.id, t]));
+
+    // --- Mapping synchrone (plus d'await par conversation) ---
+    const enrichedConversations = userConversations.map((conv) => {
+      let entityType = conv.entityType.toLowerCase() as any;
+      let entityId = conv.entityId;
+      let entityData: any = null;
+
+      if (conv.entityType === "USER") {
+        const other = userTargetByConv.get(conv.id);
+        if (other) {
+          entityId = other;
+          entityData = usersMap.get(other) || null;
         }
+      } else if (conv.entityType === "GROUP") {
+        entityData = groupsMap.get(conv.entityId) || null;
+      } else if (conv.entityType === "SHOP") {
+        entityData = shopsMap.get(conv.entityId) || null;
+      } else if (conv.entityType === "TOURNAMENT") {
+        entityData = tournamentsMap.get(conv.entityId) || null;
+      }
 
-        // Si l'entité n'est plus trouvée, on utilise des placeholders
-        if (!entityData) {
-          entityData = { id: entityId, name: "Deleted Entity", fullName: "Deleted User" };
-        }
+      if (!entityData) {
+        entityData = { id: entityId, name: "Deleted Entity", fullName: "Deleted User" };
+      }
 
-        return {
-          id: conv.id,
-          chatId: `${entityType}:${entityId}` as any,
-          entityType: entityType,
-          entityId: entityId,
-          entity: {
-            type: entityType,
-            data: entityData,
-          },
-          lastMessage: conv.lastMessage as any,
-          lastMessageTime: conv.updatedAt ? conv.updatedAt.toISOString() : null,
-          unreadCount: conv.unreadCount || 0,
-          isPinned: conv.isPinned || false,
-          isMuted: conv.isMuted || false,
-          isArchived: conv.isArchived || false,
-          metadata: conv.metadata || {},
-        } as Conversation;
-      }),
-    );
+      return {
+        id: conv.id,
+        chatId: `${entityType}:${entityId}` as any,
+        entityType: entityType,
+        entityId: entityId,
+        entity: { type: entityType, data: entityData },
+        lastMessage: conv.lastMessage as any,
+        lastMessageTime: conv.updatedAt ? conv.updatedAt.toISOString() : null,
+        unreadCount: conv.unreadCount || 0,
+        isPinned: conv.isPinned || false,
+        isMuted: conv.isMuted || false,
+        isArchived: conv.isArchived || false,
+        metadata: conv.metadata || {},
+      } as Conversation;
+    });
 
     return enrichedConversations;
   } catch (error) {
@@ -366,13 +404,13 @@ export async function getMessages(
 export async function getConversation(
   userId1: string,
   userId2: string,
-  pagination?: { page: number; limit: number },
+  pagination?: { page?: number; limit?: number; cursor?: string | null },
 ): Promise<PaginationResponse<Message>> {
   try {
-    const { page = 1, limit = 50 } = pagination || {};
-    const offset = (page - 1) * limit;
+    const { page = 1, limit = 50, cursor = null } = pagination || {};
+    const useCursor = !!cursor;
 
-    const whereConditions = and(
+    const baseWhere = and(
       eq(messages.isDeleted, false),
       or(
         and(eq(messages.senderId, userId1), eq(messages.recipientId, userId2)),
@@ -380,30 +418,52 @@ export async function getConversation(
       ),
     );
 
+    const whereConditions = useCursor
+      ? and(baseWhere, lt(messages.createdAt, new Date(cursor as string)))
+      : baseWhere;
+
+    const fetchLimit = useCursor ? limit + 1 : limit;
+    const offset = useCursor ? 0 : (page - 1) * limit;
+
     const [messagesData, totalResult] = await Promise.all([
       db
         .select()
         .from(messages)
         .where(whereConditions)
         .orderBy(desc(messages.createdAt))
-        .limit(limit)
+        .limit(fetchLimit)
         .offset(offset),
-      db.select({ count: count() }).from(messages).where(whereConditions),
+      useCursor
+        ? Promise.resolve([{ count: 0 }])
+        : db.select({ count: count() }).from(messages).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
-    const totalPages = Math.ceil(total / limit);
+    const hasMore = useCursor
+      ? messagesData.length > limit
+      : page < Math.ceil(total / limit);
+
+    const trimmed = useCursor ? messagesData.slice(0, limit) : messagesData;
+    const nextCursor =
+      useCursor && trimmed.length > 0
+        ? (trimmed[trimmed.length - 1] as any).createdAt instanceof Date
+          ? (trimmed[trimmed.length - 1] as any).createdAt.toISOString()
+          : String((trimmed[trimmed.length - 1] as any).createdAt)
+        : null;
+
+    const totalPages = useCursor ? 1 : Math.ceil(total / limit);
 
     return {
-      data: messagesData,
+      data: trimmed,
       pagination: {
-        page,
+        page: useCursor ? 1 : page,
         limit,
-        total,
+        total: useCursor ? trimmed.length : total,
         totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
-      },
+        hasNext: hasMore,
+        hasPrev: useCursor ? false : page > 1,
+        nextCursor,
+      } as any,
     };
   } catch (error) {
     console.error("Error getting conversation:", error);
@@ -416,16 +476,19 @@ export async function getConversation(
  */
 export async function getGroupMessages(
   groupId: string,
-  pagination?: { page: number; limit: number },
+  pagination?: { page?: number; limit?: number; cursor?: string | null },
 ): Promise<PaginationResponse<Message>> {
   try {
-    const { page = 1, limit = 50 } = pagination || {};
-    const offset = (page - 1) * limit;
+    const { page = 1, limit = 50, cursor = null } = pagination || {};
+    const useCursor = !!cursor;
 
-    const whereConditions = and(
-      eq(messages.groupId, groupId),
-      eq(messages.isDeleted, false),
-    );
+    const baseWhere = and(eq(messages.groupId, groupId), eq(messages.isDeleted, false));
+    const whereConditions = useCursor
+      ? and(baseWhere, lt(messages.createdAt, new Date(cursor as string)))
+      : baseWhere;
+
+    const fetchLimit = useCursor ? limit + 1 : limit;
+    const offset = useCursor ? 0 : (page - 1) * limit;
 
     const [messagesData, totalResult] = await Promise.all([
       db
@@ -433,24 +496,39 @@ export async function getGroupMessages(
         .from(messages)
         .where(whereConditions)
         .orderBy(desc(messages.createdAt))
-        .limit(limit)
+        .limit(fetchLimit)
         .offset(offset),
-      db.select({ count: count() }).from(messages).where(whereConditions),
+      useCursor
+        ? Promise.resolve([{ count: 0 }])
+        : db.select({ count: count() }).from(messages).where(whereConditions),
     ]);
 
     const total = totalResult[0]?.count || 0;
-    const totalPages = Math.ceil(total / limit);
+    const hasMore = useCursor
+      ? messagesData.length > limit
+      : page < Math.ceil(total / limit);
+
+    const trimmed = useCursor ? messagesData.slice(0, limit) : messagesData;
+    const nextCursor =
+      useCursor && trimmed.length > 0
+        ? (trimmed[trimmed.length - 1] as any).createdAt instanceof Date
+          ? (trimmed[trimmed.length - 1] as any).createdAt.toISOString()
+          : String((trimmed[trimmed.length - 1] as any).createdAt)
+        : null;
+
+    const totalPages = useCursor ? 1 : Math.ceil(total / limit);
 
     return {
-      data: messagesData,
+      data: trimmed,
       pagination: {
-        page,
+        page: useCursor ? 1 : page,
         limit,
-        total,
+        total: useCursor ? trimmed.length : total,
         totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
-      },
+        hasNext: hasMore,
+        hasPrev: useCursor ? false : page > 1,
+        nextCursor,
+      } as any,
     };
   } catch (error) {
     console.error("Error getting group messages:", error);
@@ -613,6 +691,29 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
       if (!isMember && !isAdmin(currentUser)) {
         throw new Error("Accès refusé: Vous n'êtes pas membre de ce groupe");
       }
+
+      // Lot C : permissions configurables (lecture seule, envoi, média)
+      const canSend = await hasGroupPermission(
+        currentUser.id,
+        messageData.groupId!,
+        "canSend",
+      );
+      if (!canSend) {
+        throw new Error("Ce groupe est en lecture seule ou vous n'avez pas le droit d'envoyer des messages");
+      }
+      const hasMedia =
+        (messageData.images && messageData.images.length > 0) ||
+        !!messageData.audioUrl;
+      if (hasMedia) {
+        const canMedia = await hasGroupPermission(
+          currentUser.id,
+          messageData.groupId!,
+          "canSendMedia",
+        );
+        if (!canMedia) {
+          throw new Error("Vous n'êtes pas autorisé à envoyer des médias dans ce groupe");
+        }
+      }
     }
 
     // A2-02: Empêcher de s'envoyer un message privé à soi-même
@@ -624,6 +725,21 @@ export async function createMessage(messageData: NewMessage): Promise<Message> {
 
     // senderId is always the authenticated user — strip any client-provided value
     const { senderId: _ignoredSenderId, ...restMessageData } = messageData;
+
+    // --- Idempotency (anti-doublon au retry) ---
+    // Le client peut fournir un identifiant unique de message (metadata.
+    // clientMessageId). S'il existe déjà un message persistant pour ce même
+    // expéditeur avec le même identifiant, on renvoie l'existant au lieu de
+    // créer un doublon. Aucune migration requise (stocké en jsonb metadata).
+    const clientMessageId = (messageData as any)?.id;
+    if (clientMessageId) {
+      const existing = await db.query.messages.findFirst({
+        where: eq(messages.id, clientMessageId),
+      });
+      if (existing) {
+        return existing;
+      }
+    }
     
     // Auto-populate specific ID columns based on entityType/entityId
     const finalData = { ...restMessageData, senderId: currentUser.id };
@@ -922,6 +1038,42 @@ export async function markConversationAsRead(
 /**
  * Crée une réponse à un message
  */
+/**
+ * Participants ayant déjà discuté sur une entité (Lot C).
+ * Renvoie les utilisateurs uniques ayant envoyé au moins un message,
+ * avec leur profil minimal. Pas de création de conversation privée auto.
+ */
+export async function getEntityDiscussionParticipants(
+  entityType: string,
+  entityId: string,
+): Promise<{ id: string; username: string | null; fullName: string | null; profileImage: string | null }[]> {
+  try {
+    const rows = await db
+      .select({ senderId: messages.senderId })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.entityType, entityType.toUpperCase() as any),
+          eq(messages.entityId, entityId),
+          eq(messages.isDeleted, false),
+        ),
+      )
+      .groupBy(messages.senderId);
+
+    const ids = rows.map((r) => r.senderId).filter(Boolean) as string[];
+    if (ids.length === 0) return [];
+
+    const users = await db.query.users.findMany({
+      where: (u, { inArray }) => inArray(u.id, ids),
+      columns: { id: true, username: true, fullName: true, profileImage: true },
+    });
+    return users;
+  } catch (error) {
+    console.error('Error getting entity discussion participants:', error);
+    return [];
+  }
+}
+
 export async function replyToMessage(
   parentMessageId: string,
   replyData: Omit<NewMessage, "parentMessageId">,

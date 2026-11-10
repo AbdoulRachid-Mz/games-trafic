@@ -30,8 +30,8 @@ import { CalendarCogIcon } from "@/components/icons/calendar-cog";
 import { ArrowRightIcon } from "@/components/icons/arrow-right";
 import { EditionDashboardActions } from "@/components/pages/tournaments/edition-detail/edition-dashboard-actions";
 import { db } from "@/lib/db";
-import { bracketNodes, phaseGroupParticipants, phaseGroups } from "@/database/schema";
-import { eq, and, desc, isNull, asc } from "drizzle-orm";
+import { bracketNodes, editionRegistrations, phaseGroupParticipants, phaseGroups } from "@/database/schema";
+import { eq, and, desc, isNull, asc, inArray } from "drizzle-orm";
 
 interface PageProps {
   params: Promise<{
@@ -129,20 +129,59 @@ export default async function DashboardOverviewPage({ params }: PageProps) {
         potentialWinnerName = finalNode.winnerRegistration?.member?.displayName || "Gagnant Finale";
       }
     } else if (lastPhase.phaseType === "ROUND_ROBIN" || lastPhase.phaseType === "GROUP_STAGE") {
-      // Trouver le premier du classement du dernier groupe
-      const lastGroup = await db.query.phaseGroups.findFirst({
-        where: eq(phaseGroups.id, lastPhase.id), // Si une seule ligue
-        orderBy: [desc(phaseGroups.order)]
-      });
-      if (lastGroup) {
-        const topParticipant = await db.query.phaseGroupParticipants.findFirst({
-          where: eq(phaseGroupParticipants.groupId, lastGroup.id),
-          orderBy: [asc(phaseGroupParticipants.position)],
-          with: { registration: { with: { member: true } } }
+      // FIX Phase 1 (PROMPT.md) : le groupe était cherché via
+      // eq(phaseGroups.id, lastPhase.id) — un ID de PHASE dans une colonne
+      // d'ID de groupe (toujours null). On interroge les groupes RÉELS
+      // de la phase :
+      // - phase.config.qualifiers (RR refondu : groupes = journées) ;
+      // - sinon leader du groupe « Classement » unique (éditions héritées).
+      const lastPhaseConfig = (lastPhase.config as any) || {};
+      const qualifiers = Array.isArray(lastPhaseConfig.qualifiers)
+        ? lastPhaseConfig.qualifiers
+        : [];
+
+      if (qualifiers.length > 0) {
+        const topQualifier = qualifiers[0];
+        const topRegistrationId =
+          typeof topQualifier === "string"
+            ? topQualifier
+            : topQualifier?.registrationId;
+        if (topRegistrationId) {
+          const winnerRegistration = await db.query.editionRegistrations.findFirst({
+            where: eq(editionRegistrations.id, topRegistrationId),
+            with: { member: true },
+          });
+          if (winnerRegistration) {
+            potentialWinnerId = winnerRegistration.id;
+            potentialWinnerName =
+              winnerRegistration.member?.displayName || "1er du championnat";
+          }
+        }
+      } else {
+        const lastGroups = await db.query.phaseGroups.findMany({
+          where: and(
+            eq(phaseGroups.phaseId, lastPhase.id),
+            eq(phaseGroups.isDeleted, false),
+          ),
+          orderBy: [asc(phaseGroups.order)],
         });
-        if (topParticipant) {
-          potentialWinnerId = topParticipant.registrationId;
-          potentialWinnerName = topParticipant.registration?.member?.displayName || "Leader Classement";
+        if (lastGroups.length > 0) {
+          const topParticipant = await db.query.phaseGroupParticipants.findFirst({
+            where: and(
+              inArray(
+                phaseGroupParticipants.groupId,
+                lastGroups.map((g) => g.id),
+              ),
+              eq(phaseGroupParticipants.qualified, true),
+            ),
+            orderBy: [asc(phaseGroupParticipants.position)],
+            with: { registration: { with: { member: true } } },
+          });
+          if (topParticipant) {
+            potentialWinnerId = topParticipant.registrationId;
+            potentialWinnerName =
+              topParticipant.registration?.member?.displayName || "Leader Classement";
+          }
         }
       }
     }

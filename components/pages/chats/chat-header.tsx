@@ -121,10 +121,10 @@ export function ChatHeader({
         {/* Call button (for users only) */}
         {!isGroup && (
           <>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-10 w-10">
               <Phone className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-10 w-10">
               <Video className="h-5 w-5" />
             </Button>
           </>
@@ -134,7 +134,7 @@ export function ChatHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-10 w-10"
           onClick={onViewDetails}
         >
           <Info className="h-5 w-5" />
@@ -143,7 +143,7 @@ export function ChatHeader({
         {/* More options */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-10 w-10">
               <MoreVertical className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>

@@ -17,6 +17,7 @@ import {
   Settings2 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isMatchdayGroup } from "@/lib/tournaments/config";
 import { BaseCardProps, CardActionMenu, extraActionsProps } from "./card-action-menu";
 import { useRouter } from "next/navigation";
 
@@ -48,6 +49,10 @@ export function GroupCard({
 
   const detailUrl = `/tournaments/${tournamentId}/editions/${editionId}/dashboard/groups/${group.id}`;
   const participantCount = group.participantCount || group.participants?.length || 0;
+
+  // RR refondu : ce « groupe » est en réalité une journée du championnat.
+  const isMatchday = isMatchdayGroup((group.config as any) || null);
+  const matchdayNumber = isMatchday ? ((group.config as any)?.dayNumber ?? null) : null;
 
   const handleView = () => {
     if (onView) onView(group);
@@ -94,7 +99,14 @@ export function GroupCard({
               G{group.order + 1}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold leading-none truncate">{group.name}</p>
+              <div className="flex items-center gap-1 flex-wrap">
+                <p className="text-xs font-bold leading-none truncate">{group.name}</p>
+                {isMatchday && (
+                  <Badge variant="outline" className="text-[8px] px-1 py-0 border-primary/30 text-primary">
+                    J{matchdayNumber ?? group.order + 1}
+                  </Badge>
+                )}
+              </div>
               <p className="text-[10px] text-muted-foreground mt-1">{participantCount} participants</p>
             </div>
           </div>
@@ -134,6 +146,11 @@ export function GroupCard({
                 <Badge variant="outline" className="text-[9px] uppercase font-bold">
                   {group.phaseName}
                 </Badge>
+                {isMatchday && (
+                  <Badge variant="outline" className="text-[9px] font-bold border-primary/30 text-primary">
+                    Journée {matchdayNumber ?? group.order + 1}
+                  </Badge>
+                )}
                 {group.isLocked && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
                 {group.isCompleted && <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />}
               </div>
@@ -190,6 +207,11 @@ export function GroupCard({
             <Badge variant="outline" className="text-[10px] uppercase tracking-wider font-bold">
               {group.phaseName}
             </Badge>
+            {isMatchday && (
+              <Badge variant="outline" className="text-[10px] tracking-wider font-bold w-fit border-primary/30 text-primary">
+                Journée {matchdayNumber ?? group.order + 1}
+              </Badge>
+            )}
             <CardTitle className="text-lg font-bold tracking-tight truncate">
               {group.name}
             </CardTitle>

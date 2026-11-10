@@ -55,7 +55,7 @@ export function EmojiPickerWrapper({
           onEmojiClick={handleEmojiClick}
           autoFocusSearch={false}
           theme={undefined}
-          width={350}
+          width={typeof window !== "undefined" ? Math.min(350, window.innerWidth - 32) : 350}
           height={400}
           previewConfig={{ showPreview: false }}
         />

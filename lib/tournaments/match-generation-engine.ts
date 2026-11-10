@@ -127,6 +127,21 @@ async function generateGroupMatchesEngine(tx: any, groupId: string, options: Mat
   }
 
   const existingNodes = await tx.select().from(bracketNodes).where(eq(bracketNodes.groupId, groupId));
+
+  // 🆕 Journée (matchday) Round Robin refondu : 1 node = 1 confrontation
+  // déjà en place. Une régénération round-robin full créerait des doublons
+  // A-B / B-A ; on saute explicitement.
+  if (
+    (((group.config as any) || {}).isMatchday === true) &&
+    existingNodes.length > 0
+  ) {
+    return {
+      groupId,
+      skipped: true,
+      reason: "ROUND_ROBIN_MATCHDAY_NODES_EXIST",
+      matchCount: existingNodes.length,
+    };
+  }
   
   const matchValues = generatedMatches.map((m, idx) => {
     const node = existingNodes.find((n: any) => n.round === m.round) || existingNodes[0];

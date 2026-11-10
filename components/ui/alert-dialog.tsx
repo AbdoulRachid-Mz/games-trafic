@@ -46,7 +46,16 @@ function AlertDialogContent({
   size = "default",
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
-  size?: "default" | "sm"
+  /**
+   * Largeur du dialog :
+   * - sm : compact, centré (max-w-xs)
+   * - default : compact élargi (historique, sm:max-w-sm)
+   * - lg / xl / 2xl : pour les contenus riches (3/4 arguments, tableaux, listes)
+   * - full : toute la largeur disponible
+   * Les classes `sm:max-w-*` passées via `className` par l'appelant restent
+   * effectives (tailwind-merge résout les conflits de la même variante).
+   */
+  size?: "default" | "sm" | "lg" | "xl" | "2xl" | "full";
 }) {
   return (
     <AlertDialogPortal>
@@ -56,6 +65,10 @@ function AlertDialogContent({
         data-size={size}
         className={cn(
           "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 bg-background ring-foreground/10 gap-4 rounded-xl p-4 ring-1 duration-100 data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+          size === "lg" && "sm:max-w-lg",
+          size === "xl" && "sm:max-w-2xl",
+          size === "2xl" && "sm:max-w-4xl",
+          size === "full" && "max-w-[calc(100%-2rem)] sm:max-w-none",
           className
         )}
         {...props}

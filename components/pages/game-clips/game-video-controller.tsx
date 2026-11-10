@@ -53,11 +53,11 @@ export function GameVideoController({
       </AnimatePresence>
 
       {/* Bottom Controls */}
-      <div className="absolute bottom-4 right-4 flex gap-2 pointer-events-auto">
+      <div className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 flex gap-2 pointer-events-auto">
         {/* Play/Pause Button */}
         <button
           onClick={onTogglePlay}
-          className="p-2.5 rounded-full bg-black/50 backdrop-blur-md hover:bg-black/60 transition-all active:scale-95"
+          className="p-3 rounded-full bg-black/50 backdrop-blur-md hover:bg-black/60 transition-all active:scale-95"
         >
           {isPlaying ? (
             <Pause className="w-5 h-5 text-white" />
@@ -69,7 +69,7 @@ export function GameVideoController({
         {/* Mute/Unmute Button */}
         <button
           onClick={onToggleMute}
-          className="p-2.5 rounded-full bg-black/50 backdrop-blur-md hover:bg-black/60 transition-all active:scale-95"
+          className="p-3 rounded-full bg-black/50 backdrop-blur-md hover:bg-black/60 transition-all active:scale-95"
         >
           {isMuted ? (
             <VolumeX className="w-5 h-5 text-white" />

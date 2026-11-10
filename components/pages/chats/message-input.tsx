@@ -216,7 +216,7 @@ export function MessageInput({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0"
+            className="h-9 w-9 p-0"
             onClick={onCancelReply}
           >
             <X className="h-4 w-4" />
@@ -239,7 +239,7 @@ export function MessageInput({
               <Button
                 variant="destructive"
                 size="sm"
-                className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                className="absolute -top-2 -right-2 h-9 w-9 p-0 rounded-full"
                 onClick={() => handleRemoveFile(index)}
               >
                 <X className="h-3 w-3" />
@@ -266,7 +266,7 @@ export function MessageInput({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-10 w-10 flex-shrink-0 text-[var(--chat-textMuted)] hover:text-[var(--chat-primary)] hover:bg-transparent"
+            className="h-11 w-11 flex-shrink-0 text-[var(--chat-textMuted)] hover:text-[var(--chat-primary)] hover:bg-transparent"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || isUploading}
           >

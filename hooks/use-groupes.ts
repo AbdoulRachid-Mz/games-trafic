@@ -132,7 +132,7 @@ export function useCreateGroup() {
 export function useUpdateGroup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<NewGroup> }) => updateGroup(id, data),
+    mutationFn: ({ id, userId, data }: { id: string; userId: string; data: Partial<NewGroup> }) => updateGroup(id, userId, data),
     onSuccess: (updatedGroup) => {
       queryClient.invalidateQueries({ queryKey: groupKeys.detail(updatedGroup.id) });
       queryClient.invalidateQueries({ queryKey: groupKeys.lists() });
@@ -155,8 +155,8 @@ export function useDeleteGroup() {
 export function useAddGroupMember() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ groupId, userId, role }: { groupId: string; userId: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER' }) =>
-      addGroupMember(groupId, userId, role),
+    mutationFn: ({ groupId, userId, role, addedBy }: { groupId: string; userId: string; role?: 'OWNER' | 'ADMIN' | 'MEMBER'; addedBy?: string }) =>
+      addGroupMember(groupId, userId, role, addedBy),
     onSuccess: (_, { groupId, userId }) => {
       queryClient.invalidateQueries({ queryKey: groupKeys.members(groupId) });
       queryClient.invalidateQueries({ queryKey: groupKeys.membership(userId, groupId) });
@@ -168,10 +168,9 @@ export function useAddGroupMember() {
 export function useUpdateGroupMemberRole() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ memberId, role }: { memberId: string; role: 'OWNER' | 'ADMIN' | 'MEMBER' }) =>
-      updateGroupMemberRole(memberId, role),
+    mutationFn: ({ memberId, role, updatedBy }: { memberId: string; role: 'OWNER' | 'ADMIN' | 'MEMBER'; updatedBy?: string }) =>
+      updateGroupMemberRole(memberId, role, updatedBy),
     onSuccess: () => {
-      // Broad invalidation since memberId doesn't give us groupId easily
       queryClient.invalidateQueries({ queryKey: groupKeys.all });
     },
   });
@@ -180,7 +179,7 @@ export function useUpdateGroupMemberRole() {
 export function useRemoveGroupMember() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (memberId: string) => removeGroupMember(memberId),
+    mutationFn: ({ memberId, removedBy }: { memberId: string; removedBy?: string }) => removeGroupMember(memberId, removedBy),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: groupKeys.all });
     },

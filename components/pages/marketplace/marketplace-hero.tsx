@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Gamepad2, Search, Sparkles, Trophy, Swords, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,17 @@ interface MarketplaceHeroProps {
 }
 
 export function MarketplaceHero({ searchQuery, isFilterOpen, toggleFilter, onSearch }: MarketplaceHeroProps) {
+  // Brouillon de frappe local : l'URL (?q=) n'est mise à jour qu'au submit
+  // (Entrée ou bouton Rechercher) — pas à chaque frappe.
+  const [draft, setDraft] = useState(searchQuery);
+
+  useEffect(() => {
+    setDraft(searchQuery);
+  }, [searchQuery]);
+
+  const submitSearch = () => {
+    onSearch(draft);
+  };
   return (
     <div className="relative overflow-hidden bg-gradient-to-b from-primary/10 via-background to-background py-12 md:py-20">
       {/* Effets visuels gaming */}
@@ -98,13 +110,19 @@ export function MarketplaceHero({ searchQuery, isFilterOpen, toggleFilter, onSea
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Rechercher un jeu, un rang, une plateforme..."
-                    value={searchQuery}
-                    onChange={(e) => onSearch(e.target.value)}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submitSearch();
+                    }}
                     className="flex-1 border-0 bg-transparent placeholder:text-muted-foreground focus:ring-0 focus-visible:ring-0 text-lg h-10 md:h-12"
                     />
-                  <Button className="h-10 md:h-12 px-2 rounded-xl gap-3 flex items-center justify-center">
+                  <Button
+                    onClick={submitSearch}
+                    className="h-10 md:h-12 px-2 rounded-xl gap-3 flex items-center justify-center"
+                  >
                     <span className="hidden md:inline-block">Rechercher</span>
-                    <Search className="h-10 w-10 md:h-12 md:w-12 text-white" />
+                    <Search className="h-5 w-5 md:h-6 md:w-6 text-white" />
                   </Button>
                   <Button
                     onClick={toggleFilter}

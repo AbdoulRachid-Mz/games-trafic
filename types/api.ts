@@ -307,6 +307,10 @@ export interface ShopFilters extends BaseFilters {
   ownerId?: string;
   name?: string;
   country?: string;
+  /** Liste de pays (onglet « local »). */
+  countries?: string[];
+  /** id de la catégorie réelle (entity_categories, entityType SHOP). */
+  category?: string;
   verified?: boolean;
   featured?: boolean;
   isVisible?: boolean;
@@ -366,6 +370,13 @@ export interface ProductFilters extends BaseFilters {
   categoryId?: string;
   name?: string;
   game?: string;
+  /** Feature demandée (matched du marketplace) : "featured", "negotiable", "verified". */
+  features?: string[];
+  /** Codes pays de la boutique vendeuse (shops.country). */
+  countries?: string[];
+  /** Plage de niveau de compte (accountLevel, converti en entier). */
+  levelMin?: number;
+  levelMax?: number;
   platform?: (
     | "PC"
     | "PLAYSTATION"
@@ -796,7 +807,15 @@ export interface MatchFilters extends BaseFilters {
   confirmedTo?: Date | string;
   disputed?: boolean;
   resolvedBy?: string;
-  statuses?: ("PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED")[];
+  statuses?: (
+    | "PENDING"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "CANCELLED"
+    | "PENDING_REVIEW"
+    | "AWAITING_ADMIN_CONFIRMATION"
+    | "DISPUTED"
+  )[];
   createdFrom?: Date | string;
   createdTo?: Date | string;
 }
@@ -2084,4 +2103,131 @@ export interface ExportResult {
   fileSize?: number;
   recordCount: number;
   generatedAt: string;
+}
+
+// ============================================================================
+// TYPES TOURNOIS — ROUND ROBIN REFONDU (« groupes = journées »)
+// ============================================================================
+
+/**
+ * Configuration d'un groupe-journée (RR refondu) :
+ * le groupe NE qualifie PAS — la qualification est actée au classement
+ * général de la phase, à sa validation (`phase.config.qualifiers`).
+ */
+export interface MatchdayGroupConfig {
+  /** Image caractéristique du modèle refondu : le groupe est une journée. */
+  isMatchday?: true;
+  /** Numéro de la journée (1-based, continu en aller-retour). */
+  dayNumber?: number;
+  /** Nombre de confrontations de la journée (défini par le calendrier). */
+  fixturesCount?: number;
+  /**Format des matchs de la journée. */
+  matchFormat?: "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5";
+  isHomeAway?: boolean;
+  generateMatches?: boolean;
+  /**
+   * Héritage explicite group.config → phase.config (scoring / top-N).
+   * Une clé absente signifie « hérite de la phase ».
+   */
+  advanceCount?: number;
+  pointsPerWin?: number;
+  pointsPerDraw?: number;
+  pointsPerLoss?: number;
+  seeding?: "RANDOM" | "RANKING" | "MANUAL" | "SEQUENTIAL";
+  [key: string]: unknown;
+}
+
+/**
+ * `phase.config` pour une phase Round Robin refondu. Les qualifiés
+ * officiels sont persistés ici à la VALIDATION de la phase — les lignes
+ * `phaseGroupParticipants.qualified` de ces phases ne portent rien.
+ */
+export interface RoundRobinPhaseConfig {
+  advanceCount?: number;
+  /** Qualifiés officiels : registrationId ou entrée enrichie. */
+  qualifiers?: Array<
+    | string
+    | {
+        registrationId: string;
+        position?: number;
+        points?: number;
+      }
+  >;
+  /** Préfixe des journées (« Journée », « Matchday », « Tour »…). */
+  nodePrefix?: string;
+  isHomeAway?: boolean;
+  isCompleted?: boolean;
+  seedingMethod?: string;
+  [key: string]: unknown;
+}
+
+/** Métadonnées d'un node de confrontation RR (persistées par le générateur). */
+export interface RoundRobinNodeMetadata {
+  /** registrationIds confrontés (exactement 2, BYE jamais inclus). */
+  participants: (string | null)[];
+  /** Nom affichable (« Journée 1 — Confrontation 2 »). */
+  name?: string;
+  /** Journée d'appartenance (node.round = dayNumber également). */
+  dayNumber: number;
+  /** Index de la confrontation dans la journée (1-based). */
+  fixtureIndex: number;
+  /** Confrontation retour (aller-retour). */
+  isLegTwo?: boolean;
+  nodeType: "ROUND_ROBIN";
+  generateMatches?: boolean;
+  matchesCount?: number;
+  format?: string;
+  [key: string]: unknown;
+}
+
+/** Union des métadonnées possibles d'un node (RR refondu vs autres formats). */
+export type BracketNodeMetadata = RoundRobinNodeMetadata | Record<string, unknown>;
+
+/** Types de bracket (colonne bracket_nodes.bracket_type). */
+export type BracketType = "UPPER" | "LOWER" | "FINAL" | "CONSOLATION";
+
+/** Classement agrégé d'une phase « groupes = journées » (getPhaseStandings). */
+export interface PhaseLeagueDayStatus {
+  groupId: string;
+  dayNumber: number;
+  dayName: string;
+  totalFixtures: number;
+  completedFixtures: number;
+  isCompleted: boolean;
+}
+
+export interface PhaseStandingRow {
+  id: string;
+  registrationId: string;
+  position: number;
+  qualified: boolean;
+  points: number;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesDrawn: number;
+  matchesLost: number;
+  scoreFor: number;
+  scoreAgainst: number;
+  scoreDifference: number;
+  participantName?: string;
+  participantImage?: string | null;
+}
+
+/** Groupe retourné par getPhaseStandings (virtual « Classement » si RR). */
+export interface PhaseStandingGroup {
+  groupId: string;
+  groupName: string;
+  rows: PhaseStandingRow[];
+  /** true pour le groupe virtuel « Classement » d'une phase RR refondu. */
+  aggregated?: boolean;
+  /** État jour par jour (uniquement si aggregated). */
+  dayGroups?: Array<{
+    groupId: string;
+    groupName: string;
+    isCompleted: boolean;
+  }>;
+  /** Top-N configuré (résolu serveur — getEffectiveAdvanceCount). */
+  advanceCount?: number;
+  /** Phase validée : les `qualified` des rows sont définitifs. */
+  phaseIsCompleted?: boolean;
 }

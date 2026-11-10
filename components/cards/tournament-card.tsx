@@ -131,6 +131,13 @@ export function TournamentCard({
     else handleView();
   };
 
+  // Bouton « Voir » : même pattern que handleJoin — ne pas laisser le click
+  // bouillonner vers handleMainAction (double navigation).
+  const handleViewClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleView();
+  };
+
   const handleJoin = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onJoin) {
@@ -320,26 +327,31 @@ export function TournamentCard({
 
         {/* Édition courante */}
         {tournament.currentEdition && showDetails && (
-          <Link href={`/tournaments/${tournament.id}/editions/${tournament.currentEdition.id}`}>
-            <div className="rounded-lg bg-secondary/10 cursor-pointer p-3 border border-border/50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body-sm" weight="semibold">
-                    {tournament.currentEdition.name || "Édition en cours"}
-                  </Typography>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Calendar className="w-3 h-3 text-muted-foreground" />
-                    <Typography variant="caption2" theme="muted">
-                      {new Date(tournament.currentEdition.startDate).toLocaleDateString('fr-FR')}
+          // stopPropagation : ce Link vit DANS la carte cliquable entière ;
+          // sans lui, le click bouillonne vers handleMainAction (router.push
+          // vers le tournoi) et la navigation est une course Link vs push.
+          <div onClick={(e) => e.stopPropagation()}>
+            <Link href={`/tournaments/${tournament.id}/editions/${tournament.currentEdition.id}`}>
+              <div className="rounded-lg bg-secondary/10 cursor-pointer p-3 border border-border/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Typography variant="body-sm" weight="semibold">
+                      {tournament.currentEdition.name || "Édition en cours"}
                     </Typography>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Calendar className="w-3 h-3 text-muted-foreground" />
+                      <Typography variant="caption2" theme="muted">
+                        {new Date(tournament.currentEdition.startDate).toLocaleDateString('fr-FR')}
+                      </Typography>
+                    </div>
                   </div>
+                  <Badge variant="secondary">
+                    {tournament.currentEdition.participants || 0} inscrits
+                  </Badge>
                 </div>
-                <Badge variant="secondary">
-                  {tournament.currentEdition.participants || 0} inscrits
-                </Badge>
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         )}
 
         {/* Actions */}
@@ -381,7 +393,7 @@ export function TournamentCard({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleView}
+                onClick={handleViewClick}
                 className="gap-2"
               >
                 Voir
@@ -408,7 +420,7 @@ export function TournamentCard({
         onClick={handleMainAction}
       >
         <div className="flex gap-4 p-4">
-          <div className="w-64 flex-shrink-0">
+          <div className="w-40 sm:w-64 flex-shrink-0">
             {renderImage()}
           </div>
           <CardContent className="p-0 flex-1">

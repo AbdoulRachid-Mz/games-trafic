@@ -18,6 +18,56 @@ export interface TransactionEntity {
   metadata?: Record<string, any>;
 }
 
+/**
+ * Mode de tarification explicite (PROMPT.md §11.2).
+ *
+ * - FIXED : le prix de référence est CONNU (y compris 0 — un produit gratuit
+ *   reste un produit avec prix) ; le montant ne peut pas être modifié.
+ * - VARIABLE : l'utilisateur saisit librement le montant.
+ * - QUANTITY : l'utilisateur saisit une quantité × prix unitaire.
+ */
+export type TransactionPricingMode = "FIXED" | "VARIABLE" | "QUANTITY";
+
+/**
+ * Type de contenu d'un item de jeu (détermine VARIABLE vs QUANTITY).
+ * Les "coins"/monnaies se s'achètent en montant libre ; le reste en unités.
+ */
+export function isCurrencyLikeGameItem(entity?: TransactionEntity | null): boolean {
+  const itemType =
+    entity?.metadata?.type?.toString()?.toUpperCase() ||
+    (entity as any)?.type?.toString()?.toUpperCase() ||
+    "";
+  return itemType === "COIN" || itemType === "CURRENCY";
+}
+
+/**
+ * Mode de tarification, résolu de manière explicite — JAMAIS `!!price`
+ * (incorrect pour un prix égal à 0). À utiliser côté UI et, en miroir,
+ * pour documenter la revalidation serveur (prix reconfirmés en base).
+ */
+export function resolveTransactionPricingMode(
+  transactionType: TransactionType,
+  entity?: TransactionEntity | null,
+): TransactionPricingMode {
+  switch (transactionType) {
+    case "GAME_ITEM_PURCHASE":
+      return isCurrencyLikeGameItem(entity) ? "VARIABLE" : "QUANTITY";
+    case "VIP_SUBSCRIPTION":
+      // Tarif officiel (mensuel/annuel lu côté serveur) — non modifiable.
+      return "FIXED";
+    case "THEME_PURCHASE":
+    case "ORDER_PURCHASE":
+    case "TOURNAMENT_PARTICIPATION":
+      // Prix de référence connu dès que l'entité le définit (0 compris).
+      return entity?.price != null && Number.isFinite(entity.price)
+        ? "FIXED"
+        : "VARIABLE";
+    default:
+      // DEPOSIT, WITHDRAWAL, TRANSFER, PURCHASE, REFUND, BONUS, etc.
+      return "VARIABLE";
+  }
+}
+
 export interface TransactionConfig {
   type: TransactionType;
   label: string;
@@ -147,12 +197,20 @@ export interface TransactionData {
   fromAccountId?: string;
   toAccountId?: string;
 
-  // Legacy: kept for backward compatibility with wallet-based operations
-  fromWalletId?: string;
-  toWalletId?: string;
+  // Legacy (listé ci-dessous) supprimé : `fromWalletId` / `toWalletId` n'étaient
+  // JAMAIS écrits ni lus par le flux de création (le wallet pèseur vient de la
+  // session, la cible passe par recipientWalletId). Les colonnes DB
+  // walletTransactions.from_wallet_id/to_wallet_id restent remplies côté
+  // serveur (actions/transactions.ts) — jamais par un état UI.
 
   targetId?: string;
   entity?: TransactionEntity;
+  /**
+   * Wallet destinataire d'un TRANSFER.
+   * ⚠️ L'exécution serveur lit `metadata.recipientWalletId`
+   * (voir actions/transactions.ts) — le champ build-value ici est recopié
+   * dans metadata avant l'appel ; ne pas en faire deux sources de vérité.
+   */
   recipientWalletId?: string;
   recipientAccountId?: string;
   recipientUser?: {
@@ -160,11 +218,20 @@ export interface TransactionData {
     name: string;
     walletNumber: string;
   };
+  /** Nom du bénéficiaire (affichage reçu/confirmation, non authentifié). */
+  recipientName?: string;
+  /** Note libre attachée par l'utilisateur (persistée en metadata). */
+  notes?: string;
 
   metadata: {
     paymentMethod?: string;
     paymentProvider?: string;
     paymentAccountId?: string;
+    /**
+     * TRANSFER uniquement : wallet destinataire lu par l'exécution serveur
+     * (createTransaction) — la colonne recipient_wallet_id est KEY.
+     */
+    recipientWalletId?: string;
     description?: string;
     feePercentage?: number;
     entityData?: any;

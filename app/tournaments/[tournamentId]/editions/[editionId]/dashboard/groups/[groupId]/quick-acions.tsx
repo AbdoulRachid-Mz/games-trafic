@@ -39,6 +39,10 @@ export const QuicKAction = ({basePath, groupId, editionId, group, tournamentId}:
             groupId={groupId}
             editionId={editionId}
             phaseId={group?.phaseId || ""}
+            groupConfig={{
+              isMatchday: (group?.config as any)?.isMatchday === true,
+              fixturesCount: (group?.config as any)?.fixturesCount,
+            }}
           />
 
           <Button variant="outline" className="gap-1.5" asChild>
@@ -47,7 +51,7 @@ export const QuicKAction = ({basePath, groupId, editionId, group, tournamentId}:
             </Link>
           </Button>
 
-          {group && <UpdatePhaseGroupDialog group={group} />}
+          {group && <UpdatePhaseGroupDialog group={group} phase={group?.phase} />}
 
         </div>
       )

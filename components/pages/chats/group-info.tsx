@@ -67,7 +67,7 @@ export function GroupInfo({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 w-full">
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           {canEdit && onEdit && (
             <Button
               onClick={onEdit}

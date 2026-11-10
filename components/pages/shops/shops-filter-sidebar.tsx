@@ -1,6 +1,7 @@
 // components/pages/shops/shops-filter-sidebar.tsx
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Filter, MapPin, Shield, Tag, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { getShopStats } from "@/actions/shops";
+import { getCategoriesByEntityType } from "@/actions/categories";
 
 interface ShopsFilterSidebarProps {
   filters: any;
@@ -42,14 +45,18 @@ export function ShopsFilterSidebar({
     "Italie",
   ];
 
-  const categories = [
-    { value: "gaming", label: "🎮 Gaming", count: 42 },
-    { value: "esports", label: "🏆 eSports", count: 18 },
-    { value: "digital", label: "💻 Digital", count: 56 },
-    { value: "collectibles", label: "🃏 Collection", count: 23 },
-    { value: "services", label: "🔧 Services", count: 34 },
-    { value: "hardware", label: "⚙️ Hardware", count: 15 },
-  ];
+  // Catégories RÉELLES applicables aux boutiques — plus de liste hardcodée.
+  const { data: realCategories } = useQuery({
+    queryKey: ["categories", "SHOP"],
+    queryFn: () => getCategoriesByEntityType("SHOP"),
+  });
+
+  // Statistiques RÉELLES (agrégées serveur sur TOUTES les boutiques) —
+  // PROMPT §10.5 : pas de counts hardcodés.
+  const { data: shopStats } = useQuery({
+    queryKey: ["shops-stats", "sidebar"],
+    queryFn: () => getShopStats(),
+  });
 
   return (
     <div className="space-y-4">
@@ -83,11 +90,9 @@ export function ShopsFilterSidebar({
               </Label>
               {filters.category && (
                 <Badge variant="outline" className="text-xs">
-                  {
-                    categories
-                      .find((c) => c.value === filters.category)
-                      ?.label.split(" ")[1]
-                  }
+                  {(realCategories || []).find(
+                    (c) => c.id === filters.category,
+                  )?.name ?? "Catégorie"}
                 </Badge>
               )}
             </div>
@@ -102,14 +107,9 @@ export function ShopsFilterSidebar({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes les catégories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.value} value={category.value}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{category.label}</span>
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {category.count}
-                      </Badge>
-                    </div>
+                {(realCategories || []).map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -199,24 +199,37 @@ export function ShopsFilterSidebar({
         </CardContent>
       </Card>
 
-      {/* Statistiques rapides */}
+      {/* Statistiques rapides — RÉELLES (agrégées serveur) */}
       <Card>
         <CardContent className="p-4">
           <Typography variant="body-base" weight="semibold" className="mb-3">
             Statistiques
           </Typography>
           <div className="space-y-2">
-            {categories.slice(0, 3).map((category) => (
-              <div
-                key={category.value}
-                className="flex items-center justify-between"
-              >
-                <Typography variant="body-sm" theme="muted">
-                  {category.label.split(" ")[1]}
-                </Typography>
-                <Badge variant="secondary">{category.count}</Badge>
-              </div>
-            ))}
+            <div className="flex items-center justify-between">
+              <Typography variant="body-sm" theme="muted">
+                Boutiques actives
+              </Typography>
+              <Badge variant="secondary">{shopStats?.active ?? "…"}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <Typography variant="body-sm" theme="muted">
+                Vérifiées
+              </Typography>
+              <Badge variant="secondary">{shopStats?.verified ?? "…"}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <Typography variant="body-sm" theme="muted">
+                En vedette
+              </Typography>
+              <Badge variant="secondary">{shopStats?.featured ?? "…"}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <Typography variant="body-sm" theme="muted">
+                Produits en vente
+              </Typography>
+              <Badge variant="secondary">{shopStats?.totalProducts ?? "…"}</Badge>
+            </div>
           </div>
         </CardContent>
       </Card>

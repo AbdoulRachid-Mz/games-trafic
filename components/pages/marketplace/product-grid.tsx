@@ -16,16 +16,24 @@ import { useScreenSize } from "@/hooks/use-screen";
 import { ProductCard } from "./product-card";
 
 interface ProductGridProps {
+  /** Défaut : valeur de l'URL (?q=). */
   searchQuery?: string;
   viewMode?: "grid" | "list";
+  /** Remonte le total réel (serveur) — utilisé par le compteur du header. */
+  onTotalChange?: (total: number) => void;
 }
 
-export function ProductGrid({ searchQuery, viewMode: externalViewMode }: ProductGridProps) {
+export function ProductGrid({ searchQuery: externalSearchQuery, viewMode: externalViewMode, onTotalChange }: ProductGridProps) {
   const searchParams = useSearchParams();
   const { isSmallScreen } = useScreenSize();
   const [internalViewMode, setInternalViewMode] = useState<"grid" | "list">("grid");
   
   const viewMode = externalViewMode || internalViewMode;
+
+  // Recherche : l'URL (?q=) est la source de vérité — la prop est un
+  // contournement optionnel. Avant : le hero et la sidebar écrivaient `q` dans
+  // l'URL, mais ce grid lisait un state local désynchronisé.
+  const searchQuery = externalSearchQuery ?? searchParams.get("q") ?? undefined;
 
   const games = searchParams.get("games")?.split(",");
   const platforms = searchParams.get("platforms")?.split(",");
@@ -88,6 +96,10 @@ export function ProductGrid({ searchQuery, viewMode: externalViewMode }: Product
           game: games?.[0],
           platform: platforms as ("PC" | "PLAYSTATION" | "XBOX" | "NINTENDO_SWITCH" | "MOBILE" | "VR" | "OTHER")[] | undefined,
           accountRank: ranks?.[0],
+          features,
+          countries,
+          levelMin: minLevel ? Number(minLevel) : undefined,
+          levelMax: maxLevel ? Number(maxLevel) : undefined,
           status: ["NON_VENDU", "RESERVE"],
           isActive: true,
           isDeleted: false,
@@ -122,6 +134,12 @@ export function ProductGrid({ searchQuery, viewMode: externalViewMode }: Product
       fetchNextPage();
     }
   }, [isIntersecting, hasNextPage, fetchNextPage]);
+
+  // Compteur global réel (serveur, toutes pages) remonté au header.
+  const totalProducts = data?.pages[0]?.pagination?.total;
+  useEffect(() => {
+    if (totalProducts != null) onTotalChange?.(totalProducts);
+  }, [totalProducts, onTotalChange]);
 
   // Loading skeleton avec design gaming
   if (isLoading) {

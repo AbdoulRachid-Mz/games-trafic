@@ -122,7 +122,14 @@ export function PinVerification({
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (pin.length >= 4) {
-      await onVerify(pin);
+      try {
+        await onVerify(pin);
+      } catch {
+        // L'échec est déjà signalé par le flux appelant (toast) — on
+        // réinitialise ici pour ne pas laisser les dots dans un état plein.
+      } finally {
+        setPin("");
+      }
     }
   };
 

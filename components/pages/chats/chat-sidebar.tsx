@@ -149,7 +149,7 @@ export function ChatSidebar() {
             variant="ghost"
             size="icon"
             onClick={handleThemeSelector}
-            className="h-8 w-8 text-[var(--chat-textMuted)] hover:text-[var(--chat-text)]"
+            className="h-9 w-9 text-[var(--chat-textMuted)] hover:text-[var(--chat-text)]"
             title="Thèmes"
           >
             <Palette className="h-4 w-4" />
@@ -159,7 +159,7 @@ export function ChatSidebar() {
             variant="ghost"
             size="icon"
             onClick={handleStartConversation}
-            className="h-8 w-8 text-[var(--chat-textMuted)] hover:text-[var(--chat-text)]"
+            className="h-9 w-9 text-[var(--chat-textMuted)] hover:text-[var(--chat-text)]"
             title="Démarrer une discussion"
           >
             <MessageSquarePlus className="h-4 w-4" />
@@ -169,7 +169,7 @@ export function ChatSidebar() {
             variant="ghost"
             size="icon"
             onClick={handleCreateGroup}
-            className="h-8 w-8 text-[var(--chat-textMuted)] hover:text-[var(--chat-text)]"
+            className="h-9 w-9 text-[var(--chat-textMuted)] hover:text-[var(--chat-text)]"
             title="Nouveau groupe"
           >
             <Users className="h-4 w-4" />

@@ -1,7 +1,8 @@
 // @/hooks/use-game-clips-player.ts
 import { useCallback, useRef, useEffect } from 'react';
-import { useGameClipsStore } from '@/stores/game-clips-store';
-import { useScreenSize } from '@/hooks/use-screen';
+import { useClipEngineStore } from "@/hooks/use-clip-engine";
+import { useGameClipsStore } from "@/stores/game-clips-store";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface UseGameClipsPlayerProps {
   clipId: string;
@@ -20,10 +21,12 @@ export function useGameClipsPlayer({
   const {
     isGloballyPaused,
     muted,
+    setGlobalPause,
+  } = useClipEngineStore();
+  const {
     volume,
     playbackRates,
     setActiveClip,
-    setGlobalPause,
   } = useGameClipsStore();
 
   const { isMobile } = useScreenSize();
@@ -114,6 +117,6 @@ export function useGameClipsPlayer({
     togglePlayPause,
     handleAreaClick,
     isMuted: muted,
-    toggleMute: () => useGameClipsStore.getState().toggleMute(),
+    toggleMute: () => useClipEngineStore.getState().toggleMute(),
   };
 }

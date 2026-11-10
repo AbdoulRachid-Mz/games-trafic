@@ -5,6 +5,10 @@ import {
   bracketNodes,
   matches,
   tournamentEditions,
+  editionRegistrations,
+  tournamentMembers,
+  users,
+  teams,
 } from "@/database/schema";
 import {
   eq,
@@ -13,6 +17,7 @@ import {
   inArray,
   gte,
   lte,
+  or,
 } from "drizzle-orm";
 import {
   type TournamentPhaseFilters,
@@ -70,6 +75,66 @@ export function getEliminationRoundName(participantCount: number): string {
     default:
       return `Top ${participantCount}`;
   }
+}
+
+// ============================================================================
+// ROUND ROBIN : helpers structurants (Phase 1 PROMPT.md)
+// Source de vérité unique : lib/tournaments/config.ts (module pur).
+// ============================================================================
+
+export {
+  DEFAULT_ADVANCE_COUNT,
+  LEGACY_LEAGUE_GROUP_NAME,
+  getEffectiveAdvanceCount,
+  isMatchdayGroup,
+  isLegacyLeagueStructure,
+} from "@/lib/tournaments/config";
+
+/**
+ * ROUND ROBIN — lecteur unique des qualifiés d'une phase.
+ *
+ * Priorité (miroir de la progression serveur fetchPreviousQualifiedIds) :
+ * 1. `phase.config.qualifiers` — persistés à la VALIDATION de la phase ;
+ *    seule source fiable pour le modèle « groupes = journées » (les lignes de
+ *    phaseGroupParticipants de ces phases ne portent rien).
+ * 2. Repli : lignes `phaseGroupParticipants.qualified` (anciens modèles :
+ *    GROUP_STAGE classique, structure légataire « groupe = classement »).
+ *
+ * Ne juge PAS du caractère définitif de la phase — c'est aux appelants
+ * (progression, pages) de vérifier `phase.isCompleted` / `config.qualifiers`.
+ */
+export async function getPhaseQualifiedRegistrationIds(
+  phaseId: string,
+): Promise<string[]> {
+  const phase = await db.query.tournamentPhases.findFirst({
+    where: eq(tournamentPhases.id, phaseId),
+    columns: { config: true },
+  });
+  const phaseConfig = (phase?.config as any) || {};
+  if (Array.isArray(phaseConfig.qualifiers) && phaseConfig.qualifiers.length > 0) {
+    return phaseConfig.qualifiers
+      .map((q: any) => (typeof q === "string" ? q : q?.registrationId))
+      .filter(Boolean) as string[];
+  }
+
+  const groups = await db.query.phaseGroups.findMany({
+    where: and(eq(phaseGroups.phaseId, phaseId), eq(phaseGroups.isDeleted, false)),
+    columns: { id: true },
+  });
+  if (groups.length === 0) return [];
+
+  const rows = await db.query.phaseGroupParticipants.findMany({
+    where: and(
+      inArray(
+        phaseGroupParticipants.groupId,
+        groups.map((g: any) => g.id),
+      ),
+      eq(phaseGroupParticipants.qualified, true),
+      eq(phaseGroupParticipants.isDeleted, false),
+    ),
+    columns: { registrationId: true },
+  });
+  return Array.from(new Set(rows.map((r) => r.registrationId)));
 }
 
 export async function getWinnersFromGroups(tx: any, groupIds: string[]) {
@@ -368,6 +433,36 @@ export function buildMatchWhereConditions(
 
   if (Array.isArray(filters.statuses) && filters.statuses.length > 0) {
     conditions.push(inArray(matches.status, filters.statuses));
+  }
+
+  // Recherche texte : code de match OU nom de joueur / team (membres des
+  // registrations participantes). Jusqu'ici `filters.search` était
+  // silencieusement ignoré (l'UI promettait une recherche qui ne filtrait rien).
+  if (filters.search && filters.search.trim() !== "") {
+    const term = `%${filters.search.trim()}%`;
+    const participantRegistrationIds = db
+      .select({ id: editionRegistrations.id })
+      .from(editionRegistrations)
+      .innerJoin(
+        tournamentMembers,
+        eq(editionRegistrations.memberId, tournamentMembers.id),
+      )
+      .leftJoin(users, eq(tournamentMembers.userId, users.id))
+      .leftJoin(teams, eq(tournamentMembers.teamId, teams.id))
+      .where(
+        or(
+          ilike(users.username, term),
+          ilike(users.fullName, term),
+          ilike(teams.name, term),
+        ),
+      );
+    conditions.push(
+      or(
+        ilike(matches.matchCode, term),
+        inArray(matches.participant1RegistrationId, participantRegistrationIds),
+        inArray(matches.participant2RegistrationId, participantRegistrationIds),
+      ),
+    );
   }
 
   return and(...conditions);

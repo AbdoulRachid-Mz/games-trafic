@@ -129,7 +129,7 @@ const ClipItem = memo(function ClipItem({
       data-index={index}
       data-clip-id={clip.id}
       className={cn(
-        "h-screen shrink-0 snap-start snap-always relative transition-all duration-300 ease-out",
+        "h-[100dvh] shrink-0 snap-start snap-always relative transition-all duration-300 ease-out",
         isDesktopLayoutCompact ? "w-[70%]" : "w-full"
       )}
     >
@@ -154,8 +154,6 @@ const ClipItem = memo(function ClipItem({
 // Local feed buffer hook - with continuous duplication
 function useFeedBuffer(clips: ClipData[], hasNextPage: boolean) {
   const [feedClips, setFeedClips] = useState<ClipData[]>([]);
-  const [duplicationCount, setDuplicationCount] = useState(0);
-  const MAX_DUPLICATIONS = 5;
 
   // Accumulate clips without duplicates
   useEffect(() => {
@@ -163,34 +161,22 @@ function useFeedBuffer(clips: ClipData[], hasNextPage: boolean) {
       setFeedClips((prev) => {
         const existingIds = new Set(prev.map(c => c.id));
         const newClips = clips.filter(c => !existingIds.has(c.id));
-        
+
         if (newClips.length === 0) return prev;
-        
+
         return [...prev, ...newClips];
       });
     }
   }, [clips]);
 
-  // Continuous duplication when no more data
+  // Reset when clips reset (e.g., refresh)
   useEffect(() => {
-    if (!hasNextPage && feedClips.length > 0 && duplicationCount < MAX_DUPLICATIONS) {
-      const shuffledBatch = [...feedClips]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 12);
-      
-      setFeedClips((prev) => [...prev, ...shuffledBatch]);
-      setDuplicationCount(prev => prev + 1);
+    if (clips.length === 0) {
+      setFeedClips([]);
     }
-  }, [hasNextPage, feedClips.length, duplicationCount]);
+  }, [clips.length]);
 
-  // Reset duplication count when we get new real data
-  useEffect(() => {
-    if (clips.length > 0 && hasNextPage) {
-      setDuplicationCount(0);
-    }
-  }, [clips.length, hasNextPage]);
-
-  return { feedClips, duplicationCount };
+  return { feedClips };
 }
 
 // Desktop side panel with clip resizing
@@ -357,7 +343,7 @@ export function GameClipReel({
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(false);
   
   // Local feed buffer
-  const { feedClips, duplicationCount } = useFeedBuffer(rawClips, hasNextPage);
+  const { feedClips } = useFeedBuffer(rawClips, hasNextPage);
   
   // Find initial index
   const initialIndex = useMemo(() => {
@@ -600,7 +586,7 @@ export function GameClipReel({
   if (isDesktop) {
     return (
       <div 
-        className={cn("relative h-screen w-full bg-black overflow-hidden flex", className)}
+        className={cn("relative h-[100dvh] w-full bg-black overflow-hidden flex", className)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -610,10 +596,10 @@ export function GameClipReel({
           desktopPanelOpen ? "w-[65%]" : "w-full"
         )}>
           {/* Header Controls */}
-          <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
+          <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-4 z-50 flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
+              className="bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -624,7 +610,7 @@ export function GameClipReel({
                   key={mode}
                   onClick={() => setPlaybackMode(mode)}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all",
+                    "px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all",
                     playbackMode === mode
                       ? "bg-white text-black"
                       : "text-white/50 hover:text-white/80"
@@ -639,7 +625,7 @@ export function GameClipReel({
           {/* Mute Button */}
           <button
             onClick={toggleMute}
-            className="absolute top-4 right-4 z-50 bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
+            className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
             style={{ right: desktopPanelOpen ? "calc(30% + 1rem)" : "1rem" }}
           >
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
@@ -678,7 +664,7 @@ export function GameClipReel({
             
             {/* Loading More */}
             {isFetchingNextPage && (
-              <div className="h-screen w-full flex items-center justify-center snap-start bg-black">
+              <div className="h-[100dvh] w-full flex items-center justify-center snap-start bg-black">
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-white/40" />
                   <span className="text-xs text-white/30 font-medium">Chargement...</span>
@@ -739,15 +725,15 @@ export function GameClipReel({
   // Mobile layout (original)
   return (
     <div 
-      className={cn("relative h-screen w-full bg-black overflow-hidden", className)}
+      className={cn("relative h-[100dvh] w-full bg-black overflow-hidden", className)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
       {/* Header Controls */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
+      <div className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-4 z-50 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
+          className="bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -758,7 +744,7 @@ export function GameClipReel({
               key={mode}
               onClick={() => setPlaybackMode(mode)}
               className={cn(
-                "px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all",
+                "px-3 py-2 rounded-full text-[10px] font-bold uppercase tracking-tight transition-all",
                 playbackMode === mode
                   ? "bg-white text-black"
                   : "text-white/50 hover:text-white/80"
@@ -773,7 +759,7 @@ export function GameClipReel({
       {/* Mute Button */}
       {/* <button
         onClick={toggleMute}
-        className="absolute top-4 right-4 z-50 bg-black/40 backdrop-blur-md rounded-full p-2.5 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
+        className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 bg-black/40 backdrop-blur-md rounded-full p-3 text-white border border-white/10 hover:bg-black/60 transition-all active:scale-95"
       >
         {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button> */}
@@ -810,7 +796,7 @@ export function GameClipReel({
         
         {/* Loading More */}
         {isFetchingNextPage && (
-          <div className="h-screen w-full flex items-center justify-center snap-start bg-black">
+          <div className="h-[100dvh] w-full flex items-center justify-center snap-start bg-black">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-white/40" />
               <span className="text-xs text-white/30 font-medium">Chargement...</span>
@@ -858,7 +844,7 @@ export function GameClipReel({
         {/* Comments Sheet */}
         <div
           className={cn(
-            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70vh]",
+            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70dvh]",
             mobileSheetOpen && mobileSheetType === "comments" ? "translate-y-0" : "translate-y-full"
           )}
         >
@@ -874,7 +860,7 @@ export function GameClipReel({
               </button>
             </div>
           </div>
-          <div className="h-[calc(70vh-60px)] overflow-y-auto px-4 pb-20">
+          <div className="h-[calc(70dvh-60px)] overflow-y-auto px-4 pb-20">
             {currentClip && (
               <CommentsSection
                 entityId={currentClip.id}
@@ -889,7 +875,7 @@ export function GameClipReel({
         {/* Likes Sheet */}
         <div
           className={cn(
-            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70vh]",
+            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70dvh]",
             mobileSheetOpen && mobileSheetType === "likes" ? "translate-y-0" : "translate-y-full"
           )}
         >
@@ -905,7 +891,7 @@ export function GameClipReel({
               </button>
             </div>
           </div>
-          <div className="h-[calc(70vh-60px)] overflow-y-auto px-4 pb-20">
+          <div className="h-[calc(70dvh-60px)] overflow-y-auto px-4 pb-20">
             {currentClip && (
               <InteractionList
                 entityId={currentClip.id}
@@ -920,7 +906,7 @@ export function GameClipReel({
         {/* Bookmarks Sheet */}
         <div
           className={cn(
-            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70vh]",
+            "fixed bottom-0 left-0 right-0 bg-[#0a0a0b] rounded-t-2xl z-50 transition-transform duration-300 ease-out h-[70dvh]",
             mobileSheetOpen && mobileSheetType === "bookmarks" ? "translate-y-0" : "translate-y-full"
           )}
         >
@@ -936,7 +922,7 @@ export function GameClipReel({
               </button>
             </div>
           </div>
-          <div className="h-[calc(70vh-60px)] overflow-y-auto px-4 pb-20">
+          <div className="h-[calc(70dvh-60px)] overflow-y-auto px-4 pb-20">
             {currentClip && (
               <InteractionList
                 entityId={currentClip.id}

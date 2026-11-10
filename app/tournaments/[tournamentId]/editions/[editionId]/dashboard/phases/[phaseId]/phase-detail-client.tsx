@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
 import { updateTournamentEditionModeAction } from "@/actions/editions";
+import { isMatchdayGroup } from "@/lib/tournaments/config";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -71,6 +72,13 @@ export function PhaseDetailClient({
   const isAutoMode = editionConfig.competitionMode === "AUTO";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  // RR refondu (« groupes = journées ») : la structure est générée par le
+  // moteur championnat — les actions de groupage manuel ne s'appliquent pas.
+  const isMatchdayPhase =
+    (phase?.phaseType as string) === "ROUND_ROBIN" &&
+    groups.length > 0 &&
+    groups.every((g) => isMatchdayGroup((g as any).config || null));
 
   const handleSwitchToManual = () => {
     startTransition(async () => {
@@ -208,9 +216,20 @@ export function PhaseDetailClient({
               <Users className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg">Groupes & Écuries</CardTitle>
+              <CardTitle className="text-lg">
+                {isMatchdayPhase ? "Journées du championnat" : "Groupes & Écuries"}
+              </CardTitle>
               <Typography variant="caption1" theme="muted" className="mt-0.5">
-                {groups.length} groupe{groups.length > 1 ? 's' : ''} configuré{groups.length > 1 ? 's' : ''}
+                {isMatchdayPhase ? (
+                  <>
+                    {groups.length} journée{groups.length > 1 ? "s" : ""} (générées
+                    automatiquement — 1 journée = un groupe)
+                  </>
+                ) : (
+                  <>
+                    {groups.length} groupe{groups.length > 1 ? 's' : ''} configuré{groups.length > 1 ? 's' : ''}
+                  </>
+                )}
               </Typography>
             </div>
           </div>
@@ -271,6 +290,11 @@ export function PhaseDetailClient({
                     <div className="flex items-center gap-2 flex-wrap">
                       <Typography variant="body-base" weight="bold">{group.name}</Typography>
                       <Badge variant="outline" className="text-[10px] h-5 bg-background font-bold tracking-wider">ORDRE {group.order}</Badge>
+                      {isMatchdayPhase && (
+                        <Badge variant="outline" className="text-[10px] h-5 bg-primary/5 border-primary/30 font-bold tracking-wider">
+                          JOURNÉE {(group as any).config?.dayNumber ?? String.fromCharCode(65 + idx)}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
                       <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {group.participantCount ?? 0} participants</span>
@@ -304,33 +328,40 @@ export function PhaseDetailClient({
       <DynamicActionMenu 
         floatingLabel="Actions"
         actions={[
-          {
-            id: "create-group",
-            label: "Nouveau Groupe",
-            icon: PlusCircle,
-            paramKey: "action",
-            paramValue: "createGroup",
-            overlayType: "dialog",
-            renderContent: (
-              <>
-                {isAutoMode && (
-                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4 text-amber-700 text-xs flex gap-2">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <p>
-                      <strong>Attention :</strong> Cette édition est en mode Auto. 
-                      Créer manuellement un groupe peut briser la logique de l'Assistant.
-                    </p>
-                  </div>
-                )}
-                <CreateGroupDialog 
-                  phaseId={phaseId} 
-                  nextOrder={groups.length + 1} 
-                  previousPhases={allPhases.filter(p => (p.order || 0) < (phase?.order || 0)).map(p => ({ id: p.id, name: p.name || `Phase ${p.order}` }))}
-                  asFormOnly
-                />
-              </>
-            )
-          },
+          // Structure « groupes = journées » : les journées sont générées
+          // automatiquement — pas de groupage manuel.
+          ...(isMatchdayPhase
+            ? []
+            : [
+                {
+                  id: "create-group",
+                  label: "Nouveau Groupe",
+                  icon: PlusCircle,
+                  paramKey: "action",
+                  paramValue: "createGroup",
+                  overlayType: "dialog" as const,
+                  renderContent: (
+                    <>
+                      {isAutoMode && (
+                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4 text-amber-700 text-xs flex gap-2">
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                          <p>
+                            <strong>Attention :</strong> Cette édition est en mode Auto. 
+                            Créer manuellement un groupe peut briser la logique de l'Assistant.
+                          </p>
+                        </div>
+                      )}
+                      <CreateGroupDialog
+                        phaseId={phaseId}
+                        nextOrder={groups.length + 1}
+                        phase={phase}
+                        previousPhases={allPhases.filter(p => (p.order || 0) < (phase?.order || 0)).map(p => ({ id: p.id, name: p.name || `Phase ${p.order}` }))}
+                        asFormOnly
+                      />
+                    </>
+                  ),
+                },
+              ]),
           {
              id: "organise",
              label: "Générer Structure",

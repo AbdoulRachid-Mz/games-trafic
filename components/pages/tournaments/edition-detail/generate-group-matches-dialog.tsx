@@ -40,6 +40,10 @@ interface GenerateGroupMatchesDialogProps {
   groupConfig?: {
     maxParticipants?: number;
     matchesPerParticipant?: number;
+    /** Groupe-journée RR refondu : les brackets sont définis par la config */
+    isMatchday?: boolean;
+    /** Nombre de confrontations prévu dans config du groupe */
+    fixturesCount?: number;
   };
   asFormOnly?: boolean;
 }
@@ -186,21 +190,34 @@ export function GenerateGroupMatchesDialog({
               Aucun bracket n'existe pour ce groupe. Ils seront créés automatiquement.
             </p>
             <div className="space-y-2">
-              <Label htmlFor="node-count" className="text-xs">Nombre de brackets (Journées/Sous-groupes)</Label>
-              <div className="flex items-center gap-3">
-                <Input 
-                  id="node-count" 
-                  type="number" 
-                  min={1} 
-                  max={Math.floor(participantsCount / 2)}
-                  value={nodesToCreate}
-                  onChange={(e) => setNodesToCreate(parseInt(e.target.value) || 1)}
-                  className="h-8 w-20"
-                />
-                <span className="text-[10px] text-muted-foreground">
-                  ~{Math.ceil(participantsCount / nodesToCreate)} participants par bracket
-                </span>
-              </div>
+              {groupConfig?.isMatchday ? (
+                /* Groupe-journée : les confrontations proviennent de la config
+                   du groupe, pas du choix utilisateur. */
+                <p className="text-xs text-muted-foreground italic">
+                  Confrontations de la journée : auto
+                  {typeof groupConfig.fixturesCount === "number"
+                    ? ` (config.fixturesCount : ${groupConfig.fixturesCount})`
+                    : " (config.fixturesCount)"}
+                </p>
+              ) : (
+                <>
+                  <Label htmlFor="node-count" className="text-xs">Nombre de brackets (Journées/Sous-groupes)</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="node-count"
+                      type="number"
+                      min={1}
+                      max={Math.floor(participantsCount / 2)}
+                      value={nodesToCreate}
+                      onChange={(e) => setNodesToCreate(parseInt(e.target.value) || 1)}
+                      className="h-8 w-20"
+                    />
+                    <span className="text-[10px] text-muted-foreground">
+                      ~{Math.ceil(participantsCount / nodesToCreate)} participants par bracket
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

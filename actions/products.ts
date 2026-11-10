@@ -702,6 +702,14 @@ function buildProductWhereConditions(
   if (filters.categoryId) {
     conditions.push(eq(products.categoryId, filters.categoryId));
   }
+  // Recherche texte : `name` est le mapping historique, `search` (BaseFilters)
+  // est désormais équivalent et s'étend à la description.
+  if (filters.search && filters.search.trim() !== "") {
+    const term = `%${filters.search.trim()}%`;
+    conditions.push(
+      or(ilike(products.name, term), ilike(products.description, term)),
+    );
+  }
   if (filters.name) {
     conditions.push(ilike(products.name, `%${filters.name}%`));
   }
@@ -722,6 +730,63 @@ function buildProductWhereConditions(
   }
   if (filters.accountRank) {
     conditions.push(eq(products.accountRank, filters.accountRank));
+  }
+
+  // Niveau de compte en plage (accountLevel est text — ne matcher que les
+  // valeurs numériques pour éviter les erreurs de cast).
+  if (filters.levelMin !== undefined) {
+    conditions.push(
+      sql`${products.accountLevel} ~ '^[0-9]+$' AND ${products.accountLevel}::integer >= ${filters.levelMin}`,
+    );
+  }
+  if (filters.levelMax !== undefined) {
+    conditions.push(
+      sql`${products.accountLevel} ~ '^[0-9]+$' AND ${products.accountLevel}::integer <= ${filters.levelMax}`,
+    );
+  }
+
+  // Features & pays d'origine : mapping réaliste sur les données existantes.
+  // - "featured" → products.isFeatured ; "negotiable" → products.isNegotiable
+  //   (si le produit est négociable) ;
+  // - "verified" → verified de la boutique vendeuse ;
+  // - "instant" n'a pas de colonne équivalente en base : ce filtre est ignoré
+  //   ici (pas de fausses données) ;
+  // - countries → country de la boutique vendeuse.
+  const productFeatures = (filters.features || []).filter(
+    (f) => f === "featured" || f === "negotiable",
+  );
+  const shopFeatures = (filters.features || []).filter(
+    (f) => f === "verified",
+  );
+  if (productFeatures.includes("featured")) {
+    conditions.push(eq(products.isFeatured, true));
+  }
+  if (productFeatures.includes("negotiable")) {
+    conditions.push(eq(products.isNegotiable, true));
+  }
+  const shopConditions = [];
+  if (shopFeatures.length > 0) {
+    shopConditions.push(eq(shops.verified, true));
+  }
+  if (filters.countries && filters.countries.length > 0) {
+    shopConditions.push(inArray(shops.country, filters.countries));
+  }
+  if (shopConditions.length > 0) {
+    conditions.push(
+      inArray(
+        products.shopId,
+        db
+          .select({ id: shops.id })
+          .from(shops)
+          .where(
+            and(
+              ...shopConditions,
+              eq(shops.isDeleted, false),
+              eq(shops.isActive, true),
+            ),
+          ),
+      ),
+    );
   }
   if (typeof filters.isNegotiable === 'boolean') {
     conditions.push(eq(products.isNegotiable, filters.isNegotiable));

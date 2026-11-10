@@ -17,6 +17,7 @@ import {
   setupSwissPhase,
 } from "./generators";
 import { getEliminationRoundName } from "./get-name";
+import { getEffectiveAdvanceCount } from "./config";
 
 export interface PhaseBlueprint {
   name: string;
@@ -157,7 +158,7 @@ export async function createStructureEngine({
           },
         );
 
-        const advanceCount = phaseConfig.advanceCount || 2;
+        const advanceCount = getEffectiveAdvanceCount(phase, groups?.[0]);
         const totalQualifiers = (groups?.length || 0) * advanceCount;
 
         // ✅ Stocker les placeholders pour la prochaine phase (représentation symbolique)
@@ -315,7 +316,9 @@ async function generatePreview(
         });
         phaseMatches += matchesPerGroup;
       }
-      currentParticipantsCount = groupsCount * (p.config.advanceCount || 2);
+      currentParticipantsCount =
+        groupsCount *
+        (p.config.advanceCount || p.config.advanceFromGroup || 2);
     } else if (p.phaseType === "ROUND_ROBIN") {
       const matches =
         (currentParticipantsCount * (currentParticipantsCount - 1)) / 2;

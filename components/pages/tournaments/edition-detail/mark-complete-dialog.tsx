@@ -244,8 +244,13 @@ export function MarkCompleteDialog({
         setCurrentStep("CONFIRM");
       }
     } else if (currentStep === "QUALIFIERS") {
-      // Validation du nombre de qualifiés si c'est pour une phase élimination
-      if (isPowerOfTwo(selectedQualifiedIds.length)) {
+      // Validation du nombre de qualifiés si c'est pour une phase élimination.
+      // 🆕 RR refondu : la qualification vient du classement général (top N)
+      // — N n'a jamais besoin d'être une puissance de 2.
+      if (
+        phaseContext?.phaseType === "ROUND_ROBIN" ||
+        isPowerOfTwo(selectedQualifiedIds.length)
+      ) {
         setCurrentStep("CONFIRM");
       } else {
         toast.error(
@@ -1138,7 +1143,7 @@ export function MarkCompleteDialog({
 
       <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
         <AlertDialogTitle className="hidden">Confirmation</AlertDialogTitle>
-        <AlertDialogContent className="md:max-w-3xl w-[95vw] overflow-auto max-h-[85vh]">{content}</AlertDialogContent>
+        <AlertDialogContent size="2xl" className="w-[95vw] sm:max-w-3xl overflow-auto max-h-[85vh]">{content}</AlertDialogContent>
       </AlertDialog>
     </>
   );

@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
-import { createPhaseGroup, getPhaseGroupParticipants, bulkCreatePhaseGroupParticipants } from "@/actions/phases";
+import { createPhaseGroup, bulkCreatePhaseGroupParticipants, getPhaseQualifiedParticipantsAction } from "@/actions/phases";
+import { resolveScoring } from "@/lib/tournaments/scoring";
+import { getEffectiveAdvanceCount } from "@/lib/tournaments/config";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -23,6 +25,8 @@ interface CreateGroupDialogProps {
     nextOrder: number;
     previousPhases?: { id: string; name: string }[];
     asFormOnly?: boolean;
+    /** Phase parente : sert uniquement au préremplissage (héritage). */
+    phase?: { config?: unknown } | null;
 }
 
 export function CreateGroupDialog({
@@ -30,11 +34,17 @@ export function CreateGroupDialog({
     nextOrder,
     previousPhases = [],
     asFormOnly = false,
+    phase,
 }: CreateGroupDialogProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
     const router = useRouter();
+
+    // Scoring et qualifiés préremplis depuis la phase (héritage éditable :
+    // champ vide = hérite, champ rempli = écrase explicitement).
+    const effectiveScoring = resolveScoring((phase?.config as any) || null);
+    const effectiveAdvanceCount = getEffectiveAdvanceCount(phase);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -43,13 +53,22 @@ export function CreateGroupDialog({
         const formData = new FormData(e.currentTarget);
         const name = formData.get("name") as string;
 
-        // Advanced data
+        // Advanced data — un champ laissé vide écrit RIEN dans config :
+        // le groupe hérite alors de la phase (jamais de valeur par défaut
+        // toute faite qui bloquerait l'héritage).
+        const explicitNumber = (key: string): number | undefined => {
+            const raw = formData.get(key);
+            if (typeof raw !== "string" || raw.trim() === "" || isNaN(Number(raw))) {
+                return undefined;
+            }
+            return Number(raw);
+        };
         const seeding = formData.get("seeding") as string || "RANDOM";
-        const advanceCount = parseInt(formData.get("advanceCount") as string) || 2;
-        const pointsPerWin = parseInt(formData.get("pointsPerWin") as string) || 3;
-        const pointsPerDraw = parseInt(formData.get("pointsPerDraw") as string) || 1;
-        const pointsPerLoss = parseInt(formData.get("pointsPerLoss") as string) || 0;
-        const matchesPerParticipant = parseInt(formData.get("matchesPerParticipant") as string) || 1;
+        const advanceCount = explicitNumber("advanceCount");
+        const pointsPerWin = explicitNumber("pointsPerWin");
+        const pointsPerDraw = explicitNumber("pointsPerDraw");
+        const pointsPerLoss = explicitNumber("pointsPerLoss");
+        const matchesPerParticipant = explicitNumber("matchesPerParticipant") ?? 1;
 
         try {
             const newGroup = await createPhaseGroup({
@@ -58,26 +77,23 @@ export function CreateGroupDialog({
                 order: nextOrder,
                 config: {
                     seeding,
-                    advanceCount,
-                    pointsPerWin,
-                    pointsPerDraw,
-                    pointsPerLoss,
                     matchesPerParticipant,
+                    ...(advanceCount !== undefined && { advanceCount }),
+                    ...(pointsPerWin !== undefined && { pointsPerWin }),
+                    ...(pointsPerDraw !== undefined && { pointsPerDraw }),
+                    ...(pointsPerLoss !== undefined && { pointsPerLoss }),
                 } as any
             } as any);
 
             // Auto-add participants if selected
             if (selectedPhases.length > 0 && newGroup?.id) {
                 const qualifiedRegIds = new Set<string>();
-                
+
                 await Promise.all(selectedPhases.map(async (pId) => {
-                    const res = await getPhaseGroupParticipants({
-                        filters: { phaseId: pId, qualified: true },
-                        pagination: { limit: 1000, page: 1 }
-                    });
-                    res.data.forEach((p: any) => {
-                        if (p.registrationId) qualifiedRegIds.add(p.registrationId);
-                    });
+                    // Qualifiés officiels : phase.config.qualifiers d'abord
+                    // (phases « groupes = journées »), lignes de groupe en repli.
+                    const res = await getPhaseQualifiedParticipantsAction(pId);
+                    res.registrationIds.forEach((regId) => qualifiedRegIds.add(regId));
                 }));
 
                 if (qualifiedRegIds.size > 0) {
@@ -129,29 +145,29 @@ export function CreateGroupDialog({
                         </select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="advanceCount">Qualifiés</Label>
-                        <Input type="number" id="advanceCount" name="advanceCount" defaultValue={2} />
+                        <Label htmlFor="advanceCount">Qualifiés (vide = hérite)</Label>
+                        <Input type="number" id="advanceCount" name="advanceCount" placeholder={`${effectiveAdvanceCount}`} />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-2">
                         <Label htmlFor="pointsPerWin">Pts Victoire</Label>
-                        <Input type="number" id="pointsPerWin" name="pointsPerWin" defaultValue={3} />
+                        <Input type="number" id="pointsPerWin" name="pointsPerWin" placeholder={`${effectiveScoring.pointsPerWin}`} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="pointsPerDraw">Pts Nul</Label>
-                        <Input type="number" id="pointsPerDraw" name="pointsPerDraw" defaultValue={1} />
+                        <Input type="number" id="pointsPerDraw" name="pointsPerDraw" placeholder={`${effectiveScoring.pointsPerDraw}`} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="pointsPerLoss">Pts Défaite</Label>
-                        <Input type="number" id="pointsPerLoss" name="pointsPerLoss" defaultValue={0} />
+                        <Input type="number" id="pointsPerLoss" name="pointsPerLoss" placeholder={`${effectiveScoring.pointsPerLoss}`} />
                     </div>
                 </div>
 
                 <div className="space-y-2">
                     <Label htmlFor="matchesPerParticipant">Matches par participant</Label>
-                    <Input type="number" id="matchesPerParticipant" name="matchesPerParticipant" defaultValue={1} />
+                    <Input type="number" id="matchesPerParticipant" name="matchesPerParticipant" placeholder="1" />
                 </div>
             </div>
 

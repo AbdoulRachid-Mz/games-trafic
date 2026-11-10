@@ -42,6 +42,13 @@ export function BracketNodeCard({
   const matchesCount = node.matchesCount || 0;
   const bracketId = node.id;
 
+  // Libellé de round : pour les confrontations RR (metadata.name), afficher
+  // une version compacte (nodeCode, ex. "J1-C2") ; élimination → "Round N".
+  const nodeMetadata = (node.metadata as any) || {};
+  const roundLabel = nodeMetadata.name
+    ? node.nodeCode || "Confrontation"
+    : `Round ${node.round}`;
+
   const bracketTypeColor: Record<string, string> = {
     UPPER: "bg-blue-500/10 text-blue-600 border-blue-500/20",
     LOWER: "bg-orange-500/10 text-orange-600 border-orange-500/20",
@@ -99,7 +106,7 @@ export function BracketNodeCard({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold leading-none truncate">{(node.metadata as any)?.name || `Bracket ${bracketId.slice(0, 4)}`}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">Round {node.round} • {participants.length} pts</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{roundLabel} • {participants.length} pts</p>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -141,7 +148,7 @@ export function BracketNodeCard({
               </div>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Hash className="h-3 w-3" /> Round {node.round}
+                  <Hash className="h-3 w-3" /> {roundLabel}
                 </span>
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Users className="h-3 w-3" /> {participants.length} Participants
@@ -217,7 +224,7 @@ export function BracketNodeCard({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground uppercase font-bold">Round</p>
-            <p className="text-sm font-mono font-bold">#{node.round}</p>
+            <p className="text-sm font-mono font-bold">{nodeMetadata.name ? roundLabel : `#${node.round}`}</p>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] text-muted-foreground uppercase font-bold">Match Number</p>

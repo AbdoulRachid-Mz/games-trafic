@@ -229,7 +229,7 @@ export default function ClaimsPage() {
       </motion.div>
 
       {/* Statistiques rapides */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">

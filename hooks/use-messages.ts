@@ -14,7 +14,7 @@ import { MessageWithRelations, NewMessage } from '@/database/schema';
 // QUERY KEYS
 // ============================================================================
 
-const messageKeys = {
+export const messageKeys = {
   all: ['messages'] as const,
   lists: () => [...messageKeys.all, 'list'] as const,
   list: (filters: MessageFilters = {}) => [...messageKeys.lists(), filters] as const,
@@ -118,15 +118,24 @@ export function useInfiniteMessages(
 export function useConversation(
   userId1: string,
   userId2: string,
-  pagination?: { page: number; limit: number },
-  enabled: boolean = true
+  pagination?: { page?: number; limit?: number; cursor?: string | null },
+  enabled: boolean = true,
 ) {
-  return useQuery({
+  const limit = pagination?.limit || 50;
+  return useInfiniteQuery({
     queryKey: messageKeys.conversation(userId1, userId2),
-    queryFn: () => getConversation(userId1, userId2, pagination),
+    queryFn: ({ pageParam }) =>
+      getConversation(userId1, userId2, {
+        limit,
+        cursor: pageParam ?? null,
+      }),
+    getNextPageParam: (lastPage: any) => {
+      return lastPage?.pagination?.nextCursor ?? undefined;
+    },
+    initialPageParam: null as string | null,
     enabled: enabled && !!userId1 && !!userId2,
-    staleTime: 10 * 1000, // 10 seconds for real-time feel
-    gcTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000,
+    gcTime: 2 * 60 * 1000,
   });
 }
 
@@ -138,15 +147,21 @@ export function useConversation(
  */
 export function useGroupMessages(
   groupId: string,
-  pagination?: { page: number; limit: number },
-  enabled: boolean = true
+  pagination?: { page?: number; limit?: number; cursor?: string | null },
+  enabled: boolean = true,
 ) {
-  return useQuery({
+  const limit = pagination?.limit || 50;
+  return useInfiniteQuery({
     queryKey: messageKeys.group(groupId),
-    queryFn: () => getGroupMessages(groupId, pagination),
+    queryFn: ({ pageParam }) =>
+      getGroupMessages(groupId, { limit, cursor: pageParam ?? null }),
+    getNextPageParam: (lastPage: any) => {
+      return lastPage?.pagination?.nextCursor ?? undefined;
+    },
+    initialPageParam: null as string | null,
     enabled: enabled && !!groupId,
-    staleTime: 10 * 1000, // 10 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 1000,
+    gcTime: 2 * 60 * 1000,
   });
 }
 
@@ -191,7 +206,7 @@ export function useUnreadMessages(userId: string, enabled = true) {
     enabled: enabled && !!userId,
     staleTime: 5 * 1000, // 5 seconds for real-time updates
     gcTime: 60 * 1000, // 1 minute
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+    refetchInterval: 60 * 1000, // 60 s (allégé)
   });
 }
 
@@ -238,38 +253,111 @@ export function useCreateMessage() {
 
   return useMutation({
     mutationFn: createMessage,
-    onSuccess: (newMessage) => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
-      
-      // Invalidate conversation if it's a private message
-      if (newMessage.recipientId && newMessage.senderId) {
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.conversation(newMessage.senderId, newMessage.recipientId) 
-        });
+    onMutate: async (messageData: any) => {
+      // Idempotency key client (réutilisé par le serveur via A4)
+      const tempId =
+        messageData?.id ||
+        (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      messageData.id = tempId;
+
+      // Cible du cache selon le type de conversation
+      let targetKey: any = null;
+      if (messageData.groupId) {
+        targetKey = messageKeys.group(messageData.groupId);
+      } else if (messageData.recipientId && messageData.senderId) {
+        targetKey = messageKeys.conversation(
+          messageData.senderId,
+          messageData.recipientId,
+        );
+      } else if (messageData.entityType && messageData.entityId) {
+        targetKey = messageKeys.entity(
+          messageData.entityType,
+          messageData.entityId,
+        );
       }
-      
-      // Invalidate group messages if it's a group message
-      if (newMessage.groupId) {
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.group(newMessage.groupId) 
+
+      if (targetKey) {
+        await queryClient.cancelQueries({ queryKey: targetKey });
+        const previous = queryClient.getQueryData(targetKey);
+        const tempMessage: any = {
+          ...messageData,
+          id: tempId,
+          status: "sending",
+          isOptimistic: true,
+          createdAt: new Date().toISOString(),
+          readBy: [],
+        };
+        queryClient.setQueryData(targetKey, (old: any) => {
+          if (!old) return old;
+          if (Array.isArray(old)) return [...old, tempMessage];
+          if (old.data && Array.isArray(old.data))
+            return { ...old, data: [...old.data, tempMessage] };
+          return old;
         });
+        return { tempId, targetKey, previous };
       }
-      
-      // Invalidate unread counts for recipient
-      if (newMessage.recipientId) {
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.unreadCount(newMessage.recipientId) 
-        });
-        queryClient.invalidateQueries({ 
-          queryKey: messageKeys.unread(newMessage.recipientId) 
-        });
-      }
-      
-      toast.success('Message sent successfully');
+      return { tempId, targetKey: null, previous: null };
     },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to send message');
+    onSuccess: (newMessage, _variables, context) => {
+      const tempId = context?.tempId;
+      const targetKey = context?.targetKey;
+      if (targetKey && tempId) {
+        queryClient.setQueryData(targetKey, (old: any) => {
+          if (!old) return old;
+          const replace = (arr: any[]) =>
+            arr.map((m: any) =>
+              m.id === tempId
+                ? { ...newMessage, status: "sent", isOptimistic: false }
+                : m,
+            );
+          if (Array.isArray(old)) return replace(old);
+          if (old.data && Array.isArray(old.data))
+            return { ...old, data: replace(old.data) };
+          return old;
+        });
+      }
+      // Revalidation ciblée (liste inbox, unread)
+      queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
+      if (newMessage.recipientId && newMessage.senderId) {
+        queryClient.invalidateQueries({
+          queryKey: messageKeys.conversation(
+            newMessage.senderId,
+            newMessage.recipientId,
+          ),
+        });
+      }
+      if (newMessage.groupId) {
+        queryClient.invalidateQueries({
+          queryKey: messageKeys.group(newMessage.groupId),
+        });
+      }
+      if (newMessage.recipientId) {
+        queryClient.invalidateQueries({
+          queryKey: messageKeys.unreadCount(newMessage.recipientId),
+        });
+      }
+    },
+    onError: (error, _variables, context) => {
+      const tempId = context?.tempId;
+      const targetKey = context?.targetKey;
+      if (targetKey && tempId) {
+        queryClient.setQueryData(targetKey, (old: any) => {
+          if (!old) return old;
+          const mark = (arr: any[]) =>
+            arr.map((m: any) =>
+              m.id === tempId ? { ...m, status: "failed" } : m,
+            );
+          if (Array.isArray(old)) return mark(old);
+          if (old.data && Array.isArray(old.data))
+            return { ...old, data: mark(old.data) };
+          return old;
+        });
+      }
+      toast.error(
+        error instanceof Error ? error.message : "Échec de l'envoi du message",
+      );
     },
   });
 }

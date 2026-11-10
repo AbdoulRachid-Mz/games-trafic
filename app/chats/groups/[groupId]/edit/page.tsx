@@ -29,6 +29,8 @@ function EditGroupContent() {
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [whoCanSend, setWhoCanSend] = useState('all');
   const [groupImage, setGroupImage] = useState<File | null>(null);
   const [groupImagePreview, setGroupImagePreview] = useState<string | null>(
     null
@@ -40,6 +42,8 @@ function EditGroupContent() {
       setGroupName(group.name);
       setDescription(group.description || "");
       setIsPrivate(group.isPrivate || false);
+      setIsReadOnly((group as any).isReadOnly || false);
+      setWhoCanSend(((group as any).permissions?.whoCanSend) || 'all');
       setGroupImagePreview(group.image || null);
     }
   }, [group]);
@@ -82,11 +86,14 @@ function EditGroupContent() {
 
       await updateGroupMutation.mutateAsync({
         id: groupId,
+        userId: user.id,
         data: {
           name: groupName,
           description: description || undefined,
           image: imageUrl,
           isPrivate,
+          isReadOnly,
+          permissions: { whoCanSend, whoCanSendMedia: 'all', whoCanAddMembers: 'admins', whoCanEditInfo: 'admins', whoCanPin: 'admins', whoCanDeleteMessages: 'admins' },
         },
       });
 
@@ -239,6 +246,31 @@ function EditGroupContent() {
               </p>
             </div>
             <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-[var(--chat-border)]">
+            <Label className="text-base font-semibold">Permissions</Label>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Lecture seule</Label>
+                <p className="text-sm text-[var(--chat-textMuted)]">
+                  Seul le propriétaire peut envoyer des messages
+                </p>
+              </div>
+              <Switch checked={isReadOnly} onCheckedChange={setIsReadOnly} />
+            </div>
+            <div className="space-y-1">
+              <Label>Qui peut envoyer des messages</Label>
+              <select
+                value={whoCanSend}
+                onChange={(e) => setWhoCanSend(e.target.value)}
+                className="w-full rounded-md border border-[var(--chat-border)] bg-[var(--chat-surface)] px-3 py-2 text-sm"
+              >
+                <option value="all">Tous les membres</option>
+                <option value="admins">Administrateurs</option>
+                <option value="owner">Propriétaire uniquement</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

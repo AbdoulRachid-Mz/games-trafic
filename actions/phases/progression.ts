@@ -60,7 +60,15 @@ import {
   hasPending,
   getEliminationRoundName,
   getWinnersFromGroups,
+  getEffectiveAdvanceCount,
+  isMatchdayGroup,
 } from "./helpers";
+import { setupLeaguePhase } from "@/lib/tournaments/generators";
+import { resolveScoring, isMatchCountable } from "@/lib/tournaments/scoring";
+import {
+  syncStandingsWithMatches,
+  rankParticipants as rankEngineParticipants,
+} from "@/lib/tournaments/standings.engine";
 import {
   getTournamentPhaseById,
   getPhaseGroupById,
@@ -591,9 +599,38 @@ export async function markGroupCompleteAction(
     }
 
     const config = (group.config as any) || {};
-    const advanceCount = config.advanceCount || 2;
     const groupType = group.groupType;
     const phaseType = group.phase?.phaseType;
+
+    // 🆕 Journée (matchday) Round Robin refondu : on ferme la journée
+    // SANS qualifier qui que ce soit — une journée terminée ne qualifie
+    // pas les participants ; la vent qu'à la validation de PHASE.
+    if (isMatchdayGroup(config) && groupType === "ROUND_ROBIN") {
+      return await db.transaction(async (tx) => {
+        await tx
+          .update(phaseGroups)
+          .set({ isCompleted: true, isLocked: true, updatedAt: new Date() })
+          .where(eq(phaseGroups.id, groupId));
+
+        // Clôturer les nodes de la journée (idempotent).
+        await tx
+          .update(bracketNodes)
+          .set({ isCompleted: true, updatedAt: new Date() })
+          .where(
+            and(
+              eq(bracketNodes.groupId, groupId),
+              eq(bracketNodes.isCompleted, false),
+            ),
+          );
+
+        revalidatePath(`/tournaments/dashboard`);
+        return { success: true, matchday: true, qualifiedCount: 0 };
+      });
+    }
+
+    // AdvanceCount effectif (group.config → phase.config → legacy → défaut),
+    // plus aucun `|| 2` implicite.
+    const advanceCount = getEffectiveAdvanceCount(group.phase, group);
 
     // **NOUVEAU: Pour les phases elimination, completer d'abord tous les brackets non completes**
     if (phaseType === "ELIMINATION" || phaseType === "KNOCKOUT") {
@@ -783,10 +820,17 @@ export async function markGroupCompleteAction(
 
 /**
  * Calcule les classements d'un groupe à partir des matchs réels
+ * Scoring group.config → phase.config → défauts 3/1/0 (centralisé).
  */
 async function calculateGroupStandings(
   groupId: string,
 ): Promise<Map<string, ParticipantStats & { participantId: string }>> {
+  // Récupérer le groupe avec sa phase (config de scoring héritée).
+  const groupRecord = await db.query.phaseGroups.findFirst({
+    where: eq(phaseGroups.id, groupId),
+    with: { phase: true },
+  });
+
   // Récupérer tous les matchs terminés du groupe
   const finishedMatches = await db.query.matches.findMany({
     where: and(
@@ -843,21 +887,26 @@ async function calculateGroupStandings(
     p2Stats.scoreFor += s2;
     p2Stats.scoreAgainst += s1;
 
+    const scoring = resolveScoring(
+      (groupRecord?.phase?.config as any) || {},
+      (groupRecord?.config as any) || {},
+    );
+
     if (s1 > s2) {
       p1Stats.matchesWon++;
-      p1Stats.points += 3;
+      p1Stats.points += scoring.pointsPerWin;
       p2Stats.matchesLost++;
-      p2Stats.points += 0;
+      p2Stats.points += scoring.pointsPerLoss;
     } else if (s1 < s2) {
       p2Stats.matchesWon++;
-      p2Stats.points += 3;
+      p2Stats.points += scoring.pointsPerWin;
       p1Stats.matchesLost++;
-      p1Stats.points += 0;
+      p1Stats.points += scoring.pointsPerLoss;
     } else {
       p1Stats.matchesDrawn++;
       p2Stats.matchesDrawn++;
-      p1Stats.points += 1;
-      p2Stats.points += 1;
+      p1Stats.points += scoring.pointsPerDraw;
+      p2Stats.points += scoring.pointsPerDraw;
     }
 
     p1Stats.scoreDifference = p1Stats.scoreFor - p1Stats.scoreAgainst;
@@ -923,6 +972,54 @@ function rankParticipants(
   });
 }
 
+/**
+ * Agrège les résultats d'une phase RR par journées depuis les matches
+ * (source de vérité unique) — utilisé pour la VALIDATION de phase.
+ * Utiliser getPhaseLeagueStandings (queries.ts) pour l'affichage.
+ */
+async function computeMatchdayPhaseResults(
+  phaseId: string,
+  phaseConfig: Record<string, any>,
+  groups: Array<{ id: string; config?: unknown }>,
+): Promise<
+  Array<{ registrationId: string; stats: Record<string, number> }>
+> {
+  const groupIds = groups.map((g) => g.id);
+
+  const [phaseMatches, participantsRows] = await Promise.all([
+    db.query.matches.findMany({
+      where: and(eq(matches.phaseId, phaseId), eq(matches.isDeleted, false)),
+    }),
+    db.query.phaseGroupParticipants.findMany({
+      where: and(
+        inArray(phaseGroupParticipants.groupId, groupIds),
+        eq(phaseGroupParticipants.isDeleted, false),
+      ),
+    }),
+  ]);
+
+  // Union sans doublons des registrations (un joueur apparaît à plusieurs journées).
+  const registrationIds = Array.from(
+    new Set(participantsRows.map((p) => p.registrationId)),
+  );
+
+  const scoring = resolveScoring(
+    phaseConfig,
+    (groups[0]?.config as any) || {},
+  );
+
+  const countable = (phaseMatches as any[]).filter(isMatchCountable);
+  const statsMap = syncStandingsWithMatches(registrationIds, countable, {
+    ...scoring,
+  });
+
+  const ranked = rankEngineParticipants(statsMap, {});
+  return ranked.map((r) => ({
+    registrationId: r.registrationId,
+    stats: r.stats as unknown as Record<string, number>,
+  }));
+}
+
 export async function markPhaseCompleteAction(phaseId: string) {
   try {
     const phase = await db.query.tournamentPhases.findFirst({
@@ -985,11 +1082,49 @@ export async function markPhaseCompleteAction(phaseId: string) {
       qualifiedCount += qualified.length;
     }
 
+    // 🆕 Round Robin refondu (groupes = journées) : les journées ne
+    // qualifient rien — la qualification s'acte ICI, à la validation
+    // de phase, et est persistée dans phase.config.qualifiers.
+    const phaseConfig = (phase.config as any) || {};
+    const isMatchdayRoundRobin =
+      phase.phaseType === "ROUND_ROBIN" &&
+      groups.length > 0 &&
+      isMatchdayGroup((groups[0].config as any) || {});
+
+    let persistedQualifiers: Array<{
+      registrationId: string;
+      position: number;
+      points: number;
+    }> = [];
+
+    if (isMatchdayRoundRobin) {
+      const phaseResults = await computeMatchdayPhaseResults(phaseId, phaseConfig, groups);
+      const advanceCount = getEffectiveAdvanceCount(phase, groups[0]);
+      persistedQualifiers = phaseResults
+        .slice(0, advanceCount)
+        .map((r, index) => ({
+          registrationId: r.registrationId,
+          position: index + 1,
+          points: r.stats?.points ?? 0,
+        }));
+      qualifiedCount = persistedQualifiers.length;
+    }
+
     return await db.transaction(async (tx) => {
       await tx
         .update(tournamentPhases)
         .set({ isCompleted: true, isActive: false, updatedAt: new Date() })
         .where(eq(tournamentPhases.id, phaseId));
+
+      if (persistedQualifiers.length > 0) {
+        await tx
+          .update(tournamentPhases)
+          .set({
+            config: { ...phaseConfig, qualifiers: persistedQualifiers },
+            updatedAt: new Date(),
+          })
+          .where(eq(tournamentPhases.id, phaseId));
+      }
 
       await tx
         .update(phaseGroups)
@@ -1179,6 +1314,85 @@ export async function getQualifiedParticipantsPreviewAction(phaseId: string) {
 
     if (!phase) return { success: false, error: "Phase introuvable" };
 
+    // 🆕 RR refondu (groupes = journées) : les lignes de journée ne portent
+    // pas de qualification — les qualifiés officiels viennent de
+    // phase.config.qualifiers (écrits à la validation de phase).
+    const phaseConfigAny = (phase.config as any) || {};
+    if (
+      phase.phaseType === "ROUND_ROBIN" &&
+      Array.isArray(phaseConfigAny.qualifiers)
+    ) {
+      const qualifiedPreview: any[] = [];
+      const qualifiedIds: string[] = phaseConfigAny.qualifiers
+        .map((q: any) => (typeof q === "string" ? q : q?.registrationId))
+        .filter(Boolean);
+
+      // Annuaire (une entrée par registrationId, informations d'affichage)
+      const infoMap = new Map<string, any>();
+      for (const group of phase.groups) {
+        for (const participant of group.participants) {
+          if (!infoMap.has(participant.registrationId)) {
+            infoMap.set(participant.registrationId, participant);
+          }
+        }
+      }
+
+      for (const [index, regId] of qualifiedIds.entries()) {
+        const participant = infoMap.get(regId);
+        if (!participant) continue;
+        qualifiedPreview.push({
+          id: participant.registrationId,
+          participantId: participant.id,
+          registrationId: participant.registrationId,
+          name:
+            participant.registration.member?.displayName ||
+            participant.registration.member?.team?.name ||
+            participant.registration.member?.user?.fullName ||
+            "Participant",
+          image:
+            participant.registration.member?.avatar ||
+            participant.registration.member?.user?.profileImage ||
+            participant.registration.member?.user?.image,
+          email:
+            participant.registration.member?.contactEmail ||
+            participant.registration.member?.user?.email,
+          phone:
+            participant.registration.member?.contactPhone ||
+            participant.registration.member?.user?.phoneNumber,
+          groupId: phase.id,
+          position: index + 1,
+          isQualified: true,
+        });
+      }
+      return {
+        success: true,
+        qualified: qualifiedPreview,
+        others: Array.from(infoMap.keys())
+          .filter((id) => !qualifiedIds.includes(id))
+          .map((id) => {
+            const participant = infoMap.get(id);
+            return {
+              id: participant.registrationId,
+              participantId: participant.id,
+              registrationId: participant.registrationId,
+              name:
+                participant.registration.member?.displayName ||
+                participant.registration.member?.team?.name ||
+                participant.registration.member?.user?.fullName ||
+                "Participant",
+              image:
+                participant.registration.member?.avatar ||
+                participant.registration.member?.user?.profileImage,
+              email: undefined,
+              phone: undefined,
+              groupId: phase.id,
+              position: undefined,
+              isQualified: false,
+            };
+          }),
+      };
+    }
+
     const qualified: any[] = [];
     const others: any[] = [];
 
@@ -1348,7 +1562,21 @@ export async function organizeNextPhaseAction(
           ),
         });
 
-        if (previousGroups.length > 0) {
+        // 🆕 Priorité aux qualifiés persistés à la VALIDATION d'une phase
+        // RR par journées (phase.config.qualifiers) : les lignes de
+        // phaseGroupParticipants de ces phases ne portent rien de fiable.
+        const previousPhaseConfig = (previousPhase.config as any) || {};
+        if (Array.isArray(previousPhaseConfig.qualifiers)) {
+          participantRegIds = previousPhaseConfig.qualifiers
+            .map((q: any) =>
+              typeof q === "string" ? q : q?.registrationId,
+            )
+            .filter(Boolean);
+        }
+
+        if (participantRegIds.length > 0) {
+          // Qualifiés déjà résolus — pas de lecture des groupes.
+        } else if (previousGroups.length > 0) {
           // Récupérer les participants qualifiés
           const qualifiedParticipants =
             await db.query.phaseGroupParticipants.findMany({
@@ -1372,7 +1600,10 @@ export async function organizeNextPhaseAction(
             where: eq(editionResults.editionId, phase.editionId),
             orderBy: asc(editionResults.position),
           });
-          const advanceCount = (phase.config as any)?.advanceCount || 2;
+          const advanceCount =
+            (phase.config as any)?.advanceCount ||
+            (phase.config as any)?.advanceFromGroup ||
+            2;
           const groupsCount = previousGroups.length || 1;
           participantRegIds = editionResultsList
             .slice(0, advanceCount * groupsCount)
@@ -1420,6 +1651,20 @@ export async function organizeNextPhaseAction(
         phase.phaseType === "GROUP_STAGE" ||
         phase.phaseType === "ROUND_ROBIN"
       ) {
+        // 🆕 Round Robin refondu (Phase 1 PROMPT.md) : groupes = journées,
+        // nodes = confrontations uniques (2 participants). Délégation unique
+        // au générateur (Circle Method, BYE, allers-retours, scoring hérité
+        // phase → groupe). Plus de groupe « Classement » ni de nodes = journées.
+        if (phase.phaseType === "ROUND_ROBIN") {
+          await setupLeaguePhase(tx, phase.editionId, phase, participants, {
+            generateGroups: true,
+            generateNodes,
+            generateMatches,
+            isHomeAway,
+            nodePrefix: (phase.config as any)?.nodePrefix || "Journée",
+            matchFormat,
+          });
+        } else {
         const groupsCount = (phase.config as any)?.groupsCount ?? 1;
         const perGroup = Math.ceil(participants.length / groupsCount);
         const createdGroups: any[] = [];
@@ -1441,11 +1686,10 @@ export async function organizeNextPhaseAction(
               name: groupName,
               order: i,
               participantCount: chunk.length,
-              groupType:
-                phase.phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "STANDARD",
+              groupType: "STANDARD",
               config: {
                 isHomeAway: isHomeAway,
-                advanceCount: (phase.config as any)?.advanceCount || 2,
+                advanceCount: getEffectiveAdvanceCount(phase),
               },
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -1466,62 +1710,10 @@ export async function organizeNextPhaseAction(
 
         if (generateNodes && createdGroups.length > 0) {
           for (const g of createdGroups) {
-            if (phase.phaseType === "ROUND_ROBIN") {
-              // ROUND_ROBIN: créer un nœud par journée
-              const roundsCount = g.participants.length - 1;
-              if (roundsCount > 0) {
-                for (let round = 1; round <= roundsCount; round++) {
-                  const [node] = await tx
-                    .insert(bracketNodes)
-                    .values({
-                      phaseId: phase.id,
-                      groupId: g.group.id,
-                      nodeCode: `J${round}`,
-                      round: round,
-                      matchNumber: round,
-                      bracketType: "UPPER",
-                      order: round,
-                      metadata: {
-                        participants: g.participants,
-                        name: `Journée ${round}`,
-                        generateMatches: generateMatches,
-                        format: "BEST_OF_1",
-                        nodeType: "ROUND_ROBIN",
-                      },
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    })
-                    .returning();
-
-                  if (generateMatches) {
-                    const roundMatches = generateRoundRobinMatchesForRound(
-                      g.participants,
-                      round,
-                      g.participants.length,
-                    );
-                    for (let idx = 0; idx < roundMatches.length; idx++) {
-                      const m = roundMatches[idx];
-                      await tx.insert(matches).values({
-                        editionId: phase.editionId,
-                        phaseId: phase.id,
-                        groupId: g.group.id,
-                        bracketNodeId: node.id,
-                        participant1RegistrationId: m.participant1.id,
-                        participant2RegistrationId: m.participant2.id,
-                        matchCode: `${node.nodeCode}-M${idx + 1}`,
-                        status: "PENDING",
-                        round: round,
-                        matchNumber: idx + 1,
-                        scheduledTime: getDefaultScheduledTime(round, idx + 1),
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                      });
-                    }
-                  }
-                }
-              }
-            } else {
+            {
               // GROUP_STAGE standard: un seul nœud par groupe (poule)
+              // NB : les phases ROUND_ROBIN sont traitées plus haut via
+              // setupLeaguePhase (groupes = journées, 1 node = 1 confrontation).
               const totalMatches =
                 (g.participants.length * (g.participants.length - 1)) / 2;
               const [node] = await tx
@@ -1573,6 +1765,7 @@ export async function organizeNextPhaseAction(
               }
             }
           }
+        }
         }
       }
 
@@ -1816,50 +2009,6 @@ function generateAllRoundRobinMatches(participants: string[]): {
   }
 
   return allMatches;
-}
-
-/**
- * Génère les matchs round-robin pour un round spécifique
- */
-function generateRoundRobinMatchesForRound(
-  participants: string[],
-  round: number,
-  totalRounds: number,
-): { participant1: { id: string }; participant2: { id: string } }[] {
-  const n = participants.length;
-  if (n < 2) return [];
-
-  const players = [...participants];
-  if (n % 2 !== 0) {
-    players.push("BYE");
-  }
-
-  const half = players.length / 2;
-  const matches: {
-    participant1: { id: string };
-    participant2: { id: string };
-  }[] = [];
-
-  // Rotation cyclique pour atteindre le round demandé
-  const roundIndex = round - 1;
-  for (let i = 0; i < roundIndex; i++) {
-    const last = players.pop()!;
-    players.splice(1, 0, last);
-  }
-
-  for (let i = 0; i < half; i++) {
-    const p1 = players[i];
-    const p2 = players[players.length - 1 - i];
-
-    if (p1 !== "BYE" && p2 !== "BYE") {
-      matches.push({
-        participant1: { id: p1 },
-        participant2: { id: p2 },
-      });
-    }
-  }
-
-  return matches;
 }
 
 /**

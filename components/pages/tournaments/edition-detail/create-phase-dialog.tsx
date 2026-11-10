@@ -54,14 +54,22 @@ export function CreatePhaseDialog({
         const isDoubleElimination = formData.get("isDoubleElimination") === "on";
         const participantSource = formData.get("participantSource") as string;
 
-        // Advanced data
-        const groupsCount = parseInt(formData.get("groupsCount") as string) || 1;
-        const pointsPerWin = parseInt(formData.get("pointsPerWin") as string) || 3;
-        const pointsPerDraw = parseInt(formData.get("pointsPerDraw") as string) || 1;
-        const pointsPerLoss = parseInt(formData.get("pointsPerLoss") as string) || 0;
+        // Advanced data — champs explicitement remplis uniquement :
+        // ils écrasent les défauts ; laissés vides, ils restent héritants.
+        const explicitNumber = (key: string): number | undefined => {
+            const raw = formData.get(key);
+            if (typeof raw !== "string" || raw.trim() === "" || isNaN(Number(raw))) return undefined;
+            const n = Number(raw);
+            return n > 0 ? n : undefined;
+        };
+        const groupsCount = explicitNumber("groupsCount");
+        const pointsPerWin = explicitNumber("pointsPerWin");
+        const pointsPerDraw = explicitNumber("pointsPerDraw");
+        const pointsPerLoss = explicitNumber("pointsPerLoss");
         const seedingMethod = formData.get("seedingMethod") as string || "RANDOM";
-        const advanceFromGroup = parseInt(formData.get("advanceFromGroup") as string) || 2;
-        const matchesPerParticipant = parseInt(formData.get("matchesPerParticipant") as string) || 1;
+        const advanceFromGroup = explicitNumber("advanceFromGroup");
+        const advanceCount = explicitNumber("advanceCount");
+        const matchesPerParticipant = explicitNumber("matchesPerParticipant") ?? 1;
 
         try {
             await createTournamentPhase({
@@ -72,13 +80,19 @@ export function CreatePhaseDialog({
                 isDoubleElimination,
                 config: {
                     participantSource,
-                    groupsCount,
-                    pointsPerWin,
-                    pointsPerDraw,
-                    pointsPerLoss,
                     seedingMethod,
-                    advanceFromGroup,
                     matchesPerParticipant,
+                    // GROUP_STAGE (poules classiques) : top-N PAR groupe.
+                    // ROUND_ROBIN (groupes = journées) : top-N de la PHASE
+                    // (un classement général, jamais par journée).
+                    ...(phaseType === "GROUP_STAGE" && {
+                        groupsCount,
+                        advanceFromGroup,
+                    }),
+                    ...(phaseType !== "GROUP_STAGE" && { advanceCount }),
+                    ...(pointsPerWin !== undefined && { pointsPerWin }),
+                    ...(pointsPerDraw !== undefined && { pointsPerDraw }),
+                    ...(pointsPerLoss !== undefined && { pointsPerLoss }),
                 } as any
             });
 
@@ -183,16 +197,28 @@ export function CreatePhaseDialog({
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="space-y-2">
                                     <Label htmlFor="pointsPerWin">Pts Victoire</Label>
-                                    <Input type="number" id="pointsPerWin" name="pointsPerWin" defaultValue={3} />
+                                    <Input type="number" id="pointsPerWin" name="pointsPerWin" placeholder="3" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="pointsPerDraw">Pts Nul</Label>
-                                    <Input type="number" id="pointsPerDraw" name="pointsPerDraw" defaultValue={1} />
+                                    <Input type="number" id="pointsPerDraw" name="pointsPerDraw" placeholder="1" />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="pointsPerLoss">Pts Défaite</Label>
-                                    <Input type="number" id="pointsPerLoss" name="pointsPerLoss" defaultValue={0} />
+                                    <Input type="number" id="pointsPerLoss" name="pointsPerLoss" placeholder="0" />
                                 </div>
+                            </div>
+                        )}
+
+                        {phaseType === "ROUND_ROBIN" && (
+                            <div className="space-y-2">
+                                <Label htmlFor="advanceCount">Qualifiés de la phase (top N)</Label>
+                                <Input type="number" id="advanceCount" name="advanceCount" min={1} placeholder="2" />
+                                <p className="text-[10px] text-muted-foreground italic">
+                                    Championnat à un classement général : le top N du
+                                    classement de la phase se qualifie à la validation
+                                    de la phase (jamais par journée).
+                                </p>
                             </div>
                         )}
 

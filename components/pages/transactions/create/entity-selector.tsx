@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Typography } from "@/components/ui/typography";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import {
 import { TransactionType } from "@/types/transaction-types";
 import { cn } from "@/lib/utils";
 import { useEntityList, type EntityType } from "@/hooks/use-entity-list";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useAuthContext } from "@/contexts/auth-context";
 import { getTournamentEditions } from "@/actions/tournaments";
 
@@ -77,8 +78,7 @@ export function TransactionEntitySelector({
   } = useEntityList<any>({
     entityType: (entityType || "products") as any, // Fallback to products
     defaultLimit: (type === "ORDER_PURCHASE" || type === "GAME_ITEM_PURCHASE") ? 20 : 50,
-    enabled: !!entityType,
-    defaultFilters: {
+    enabled: !!entityType,    defaultFilters: {
       isActive: true, 
       isVisible: true,
       // Filtres spécifiques selon le type
@@ -112,6 +112,15 @@ export function TransactionEntitySelector({
         : undefined,
   });
 
+  // 🔎 Recherche connectée au serveur (debounce 300ms) — avant, le hook
+  // exposait setSearchTerm mais il n'était jamais appelé : la saisie ne
+  // filtrait que les 20/50 items déjà chargés côté client.
+  const debouncedSearch = useDebounce(search, 300);
+  useEffect(() => {
+    setSearchTerm(debouncedSearch);
+    // setSearchTerm est un setter d'état (stable)
+  }, [debouncedSearch, setSearchTerm]);
+
   const getEntityIcon = () => {
     switch (type) {
       case "THEME_PURCHASE":
@@ -143,21 +152,15 @@ export function TransactionEntitySelector({
   };
 
   const filteredEntities = useMemo(() => {
+    // 🎯 Filtrage 100 % serveur (params.search → where-builder, see above) ;
+    // on garde SEULEMENT l'exclusion des produits de l'utilisateur, qui ne
+    // peut pas être exprimée côté serveur pour ce flux.
     return (entities || []).filter((entity: any) => {
-      const name = (entity.name || entity.editionSlug || "").toLowerCase();
-      const desc = (entity.description || "").toLowerCase();
-      const idMatch = entity.id?.toLowerCase() === search.toLowerCase();
-      // Exclusions supplémentaires pour produits: ne pas retourner ses propres items
       const notOwnProduct =
         type !== "ORDER_PURCHASE" || (entity.userId && user?.id ? entity.userId !== user.id : true);
-      return (
-        (name.includes(search.toLowerCase()) ||
-          desc.includes(search.toLowerCase()) ||
-          idMatch) &&
-        notOwnProduct
-      );
+      return notOwnProduct;
     });
-  }, [entities, search, type, user]);
+  }, [entities, type, user]);
 
   const mappedEntities = useMemo(() => {
     return filteredEntities.map((entity: any) => {
@@ -201,7 +204,7 @@ export function TransactionEntitySelector({
         </Typography>
       </div>
 
-      <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-xl overflow-hidden">
+      <Card className="bg-card border-border/50 shadow-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="p-6 space-y-6">
             {/* Header with Search */}
@@ -215,13 +218,6 @@ export function TransactionEntitySelector({
                   className="pl-12 h-12 bg-background/50 border-input/50 focus:border-primary/50 focus:ring-primary/20 transition-all rounded-xl"
                 />
               </div>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 rounded-xl shrink-0"
-              >
-                <Filter className="h-5 w-5 text-muted-foreground" />
-              </Button>
             </div>
 
             <div className="flex items-center justify-between px-1">
@@ -233,7 +229,7 @@ export function TransactionEntitySelector({
             </div>
 
             {/* List */}
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <div

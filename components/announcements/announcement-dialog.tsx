@@ -94,7 +94,7 @@ export function AnnouncementDialog({ announcements, onClose }: AnnouncementDialo
     <AnimatePresence>
       {isVisible && (
         <Dialog open={isVisible} onOpenChange={handleClose}>
-          <DialogContent className="max-w-2xl max-h-[80vh] p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] p-0 overflow-hidden">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

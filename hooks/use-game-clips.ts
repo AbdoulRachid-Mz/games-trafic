@@ -45,7 +45,16 @@ export function useGameClips(filters: GameClipFilters = {}) {
     initialPageParam: 1,
   });
 
-  const clips = data?.pages.flatMap((page) => page.data) || [];
+  const clips = (() => {
+    const raw = data?.pages.flatMap((page) => page.data) || [];
+    const seen = new Set<string>();
+    return raw.filter((c: any) => {
+      if (!c?.id) return true;
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
+  })();
 
   const createMutation = useMutation({
     mutationFn: async (data: {

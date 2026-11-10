@@ -30,6 +30,7 @@ interface MessageBubbleProps {
   onDelete?: (messageId: string) => void;
   onLike?: (messageId: string) => void;
   onPin?: (messageId: string) => void;
+  onRetry?: (messageId: string) => void;
   // Like state
   isLiked?: boolean;
   likeCount?: number;
@@ -52,6 +53,7 @@ export function MessageBubble({
   onDelete,
   onLike,
   onPin,
+  onRetry,
   isLiked = false,
   likeCount = 0,
   isSelected = false,
@@ -252,17 +254,32 @@ export function MessageBubble({
               </>
             )}
 
-            {/* Timestamp + read receipts */}
+            {/* Timestamp + read receipts / statut d'envoi */}
             <div className="flex items-center gap-1 justify-end opacity-70">
               <span className="text-[10px]">
                 {message.createdAt ? formatMessageTime(message.createdAt) : ""}
               </span>
               {isSent && (
-                <span className="flex-shrink-0">
-                  {message.readBy && message.readBy.length > 1 ? (
-                    <CheckCheck className="h-4 w-4 text-[#53bdeb]" />
-                  ) : (
-                    <CheckCheck className="h-4 w-4" />
+                <span className="flex-shrink-0 flex items-center gap-1">
+                  {message.status === "sending" && (
+                    <span className="text-[10px] italic">Envoi…</span>
+                  )}
+                  {message.status === "failed" && (
+                    <button
+                      type="button"
+                      onClick={() => onRetry?.(message.id)}
+                      className="text-[10px] text-red-400 underline"
+                      title="Réessayer"
+                    >
+                      Échec · réessayer
+                    </button>
+                  )}
+                  {(!message.status || message.status === "sent" || message.status === "delivered" || message.status === "read") && (
+                    message.readBy && message.readBy.length > 1 ? (
+                      <CheckCheck className="h-4 w-4 text-[#53bdeb]" />
+                    ) : (
+                      <CheckCheck className="h-4 w-4" />
+                    )
                   )}
                 </span>
               )}

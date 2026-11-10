@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { TransactionType, TransactionEntity } from "@/types/transaction-types";
+import {
+  TransactionType,
+  TransactionEntity,
+  resolveTransactionPricingMode,
+  isCurrencyLikeGameItem,
+  type TransactionPricingMode,
+} from "@/types/transaction-types";
 import { ArrowLeft, ArrowRight, Wallet, Info, AlertTriangle } from "lucide-react";
 
 interface TransactionAmountInputProps {
@@ -28,7 +34,6 @@ interface TransactionAmountInputProps {
     gameAccount?: string;
     encryptedPassword?: string;
     additionalInfo?: string;
-    originalAmount?: number;
   };
   onMetadataChange?: (data: {
     gameAccount?: string;
@@ -58,30 +63,21 @@ export function TransactionAmountInput({
   const isTransfer = transactionType === "TRANSFER";
   const isGameItem = transactionType === "GAME_ITEM_PURCHASE";
   const isVip = transactionType === "VIP_SUBSCRIPTION";
-  const isTournamentParticipation = transactionType === "TOURNAMENT_PARTICIPATION";
 
-  const isFixedPrice =
-    isVip ||
-    (!!entity?.price && (isTournamentParticipation || !isGameItem));
-  const itemType =
-    (entity as any)?.metadata?.type?.toString()?.toUpperCase() ||
-    (entity as any)?.type?.toString()?.toUpperCase() ||
-    "";
-  const requiresAmountInput =
-    isDeposit ||
-    isWithdrawal ||
-    isTransfer ||
-    (isGameItem && (itemType === "COIN" || itemType === "CURRENCY")) ||
-    !isFixedPrice;
-  const requiresQuantity =
-    isGameItem && !(itemType === "COIN" || itemType === "CURRENCY");
-  const unitPrice = entity?.price || 0;
+  // Tarification explicite : FIXED (prix de référence connu, 0 compris),
+  // VARIABLE (montant libre), QUANTITY (quantité × prix unitaire).
+  // JAMAIS `!!entity?.price` — un prix nul reste un prix défini.
+  const pricingMode = resolveTransactionPricingMode(transactionType, entity);
+  const isFixedPrice = pricingMode === "FIXED";
+  const isCurrencyLikeItem = isCurrencyLikeGameItem(entity);
+  const requiresAmountInput = pricingMode === "VARIABLE";
+  const requiresQuantity = pricingMode === "QUANTITY";
+  const unitPrice = entity?.price ?? 0;
+  const quantityMissingPrice = requiresQuantity && unitPrice <= 0;
   const grossAmount = amount || 0;
   const feeAmount = fees.amount || 0;
   const debitedAmount = grossAmount;
   const receivedAmount = Math.max(0, grossAmount - feeAmount);
-  const originalAmount = metadata?.originalAmount;
-
   const [gameAccount, setGameAccount] = React.useState(metadata?.gameAccount || "");
   const [gamePassword, setGamePassword] = React.useState(metadata?.encryptedPassword || "");
   const [additionalInfo, setAdditionalInfo] = React.useState(metadata?.additionalInfo || "");
@@ -108,13 +104,18 @@ export function TransactionAmountInput({
   
   const isMinAmountRestricted = (isTransfer || isWithdrawal) && amount > 0 && amount < MIN_AMOUNT;
 
-  const quickAmounts = isDeposit
-    ? [500, 1000, 5000, 10000]
-    : transactionType === "TRANSFER"
-      ? [100, 500, 1000, 2000]
+  // Validité du montant pour autoriser l'étape suivante, selon le mode :
+  // - VARIABLE : montant strictement positif (les crédits/débits libres) ;
+  // - FIXED : prix de référence connu (0 = gratuit, autorisé) ;
+  // - QUANTITY : quantité ≥ 1 et total > 0 (unitaire défini).
+  const isAmountValid =
+    pricingMode === "FIXED"
+      ? entity?.price != null || amount > 0
       : requiresQuantity
-        ? [1, 5, 10]
-        : [];
+        ? quantityMissingPrice
+          ? false
+          : qty >= 1 && (amount || 0) > 0
+        : amount > 0;
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-8">
@@ -191,20 +192,6 @@ export function TransactionAmountInput({
             </div>
           )}
 
-          {isGameItem &&
-            typeof originalAmount === "number" &&
-            originalAmount > 0 &&
-            Math.abs(originalAmount - grossAmount) > 0.01 && (
-              <div className="mb-6 p-4 rounded-xl border border-amber-300/40 bg-amber-200/15">
-                <Typography variant="body-sm" className="font-bold text-amber-700">
-                  Montant réel appliqué: {grossAmount.toFixed(2)} GTC
-                </Typography>
-                <Typography variant="caption1" theme="muted">
-                  Montant initial reçu: {originalAmount.toFixed(2)} GTC
-                </Typography>
-              </div>
-            )}
-
           {(requiresAmountInput || requiresQuantity) && (
             <div className="space-y-8">
               <div className="relative flex justify-center py-4">
@@ -228,73 +215,38 @@ export function TransactionAmountInput({
                         onChange(v);
                       }
                     }}
-                    className="text-6xl font-black h-24 text-center border-none bg-transparent focus-visible:ring-0 shadow-none p-0 w-full min-w-[200px] max-w-[400px]"
+                    className="text-3xl sm:text-4xl font-black h-16 sm:h-20 text-center border-none bg-transparent focus-visible:ring-0 shadow-none p-0 w-full min-w-[120px] max-w-full"
                     min="0"
                     step={requiresQuantity ? "1" : "0.01"}
                     autoFocus
                   />
                   {!requiresQuantity && (
-                    <span className="absolute top-1/2 -right-12 -translate-y-1/2 text-2xl font-bold text-muted-foreground">
+                    <span className="absolute top-1/2 -right-10 sm:-right-12 -translate-y-1/2 text-xl sm:text-2xl font-bold text-muted-foreground">
                       GTC
                     </span>
                   )}
                 </div>
               </div>
 
-              {requiresAmountInput && !requiresQuantity && !isFixedPrice && (
-                <div className="flex justify-center gap-2">
-                  {[-1000, -100, 100, 1000].map((step) => (
-                    <Button
-                      key={step}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const next = Math.max(0, (amount || 0) + step);
-                        onChange(next);
-                      }}
-                      className="h-9 px-3 text-xs font-bold"
-                    >
-                      {step > 0 ? `+${step}` : step} GTC
-                    </Button>
-                  ))}
-                </div>
-              )}
-
-              {quickAmounts.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-3">
-                  {quickAmounts.map((quickAmount) => (
-                    <button
-                      key={quickAmount}
-                      onClick={() => {
-                        if (requiresQuantity) {
-                          const total = quickAmount * unitPrice;
-                          setQty(quickAmount);
-                          onChange(total);
-                        } else {
-                          onChange(quickAmount);
-                        }
-                      }}
-                      className={cn(
-                        "px-4 py-2 rounded-full text-sm font-bold transition-all border",
-                        (requiresQuantity
-                          ? Math.max(0, Math.round((amount || 0) / unitPrice))
-                          : amount) === quickAmount
-                          ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25"
-                          : "bg-card/50 border-border hover:border-primary/50 hover:bg-card/80"
-                      )}
-                    >
-                      {requiresQuantity ? quickAmount : `${quickAmount} GTC`}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Saisie manuelle uniquement : les raccourcis de type
+                  +1000/+100 (et tout équivalent) sont supprimés
+                  définitivement (PROMPT.md §11) — pas de substitut. */}
 
               {isMinAmountRestricted && (
                 <div className="flex items-center gap-2 justify-center text-red-500 bg-red-500/10 p-3 rounded-lg border border-red-500/20">
                   <AlertTriangle className="w-5 h-5" />
                   <Typography variant="body-sm" weight="bold">
                     Le montant minimum pour cette transaction est de {MIN_AMOUNT} GTC
+                  </Typography>
+                </div>
+              )}
+
+              {quantityMissingPrice && (
+                <div className="flex items-center gap-2 justify-center text-amber-600 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+                  <AlertTriangle className="w-5 h-5" />
+                  <Typography variant="body-sm" weight="bold">
+                    Cet article n&apos;a pas de prix unitaire défini — transaction
+                    impossible.
                   </Typography>
                 </div>
               )}
@@ -416,8 +368,7 @@ export function TransactionAmountInput({
           size="lg"
           onClick={onContinue}
           disabled={
-            (!amount && !entity?.price) ||
-            (amount <= 0 && !entity?.price) ||
+            !isAmountValid ||
             isMinAmountRestricted ||
             !hasSufficientBalance ||
             (isVip && !!alreadyVip) ||
