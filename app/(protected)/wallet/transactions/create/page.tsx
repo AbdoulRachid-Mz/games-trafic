@@ -39,7 +39,6 @@ import { QrScanner } from "@/components/shared/qr-scanner";
 import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTransactionFees } from "@/hooks/use-transaction-fees";
-import { getTournamentMembers } from "@/actions/members";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -457,24 +456,9 @@ function CreateTransactionContent({
       }
     }
 
-    if (transactionData.type === "TOURNAMENT_PARTICIPATION" && user?.id) {
-      const tId =
-        entity?.metadata?.tournamentId ||
-        entity?.tournamentId ||
-        entity?.tournament?.id;
-      if (tId) {
-        try {
-          const res = await getTournamentMembers({
-            pagination: { page: 1, limit: 1 },
-            filters: { tournamentId: tId, userId: user.id } as any,
-          });
-          if (res?.data && res.data.length > 0) {
-            toast.error("Vous êtes déjà membre ou organisateur de ce tournoi");
-            return;
-          }
-        } catch (e) {}
-      }
-    }
+    // L'anti-doublon d'inscription est vérifié côté serveur (édition + membre)
+    // avant tout débit : être membre du tournoi n'empêche pas de s'inscrire à
+    // une nouvelle édition.
 
     let finalEntity = entity;
     if (transactionData.type === "TOURNAMENT_PARTICIPATION") {

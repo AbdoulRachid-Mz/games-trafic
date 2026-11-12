@@ -416,7 +416,9 @@ export async function joinEdition(
           memberId: member.id,
           status: "REGISTERED",
           checkedIn: false,
-          feePaid: entryFee > 0 ? true : true,
+          feePaid: true,
+          registrationFee: entryFee.toFixed(2),
+          paymentTransactionId: paidTransactionId,
         })
         .returning();
 

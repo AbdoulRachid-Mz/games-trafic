@@ -6,7 +6,8 @@ import {
   vipSubscriptions, type WalletTransaction,
   type NewWalletTransaction, users, registrationPayments,
   requests
-, gameItems, themes, tournamentEditions} from "@/database/schema";
+, gameItems, themes, tournamentEditions,
+  tournamentMembers, editionRegistrations } from "@/database/schema";
 import {
   eq,
   and, desc,
@@ -23,6 +24,7 @@ import {
   type QueryOptions,
 } from "@/types/api";
 import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import { getAppSettings } from "./app-settings";
 import { getUserWalletById, verifyWalletPin } from "./wallets";
@@ -309,6 +311,8 @@ export async function createTransaction(
   }
 
   let amount = Number(data.amount);
+  // Compte cible du pool pour une inscription tournoi (aligné sur joinEdition).
+  let tournamentPoolAccountId: string | null = null;
 
   // 🛡️ P0-F5: Server-side price enforcement for purchase/entry types
   if (data.type === "GAME_ITEM_PURCHASE") {
@@ -329,18 +333,81 @@ export async function createTransaction(
     }
   } else if (data.type === "TOURNAMENT_PARTICIPATION") {
     const editionId = data.metadata?.targetId || data.metadata?.editionId;
-    if (editionId) {
-      const edition = await db.query.tournamentEditions.findFirst({
-        where: eq(tournamentEditions.id, editionId),
+    if (!editionId) {
+      throw new Error("Édition cible requise");
+    }
+
+    const edition = await db.query.tournamentEditions.findFirst({
+      where: eq(tournamentEditions.id, editionId),
+    });
+    if (!edition) {
+      throw new Error("Édition introuvable");
+    }
+
+    // Mêmes règles métier que joinEdition : inscriptions ouvertes, édition à
+    // venir et places disponibles.
+    if (edition.status !== "UPCOMING") {
+      throw new Error(
+        "Les inscriptions sont fermées. Le tournoi a déjà commencé ou est terminé.",
+      );
+    }
+    const now = new Date();
+    if (edition.registrationOpens && now < new Date(edition.registrationOpens)) {
+      throw new Error(
+        "Les inscriptions ne sont pas encore ouvertes pour cette édition.",
+      );
+    }
+    if (
+      edition.registrationDeadline &&
+      now > new Date(edition.registrationDeadline)
+    ) {
+      throw new Error("La date limite d'inscription est dépassée.");
+    }
+    const maxParticipants = edition.maxParticipants || 0;
+    if (
+      maxParticipants > 0 &&
+      (edition.currentParticipants || 0) >= maxParticipants
+    ) {
+      throw new Error("Désolé, cette édition est déjà complète.");
+    }
+
+    // Le prix est toujours celui du serveur.
+    const serverFee = parseFloat(edition.entryFee || "0");
+    if (serverFee <= 0) {
+      throw new Error(
+        "Cette édition est gratuite : aucune transaction de portefeuille n'est nécessaire.",
+      );
+    }
+    if (!isNaN(amount) && Math.abs(amount - serverFee) > 0.01) {
+      throw new Error("PRICE_CHANGED: Les frais d'inscription du tournoi ont été actualisés.");
+    }
+    amount = serverFee;
+    // Les frais d'inscription alimentent le pool de l'édition, comme dans
+    // joinEdition ; ESCROW sert uniquement de repli si le pool n'existe pas.
+    tournamentPoolAccountId = edition.financialAccountId ?? null;
+
+    // Anti-doublon AVANT tout débit : une seule inscription active par édition.
+    // La contrainte porte sur l'inscription à l'édition, pas sur l'appartenance
+    // au tournoi (un membre peut s'inscrire à plusieurs éditions).
+    const existingMember = await db.query.tournamentMembers.findFirst({
+      where: (m, { and, eq }) =>
+        and(
+          eq(m.tournamentId, edition.tournamentId),
+          eq(m.userId, user.id),
+        ),
+    });
+    if (existingMember) {
+      const existingRegistration = await db.query.editionRegistrations.findFirst({
+        where: (r, { and, eq }) =>
+          and(
+            eq(r.editionId, editionId),
+            eq(r.memberId, existingMember.id),
+            eq(r.isDeleted, false),
+          ),
       });
-      if (!edition) {
-        throw new Error("Édition introuvable");
+      if (existingRegistration) {
+        throw new Error("Vous êtes déjà inscrit à cette édition.");
       }
-      const serverFee = parseFloat(edition.entryFee || "0");
-      if (!isNaN(amount) && Math.abs(amount - serverFee) > 0.01) {
-        throw new Error("PRICE_CHANGED: Les frais d'inscription du tournoi ont été actualisés.");
-      }
-      amount = serverFee;
     }
   } else if (data.type === "THEME_PURCHASE") {
     const themeId = data.metadata?.targetId || data.metadata?.themeId;
@@ -413,7 +480,10 @@ export async function createTransaction(
   // Déterminer les écritures et comptes selon le type de transaction
   const canonicalType: TransactionType = data.type as TransactionType;
 
-  const pendingTypes = ["ORDER_PURCHASE", "TOURNAMENT_PARTICIPATION"];
+  // L'inscription à un tournoi est un paiement immédiat : elle est validée
+  // dans la même transaction que la création de l'inscription (voir
+  // handleTransactionTypeSafe). Seul l'achat de produit reste en escrow.
+  const pendingTypes = ["ORDER_PURCHASE"];
   const initialStatus: "PENDING" | "COMPLETED" = pendingTypes.includes(
     canonicalType
   )
@@ -512,10 +582,25 @@ export async function createTransaction(
       postings.push({ accountId: wallet.financialAccountId, debit: amount });
       postings.push({ accountId: feeAccount.id, credit: amount });
       netAmount = 0;
-    } else if (
-      canonicalType === "TOURNAMENT_PARTICIPATION" ||
-      canonicalType === "WITHDRAWAL"
-    ) {
+    } else if (canonicalType === "TOURNAMENT_PARTICIPATION") {
+      // Le brut va au pool de l'édition (fallback ESCROW si absent) ; les frais
+      // éventuels sont ajoutés au débit du payeur et créditent PLATFORM_FEES.
+      const poolAccount = tournamentPoolAccountId
+        ? { id: tournamentPoolAccountId }
+        : await getOrCreateSystemAccount(db, "ESCROW");
+      journalFees = fees;
+      postings.push({
+        accountId: wallet.financialAccountId,
+        debit: Math.round((amount + fees) * 100) / 100,
+      });
+      postings.push({ accountId: poolAccount.id, credit: amount });
+      if (fees > 0) {
+        const feeAccount = await getOrCreateSystemAccount(db, "FEES");
+        postings.push({ accountId: feeAccount.id, credit: fees });
+      }
+      // Le pool reçoit le brut : aligné sur joinEdition (netAmount = entryFee).
+      netAmount = amount;
+    } else if (canonicalType === "WITHDRAWAL") {
       const escrow = await getOrCreateSystemAccount(db, "ESCROW");
       journalFees = fees;
       postings.push({
@@ -701,21 +786,147 @@ async function handleTransactionTypeSafe(
     // 🏆 TOURNAMENT
     // =====================================================
     case "TOURNAMENT_PARTICIPATION": {
-      const editionId = metadata?.targetId;
-      if (!editionId) break;
+      const editionId = metadata?.targetId || metadata?.editionId;
+      if (!editionId) {
+        throw new Error("Édition cible requise");
+      }
 
-      await tx.insert(registrationPayments).values({
-        registrationId: metadata.registrationId,
-        transactionId,
-        amount: metadata.amount,
-        currency: "GTC",
-        status: "PENDING",
-        paymentMethod: "WALLET",
-        paidAt: new Date(),
-        metadata: { fromTransaction: transactionId },
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      // Verrou pessimiste : deux paiements concurrents ne peuvent pas
+      // dépasser le nombre maximal de participants.
+      const [edition] = await tx
+        .select()
+        .from(tournamentEditions)
+        .where(eq(tournamentEditions.id, editionId))
+        .for("update");
+      if (!edition) {
+        throw new Error("Édition introuvable");
+      }
+
+      // Membre du tournoi : celui fourni par le formulaire d'inscription s'il
+      // appartient bien à l'utilisateur, sinon le membre existant, sinon
+      // création d'un membre participant minimal.
+      let member = metadata?.memberId
+        ? await tx.query.tournamentMembers.findFirst({
+            where: (m: any, { eq }: any) => eq(m.id, metadata.memberId),
+          })
+        : null;
+
+      if (member && member.userId !== userId) {
+        throw new Error("Membre invalide pour cette inscription");
+      }
+
+      if (!member) {
+        member = await tx.query.tournamentMembers.findFirst({
+          where: (m: any, { and, eq }: any) =>
+            and(
+              eq(m.tournamentId, edition.tournamentId),
+              eq(m.userId, userId),
+            ),
+        });
+      }
+
+      if (!member) {
+        const account = await tx.query.users.findFirst({
+          where: (u: any, { eq }: any) => eq(u.id, userId),
+        });
+        const [createdMember] = await tx
+          .insert(tournamentMembers)
+          .values({
+            tournamentId: edition.tournamentId,
+            userId,
+            role: "PARTICIPANT",
+            displayName:
+              metadata?.playerName ||
+              account?.username ||
+              account?.fullName ||
+              "Joueur",
+            avatar: account?.profileImage || account?.image || null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+        member = createdMember;
+      }
+
+      // Anti-doublon : réutilise l'inscription existante plutôt que d'en créer
+      // une seconde pour la même édition.
+      let registration = await tx.query.editionRegistrations.findFirst({
+        where: (r: any, { and, eq }: any) =>
+          and(
+            eq(r.editionId, editionId),
+            eq(r.memberId, member.id),
+            eq(r.isDeleted, false),
+          ),
       });
+
+      if (!registration) {
+        const maxParticipants = edition.maxParticipants || 0;
+        if (
+          maxParticipants > 0 &&
+          (edition.currentParticipants || 0) >= maxParticipants
+        ) {
+          throw new Error("Désolé, cette édition est déjà complète.");
+        }
+
+        const [createdRegistration] = await tx
+          .insert(editionRegistrations)
+          .values({
+            editionId,
+            memberId: member.id,
+            status: "REGISTERED",
+            checkedIn: false,
+            feePaid: true,
+            paymentTransactionId: transactionId,
+            registrationFee: String(amount),
+          })
+          .returning();
+        registration = createdRegistration;
+
+        await tx
+          .update(tournamentEditions)
+          .set({
+            currentParticipants: (edition.currentParticipants || 0) + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(tournamentEditions.id, editionId));
+      } else {
+        await tx
+          .update(editionRegistrations)
+          .set({
+            feePaid: true,
+            paymentTransactionId: transactionId,
+            registrationFee: String(amount),
+            updatedAt: new Date(),
+          })
+          .where(eq(editionRegistrations.id, registration.id));
+      }
+
+      // Lien paiement ↔ inscription, idempotent sur la transaction.
+      const existingPayment = await tx.query.registrationPayments.findFirst({
+        where: (p: any, { eq }: any) => eq(p.transactionId, transactionId),
+      });
+
+      if (!existingPayment) {
+        await tx.insert(registrationPayments).values({
+          registrationId: registration.id,
+          transactionId,
+          amount: Number(amount).toFixed(2),
+          currency: edition.prizeCurrency || "GTC",
+          status: "COMPLETED",
+          paymentMethod: "WALLET",
+          paidAt: new Date(),
+          metadata: { fromTransaction: transactionId, editionId },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      revalidatePath(
+        `/tournaments/${edition.tournamentId}/editions/${editionId}`,
+      );
+      revalidatePath(
+        `/tournaments/${edition.tournamentId}/members/${member.id}`,
+      );
 
       break;
     }

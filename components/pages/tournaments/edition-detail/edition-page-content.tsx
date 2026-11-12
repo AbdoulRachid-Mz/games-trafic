@@ -81,7 +81,6 @@ export function EditionPageContent({
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [joinValues, setJoinValues] = useState<JoinEditionFormValues | null>(null);
-  const [paymentMemberId, setPaymentMemberId] = useState<string | undefined>();
   const joinMutation = useJoinEdition();
 
   const isRegistered = !!currentUserRegistration;
@@ -136,7 +135,6 @@ export function EditionPageContent({
         onSuccess: (data) => {
           if (data.paymentRequired) {
             setShowJoinDialog(false);
-            setPaymentMemberId(data.memberId ?? currentUserMember?.id);
             setShowPaymentDialog(true);
             return;
           }
@@ -425,7 +423,6 @@ export function EditionPageContent({
         edition={edition}
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
-        memberId={paymentMemberId ?? currentUserMember?.id}
       />
     </div>
   );

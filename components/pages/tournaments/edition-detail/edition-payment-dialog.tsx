@@ -24,7 +24,6 @@ interface EditionPaymentDialogProps {
   edition: TournamentEdition;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  memberId?: string;
 }
 
 import { useUserProfile } from "@/hooks/use-profile";
@@ -34,7 +33,6 @@ export function EditionPaymentDialog({
   edition,
   open,
   onOpenChange,
-  memberId,
 }: EditionPaymentDialogProps) {
   const { isAuthenticated, user } = useAuthContext();
   const { data: completeData } = useUserProfile({
