@@ -6,7 +6,10 @@ import { ProfileHeader } from "@/components/pages/profile/new/profile-header";
 import { ProfileTabs } from "@/components/pages/profile/new/profile-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getUserProfile } from "@/actions/users";
-import { useEntityInteractionCounts } from "@/hooks/use-interactions";
+import {
+  useEntityInteractionCounts,
+  useInteractionStats,
+} from "@/hooks/use-interactions";
 import { notFound, useParams } from "next/navigation";
 import type { UserWithAllRelations } from "@/actions/users";
 
@@ -21,6 +24,7 @@ export default function PublicProfilePage() {
   }
 
   const { data: counts } = useEntityInteractionCounts(id as string, "USER");
+  const { data: stats } = useInteractionStats({ userId: (id as string) || "" });
 
   useEffect(() => {
     loadProfile();
@@ -67,7 +71,7 @@ export default function PublicProfilePage() {
           user={profile}
           isOwnProfile={isOwnProfile}
           followersCount={counts?.FOLLOW || 0}
-          followingCount={0}
+          followingCount={stats?.follows || 0}
           postsCount={profile.posts?.length || 0}
         />
 

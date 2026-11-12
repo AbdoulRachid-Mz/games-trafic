@@ -14,11 +14,11 @@ import {
   Sparkles,
   Store,
   ShoppingBag,
+  ShoppingCart,
   Trophy,
   Wallet,
   MessageCircle,
   Bell,
-  Star,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/auth-context";
 
@@ -45,15 +45,16 @@ export function DashboardShell({ children }: DashboardShellProps) {
       <div className="p-3 space-y-2">
         <SidebarGroup label="Général" sidebarBgType="gradient">
           <SidebarItem title="Overview" icon={Sparkles} url="/dashboard" isActive={isActive("/dashboard", true)} sidebarBgType="gradient" />
+          <SidebarItem title="Commandes" icon={ShoppingCart} url="/dashboard/orders" isActive={isActive("/dashboard/orders", false)} sidebarBgType="gradient" />
           <SidebarItem title="Boutiques" icon={Store} url="/dashboard/shops" isActive={isActive("/dashboard/shops", false)} sidebarBgType="gradient" />
           <SidebarItem title="Produits" icon={ShoppingBag} url="/dashboard/products" isActive={isActive("/dashboard/products", false)} sidebarBgType="gradient" />
           <SidebarItem title="Tournois" icon={Trophy} url="/dashboard/tournaments" isActive={isActive("/dashboard/tournaments", false)} sidebarBgType="gradient" />
         </SidebarGroup>
 
-        <SidebarGroup label="Activités" sidebarBgType="gradient">
-          <SidebarItem title="Portefeuille" icon={Wallet} url="/dashboard/wallet" isActive={isActive("/dashboard/wallet", false)} sidebarBgType="gradient" />
+        <SidebarGroup label="Mon compte" sidebarBgType="gradient">
+          <SidebarItem title="Portefeuille" icon={Wallet} url="/wallet" isActive={isActive("/wallet", false)} sidebarBgType="gradient" />
+          <SidebarItem title="Messages" icon={MessageCircle} url="/chats" isActive={isActive("/chats", false)} sidebarBgType="gradient" />
           <SidebarItem title="Notifications" icon={Bell} url="/dashboard/notifications" isActive={isActive("/dashboard/notifications", false)} sidebarBgType="gradient" />
-          <SidebarItem title="VIP" icon={Star} url="/dashboard/vip" isActive={isActive("/dashboard/vip", false)} sidebarBgType="gradient" />
         </SidebarGroup>
       </div>
 

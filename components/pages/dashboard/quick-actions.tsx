@@ -3,8 +3,16 @@
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { Button } from "@/components/ui/button";
-import { Plus, Store, Trophy, CreditCard, Settings } from "lucide-react";
+import {
+  Store,
+  Trophy,
+  CreditCard,
+  Settings,
+  Wallet,
+  ShoppingCart,
+  MessageCircle,
+  ShoppingBag,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function QuickActions() {
@@ -12,25 +20,53 @@ export function QuickActions() {
 
   const actions = [
     {
-      icon: Store,
-      label: "Créer une Boutique",
-      description: "Ouvrez votre boutique",
-      onClick: () => router.push("/shops/create"),
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      icon: Trophy,
-      label: "Rejoindre un Tournoi",
-      description: "Participez aux compétitions",
-      onClick: () => router.push("/tournaments"),
-      color: "from-purple-500 to-pink-500",
+      icon: Wallet,
+      label: "Mon Wallet",
+      description: "Voir mon solde et mes mouvements",
+      onClick: () => router.push("/wallet"),
+      color: "from-emerald-500 to-teal-500",
     },
     {
       icon: CreditCard,
       label: "Recharger",
       description: "Ajoutez des fonds",
-      onClick: () => router.push("/wallet/transactions/create?type=deposite"),
+      onClick: () => router.push("/wallet/transactions/create?type=DEPOSIT"),
       color: "from-green-500 to-emerald-500",
+    },
+    {
+      icon: ShoppingCart,
+      label: "Mes commandes",
+      description: "Suivre mes achats",
+      onClick: () => router.push("/dashboard/orders"),
+      color: "from-blue-500 to-indigo-500",
+    },
+    {
+      icon: MessageCircle,
+      label: "Mes messages",
+      description: "Reprendre une discussion",
+      onClick: () => router.push("/chats"),
+      color: "from-sky-500 to-cyan-500",
+    },
+    {
+      icon: Store,
+      label: "Créer une boutique",
+      description: "Ouvrez votre boutique",
+      onClick: () => router.push("/shops/create"),
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      icon: ShoppingBag,
+      label: "Mes produits",
+      description: "Gérer mes annonces",
+      onClick: () => router.push("/dashboard/products"),
+      color: "from-amber-500 to-orange-500",
+    },
+    {
+      icon: Trophy,
+      label: "Rejoindre un tournoi",
+      description: "Participez aux compétitions",
+      onClick: () => router.push("/tournaments"),
+      color: "from-purple-500 to-pink-500",
     },
     {
       icon: Settings,
@@ -53,9 +89,9 @@ export function QuickActions() {
             key={action.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            transition={{ delay: index * 0.06 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
           >
             <Card
               className="cursor-pointer border-2 py-0 hover:shadow-lg hover:shadow-primary/25 transition-all duration-300 overflow-hidden group"

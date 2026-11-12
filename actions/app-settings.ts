@@ -14,8 +14,16 @@ import { revalidateTag } from 'next/cache';
 // QUERIES - Lecture des données
 // ============================================================================
 
+/** Identifiant stable de la ligne singleton de configuration. */
+const APP_SETTINGS_SINGLETON_ID = 'global';
+
 /**
- * Récupère la configuration actuelle (singleton)
+ * Récupère la configuration actuelle (singleton).
+ *
+ * Auto-réparation : si la table `app_settings` est vide (base fraîche ou
+ * migration appliquée manuellement sans seed), la ligne singleton est créée
+ * avec les valeurs par défaut du schéma. Sans cela, toutes les opérations
+ * financières échouaient avec `FEE_POLICY_UNAVAILABLE`.
  */
 export async function getAppSettings(): Promise<NewAppSettings | null> {
   'use cache';
@@ -23,7 +31,18 @@ export async function getAppSettings(): Promise<NewAppSettings | null> {
   cacheLife('hours');
   try {
     const rows = await db.select().from(appSettings).limit(1);
-    return rows[0] ?? null;
+    if (rows[0]) return rows[0];
+
+    // Toutes les colonnes ont une valeur par défaut en base : insérer
+    // uniquement l'id suffit à matérialiser la politique par défaut.
+    // `onConflictDoNothing` protège contre deux requêtes concurrentes.
+    await db
+      .insert(appSettings)
+      .values({ id: APP_SETTINGS_SINGLETON_ID })
+      .onConflictDoNothing({ target: appSettings.id });
+
+    const [created] = await db.select().from(appSettings).limit(1);
+    return created ?? null;
   } catch (error) {
     console.warn('Database offline or unreachable for app-settings, fallback to null:', (error as any)?.message || error);
     return null;

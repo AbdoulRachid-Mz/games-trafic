@@ -76,10 +76,7 @@ export default function DashboardPage() {
           title="Boutiques"
           value={stats?.overview.total_shops ?? 0}
           icon={Store}
-          change={12}
           changeLabel={`${stats?.shops.total_products ?? 0} produits`}
-          trend="up"
-          // className="border-2 border-l-primary border-r-secondary"
           delay={0}
         />
 
@@ -87,10 +84,7 @@ export default function DashboardPage() {
           title="Produits"
           value={stats?.overview.total_products ?? 0}
           icon={ShoppingBag}
-          change={8}
           changeLabel={`${stats?.products.sold ?? 0} vendus`}
-          trend="up"
-          // className="border-2 border-l-primary border-r-secondary"
           delay={0.1}
         />
 
@@ -98,10 +92,7 @@ export default function DashboardPage() {
           title="Tournois"
           value={stats?.overview.total_tournaments ?? 0}
           icon={Trophy}
-          change={-3}
           changeLabel={`${stats?.tournaments.total_participants ?? 0} participants`}
-          trend="down"
-          // className="border-2 border-l-primary border-r-secondary"
           delay={0.2}
         />
 
@@ -109,10 +100,7 @@ export default function DashboardPage() {
           title="Solde"
           value={`${stats?.wallet.balance?.toFixed(2) ?? "0.00"} GTC`}
           icon={CreditCard}
-          change={15}
           changeLabel={`${stats?.overview.total_transactions ?? 0} transactions`}
-          trend="up"
-          // className="border-2 border-l-primary border-r-secondary"
           delay={0.3}
         />
       </StatsCarousel>

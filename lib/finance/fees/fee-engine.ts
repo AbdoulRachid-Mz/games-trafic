@@ -1,4 +1,5 @@
 import type { FeeCalculation, FeeOptions, TransactionType } from "../types";
+import { DEFAULT_APP_SETTINGS } from "@/config/app-config";
 
 /**
  * Calcule purement les frais d'une transaction à partir d'un taux et d'options.
@@ -84,14 +85,24 @@ export async function calculateTransactionFees(
   try {
     // Imports dynamiques : les fonctions pures ne doivent pas charger la session
     // ni les Server Actions (important pour les tests et le tree-shaking).
-    const settings =
-      options?.settings !== undefined
-        ? options.settings
-        : await (
-            await import("@/actions/app-settings")
-          ).getAppSettings();
+    const hasExplicitPolicy = options?.settings !== undefined;
+    let settings = hasExplicitPolicy
+      ? options?.settings
+      : await (await import("@/actions/app-settings")).getAppSettings();
+
     if (settings === null || settings === undefined) {
-      throw new Error("FEE_POLICY_UNAVAILABLE: Impossible de récupérer les paramètres de politique de frais.");
+      // Politique explicitement fournie et invalide => on échoue fermement.
+      if (hasExplicitPolicy) {
+        throw new Error("FEE_POLICY_UNAVAILABLE: Impossible de récupérer les paramètres de politique de frais.");
+      }
+      // Aucune ligne `app_settings` en base (ou base momentanément
+      // indisponible) : on applique la politique par défaut du code plutôt
+      // que de casser toutes les opérations financières. La ligne singleton
+      // est normalement créée automatiquement par getAppSettings().
+      console.warn(
+        "FEE_POLICY_UNAVAILABLE: app_settings absent, utilisation de la politique de frais par défaut."
+      );
+      settings = DEFAULT_APP_SETTINGS;
     }
 
     const basePercentage = resolveBaseFeePercentage(type, settings);

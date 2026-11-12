@@ -1,9 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   calculatePureFee,
   resolveBaseFeePercentage,
   calculateTransactionFees,
 } from "@/lib/finance/fees/fee-engine";
+
+// Simule une base sans ligne `app_settings` (cas réel du bug FEE_POLICY_UNAVAILABLE).
+vi.mock("@/actions/app-settings", () => ({
+  getAppSettings: vi.fn(async () => null),
+}));
 
 describe("lib/finance/fees/fee-engine - Fee Engine Invariants (TASK-FIN-01)", () => {
   describe("calculatePureFee", () => {
@@ -113,6 +118,17 @@ describe("lib/finance/fees/fee-engine - Fee Engine Invariants (TASK-FIN-01)", ()
       await expect(
         calculateTransactionFees("TRANSFER", 100, { settings: null })
       ).rejects.toThrow("FEE_POLICY_UNAVAILABLE");
+    });
+
+    it("should fall back to the default policy when app_settings is empty", async () => {
+      // Aucune politique explicitement fournie + getAppSettings() renvoie null :
+      // on ne doit pas casser l'opération, on applique les taux par défaut.
+      const result = await calculateTransactionFees("TRANSFER", 100, {
+        isVip: false,
+      });
+      expect(result.feePercentage).toBe(0.005);
+      expect(result.fees).toBe(0.5);
+      expect(result.netAmount).toBe(99.5);
     });
   });
 });

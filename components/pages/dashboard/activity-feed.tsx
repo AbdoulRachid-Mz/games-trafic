@@ -47,43 +47,7 @@ const statusColors = {
 };
 
 export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
-  // Mock data if no activities provided
-  const mockActivities: Activity[] = [
-    {
-      id: "1",
-      type: "shop",
-      title: "Nouvelle boutique créée",
-      description: "Votre boutique 'Gaming Store' a été créée avec succès",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      status: "success",
-    },
-    {
-      id: "2",
-      type: "tournament",
-      title: "Inscription au tournoi",
-      description: "Vous êtes inscrit au tournoi 'Championship 2024'",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      status: "success",
-    },
-    {
-      id: "3",
-      type: "purchase",
-      title: "Achat effectué",
-      description: "Vous avez acheté 'Epic Game Key' pour 50 GTC",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-      status: "success",
-    },
-    {
-      id: "4",
-      type: "transaction",
-      title: "Rechargement en attente",
-      description: "Votre rechargement de 100 GTC est en cours de traitement",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      status: "pending",
-    },
-  ];
-
-  const displayActivities = activities.length > 0 ? activities : mockActivities;
+  const displayActivities = activities;
 
   return (
     <Card>

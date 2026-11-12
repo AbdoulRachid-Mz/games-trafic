@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { ResponsiveTabs, type ResponsiveTab } from "@/components/ui/responsive-tabs";
 import { useShopsByOwner } from "@/hooks/use-shops";
 import { useTournamentsWithEditions } from "@/hooks/use-tournaments";
-import { useMessages } from "@/hooks/use-messages";
+import { useConversations } from "@/hooks/use-conversations";
 import Link from "next/link";
 
 interface ProfileTabsProps {
@@ -89,10 +89,10 @@ export function ProfileTabs({
     ...(isOwnProfile
       ? [
           {
-            value: "messages",
-            label: "Messages",
+            value: "discussions",
+            label: "Discussions",
             icon: <MessageSquare className="h-4 w-4" />,
-            content: <MessagesSection userId={profileUser.id} />,
+            content: <DiscussionsSection userId={profileUser.id} />,
           },
         ]
       : []),
@@ -383,16 +383,18 @@ function TournamentsSection({ userId }: { userId: string }) {
 }
 
 // ========================================================================
-// MessagesSection — uses useMessages hook
+// DiscussionsSection — liste les entités avec qui l'utilisateur a échangé
+// (remplace l'ancien onglet "Messages" qui affichait les messages bruts)
 // ========================================================================
-function MessagesSection({ userId }: { userId: string }) {
-  const { data, isLoading } = useMessages(
-    {
-      filters: { senderId: userId },
-      pagination: { page: 1, limit: 20 },
-    },
-    !!userId
-  );
+const DISCUSSION_ICONS: Record<string, typeof Users> = {
+  user: UserIcon,
+  group: Users,
+  shop: ShoppingBag,
+  tournament: Trophy,
+};
+
+function DiscussionsSection({ userId }: { userId: string }) {
+  const { conversations, isLoading } = useConversations(userId);
 
   if (isLoading) {
     return (
@@ -402,39 +404,89 @@ function MessagesSection({ userId }: { userId: string }) {
     );
   }
 
-  const messages = data?.data || [];
-
-  if (messages.length === 0) {
+  if (conversations.length === 0) {
     return (
       <div className="text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed">
         <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
         <p className="text-muted-foreground font-medium">
-          Bientôt : Gérez vos messages privés ici
+          Aucune discussion pour le moment
         </p>
+        <Button asChild variant="outline" className="mt-4 rounded-full">
+          <Link href="/chats">Démarrer une discussion</Link>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {messages.map((message: any) => (
-        <div
-          key={message.id}
-          className="p-4 rounded-xl border bg-card"
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <Typography variant="body-sm" weight="bold">
-              {message.subject || "Message"}
-            </Typography>
-            <Typography variant="caption2" theme="muted">
-              {new Date(message.createdAt).toLocaleDateString()}
-            </Typography>
-          </div>
-          <Typography variant="body-sm" theme="muted" className="line-clamp-2">
-            {message.content}
-          </Typography>
-        </div>
-      ))}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {conversations.map((conv) => {
+        const entity = conv.entity?.data || {};
+        const Icon = DISCUSSION_ICONS[conv.entityType] || MessageSquare;
+        const name =
+          entity.fullName ||
+          entity.name ||
+          entity.username ||
+          "Discussion";
+        const avatar =
+          entity.profileImage || entity.logo || entity.image || "";
+        const lastMessage = conv.lastMessage;
+        const preview = lastMessage
+          ? lastMessage.content?.trim() ||
+            (lastMessage.audioUrl ? "Message vocal" : "Média")
+          : "Aucun message";
+        const time = conv.lastMessageTime
+          ? new Date(conv.lastMessageTime)
+          : null;
+
+        return (
+          <Link
+            key={conv.id}
+            href={`/chats?entityType=${conv.entityType}&entityId=${conv.entityId}`}
+            className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:shadow-md hover:border-primary/40 transition-all"
+          >
+            <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+              {avatar ? <AvatarImage src={avatar} alt={name} /> : null}
+              <AvatarFallback className="bg-primary/10 text-primary">
+                {avatar ? (
+                  <Icon className="h-5 w-5" />
+                ) : (
+                  <span className="text-sm font-bold uppercase">
+                    {String(name).slice(0, 2)}
+                  </span>
+                )}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold truncate">{name}</span>
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">
+                  {conv.entityType}
+                </span>
+                {conv.unreadCount > 0 && (
+                  <span className="ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                    {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-sm text-muted-foreground truncate">
+                {preview}
+              </span>
+              {time && (
+                <span className="text-[11px] text-muted-foreground/80 mt-0.5">
+                  {time.toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }
