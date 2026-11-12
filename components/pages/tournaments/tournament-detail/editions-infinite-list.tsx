@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,7 @@ interface EditionsInfiniteListProps {
   isDashboard?: boolean;
 }
 
-import { deleteTournamentEdition } from "@/actions/tournaments";
+import { deleteTournamentEdition, updateTournamentEdition } from "@/actions/tournaments";
 import { toast } from "sonner";
 
 export function EditionsInfiniteList({
@@ -35,6 +35,13 @@ export function EditionsInfiniteList({
   isDashboard = false,
 }: EditionsInfiniteListProps) {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const queryClient = useQueryClient();
+  const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
+
+  const invalidateLists = () =>
+    queryClient.invalidateQueries({
+      queryKey: ["tournament-editions", tournamentId],
+    });
 
   const {
     data,
@@ -43,7 +50,6 @@ export function EditionsInfiniteList({
     isFetchingNextPage,
     isLoading,
     isError,
-    refetch,
   } = useInfiniteQuery({
     queryKey: ["tournament-editions", tournamentId, statusFilter],
     queryFn: async ({ pageParam = 1 }) => {
@@ -68,9 +74,28 @@ export function EditionsInfiniteList({
     try {
       await deleteTournamentEdition(id);
       toast.success("Édition supprimée");
-      refetch();
+      await invalidateLists();
     } catch (error) {
       toast.error("Erreur lors de la suppression");
+    }
+  };
+
+  const handleToggleActive = async (edition: any) => {
+    setPendingToggleId(edition.id);
+    try {
+      await updateTournamentEdition(edition.id, {
+        isActive: !edition.isActive,
+      } as any);
+      toast.success(
+        edition.isActive ? "Édition désactivée" : "Édition activée",
+      );
+      await invalidateLists();
+    } catch (error: any) {
+      toast.error(
+        error?.message || "Impossible de modifier le statut de l'édition",
+      );
+    } finally {
+      setPendingToggleId(null);
     }
   };
 
@@ -142,6 +167,8 @@ export function EditionsInfiniteList({
               tournamentId={tournamentId}
               isDashboard={isDashboard}
               onDelete={handleDelete}
+              onToggleActive={isDashboard ? handleToggleActive : undefined}
+              isActivePending={pendingToggleId === ed.id}
               className="h-full"
             />
           ))}

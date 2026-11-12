@@ -21,6 +21,13 @@ import {
   getRequiredWins,
 } from "./bracket-engine";
 import { getDefaultScheduledTime } from "./utils";
+import {
+  applyQualificationToRanking,
+  buildResultProgressionMessage,
+  resolveQualification,
+  type QualificationOutcome,
+  type QualificationResolution,
+} from "./qualification";
 
 export interface ProgressionResult {
   isNodeComplete: boolean;
@@ -35,6 +42,12 @@ export interface ProgressionResult {
     name: string;
   };
   competitionMode?: string;
+  /** Qualification effective calculée (source + top-N + règles). */
+  qualification?: QualificationResolution;
+  /** Résultat détaillé de la qualification (qualifiés / éliminés / textes). */
+  qualificationOutcome?: QualificationOutcome;
+  /** Messages explicatifs issus du calcul réel (jamais codés en dur). */
+  messages?: string[];
 }
 
 export async function progressTournamentAfterMatch(
@@ -124,23 +137,49 @@ export async function progressTournamentAfterMatch(
       });
       const participantIds = groupParticipants.map((p) => p.registrationId);
 
-      const config = (match.group?.config as any) || {};
+      // Qualification résolue centralement : groupe → phase → édition →
+      // défaut du format (jamais de top-2 codé en dur).
+      const phaseConfig = (match.phase?.config as any) || {};
+      const groupConfig = (match.group?.config as any) || {};
+      const qualification = resolveQualification({
+        group: { config: groupConfig },
+        phase: {
+          config: phaseConfig,
+          phaseType: match.phase?.phaseType,
+        },
+        edition: {
+          editionConfig: match.edition?.editionConfig,
+        },
+      });
+
+      // Scoring hérité group.config → phase.config.
       const statsMap = syncStandingsWithMatches(
         participantIds,
         groupMatches as any[],
-        config,
+        { ...(phaseConfig as any), ...(groupConfig as any) },
       );
-      const ranked = rankParticipants(statsMap, config);
+      const ranked = rankParticipants(statsMap, {
+        ...(phaseConfig as any),
+        ...(groupConfig as any),
+        tiebreakerRules: qualification.tiebreakerRules,
+      });
 
-      const advanceCount =
-        typeof config.advanceCount === "number" && config.advanceCount > 0
-          ? config.advanceCount
-          : 2;
+      const outcome = applyQualificationToRanking(ranked as any[], qualification, {
+        groupName: match.group?.name || undefined,
+      });
+      result.qualification = qualification;
+      result.qualificationOutcome = outcome;
+      result.messages = outcome.messages;
+      const qualifiedIds = new Set(
+        [...outcome.qualified, ...outcome.additionalQualified].map(
+          (p) => p.registrationId,
+        ),
+      );
 
       const qualifiers = [];
       for (let i = 0; i < ranked.length; i++) {
         const { registrationId, stats } = ranked[i];
-        const isQualified = i < advanceCount;
+        const isQualified = qualifiedIds.has(registrationId);
         if (isQualified) qualifiers.push(registrationId);
 
         await db
@@ -178,7 +217,6 @@ export async function progressTournamentAfterMatch(
   const phaseMatches = await db.query.matches.findMany({
     where: eq(matches.phaseId, match.phaseId),
   });
-
   const allPhaseCompleted = phaseMatches.every((m) => m.status === "COMPLETED");
   if (allPhaseCompleted && phaseMatches.length > 0) {
     result.isPhaseComplete = true;
@@ -219,6 +257,20 @@ export async function progressTournamentAfterMatch(
       // Pas de prochaine phase = Fin de l'édition !
       result.isEditionComplete = true;
     }
+  }
+
+  const summaryMessage = buildResultProgressionMessage({
+    isNodeComplete: result.isNodeComplete,
+    isGroupComplete: result.isGroupComplete,
+    isPhaseComplete: result.isPhaseComplete,
+    isEditionComplete: result.isEditionComplete,
+    qualifiedCount: result.qualifiers?.length,
+    advanceCount: result.qualification?.advanceCount,
+    nextPhaseName: result.nextLevelToOrganize?.name,
+    source: result.qualification?.source,
+  });
+  if (summaryMessage && !result.messages?.includes(summaryMessage)) {
+    result.messages = [...(result.messages ?? []), summaryMessage];
   }
 
   return result;

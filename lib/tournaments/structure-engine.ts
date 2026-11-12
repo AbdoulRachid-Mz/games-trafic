@@ -18,6 +18,7 @@ import {
 } from "./generators";
 import { getEliminationRoundName } from "./get-name";
 import { getEffectiveAdvanceCount } from "./config";
+import { resolveQualification } from "./qualification";
 
 export interface PhaseBlueprint {
   name: string;
@@ -197,7 +198,9 @@ export async function createStructureEngine({
           ...genOptions,
           roundsCount: phaseConfig.roundsCount,
         });
-        const advanceCount = phaseConfig.advanceCount || 8;
+        const advanceCount = resolveQualification({
+          phase: { config: phaseConfig, phaseType: phase.phaseType },
+        }).advanceCount;
         currentPhaseParticipants = Array.from(
           { length: advanceCount },
           (_, idx) => `QUALIFIER_${idx + 1}`,
@@ -318,7 +321,9 @@ async function generatePreview(
       }
       currentParticipantsCount =
         groupsCount *
-        (p.config.advanceCount || p.config.advanceFromGroup || 2);
+        resolveQualification({
+          phase: { config: p.config, phaseType: p.phaseType },
+        }).advanceCount;
     } else if (p.phaseType === "ROUND_ROBIN") {
       const matches =
         (currentParticipantsCount * (currentParticipantsCount - 1)) / 2;
@@ -329,8 +334,10 @@ async function generatePreview(
         matchesCount: totalRRMatches,
       });
       phaseMatches += totalRRMatches;
-      currentParticipantsCount =
-        p.config.advanceCount || Math.min(8, currentParticipantsCount);
+      // Aligné sur la résolution réelle (groupe → phase → édition → format).
+      currentParticipantsCount = resolveQualification({
+        phase: { config: p.config, phaseType: p.phaseType },
+      }).advanceCount;
     } else if (p.phaseType === "ELIMINATION" || p.phaseType === "KNOCKOUT") {
       const totalRounds = Math.ceil(Math.log2(currentParticipantsCount || 2));
       let phaseMatches = 0;

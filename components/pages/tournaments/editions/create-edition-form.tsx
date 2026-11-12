@@ -29,26 +29,88 @@ import { createTournamentEdition } from "@/actions/tournaments";
 import { Loader2 } from "lucide-react";
 import { Controller } from "react-hook-form";
 
-// Schéma simplifié - accepter string pour startDate
-const formSchema = z.object({
-  name: z.string().min(1, "Le nom est requis"),
-  editionNumber: z.number().int().min(1),
-  startDate: z.string().min(1, "La date est requise"),
-  maxParticipants: z.number().int().min(1).nullable().optional(),
-  prizePool: z.string().nullable().optional(),
-  prizeCurrency: z.string().min(1),
-  locationType: z.string().min(1),
-  location: z.string().nullable().optional(),
-  description: z.string().nullable().optional(),
-  editionConfig: z.object({
-    competitionType: z.enum(["CHAMPIONSHIP", "CUP", "LDC", "SWISS"]),
-    competitionMode: z.enum(["AUTO", "MANUAL"]),
-    checkinRequired: z.boolean(),
-    autoStart: z.boolean(),
-    seedMethod: z.string(),
-    tiebreakerRules: z.record(z.string(), z.any()),
-  }),
-});
+// Schéma de création d'édition : dates, inscription, scoring, finance, médias, format.
+const formSchema = z
+  .object({
+    name: z.string().min(1, "Le nom est requis"),
+    editionNumber: z.number().int().min(1),
+    startDate: z.string().min(1, "La date de début est requise"),
+    endDate: z.string().optional(),
+    registrationOpens: z.string().optional(),
+    registrationDeadline: z.string().optional(),
+    maxParticipants: z.number().int().min(1).nullable().optional(),
+    entryFee: z.string().nullable().optional(),
+    prizePool: z.string().nullable().optional(),
+    prizeCurrency: z.string().min(1),
+    locationType: z.string().min(1),
+    location: z.string().nullable().optional(),
+    virtualLink: z.string().nullable().optional(),
+    streamLink: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    editionRules: z.string().nullable().optional(),
+    editionConfig: z.object({
+      competitionType: z.enum(["CHAMPIONSHIP", "CUP", "LDC", "SWISS"]),
+      competitionMode: z.enum(["AUTO", "MANUAL"]),
+      checkinRequired: z.boolean(),
+      autoStart: z.boolean(),
+      seedMethod: z.string(),
+      tiebreakerRules: z.record(z.string(), z.any()),
+    }),
+  })
+  .superRefine((values, ctx) => {
+    const start = values.startDate ? new Date(values.startDate) : null;
+    if (start && !Number.isNaN(start.getTime())) {
+      if (values.endDate) {
+        const end = new Date(values.endDate);
+        if (!Number.isNaN(end.getTime()) && end < start) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["endDate"],
+            message: "La date de fin doit être postérieure au début.",
+          });
+        }
+      }
+      if (values.registrationDeadline) {
+        const deadline = new Date(values.registrationDeadline);
+        if (!Number.isNaN(deadline.getTime()) && deadline > start) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["registrationDeadline"],
+            message: "La clôture des inscriptions doit précéder le début.",
+          });
+        }
+      }
+    }
+    if (values.registrationOpens && values.registrationDeadline) {
+      const opens = new Date(values.registrationOpens);
+      const deadline = new Date(values.registrationDeadline);
+      if (
+        !Number.isNaN(opens.getTime()) &&
+        !Number.isNaN(deadline.getTime()) &&
+        deadline < opens
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["registrationDeadline"],
+          message: "La clôture doit être postérieure à l'ouverture.",
+        });
+      }
+    }
+    if (values.entryFee && Number(values.entryFee) < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["entryFee"],
+        message: "Les frais d'inscription ne peuvent pas être négatifs.",
+      });
+    }
+    if (values.prizePool && Number(values.prizePool) < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prizePool"],
+        message: "Le cashprize ne peut pas être négatif.",
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -83,12 +145,19 @@ export function CreateEditionForm({
       name: `Édition ${nextEditionNumber}`,
       editionNumber: nextEditionNumber,
       startDate: formatDateForInput(new Date()),
+      endDate: "",
+      registrationOpens: "",
+      registrationDeadline: "",
       maxParticipants: 32,
+      entryFee: "0",
       prizePool: "0",
       prizeCurrency: "GTC",
       locationType: "ONLINE",
       location: "En ligne",
+      virtualLink: "",
+      streamLink: "",
       description: "",
+      editionRules: "",
       editionConfig: {
         competitionType: "LDC",
         competitionMode: "AUTO",
@@ -103,27 +172,45 @@ export function CreateEditionForm({
   const onSubmit: SubmitHandler<FormValues> = async (values) => {
     setLoading(true);
     try {
-      // Convertir la string en Date pour l'API
-      const startDate = new Date(values.startDate);
-      
-      // Vérifier que la date est valide
-      if (isNaN(startDate.getTime())) {
-        throw new Error("Date invalide");
-      }
+      const toDate = (value?: string | null) => {
+        if (!value) return undefined;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+      };
 
-      await createTournamentEdition({
-        ...values,
+      const startDate = toDate(values.startDate);
+      if (!startDate) throw new Error("La date de début est invalide.");
+
+      const { endDate, registrationOpens, registrationDeadline, ...rest } =
+        values;
+
+      const payload = {
+        ...rest,
+        endDate: toDate(endDate),
+        registrationOpens: toDate(registrationOpens),
+        registrationDeadline: toDate(registrationDeadline),
+        entryFee: values.entryFee ? values.entryFee : "0",
+        prizePool: values.prizePool ? values.prizePool : "0",
+        location: values.location || null,
+        virtualLink: values.virtualLink || null,
+        streamLink: values.streamLink || null,
+        description: values.description || null,
+        editionRules: values.editionRules || null,
         tournamentId,
-        status: "UPCOMING",
+        status: "UPCOMING" as const,
         startDate,
-      } as any);
+      };
+
+      await createTournamentEdition(payload as any);
 
       toast.success("Édition créée avec succès");
       router.push(`/tournaments/${tournamentId}/dashboard/editions`);
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Erreur lors de la création de l'édition");
+      toast.error(
+        error?.message || "Erreur lors de la création de l'édition",
+      );
     } finally {
       setLoading(false);
     }
@@ -175,6 +262,52 @@ export function CreateEditionForm({
               </Field>
 
               <Field>
+                <FieldLabel>Date de fin</FieldLabel>
+                <FieldContent>
+                  <Input
+                    type="date"
+                    {...register("endDate")}
+                    aria-invalid={!!errors.endDate}
+                  />
+                  {errors.endDate && <FieldError errors={[errors.endDate]} />}
+                </FieldContent>
+                <FieldDescription>
+                  Facultatif. Doit être postérieure à la date de début.
+                </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel>Ouverture des inscriptions</FieldLabel>
+                <FieldContent>
+                  <Input
+                    type="date"
+                    {...register("registrationOpens")}
+                    aria-invalid={!!errors.registrationOpens}
+                  />
+                  {errors.registrationOpens && (
+                    <FieldError errors={[errors.registrationOpens]} />
+                  )}
+                </FieldContent>
+              </Field>
+
+              <Field>
+                <FieldLabel>Clôture des inscriptions</FieldLabel>
+                <FieldContent>
+                  <Input
+                    type="date"
+                    {...register("registrationDeadline")}
+                    aria-invalid={!!errors.registrationDeadline}
+                  />
+                  {errors.registrationDeadline && (
+                    <FieldError errors={[errors.registrationDeadline]} />
+                  )}
+                </FieldContent>
+                <FieldDescription>
+                  Doit précéder le début de l&apos;édition.
+                </FieldDescription>
+              </Field>
+
+              <Field>
                 <FieldLabel>Nombre max de participants</FieldLabel>
                 <FieldContent>
                   <Input
@@ -197,6 +330,49 @@ export function CreateEditionForm({
                   />
                   {errors.prizePool && <FieldError errors={[errors.prizePool]} />}
                 </FieldContent>
+              </Field>
+
+              <Field>
+                <FieldLabel>Devise</FieldLabel>
+                <FieldContent>
+                  <Controller
+                    control={control}
+                    name="prizeCurrency"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir la devise" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GTC">GTC</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.prizeCurrency && (
+                    <FieldError errors={[errors.prizeCurrency]} />
+                  )}
+                </FieldContent>
+              </Field>
+
+              <Field>
+                <FieldLabel>Frais d&apos;inscription</FieldLabel>
+                <FieldContent>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register("entryFee")}
+                    aria-invalid={!!errors.entryFee}
+                  />
+                  {errors.entryFee && <FieldError errors={[errors.entryFee]} />}
+                </FieldContent>
+                <FieldDescription>
+                  0 pour une inscription gratuite. Le paiement est débité du
+                  portefeuille du joueur.
+                </FieldDescription>
               </Field>
 
               <Field>
@@ -282,6 +458,57 @@ export function CreateEditionForm({
                   aria-invalid={!!errors.location}
                 />
                 {errors.location && <FieldError errors={[errors.location]} />}
+              </FieldContent>
+            </Field>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Field>
+                <FieldLabel>Lien de jeu / salon</FieldLabel>
+                <FieldContent>
+                  <Input
+                    placeholder="https://..."
+                    {...register("virtualLink")}
+                    aria-invalid={!!errors.virtualLink}
+                  />
+                  {errors.virtualLink && (
+                    <FieldError errors={[errors.virtualLink]} />
+                  )}
+                </FieldContent>
+                <FieldDescription>
+                  Lien de connexion pour les participants (Discord, lobby, etc.).
+                </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel>Lien du stream</FieldLabel>
+                <FieldContent>
+                  <Input
+                    placeholder="https://twitch.tv/..."
+                    {...register("streamLink")}
+                    aria-invalid={!!errors.streamLink}
+                  />
+                  {errors.streamLink && (
+                    <FieldError errors={[errors.streamLink]} />
+                  )}
+                </FieldContent>
+                <FieldDescription>
+                  Diffusion officielle de l&apos;édition (facultatif).
+                </FieldDescription>
+              </Field>
+            </div>
+
+            <Field>
+              <FieldLabel>Règlement de l&apos;édition</FieldLabel>
+              <FieldContent>
+                <Textarea
+                  placeholder="Règles spécifiques, format, horaires..."
+                  className="min-h-[100px]"
+                  {...register("editionRules")}
+                  aria-invalid={!!errors.editionRules}
+                />
+                {errors.editionRules && (
+                  <FieldError errors={[errors.editionRules]} />
+                )}
               </FieldContent>
             </Field>
 

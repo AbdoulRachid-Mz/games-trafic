@@ -34,6 +34,7 @@ import {
 } from "@/actions/members";
 import { getMatchesWithParticipants } from "@/actions/phases";
 import { updateTeam } from "@/actions/participants";
+import { isUserTournamentOrganizer } from "@/actions/tournaments";
 import { useAuthContext } from "@/contexts/auth-context";
 import type { TournamentMember } from "@/database/schema";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,6 +78,11 @@ const memberTabs: ResponsiveTab[] = [
     label: "Réussites",
     icon: <Medal className="h-4 w-4" />,
   },
+  {
+    value: "discussions",
+    label: "Discussions",
+    icon: <MessageCircle className="h-4 w-4" />,
+  },
 ];
 
 export default function MemberDetailPage() {
@@ -88,6 +94,8 @@ export default function MemberDetailPage() {
   const [teammates, setTeammates] = useState<any[]>([]);
   const [matchesList, setMatchesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isTournamentOrganizer, setIsTournamentOrganizer] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
   // States for Editing
@@ -103,64 +111,78 @@ export default function MemberDetailPage() {
 
   useEffect(() => {
     loadMember();
-  }, [memberId]);
+  }, [memberId, tournamentId]);
 
   const loadMember = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const data = await getTournamentMemberById(memberId);
-      if (data) {
-        setMember(data);
-        setEditData({
-          displayName: data.displayName || "",
-          gameTag: data.gameTag || "",
-          biography: data.biography || "",
-          clubName: data.clubName || "",
-          contactEmail: data.contactEmail || "",
-          contactPhone: data.contactPhone || "",
+      // Le membre est toujours résolu dans le périmètre du tournoi de l'URL :
+      // un identifiant de membre appartenant à un autre tournoi n'est pas exposé.
+      const data = await getTournamentMemberById(memberId, { tournamentId });
+      if (!data) {
+        setMember(null);
+        setError("Ce membre n'existe pas dans ce tournoi.");
+        return;
+      }
+
+      setMember(data);
+      setEditData({
+        displayName: data.displayName || "",
+        gameTag: data.gameTag || "",
+        biography: data.biography || "",
+        clubName: data.clubName || "",
+        contactEmail: data.contactEmail || "",
+        contactPhone: data.contactPhone || "",
+      });
+
+      if (data.team) {
+        setTeamEditData({
+          name: data.team.name || "",
         });
+      }
 
-        if (data.team) {
-          setTeamEditData({
-            name: data.team.name || "",
-          });
-        }
+      // Load additional info in parallel
+      const [stats, teamRes, organizer] = await Promise.all([
+        getMemberStatsByEdition(memberId, { tournamentId }),
+        data.teamId ? getTeamMembers(data.teamId) : Promise.resolve([]),
+        user?.id
+          ? isUserTournamentOrganizer(tournamentId, user.id)
+          : Promise.resolve(false),
+      ]);
 
-        // Load additional info in parallel
-        const [stats, teamRes] = await Promise.all([
-          getMemberStatsByEdition(memberId),
-          data.teamId ? getTeamMembers(data.teamId) : Promise.resolve([]),
-        ]);
+      setIsTournamentOrganizer(Boolean(organizer));
+      setEditionStats(stats);
+      setTeammates(teamRes.filter((m) => m.id !== memberId));
 
-        setEditionStats(stats);
-        setTeammates(teamRes.filter((m) => m.id !== memberId));
-
-        // Load matches if any registrations exist
-        if (stats.length > 0) {
-          // Get matches for all registrations
-          const matchesPromises = stats.map((s) =>
-            getMatchesWithParticipants({
-              filters: { 
-                memberRegistrationId: s.id,
-                editionId: s.editionId
-              },
-              pagination: { page: 1, limit: 10 },
-            }),
-          );
-          const matchesResults = await Promise.all(matchesPromises);
-          const allMatches = matchesResults.flatMap((res) => res.data);
-          // Sort by date desc
-          setMatchesList(
-            allMatches.sort(
-              (a, b) =>
-                new Date(b.scheduledTime || b.createdAt).getTime() -
-                new Date(a.scheduledTime || a.createdAt).getTime(),
-            ),
-          );
-        }
+      // Load matches if any registrations exist
+      if (stats.length > 0) {
+        // Get matches for all registrations
+        const matchesPromises = stats.map((s) =>
+          getMatchesWithParticipants({
+            filters: {
+              memberRegistrationId: s.id,
+              editionId: s.editionId,
+            },
+            pagination: { page: 1, limit: 10 },
+          }),
+        );
+        const matchesResults = await Promise.all(matchesPromises);
+        const allMatches = matchesResults.flatMap((res) => res.data);
+        // Sort by date desc
+        setMatchesList(
+          allMatches.sort(
+            (a, b) =>
+              new Date(b.scheduledTime || b.createdAt).getTime() -
+              new Date(a.scheduledTime || a.createdAt).getTime(),
+          ),
+        );
+      } else {
+        setMatchesList([]);
       }
     } catch (error) {
       console.error("Erreur chargement membre:", error);
+      setError("Impossible de charger les données du membre.");
       toast.error("Impossible de charger les données du membre");
     } finally {
       setLoading(false);
@@ -197,7 +219,9 @@ export default function MemberDetailPage() {
   };
 
   const isOwner = user?.id === member?.userId;
-  const isOrganizer = member?.role === "ORGANIZER";
+  // Le droit d'édition vient du rôle de l'utilisateur connecté sur ce tournoi,
+  // pas du rôle du membre consulté.
+  const canManageMember = isOwner || isTournamentOrganizer;
 
   if (loading) {
     return (
@@ -216,8 +240,23 @@ export default function MemberDetailPage() {
   if (!member) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center space-y-4">
-        <Typography variant="h4">Membre non trouvé</Typography>
-        <Button onClick={() => router.back()}>Retour</Button>
+        <Typography variant="h4">
+          {error ?? "Membre non trouvé"}
+        </Typography>
+        <Typography variant="body-base" theme="muted" className="max-w-md text-center">
+          {error
+            ? "Vérifiez le lien utilisé ou revenez à la liste des participants du tournoi."
+            : "Ce membre n'existe pas ou n'est plus rattaché à ce tournoi."}
+        </Typography>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/tournaments/${tournamentId}/members`)}
+          >
+            Voir les participants
+          </Button>
+          <Button onClick={() => router.back()}>Retour</Button>
+        </div>
       </div>
     );
   }
@@ -283,7 +322,7 @@ export default function MemberDetailPage() {
                 </Button>
               )}
               
-              {(isOwner || isOrganizer) && (
+              {(canManageMember) && (
                 <Button
                   variant="outline"
                   className="rounded-full"
@@ -508,7 +547,11 @@ export default function MemberDetailPage() {
           {activeTab === "history" && (
             <div className="space-y-4 py-4">
               {editionStats.length > 0 ? (
-                editionStats.map((stat: any) => (
+                editionStats.map((stat: any) => {
+                  const result = stat.results?.[0];
+                  const editionNumber =
+                    stat.edition?.editionNumber ?? stat.edition?.number;
+                  return (
                   <Card
                     key={stat.id}
                     className="group hover:border-primary/50 transition-all shadow-sm rounded-2xl overflow-hidden"
@@ -521,7 +564,7 @@ export default function MemberDetailPage() {
                             weight="bold"
                             className="leading-none"
                           >
-                            {stat.edition?.number || "#"}
+                            {editionNumber ?? "#"}
                           </Typography>
                           <span className="text-[8px] uppercase font-bold">
                             Ed.
@@ -529,7 +572,8 @@ export default function MemberDetailPage() {
                         </div>
                         <div className="flex-1">
                           <Typography variant="body-base" weight="bold">
-                            Edition {stat.edition?.number || stat.edition?.id}
+                            {stat.edition?.name ||
+                              `Édition ${editionNumber ?? stat.edition?.id}`}
                           </Typography>
                           <div className="flex items-center gap-2 text-muted-foreground mt-1 text-xs">
                             <Calendar className="h-3 w-3" />
@@ -549,7 +593,7 @@ export default function MemberDetailPage() {
                               Rang
                             </Typography>
                             <Typography variant="body-base" weight="bold">
-                              #{stat.position || "-"}
+                              {result?.position ? `#${result.position}` : "—"}
                             </Typography>
                           </div>
                           <Separator orientation="vertical" className="h-8" />
@@ -562,7 +606,7 @@ export default function MemberDetailPage() {
                               Points
                             </Typography>
                             <Typography variant="body-base" weight="bold">
-                              {stat.points || 0}
+                              {result?.totalScore ?? 0}
                             </Typography>
                           </div>
                         </div>
@@ -579,7 +623,8 @@ export default function MemberDetailPage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-20 bg-muted/10 rounded-3xl border-2 border-dashed">
                   <Calendar className="h-16 w-16 mx-auto text-muted-foreground opacity-10 mb-4" />
@@ -720,6 +765,33 @@ export default function MemberDetailPage() {
                       </Typography>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          {activeTab === "discussions" && (
+            <div className="space-y-4 py-4">
+              <Card className="border-none shadow-sm bg-muted/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                    Discussions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Typography variant="body-base" theme="muted">
+                    Les échanges liés à ce tournoi sont centralisés dans la
+                    messagerie Chats. Vous y retrouverez les conversations des
+                    organisateurs et des participants.
+                  </Typography>
+                  <Button asChild className="gap-2">
+                    <Link
+                      href={`/chats?entityType=tournament&entityId=${tournamentId}`}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Ouvrir les discussions du tournoi
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             </div>

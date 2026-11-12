@@ -127,7 +127,13 @@ export function useJoinEdition() {
     }: {
       editionId: string;
       userId: string;
-      userInfo: { username: string; image?: string | null };
+      userInfo: {
+        username: string;
+        image?: string | null;
+        playerName?: string;
+        teamId?: string;
+        teamName?: string;
+      };
     }) => {
       try {
         const response = await joinEdition(editionId, userId, userInfo);

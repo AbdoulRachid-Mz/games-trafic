@@ -176,12 +176,14 @@ export function MatchControlClient({
         });
         setShouldShowConfetti(!!result.needsProgression);
         setShowCelebration(true);
-        if (result.progressionResult?.isPhaseComplete) {
-          toast.info("La phase est terminée !");
+        const progressionMessages: string[] =
+          result.progressionResult?.messages ?? [];
+        if (progressionMessages.length > 0) {
+          toast.info(progressionMessages.join(" "));
+        } else if (result.progressionResult?.isPhaseComplete) {
+          toast.info("La phase est terminée.");
         } else if (result.progressionResult?.isGroupComplete) {
-          toast.info("Le groupe est terminé !");
-        } else if (result.needsProgression) {
-          toast.info(`${result.winnerName || "Le vainqueur"} est qualifié pour la phase suivante !`);
+          toast.info("Le groupe est terminé.");
         }
         router.refresh();
       } catch (error: any) {

@@ -447,6 +447,9 @@ export async function getPhaseStandings(phaseId: string) {
   try {
     const phase = await db.query.tournamentPhases.findFirst({
       where: eq(tournamentPhases.id, phaseId),
+      with: {
+        edition: { columns: { editionConfig: true } },
+      },
     });
     if (!phase) return [];
 
@@ -513,6 +516,7 @@ export async function getPhaseStandings(phaseId: string) {
             advanceCount: getEffectiveAdvanceCount(
               phase as any,
               { config: firstGroupConfig } as any,
+              { editionConfig: (phase as any).edition?.editionConfig } as any,
             ),
             dayGroups: aggregate.days.map((d) => ({
               groupId: d.groupId,

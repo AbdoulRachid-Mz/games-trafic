@@ -39,6 +39,8 @@ interface EditionCardProps {
   onView?: (id: string) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onToggleActive?: (edition: TournamentEdition) => void;
+  isActivePending?: boolean;
   isDashboard?: boolean;
   showDetails?: boolean;
   className?: string;
@@ -73,6 +75,8 @@ export function EditionCard({
   onView,
   onEdit,
   onDelete,
+  onToggleActive,
+  isActivePending,
   isDashboard,
   showDetails,
   className,
@@ -117,6 +121,12 @@ export function EditionCard({
           <div className="absolute bottom-3 right-3 text-white text-[10px] px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 uppercase font-bold tracking-wider">
             {edition.editionNumber ? `Édition #${edition.editionNumber}` : "Événement"}
           </div>
+
+          {edition.isActive === false && (
+            <div className="absolute bottom-3 left-3 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/70 text-slate-100 backdrop-blur-md border border-white/10 uppercase font-bold tracking-wider">
+              Désactivée
+            </div>
+          )}
         </div>
 
         {isDashboard && (
@@ -134,6 +144,22 @@ export function EditionCard({
                 <DropdownMenuItem onClick={() => router.push(`/tournaments/${tournamentId}/editions/${edition.id}/dashboard`)}>
                   <ChevronRight className="h-4 w-4 mr-2" /> Dashboard
                 </DropdownMenuItem>
+                {onToggleActive && (
+                  <DropdownMenuItem
+                    disabled={isActivePending}
+                    onClick={() => onToggleActive(edition)}
+                  >
+                    {edition.isActive ? (
+                      <>
+                        <Clock className="h-4 w-4 mr-2" /> Désactiver
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 mr-2" /> Activer
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-destructive"
                   onClick={() => onDelete?.(edition.id)}

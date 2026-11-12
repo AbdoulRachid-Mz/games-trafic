@@ -46,7 +46,7 @@ export function StatsCarousel({
   children,
   className,
   itemsPerView = {
-    mobile: 1,
+    mobile: 2,
     md: 2,
     lg: 3,
     xl: 4,
@@ -74,9 +74,10 @@ export function StatsCarousel({
   const basis = `${100 / itemsCount}%`
 
   // 🔥 AUTO MODE
-  const shouldUseCarousel =
-    mode === "carousel" ||
-    (mode === "auto" && (isMobile || (data?.length ?? 0) > itemsCount))
+  // En mode « auto », la grille est privilégiée (y compris sur mobile) :
+  // les cartes s'alignent en 2 colonnes lisibles puis s'adaptent au nombre
+  // d'éléments, sans débordement horizontal. Le carrousel reste opt-in.
+  const shouldUseCarousel = mode === "carousel"
 
   // 🔥 CONTENT BUILDER
   const renderItems = () => {

@@ -9,8 +9,10 @@
  * côté lib, actions et tests unitaires.
  */
 
+import { FALLBACK_ADVANCE_COUNT, resolveQualification } from "./qualification";
+
 /** Défaut explicite de qualification par groupe (jamais lu en dur ailleurs). */
-export const DEFAULT_ADVANCE_COUNT = 2;
+export const DEFAULT_ADVANCE_COUNT = FALLBACK_ADVANCE_COUNT;
 
 /** Nom du groupe unique des éditions RR héritées (legacy). */
 export const LEGACY_LEAGUE_GROUP_NAME = "Classement";
@@ -18,32 +20,17 @@ export const LEGACY_LEAGUE_GROUP_NAME = "Classement";
 /**
  * AdvanceCount effectif, priorité : group.config.advanceCount →
  * phase.config.advanceCount → phase.config.advanceFromGroup (legacy,
- * écrit par l'ancien wizard mais jamais lu avant) → défaut explicite.
- * Top-N dynamique : plus aucun `|| 2` implicite dans la logique.
+ * écrit par l'ancien wizard mais jamais lu avant) → editionConfig →
+ * défaut du format. Délègue à `resolveQualification` (source unique).
  *
  * Accepte directement les records Drizzle (le config est lu génériquement).
  */
 export function getEffectiveAdvanceCount(
-  phase?: { config?: unknown } | null,
-  group?: { config?: unknown } | null
+  phase?: { config?: unknown; phaseType?: string | null } | null,
+  group?: { config?: unknown } | null,
+  edition?: { editionConfig?: unknown; config?: unknown } | null,
 ): number {
-  const phaseConfig = (phase?.config || {}) as Record<string, any>;
-  const groupConfig = (group?.config || {}) as Record<string, any>;
-
-  if (isPositiveInt(groupConfig.advanceCount)) {
-    return groupConfig.advanceCount;
-  }
-  if (isPositiveInt(phaseConfig.advanceCount)) {
-    return phaseConfig.advanceCount;
-  }
-  if (isPositiveInt(phaseConfig.advanceFromGroup)) {
-    return phaseConfig.advanceFromGroup;
-  }
-  return DEFAULT_ADVANCE_COUNT;
-}
-
-function isPositiveInt(value: unknown): value is number {
-  return typeof value === "number" && !isNaN(value) && value > 0;
+  return resolveQualification({ phase, group, edition }).advanceCount;
 }
 
 /**

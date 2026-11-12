@@ -26,7 +26,9 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { useJoinEdition } from "@/hooks/use-editions";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CommentsSection } from "@/components/comments/comments-section";
+import {
+  type JoinEditionFormValues,
+} from "./edition-join-dialog";
 import {
   Calendar,
   Info,
@@ -78,6 +80,8 @@ export function EditionPageContent({
 
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [joinValues, setJoinValues] = useState<JoinEditionFormValues | null>(null);
+  const [paymentMemberId, setPaymentMemberId] = useState<string | undefined>();
   const joinMutation = useJoinEdition();
 
   const isRegistered = !!currentUserRegistration;
@@ -110,8 +114,12 @@ export function EditionPageContent({
     setShowJoinDialog(true);
   }, [searchParams, isRegistered, user, showJoinDialog]);
 
-  const handleConfirmJoin = async () => {
+  const handleConfirmJoin = async (values?: JoinEditionFormValues) => {
     if (!user) return;
+
+    // Conserve les valeurs du formulaire pour le retour depuis le paiement.
+    const payload = values ?? joinValues;
+    if (payload) setJoinValues(payload);
 
     joinMutation.mutate(
       {
@@ -120,20 +128,40 @@ export function EditionPageContent({
         userInfo: {
           username: user.username || user.fullName || "User",
           image: user.profileImage,
+          playerName: payload?.playerName,
+          teamName: payload?.teamName,
         },
       },
       {
         onSuccess: (data) => {
           if (data.paymentRequired) {
             setShowJoinDialog(false);
+            setPaymentMemberId(data.memberId ?? currentUserMember?.id);
             setShowPaymentDialog(true);
-          } else if (data.success) {
+            return;
+          }
+
+          if (data.success) {
             setShowJoinDialog(false);
-            router.refresh();
+            toast.success(data.message || "Inscription confirmée");
+            if (data.registrationStatus && data.registrationStatus !== "REGISTERED") {
+              toast.info("Votre inscription est en attente de validation par l'organisateur.");
+            }
+            // Redirection vers le profil membre réel (ids serveur).
+            if (data.tournamentId && data.memberId) {
+              router.push(
+                `/tournaments/${data.tournamentId}/members/${data.memberId}`,
+              );
+            } else {
+              router.refresh();
+            }
+          } else if (data.message) {
+            toast.error(data.message);
           }
         },
-        onError: (err) => {
+        onError: (err: any) => {
           console.error(err);
+          toast.error(err?.message || "Impossible de rejoindre l'édition");
         },
       },
     );
@@ -162,7 +190,7 @@ export function EditionPageContent({
         }}
       />
 
-      <div className="container mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6 md:space-y-10 relative z-10">
+      <div className="container mx-auto px-4 md:px-6 py-4 md:py-8 space-y-4 md:space-y-8 relative z-10">
         {/* CTA D'INSCRIPTION RAPIDE SI NON INSCRIT */}
         {!isRegistered && (
           <div className="relative overflow-hidden bg-gradient-to-br from-card via-card/70 to-card/40 border border-primary/20 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_30px_rgba(var(--primary),0.1)] group">
@@ -281,15 +309,6 @@ export function EditionPageContent({
                   </div>
                 )}
               </div>
-
-              {/* Raccourci vers les discussions */}
-              <div className="bg-card/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-8 shadow-xl">
-                <CommentsSection
-                  entityId={edition.id}
-                  entityType="EDITION"
-                  title="Discussion & Échanges de l'édition"
-                />
-              </div>
             </div>
           )}
 
@@ -388,17 +407,6 @@ export function EditionPageContent({
           {activeTab === "rules" && (
             <EditionRulesTab tournament={tournament} edition={edition} />
           )}
-
-          {/* TAB: DISCUSSION */}
-          {activeTab === "community" && (
-            <div className="bg-card/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-8 shadow-xl">
-              <CommentsSection
-                entityId={edition.id}
-                entityType="EDITION"
-                title="Espace Communautaire de l'Édition"
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -410,13 +418,14 @@ export function EditionPageContent({
         onConfirm={handleConfirmJoin}
         isLoading={joinMutation.isPending}
         userTeam={currentUserMember?.team ? currentUserMember.team : undefined}
+        defaultPlayerName={user?.fullName || user?.username || ""}
       />
 
       <EditionPaymentDialog
         edition={edition}
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
-        memberId={currentUserMember?.id}
+        memberId={paymentMemberId ?? currentUserMember?.id}
       />
     </div>
   );

@@ -1,47 +1,19 @@
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, GitBranch, AlertCircle, ArrowUp, ArrowDown, Settings2, Trash2, Zap, Eye, ArrowRight } from "lucide-react";
+import { AlertCircle, GitBranch } from "lucide-react";
 import { TournamentPhase } from "@/database/schema";
 import { getTournamentPhases } from "@/actions/phases";
 import { Typography } from "@/components/ui/typography";
-import { Badge } from "@/components/ui/badge";
 import { CreatePhaseDialog } from "@/components/pages/tournaments/edition-detail/create-phase-dialog";
-import { PhaseItemActions } from "@/components/pages/tournaments/edition-detail/phase-item-actions";
+import { PhaseCard } from "@/components/cards/phase-card";
 
 interface PageProps {
   params: Promise<{
     tournamentId: string;
     editionId: string;
   }>;
-}
-
-const PHASE_TYPES = [
-  { value: "ELIMINATION", label: "Élimination directe", description: "Bracket à élimination simple" },
-  { value: "ROUND_ROBIN", label: "Round Robin", description: "Chaque joueur affronte tous les autres" },
-  { value: "GROUP_STAGE", label: "Phase de poules", description: "Plusieurs groupes avec qualifications" },
-  { value: "SWISS", label: "Système suisse", description: "Adversaires de même niveau à chaque ronde" },
-  { value: "KNOCKOUT", label: "Knockout", description: "Élimination directe - variante" },
-  { value: "CUSTOM", label: "Personnalisé", description: "Configuration libre" },
-] as const;
-
-function phaseTypeLabel(type: string | null | undefined): string {
-  return PHASE_TYPES.find((t) => t.value === type)?.label || type || "—";
-}
-
-function phaseTypeBadgeColor(type: string | null | undefined): string {
-  switch (type) {
-    case "ELIMINATION": return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-    case "ROUND_ROBIN": return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-    case "GROUP_STAGE": return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-    case "SWISS": return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400";
-    case "KNOCKOUT": return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-    default: return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
-  }
 }
 
 export default async function DashboardPhasesPage({ params }: PageProps) {
@@ -87,54 +59,18 @@ export default async function DashboardPhasesPage({ params }: PageProps) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {phases.map((phase: TournamentPhase, idx: number) => (
-            <Card key={phase.id} className="relative group hover:border-primary/50 transition-all border-border/50 overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
-              <CardHeader className="py-4 px-6 space-y-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Typography variant="body-base" weight="bold">
-                        {phase.name}
-                      </Typography>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${phaseTypeBadgeColor(phase.phaseType)}`}>
-                        {phaseTypeLabel(phase.phaseType)}
-                      </span>
-                      {phase.isDoubleElimination && (
-                        <Badge variant="outline" className="text-[10px] h-5 px-2 bg-muted/50">Double Élim.</Badge>
-                      )}
-                      {phase.isActive && (
-                        <Badge className="bg-green-600 text-white text-[10px] h-5 px-2 shadow-sm border-none">Active</Badge>
-                      )}
-                      {phase.isCompleted && (
-                        <Badge variant="secondary" className="text-[10px] h-5 px-2">Terminée</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                      <span className="flex items-center gap-1.5">
-                        <Settings2 className="h-3.5 w-3.5" /> Ordre: {phase.order}
-                      </span>
-                      {phase.totalMatches !== null && phase.totalMatches !== undefined && (
-                        <>
-                          <span className="text-muted-foreground/30">|</span>
-                          <span>{phase.completedMatches ?? 0}/{phase.totalMatches} matches terminés</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <PhaseItemActions
-                    phase={phase}
-                    tournamentId={tournamentId}
-                    editionId={editionId}
-                    isFirst={idx === 0}
-                    isLast={idx === phases.length - 1}
-                    phasesCount={phases.length}
-                  />
-                </div>
-              </CardHeader>
-            </Card>
+            <PhaseCard
+              key={phase.id}
+              item={phase}
+              tournamentId={tournamentId}
+              editionId={editionId}
+              isFirst={idx === 0}
+              isLast={idx === phases.length - 1}
+              phasesCount={phases.length}
+              canManage
+            />
           ))}
         </div>
       )}

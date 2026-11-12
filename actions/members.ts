@@ -16,6 +16,8 @@ import {
     type PaginationResponse,
 } from "@/types/api";
 import { editionRegistrations, tournamentEditions } from "@/database/schema";
+import { getCurrentUser } from "@/lib/auth/session";
+import { isUserTournamentOrganizer } from "./tournaments/tournaments";
 
 /**
  * Auto-génère des participants guests pour une édition
@@ -137,10 +139,18 @@ export async function linkGuestToUserAction(memberId: string, userId: string) {
 /**
  * Récupère un membre de tournoi par son ID
  */
-export async function getTournamentMemberById(id: string) {
+export async function getTournamentMemberById(
+    id: string,
+    options?: { tournamentId?: string }
+) {
     try {
         const member = await db.query.tournamentMembers.findFirst({
-            where: eq(tournamentMembers.id, id),
+            where: options?.tournamentId
+                ? and(
+                    eq(tournamentMembers.id, id),
+                    eq(tournamentMembers.tournamentId, options.tournamentId),
+                )
+                : eq(tournamentMembers.id, id),
             with: {
                 user: true,
                 team: true,
@@ -237,10 +247,46 @@ export async function updateTournamentMember(
     memberData: Partial<NewTournamentMember>
 ): Promise<TournamentMember> {
     try {
+        const currentUser = await getCurrentUser();
+        if (!currentUser) throw new Error("Non authentifié");
+        const isAdmin =
+            currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+        const existing = await db.query.tournamentMembers.findFirst({
+            where: eq(tournamentMembers.id, id),
+        });
+        if (!existing) throw new Error("Membre introuvable");
+
+        if (!isAdmin) {
+            const isSelf = existing.userId === currentUser.id;
+            const isOrganizer = await isUserTournamentOrganizer(
+                existing.tournamentId,
+                currentUser.id,
+            );
+            if (!isSelf && !isOrganizer) {
+                throw new Error("Accès refusé — vous ne pouvez pas modifier ce membre");
+            }
+        }
+
+        // Champs structurels non modifiables via l'édition de profil.
+        const safeData: Partial<NewTournamentMember> = { ...memberData };
+        delete (safeData as any).id;
+        delete (safeData as any).tournamentId;
+        delete (safeData as any).userId;
+        delete (safeData as any).createdAt;
+        if (!isAdmin) {
+            delete (safeData as any).role;
+            delete (safeData as any).permissions;
+            delete (safeData as any).isCoOrganizer;
+            delete (safeData as any).totalWins;
+            delete (safeData as any).totalMatches;
+            delete (safeData as any).rankingPoints;
+        }
+
         const result = await db
             .update(tournamentMembers)
             .set({
-                ...memberData,
+                ...safeData,
                 updatedAt: new Date(),
             })
             .where(eq(tournamentMembers.id, id))
@@ -324,10 +370,15 @@ export async function getTournamentMembers(
 /**
  * Récupère les inscriptions et stats d'un membre pour toutes les éditions d'un tournoi
  */
-export async function getMemberStatsByEdition(memberId: string) {
+export async function getMemberStatsByEdition(
+    memberId: string,
+    options?: { tournamentId?: string }
+) {
     try {
+        const tournamentId = options?.tournamentId;
         const stats = await db.query.editionRegistrations.findMany({
-            where: (t, { eq, and }) => and(eq(t.memberId, memberId), eq(t.isDeleted, false)),
+            where: (t, { eq, and }) =>
+                and(eq(t.memberId, memberId), eq(t.isDeleted, false)),
             with: {
                 edition: {
                     columns: { id: true, name: true, editionNumber: true, tournamentId: true },
@@ -337,10 +388,25 @@ export async function getMemberStatsByEdition(memberId: string) {
                         }
                     }
                 },
+                results: {
+                    columns: {
+                        position: true,
+                        tier: true,
+                        matchesPlayed: true,
+                        matchesWon: true,
+                        matchesDrawn: true,
+                        matchesLost: true,
+                        totalScore: true,
+                    },
+                },
             },
             orderBy: (t, { desc }) => [desc(t.registeredAt)],
         });
-        return stats;
+
+        // Le filtrage par tournoi est appliqué côté serveur sur la relation.
+        return tournamentId
+            ? stats.filter((stat) => stat.edition?.tournamentId === tournamentId)
+            : stats;
     } catch (error) {
         console.error("Error getting member edition stats:", error);
         throw new Error("Failed to fetch edition stats");

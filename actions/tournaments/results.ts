@@ -102,6 +102,52 @@ import { recalculateGroupStandings } from "@/actions/phases";
 import { buildEditionResultWhereConditions } from "./helpers";
 import { getRegistrationWithMember } from "./members";
 import { isUserTournamentOrganizer } from "./tournaments";
+import {
+  isMatchScheduleValid,
+  resolveMatchSchedule,
+} from "@/lib/tournaments/scheduling";
+
+/**
+ * Ne complète la programmation que si elle est absente/invalide.
+ * À appeler DANS une transaction avec la ligne match verrouillée : la
+ * référence temporelle est unique et un retry ne duplique rien.
+ */
+async function computeMatchScheduleFields(
+  tx: any,
+  match: Match,
+  now: Date,
+): Promise<{ scheduledTime?: Date; estimatedDuration?: number }> {
+  if (isMatchScheduleValid(match)) return {};
+
+  const [phase, edition] = await Promise.all([
+    tx.query.tournamentPhases.findFirst({
+      where: eq(tournamentPhases.id, match.phaseId),
+      columns: { matchDuration: true },
+    }),
+    tx.query.tournamentEditions.findFirst({
+      where: eq(tournamentEditions.id, match.editionId),
+      columns: { editionConfig: true },
+    }),
+  ]);
+
+  const editionConfig = (edition?.editionConfig as any) || {};
+  const configuredDuration =
+    phase?.matchDuration ??
+    editionConfig.matchDuration ??
+    editionConfig.matchDurationMinutes ??
+    editionConfig.estimatedDuration ??
+    null;
+
+  const schedule = resolveMatchSchedule(match, {
+    configuredDuration,
+    now,
+  });
+
+  return {
+    scheduledTime: schedule.scheduledTime,
+    estimatedDuration: schedule.estimatedDuration,
+  };
+}
 
 export async function handleMatchProgression(match: Match) {
   try {
@@ -244,57 +290,72 @@ export async function submitMatchResult(
     const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
     const resolvedUserId = (isAdmin && submittedByUserId) ? submittedByUserId : currentUser.id;
 
-    const match = await db.query.matches.findFirst({
-      where: eq(matches.id, id),
-    });
-
-    if (!match) throw new Error("Match not found");
-
-    const updateData: any = {
-      score1,
-      score2,
-      submittedByUserId: resolvedUserId,
-      proofUrl,
-      updatedAt: new Date(),
-    };
-
     // pas de score negatif
     if (score1 < 0 || score2 < 0) {
       throw new Error("Le score ne peut pas être négatif");
     }
 
-    // Determine status and confirmations
-    const isParticipant1 =
-      match.participant1RegistrationId &&
-      (await isUserRegistered(
-        resolvedUserId,
-        match.participant1RegistrationId,
-      ));
-    const isParticipant2 =
-      match.participant2RegistrationId &&
-      (await isUserRegistered(
-        resolvedUserId,
-        match.participant2RegistrationId,
-      ));
+    const result = await db.transaction(async (tx) => {
+      // Verrou de ligne : deux soumissions concurrentes ne peuvent pas créer
+      // deux programmations différentes.
+      const [match] = await tx
+        .select()
+        .from(matches)
+        .where(eq(matches.id, id))
+        .for("update");
 
-    if (isParticipant1) {
-      updateData.confirmedByParticipant1 = true;
-      updateData.status = "PENDING_REVIEW";
-    } else if (isParticipant2) {
-      updateData.confirmedByParticipant2 = true;
-      updateData.status = "PENDING_REVIEW";
-    } else {
-      // Admin / Organizer submission
-      updateData.status = "AWAITING_ADMIN_CONFIRMATION";
-    }
+      if (!match) throw new Error("Match not found");
 
-    const result = await db
-      .update(matches)
-      .set(updateData)
-      .where(eq(matches.id, id))
-      .returning();
+      const updateData: any = {
+        score1,
+        score2,
+        submittedByUserId: resolvedUserId,
+        proofUrl,
+        updatedAt: new Date(),
+      };
 
-    return result[0];
+      // Determine status and confirmations
+      const isParticipant1 =
+        match.participant1RegistrationId &&
+        (await isUserRegistered(
+          resolvedUserId,
+          match.participant1RegistrationId,
+        ));
+      const isParticipant2 =
+        match.participant2RegistrationId &&
+        (await isUserRegistered(
+          resolvedUserId,
+          match.participant2RegistrationId,
+        ));
+
+      if (isParticipant1) {
+        updateData.confirmedByParticipant1 = true;
+        updateData.status = "PENDING_REVIEW";
+      } else if (isParticipant2) {
+        updateData.confirmedByParticipant2 = true;
+        updateData.status = "PENDING_REVIEW";
+      } else {
+        // Admin / Organizer submission
+        updateData.status = "AWAITING_ADMIN_CONFIRMATION";
+      }
+
+      // Une seule référence temporelle pour le début et la fin.
+      const scheduleFields = await computeMatchScheduleFields(
+        tx,
+        match as Match,
+        new Date(),
+      );
+
+      const updated = await tx
+        .update(matches)
+        .set({ ...updateData, ...scheduleFields })
+        .where(eq(matches.id, id))
+        .returning();
+
+      return updated[0];
+    });
+
+    return result;
   } catch (error) {
     console.error("Error submitting match result:", error);
     throw error;
@@ -319,39 +380,49 @@ export async function confirmMatchResult(
       if (!isOwner) throw new Error("Accès refusé — vous n'êtes pas ce participant");
     }
 
-    const match = await db.query.matches.findFirst({
-      where: eq(matches.id, id),
+    return await db.transaction(async (tx) => {
+      const [match] = await tx
+        .select()
+        .from(matches)
+        .where(eq(matches.id, id))
+        .for("update");
+
+      if (!match) throw new Error("Match not found");
+
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (match.participant1RegistrationId === registrationId) {
+        updateData.confirmedByParticipant1 = true;
+      } else if (match.participant2RegistrationId === registrationId) {
+        updateData.confirmedByParticipant2 = true;
+      } else {
+        throw new Error("Invalid participant for this match");
+      }
+
+      // If both confirmed, move to awaiting admin
+      if (
+        (updateData.confirmedByParticipant1 || match.confirmedByParticipant1) &&
+        (updateData.confirmedByParticipant2 || match.confirmedByParticipant2)
+      ) {
+        updateData.status = "AWAITING_ADMIN_CONFIRMATION";
+      }
+
+      const scheduleFields = await computeMatchScheduleFields(
+        tx,
+        match as Match,
+        new Date(),
+      );
+
+      const updated = await tx
+        .update(matches)
+        .set({ ...updateData, ...scheduleFields })
+        .where(eq(matches.id, id))
+        .returning();
+
+      return updated[0];
     });
-
-    if (!match) throw new Error("Match not found");
-
-    const updateData: any = {
-      updatedAt: new Date(),
-    };
-
-    if (match.participant1RegistrationId === registrationId) {
-      updateData.confirmedByParticipant1 = true;
-    } else if (match.participant2RegistrationId === registrationId) {
-      updateData.confirmedByParticipant2 = true;
-    } else {
-      throw new Error("Invalid participant for this match");
-    }
-
-    // If both confirmed, move to awaiting admin
-    if (
-      (updateData.confirmedByParticipant1 || match.confirmedByParticipant1) &&
-      (updateData.confirmedByParticipant2 || match.confirmedByParticipant2)
-    ) {
-      updateData.status = "AWAITING_ADMIN_CONFIRMATION";
-    }
-
-    const result = await db
-      .update(matches)
-      .set(updateData)
-      .where(eq(matches.id, id))
-      .returning();
-
-    return result[0];
   } catch (error) {
     console.error("Error confirming match result:", error);
     throw error;
@@ -496,51 +567,68 @@ export async function adminConfirmMatchResult(
     if (!currentUser) throw new Error("Non authentifié");
     const isAdmin = currentUser.role === "admin" || (currentUser as any).isAdmin === true;
 
-    const match = await db.query.matches.findFirst({
-      where: eq(matches.id, id),
+    const updatedMatch = await db.transaction(async (tx) => {
+      const [match] = await tx
+        .select()
+        .from(matches)
+        .where(eq(matches.id, id))
+        .for("update");
+
+      if (!match) throw new Error("Match not found");
+
+      if (!isAdmin) {
+        const edition = await tx.query.tournamentEditions.findFirst({
+          where: eq(tournamentEditions.id, match.editionId),
+          columns: { tournamentId: true },
+        });
+        if (!edition) throw new Error("Édition non trouvée");
+        const isOrganizer = await isUserTournamentOrganizer(
+          edition.tournamentId,
+          currentUser.id,
+        );
+        if (!isOrganizer)
+          throw new Error("Accès réservé aux organisateurs ou administrateurs");
+      }
+
+      const s1 = score1 ?? match.score1 ?? 0;
+      const s2 = score2 ?? match.score2 ?? 0;
+
+      // Determine winner
+      let winnerId = null;
+      let loserId = null;
+      if (s1 > s2) {
+        winnerId = match.participant1RegistrationId;
+        loserId = match.participant2RegistrationId;
+      } else if (s1 < s2) {
+        winnerId = match.participant2RegistrationId;
+        loserId = match.participant1RegistrationId;
+      }
+
+      // Programmation : conservée si valide, sinon complétée (une seule
+      // référence temporelle ; idempotent grâce au verrou de ligne).
+      const scheduleFields = await computeMatchScheduleFields(
+        tx,
+        match as Match,
+        new Date(),
+      );
+
+      const result = await tx
+        .update(matches)
+        .set({
+          score1: s1,
+          score2: s2,
+          winnerRegistrationId: winnerId,
+          loserRegistrationId: loserId,
+          status: "COMPLETED",
+          confirmedByAdmin: true,
+          ...scheduleFields,
+          updatedAt: new Date(),
+        })
+        .where(eq(matches.id, id))
+        .returning();
+
+      return result[0];
     });
-
-    if (!match) throw new Error("Match not found");
-
-    if (!isAdmin) {
-      const edition = await db.query.tournamentEditions.findFirst({
-        where: eq(tournamentEditions.id, match.editionId),
-        columns: { tournamentId: true },
-      });
-      if (!edition) throw new Error("Édition non trouvée");
-      const isOrganizer = await isUserTournamentOrganizer(edition.tournamentId, currentUser.id);
-      if (!isOrganizer) throw new Error("Accès réservé aux organisateurs ou administrateurs");
-    }
-
-    const s1 = score1 ?? match.score1 ?? 0;
-    const s2 = score2 ?? match.score2 ?? 0;
-
-    // Determine winner
-    let winnerId = null;
-    let loserId = null;
-    if (s1 > s2) {
-      winnerId = match.participant1RegistrationId;
-      loserId = match.participant2RegistrationId;
-    } else if (s1 < s2) {
-      winnerId = match.participant2RegistrationId;
-      loserId = match.participant1RegistrationId;
-    }
-
-    const result = await db
-      .update(matches)
-      .set({
-        score1: s1,
-        score2: s2,
-        winnerRegistrationId: winnerId,
-        loserRegistrationId: loserId,
-        status: "COMPLETED",
-        confirmedByAdmin: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(matches.id, id))
-      .returning();
-
-    const updatedMatch = result[0];
 
     // Trigger standings recalculation (au cas où, mais le progression-engine le fait aussi)
     if (updatedMatch.groupId) {

@@ -100,6 +100,22 @@ export function MatchCard({
     (match.participant1?.member?.userId === currentUserId ||
       match.participant2?.member?.userId === currentUserId);
 
+  // Navigation fiable : ne jamais construire une URL avec un id vide.
+  // match → édition → tournoi, avec repli sur les relations de la phase.
+  const resolvedTournamentId: string | undefined =
+    match.tournamentId ||
+    match.edition?.tournamentId ||
+    match.phase?.edition?.tournamentId;
+  const resolvedEditionId: string | undefined =
+    match.editionId ||
+    match.edition?.id ||
+    match.phase?.editionId ||
+    match.phase?.edition?.id;
+  const matchHref =
+    resolvedTournamentId && resolvedEditionId
+      ? `/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/matches/${match.id}`
+      : null;
+
   const canSubmit = (isParticipant || isAdmin) && match.status !== "COMPLETED";
   const canAdminValidate = isAdmin && match.status !== "COMPLETED";
 
@@ -209,7 +225,11 @@ export function MatchCard({
       label: "Saisir le score",
       icon: Trophy,
       onClick: () => {
-        window.location.href = `/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}?submit=true`;
+        if (!matchHref) {
+          toast.error("Contexte du match incomplet (tournoi/édition introuvable)");
+          return;
+        }
+        window.location.href = `${matchHref}?submit=true`;
       }
     });
   }
@@ -508,8 +528,14 @@ export function MatchCard({
           >
             {canSubmit && (
               <Link
-                href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}?submit=true`}
+                href={matchHref ? `${matchHref}?submit=true` : "#"}
                 className="flex-1"
+                onClick={(event) => {
+                  if (!matchHref) {
+                    event.preventDefault();
+                    onView?.(match);
+                  }
+                }}
               >
                 <Button
                   variant="default"
@@ -523,8 +549,14 @@ export function MatchCard({
             
             {!canSubmit && (
               <Link
-                href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`}
+                href={matchHref ?? "#"}
                 className="flex-1"
+                onClick={(event) => {
+                  if (!matchHref) {
+                    event.preventDefault();
+                    onView?.(match);
+                  }
+                }}
               >
                  <Button
                   variant="outline"

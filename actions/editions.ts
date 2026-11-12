@@ -5,6 +5,8 @@ import {
   editionRegistrations,
   registrationPayments,
   userWallets,
+  tournamentMembers,
+  teams,
   TournamentEditionWithRelations,
   tournamentPhases,
   phaseGroupParticipants,
@@ -14,8 +16,10 @@ import {
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import { eq, and, desc, asc } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { getCurrentUser } from "@/lib/auth/session";
 import { validateEditionWinnerCandidate } from "./tournaments/editions";
+import { isUserTournamentOrganizer } from "./tournaments/tournaments";
 import {
   calculateTransactionFees,
   executeFinancialOperation,
@@ -147,7 +151,15 @@ export async function getEditionActivePhase(editionId: string) {
 export async function joinEdition(
   editionId: string,
   userId: string,
-  userInfo: { username: string; image?: string | null },
+  userInfo: {
+    username: string;
+    image?: string | null;
+    /** Nom de joueur proposé dans le formulaire d'inscription. */
+    playerName?: string;
+    /** Équipe existante (id réel) ou nom d'équipe à créer. */
+    teamId?: string;
+    teamName?: string;
+  },
   options?: {
     payWithWallet?: boolean;
     pin?: string;
@@ -156,6 +168,10 @@ export async function joinEdition(
   success: boolean;
   message?: string;
   registration?: typeof editionRegistrations.$inferSelect;
+  /** Identifiants réels renvoyés par le serveur pour la redirection. */
+  memberId?: string;
+  tournamentId?: string;
+  registrationStatus?: string;
   paymentRequired?: boolean;
   paymentDetails?: {
     amount: string;
@@ -164,6 +180,13 @@ export async function joinEdition(
   };
 }> {
   try {
+    // L'identité provient de la session serveur, jamais du client.
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, message: "Vous devez être connecté pour vous inscrire." };
+    }
+    userId = currentUser.id;
+
     return await db.transaction(async (tx) => {
       // 1. Lock and fetch Edition with tournament info (P1-F1)
       const [edition] = await tx
@@ -179,12 +202,8 @@ export async function joinEdition(
         where: (t, { eq }) => eq(t.id, edition.tournamentId),
       });
 
-      if (tournament?.organizerId === userId) {
-        return {
-          success: false,
-          message: "L'organisateur ne peut pas s'inscrire à sa propre compétition.",
-        };
-      }
+      // Le créateur/organisateur peut participer à sa propre édition :
+      // plus aucun blocage lié au rôle.
 
       if (edition.status !== "UPCOMING") {
         return {
@@ -220,34 +239,73 @@ export async function joinEdition(
       // 3. Resolve Tournament Member
       const { getTournamentMembers, addTournamentMember } = await import("./members");
 
+      const displayName =
+        userInfo.playerName?.trim() || userInfo.username?.trim() || "Joueur";
+      const requestedTeamName = userInfo.teamName?.trim();
+
       const memberRes = await getTournamentMembers({
         filters: { tournamentId: edition.tournamentId, userId },
       });
 
       let member = memberRes.data[0];
+
+      // Équipe : id existant transmis, sinon création avec le nom choisi.
+      let teamId = userInfo.teamId;
+      if (!teamId && requestedTeamName) {
+        const [createdTeam] = await tx
+          .insert(teams)
+          .values({
+            name: requestedTeamName,
+            captainId: userId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .returning();
+        teamId = createdTeam.id;
+      }
+
       if (!member) {
         member = await addTournamentMember({
           tournamentId: edition.tournamentId,
-          userId: userId,
+          userId,
           role: "PARTICIPANT",
-          displayName: userInfo.username,
+          displayName,
           avatar: userInfo.image,
+          teamId,
         });
+      } else if (
+        (userInfo.playerName && member.displayName !== displayName) ||
+        (teamId && member.teamId !== teamId)
+      ) {
+        const [updatedMember] = await tx
+          .update(tournamentMembers)
+          .set({
+            displayName: userInfo.playerName ? displayName : member.displayName,
+            teamId: teamId ?? member.teamId,
+            updatedAt: new Date(),
+          })
+          .where(eq(tournamentMembers.id, member.id))
+          .returning();
+        member = updatedMember;
       }
 
-      // 4. Check for Existing Registration
+      // 4. Check for Existing Registration (anti-doublon)
       const existingRegistration = await tx.query.editionRegistrations.findFirst({
         where: and(
           eq(editionRegistrations.editionId, editionId),
           eq(editionRegistrations.memberId, member.id),
+          eq(editionRegistrations.isDeleted, false),
         ),
       });
 
       if (existingRegistration) {
         return {
           success: true,
-          message: "Déjà inscrit",
+          message: "Vous êtes déjà inscrit à cette édition.",
           registration: existingRegistration,
+          memberId: member.id,
+          tournamentId: edition.tournamentId,
+          registrationStatus: existingRegistration.status ?? "REGISTERED",
         };
       }
 
@@ -260,6 +318,9 @@ export async function joinEdition(
           return {
             success: false,
             paymentRequired: true,
+            memberId: member.id,
+            tournamentId: edition.tournamentId,
+            registrationStatus: "PAYMENT_PENDING",
             paymentDetails: {
               amount: edition.entryFee || "0",
               currency: edition.prizeCurrency || "GTC",
@@ -383,8 +444,15 @@ export async function joinEdition(
         .where(eq(tournamentEditions.id, editionId));
 
       revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}`);
+      revalidatePath(`/tournaments/${edition.tournamentId}/members/${member.id}`);
 
-      return { success: true, registration };
+      return {
+        success: true,
+        registration,
+        memberId: member.id,
+        tournamentId: edition.tournamentId,
+        registrationStatus: registration.status ?? "REGISTERED",
+      };
     });
   } catch (error) {
     console.error("Error joining edition:", error);
@@ -394,16 +462,46 @@ export async function joinEdition(
 
 /**
  * Update Edition
+ * Sécurisé : seul l'organisateur du tournoi (ou un admin) peut modifier.
  */
 export async function updateEdition(
   id: string,
   data: Partial<NewTournamentEdition>,
 ) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin =
+      currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
+    const existing = await getTournamentEditionById(id);
+    if (!existing) throw new Error("Édition introuvable");
+
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(
+        existing.tournamentId,
+        currentUser.id,
+      );
+      if (!isOrganizer) {
+        throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+      }
+    }
+
+    // Champs sensibles non modifiables via une mise à jour générique.
+    const safeData: Partial<NewTournamentEdition> = { ...data };
+    delete (safeData as any).id;
+    delete (safeData as any).createdAt;
+    if (!isAdmin) {
+      delete (safeData as any).tournamentId;
+      delete (safeData as any).financialAccountId;
+      delete (safeData as any).winnerId;
+      delete (safeData as any).currentParticipants;
+    }
+
     const result = await db
       .update(tournamentEditions)
       .set({
-        ...data,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(tournamentEditions.id, id))
@@ -411,7 +509,10 @@ export async function updateEdition(
 
     if (result[0]) {
       revalidatePath(`/tournaments/${result[0].tournamentId}/editions/${id}`);
+      revalidatePath(`/tournaments/${result[0].tournamentId}`);
     }
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-edition-${id}`, "max");
     return { success: true };
   } catch (error) {
     console.error("Update failed", error);
@@ -421,14 +522,32 @@ export async function updateEdition(
 
 /**
  * Delete Edition
+ * Sécurisé : seul l'organisateur du tournoi (ou un admin) peut supprimer.
  */
 export async function deleteEdition(id: string) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Non authentifié");
+    const isAdmin =
+      currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+
     const edition = await getTournamentEditionById(id);
-    await db.delete(tournamentEditions).where(eq(tournamentEditions.id, id));
-    if (edition) {
-      revalidatePath(`/tournaments/${edition.tournamentId}`);
+    if (!edition) throw new Error("Édition introuvable");
+
+    if (!isAdmin) {
+      const isOrganizer = await isUserTournamentOrganizer(
+        edition.tournamentId,
+        currentUser.id,
+      );
+      if (!isOrganizer) {
+        throw new Error("Accès refusé — vous n'êtes pas organisateur de ce tournoi");
+      }
     }
+
+    await db.delete(tournamentEditions).where(eq(tournamentEditions.id, id));
+    revalidatePath(`/tournaments/${edition.tournamentId}`);
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-edition-${id}`, "max");
     return { success: true };
   } catch (error) {
     console.error("Delete failed", error);

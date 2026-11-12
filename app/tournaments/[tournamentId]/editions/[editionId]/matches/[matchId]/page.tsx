@@ -84,19 +84,32 @@ export default async function MatchDetailPage({
 
   if (!match) notFound();
 
+  // Navigation fiable : les identifiants sont dérivés des relations du match
+  // (match → édition → tournoi) et ne dépendent jamais uniquement de l'URL.
+  // Fallback sur les params si la relation n'est pas peuplée, jamais de
+  // segment vide / "undefined".
+  const resolvedEditionId: string =
+    match.editionId || match.edition?.id || editionId;
+  const resolvedTournamentId: string =
+    match.edition?.tournamentId || tournamentId;
+
+  if (!resolvedEditionId || !resolvedTournamentId) {
+    notFound();
+  }
+
   // Get session and check organizer status
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
   const isOrganizer = session?.user?.id
-    ? await isUserTournamentOrganizer(tournamentId, session.user.id)
+    ? await isUserTournamentOrganizer(resolvedTournamentId, session.user.id)
     : false;
 
   // Fetch match history between these two participants
   const historyRes = await getMatchesWithParticipants({
     filters: {
-      editionId,
+      editionId: resolvedEditionId,
       memberRegistrationId: match.participant1RegistrationId,
     },
     pagination: { limit: 50, page: 1 },
@@ -122,7 +135,7 @@ export default async function MatchDetailPage({
   // Fetch sibling matches (same group or phase)
   const siblingMatchesRes = await getMatchesWithParticipants({
     filters: {
-      editionId,
+      editionId: resolvedEditionId,
       phaseId: match.phaseId,
       groupId: match.groupId || undefined,
     },
@@ -145,13 +158,13 @@ export default async function MatchDetailPage({
           {/* on fait un back */}
           {isOrganizer ? (
             <Link
-              href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`}
+              href={`/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/dashboard/matches`}
             >
               <ChevronLeft className="h-4 w-4" /> Retour aux matchs
             </Link>
           ) : (
             <Link
-              href={`/tournaments/${tournamentId}/editions/${editionId}/matches`}
+              href={`/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/matches`}
             >
               <ChevronLeft className="h-4 w-4" /> Retour aux matchs
             </Link>
@@ -235,7 +248,7 @@ export default async function MatchDetailPage({
             {isOrganizer && (
               <Button size="sm" variant="outline" className="gap-2" asChild>
                 <Link
-                  href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`}
+                  href={`/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/dashboard/matches`}
                 >
                   <Settings2 className="h-4 w-4" /> Dashboard
                 </Link>
@@ -336,8 +349,8 @@ export default async function MatchDetailPage({
           {/* Match Control Client */}
           <MatchControlClient
             match={match}
-            tournamentId={tournamentId}
-            editionId={editionId}
+            tournamentId={resolvedTournamentId}
+            editionId={resolvedEditionId}
             autoSubmit={submit === "true"}
             isOrganizer={isOrganizer}
           />
@@ -403,7 +416,7 @@ export default async function MatchDetailPage({
                           asChild
                         >
                           <Link
-                            href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`}
+                            href={`/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/matches/${m.id}`}
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Link>
@@ -493,7 +506,7 @@ export default async function MatchDetailPage({
                   asChild
                 >
                   <Link
-                    href={`/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`}
+                    href={`/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/dashboard/phases`}
                   >
                     Voir l'arbre complet
                   </Link>
@@ -613,8 +626,8 @@ export default async function MatchDetailPage({
               <Link
                 href={
                   isOrganizer
-                    ? `/tournaments/${tournamentId}/editions/${editionId}/dashboard/matches`
-                    : `/tournaments/${tournamentId}/editions/${editionId}/matches`
+                    ? `/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/dashboard/matches`
+                    : `/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/matches`
                 }
               >
                 Tout voir <ChevronRight className="h-3 w-3 ml-1" />
@@ -626,7 +639,7 @@ export default async function MatchDetailPage({
             {siblingMatches.map((m: any) => (
               <Link
                 key={m.id}
-                href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`}
+                href={`/tournaments/${resolvedTournamentId}/editions/${resolvedEditionId}/matches/${m.id}`}
                 className="group"
               >
                 <Card className="overflow-hidden hover:border-primary/30 transition-all hover:shadow-md bg-muted/10">

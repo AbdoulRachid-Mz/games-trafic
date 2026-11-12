@@ -31,12 +31,6 @@ import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { Tournament, TournamentEditionWithRelations } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
@@ -44,8 +38,21 @@ import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
 import { InteractionButton } from "@/components/shared/interaction-button";
+import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { EditionQrDialog } from "./edition-qr-dialog";
 import { toast } from "sonner";
+import {
+  DEFAULT_TOURNAMENT_COVER,
+  resolveEditionCover,
+} from "@/lib/tournaments/edition-cover";
 
 export interface CompetitionTabItem {
   id: string;
@@ -96,6 +103,30 @@ export function EditionDetailHeader({
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
   const [showQrDialog, setShowQrDialog] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  // Couverture résolue édition → tournoi → visuel de secours, avec repli si
+  // l'URL distante est cassée (aucune image brisée affichée).
+  const resolvedCover = resolveEditionCover(
+    edition as any,
+    tournament as any,
+    DEFAULT_TOURNAMENT_COVER,
+  );
+  const [coverSrc, setCoverSrc] = useState(resolvedCover);
+  useEffect(() => {
+    setCoverSrc(resolvedCover);
+  }, [resolvedCover]);
+  const hasCover = Boolean(coverSrc && coverSrc !== DEFAULT_TOURNAMENT_COVER);
+
+  const handleDeleteEdition = async () => {
+    try {
+      await deleteMutation.mutateAsync(edition.id);
+      setShowActions(false);
+      toast.success("Édition supprimée");
+      router.push(`/tournaments/${tournament.id}`);
+    } catch (error: any) {
+      toast.error(error?.message || "Impossible de supprimer l'édition");
+    }
+  };
 
   // ─── Compact sticky header detection ─────────────────────────────────────
   // When the hero banner scrolls out of view, we show a compact edition info
@@ -175,7 +206,6 @@ export function EditionDetailHeader({
     { id: "calendar", label: "Calendrier", icon: Calendar },
     { id: "stats", label: "MVPs & Stats", icon: Star },
     { id: "rules", label: "Règlement", icon: FileText },
-    { id: "community", label: "Discussion", icon: MessageCircle },
   ], [tabCounts]);
 
   const handleShare = async () => {
@@ -194,16 +224,18 @@ export function EditionDetailHeader({
   return (
     <div className="relative border-b border-white/10 bg-gradient-to-b from-background via-card/20 to-background">
       {/* 1. HERO BANNER ESPORTS */}
-      <div className={cn(`relative w-full overflow-hidden flex flex-col justify-end`, tournament.coverImage ? "min-h-[220px] md:min-h-[300px] lg:min-h-[340px]" : "min-h-6")}>
+      <div className={cn(`relative w-full overflow-hidden flex flex-col justify-end`, hasCover ? "min-h-[220px] md:min-h-[300px] lg:min-h-[340px]" : "min-h-6")}>
         {/* Arrière-plan avec Image de Couverture & Mesh Gradient */}
         <div className="absolute inset-0 -z-10">
-          {tournament.coverImage ? (
+          {hasCover ? (
             <Image
-              src={tournament.coverImage}
+              src={coverSrc}
               alt={tournament.name}
               fill
-              className="object-cover opacity-35 scale-105 filter blur-[1px]"
+              sizes="100vw"
+              className="object-cover object-center opacity-35 scale-105 filter blur-[1px]"
               priority
+              onError={() => setCoverSrc(DEFAULT_TOURNAMENT_COVER)}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary/30 via-background to-card" />
@@ -244,16 +276,22 @@ export function EditionDetailHeader({
 
       {/* 2. MAIN TOURNAMENT CARD */}
       <div className="container mx-auto px-4 md:px-6 relative z-20 -mt-8 md:-mt-12 pb-4">
-        <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 md:p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="bg-card/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 md:p-8 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 md:gap-6">
           {/* Logo / Badge et Informations Principales */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 w-full lg:w-auto">
             {/* Logo du Tournoi */}
             <div className="relative shrink-0">
               <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-2xl border-2 border-white/15 bg-card/80 overflow-hidden shadow-2xl relative flex items-center justify-center group">
                 <Image
-                  src={tournament.profileImage || "/icons/tournament-500.png"}
+                  src={tournament.profileImage || DEFAULT_TOURNAMENT_COVER}
                   alt={edition.name || tournament.name}
                   fill
+                  onError={(event) => {
+                    const img = event.currentTarget as HTMLImageElement;
+                    if (!img.src.endsWith(DEFAULT_TOURNAMENT_COVER)) {
+                      img.src = DEFAULT_TOURNAMENT_COVER;
+                    }
+                  }}
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
@@ -351,9 +389,9 @@ export function EditionDetailHeader({
               </div>
             </div>
 
-            {/* Actions principales */}
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              {/* Bouton d'inscription dynamique */}
+            {/* Actions : 2 actions principales visibles, le reste dans le Drawer « … » */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Action principale 1 — inscription */}
               {isRegistered ? (
                 <div className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-sm font-black uppercase tracking-wider">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -370,7 +408,7 @@ export function EditionDetailHeader({
                 </Button>
               )}
 
-              {/* Bouton Dashboard si organisateur */}
+              {/* Action principale 2 — tableau de bord organisateur */}
               {isOrganizer && (
                 <Button
                   variant="outline"
@@ -384,79 +422,114 @@ export function EditionDetailHeader({
                 </Button>
               )}
 
-              {/* Partager l'édition */}
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handleShare}
-                aria-label="Partager l'édition"
-                className="font-bold border-white/15 bg-background/60 hover:bg-background/90 py-6 gap-2"
-              >
-                <Share2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Partager</span>
-              </Button>
-
-              {/* Suivre l'édition */}
-              <InteractionButton
-                entityType="EDITION"
-                entityId={edition.id}
-                type="follow"
-                size="lg"
-                variant="outline"
-                withCount
-                iconOnly={isMobile}
-                className="border-white/15 bg-background/60 hover:bg-background/90 hover:text-foreground font-bold"
-              />
-
-              {/* QR code — partager / scanner une édition */}
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => setShowQrDialog(true)}
-                aria-label="Scanner ou partager le QR code de l'édition"
-                className="font-bold border-white/15 bg-background/60 hover:bg-background/90 py-6 gap-2"
-              >
-                <QrCode className="w-4 h-4" />
-                <span className="hidden md:inline">QR Code</span>
-              </Button>
-
-              {/* Menu Plus d'actions */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-12 w-12 border-white/10 bg-background/50">
+              {/* Actions secondaires — Drawer / Sheet */}
+              <Sheet open={showActions} onOpenChange={setShowActions}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Plus d'actions pour cette édition"
+                    className="h-12 w-12 shrink-0 border-white/10 bg-background/50"
+                  >
                     <MoreVertical className="w-5 h-5" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-2xl border-white/10">
-                  <DropdownMenuItem asChild className="cursor-pointer">
-                    <Link href={`/chats?entityType=tournament&entityId=${tournament.id}`}>
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      Discuter du tournoi
-                    </Link>
-                  </DropdownMenuItem>
-                  {isOrganizer && (
-                    <>
-                      <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
-                        <Edit className="w-4 h-4 mr-2" />
-                        Modifier l&apos;édition
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          if (confirm("Confirmer la suppression définitive de cette édition ?")) {
-                            deleteMutation.mutate(edition.id, {
-                              onSuccess: () => router.push(`/tournaments/${tournament.id}`),
-                            });
-                          }
-                        }}
-                        className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                </SheetTrigger>
+                <SheetContent
+                  side={isMobile ? "bottom" : "right"}
+                  className="flex flex-col p-0"
+                >
+                  <SheetHeader className="border-b border-white/10 text-left">
+                    <SheetTitle>Actions de l&apos;édition</SheetTitle>
+                    <SheetDescription>
+                      {edition.name || `Édition #${edition.editionNumber}`}
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+                    <Button
+                      variant="ghost"
+                      className="h-11 w-full justify-start gap-3 font-medium"
+                      onClick={() => {
+                        setShowActions(false);
+                        void handleShare();
+                      }}
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Partager l&apos;édition
+                    </Button>
+
+                    <div className="flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium hover:bg-accent">
+                      <InteractionButton
+                        entityType="EDITION"
+                        entityId={edition.id}
+                        type="follow"
+                        variant="ghost"
+                        size="sm"
+                        withCount
+                        className="h-8 justify-start px-0 hover:bg-transparent"
+                      />
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      className="h-11 w-full justify-start gap-3 font-medium"
+                      onClick={() => {
+                        setShowActions(false);
+                        setShowQrDialog(true);
+                      }}
+                    >
+                      <QrCode className="h-4 w-4" />
+                      QR code de l&apos;édition
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      className="h-11 w-full justify-start gap-3 font-medium"
+                      asChild
+                    >
+                      <Link
+                        href={`/chats?entityType=tournament&entityId=${tournament.id}`}
+                        onClick={() => setShowActions(false)}
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Supprimer l&apos;édition
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                        <MessageCircle className="h-4 w-4" />
+                        Discuter du tournoi
+                      </Link>
+                    </Button>
+
+                    {isOrganizer && (
+                      <>
+                        <div className="my-1 h-px bg-border" />
+                        <Button
+                          variant="ghost"
+                          className="h-11 w-full justify-start gap-3 font-medium"
+                          onClick={() => {
+                            setShowActions(false);
+                            onEdit?.();
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                          Modifier l&apos;édition
+                        </Button>
+
+                        <ConfirmationDialog
+                          title="Supprimer cette édition ?"
+                          description="Cette action est définitive : structures, matchs et inscriptions de cette édition seront supprimés."
+                          confirmLabel="Supprimer"
+                          onConfirm={handleDeleteEdition}
+                        >
+                          <Button
+                            variant="ghost"
+                            className="h-11 w-full justify-start gap-3 font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Supprimer l&apos;édition
+                          </Button>
+                        </ConfirmationDialog>
+                      </>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>
@@ -479,7 +552,7 @@ export function EditionDetailHeader({
                 {/* Mini logo */}
                 <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/15 shrink-0">
                   <Image
-                    src={tournament.profileImage || "/icons/tournament-500.png"}
+                    src={tournament.profileImage || DEFAULT_TOURNAMENT_COVER}
                     alt={edition.name || tournament.name}
                     fill
                     className="object-cover"

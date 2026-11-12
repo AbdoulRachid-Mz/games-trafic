@@ -396,6 +396,53 @@ export async function createTournamentEdition(
       throw new Error("tournamentId, editionNumber and startDate are required");
     }
 
+    // Validation serveur : cohérence des dates et des montants.
+    const toTime = (value: unknown) => {
+      if (!value) return null;
+      const date = value instanceof Date ? value : new Date(value as string);
+      return Number.isNaN(date.getTime()) ? null : date.getTime();
+    };
+    const startTime = toTime(editionData.startDate);
+    const endTime = toTime(editionData.endDate);
+    const opensTime = toTime(editionData.registrationOpens);
+    const deadlineTime = toTime(editionData.registrationDeadline);
+
+    if (startTime === null) throw new Error("Date de début invalide");
+    if (endTime !== null && endTime < startTime) {
+      throw new Error("La date de fin doit être postérieure à la date de début");
+    }
+    if (deadlineTime !== null && deadlineTime > startTime) {
+      throw new Error(
+        "La clôture des inscriptions doit précéder le début de l'édition",
+      );
+    }
+    if (
+      opensTime !== null &&
+      deadlineTime !== null &&
+      deadlineTime < opensTime
+    ) {
+      throw new Error(
+        "La clôture des inscriptions doit être postérieure à l'ouverture",
+      );
+    }
+    if (
+      editionData.maxParticipants !== null &&
+      editionData.maxParticipants !== undefined &&
+      editionData.maxParticipants < 1
+    ) {
+      throw new Error("Le nombre de participants doit être au moins 1");
+    }
+    if (editionData.entryFee !== null && editionData.entryFee !== undefined) {
+      if (Number(editionData.entryFee) < 0) {
+        throw new Error("Les frais d'inscription ne peuvent pas être négatifs");
+      }
+    }
+    if (editionData.prizePool !== null && editionData.prizePool !== undefined) {
+      if (Number(editionData.prizePool) < 0) {
+        throw new Error("Le cashprize ne peut pas être négatif");
+      }
+    }
+
     // Only the organizer or an admin can create editions
     if (!isAdmin) {
       const isOrganizer = await isUserTournamentOrganizer(editionData.tournamentId, currentUser.id);
@@ -474,6 +521,11 @@ export async function createTournamentEdition(
     } catch (notifError) {
       console.error("Error sending notifications to followers:", notifError);
     }
+
+    revalidateTag("tournaments", "max");
+    revalidateTag(`tournament-edition-${result.id}`, "max");
+    revalidatePath(`/tournaments/${editionData.tournamentId}/dashboard/editions`);
+    revalidatePath(`/tournaments/${editionData.tournamentId}`);
 
     return result;
   } catch (error) {

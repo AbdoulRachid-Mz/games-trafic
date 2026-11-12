@@ -156,6 +156,43 @@ export async function getVipSubscriptions(
 }
 
 /**
+ * Abonnement VIP de l'utilisateur courant — lecture sécurisée.
+ * Ne retourne jamais les abonnements d'un autre utilisateur : l'identifiant
+ * provient exclusivement de la session serveur (pas d'un filtre client).
+ */
+export interface MyVipSubscriptionSummary {
+  active: VipSubscription | null;
+  history: VipSubscription[];
+}
+
+export async function getMyVipSubscription(): Promise<MyVipSubscriptionSummary> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return { active: null, history: [] };
+
+  const rows = await db
+    .select()
+    .from(vipSubscriptions)
+    .where(
+      and(
+        eq(vipSubscriptions.userId, currentUser.id),
+        eq(vipSubscriptions.isDeleted, false),
+      ),
+    )
+    .orderBy(desc(vipSubscriptions.createdAt))
+    .limit(20);
+
+  const now = Date.now();
+  const active =
+    rows.find(
+      (subscription) =>
+        subscription.status === "ACTIVE" &&
+        new Date(subscription.endDate).getTime() > now,
+    ) ?? null;
+
+  return { active, history: rows };
+}
+
+/**
  * Récupère les statistiques des abonnements VIP
  */
 export async function getVipSubscriptionStats(filters?: VipSubscriptionFilters) {

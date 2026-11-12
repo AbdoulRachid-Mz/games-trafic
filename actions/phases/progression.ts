@@ -60,9 +60,12 @@ import {
   hasPending,
   getEliminationRoundName,
   getWinnersFromGroups,
-  getEffectiveAdvanceCount,
   isMatchdayGroup,
 } from "./helpers";
+import {
+  applyQualificationToRanking,
+  resolveQualification,
+} from "@/lib/tournaments/qualification";
 import { setupLeaguePhase } from "@/lib/tournaments/generators";
 import { resolveScoring, isMatchCountable } from "@/lib/tournaments/scoring";
 import {
@@ -628,9 +631,16 @@ export async function markGroupCompleteAction(
       });
     }
 
-    // AdvanceCount effectif (group.config → phase.config → legacy → défaut),
-    // plus aucun `|| 2` implicite.
-    const advanceCount = getEffectiveAdvanceCount(group.phase, group);
+    // AdvanceCount effectif (group.config → phase.config → édition → défaut
+    // du format), plus aucun `|| 2` implicite : résolution centralisée.
+    const qualification = resolveQualification({
+      group: { config: group.config },
+      phase: {
+        config: group.phase?.config,
+        phaseType: group.phase?.phaseType,
+      },
+      edition: { editionConfig: group.phase?.edition?.editionConfig },
+    });
 
     // **NOUVEAU: Pour les phases elimination, completer d'abord tous les brackets non completes**
     if (phaseType === "ELIMINATION" || phaseType === "KNOCKOUT") {
@@ -702,15 +712,50 @@ export async function markGroupCompleteAction(
       groupType === "ROUND_ROBIN"
     ) {
       const standings = await calculateGroupStandings(groupId);
-      const tiebreakerRules = config.tiebreakerRules || [
-        "POINTS",
-        "GOAL_DIFF",
-        "GOALS_FOR",
-      ];
-      const sortedParticipants = rankParticipants(standings, tiebreakerRules);
-      qualifiedRegistrationIds = sortedParticipants
-        .slice(0, advanceCount)
-        .map((p) => p.registrationId);
+      const sortedParticipants = rankParticipants(
+        standings,
+        qualification.tiebreakerRules,
+      );
+
+      // Qualifications transversales (meilleurs deuxièmes…) : candidats des
+      // autres groupes du même tour, classés par les mêmes tiebreakers.
+      let additionalCandidates: any[] = [];
+      if (qualification.additionalQualifiers > 0) {
+        const siblingGroups = await db.query.phaseGroups.findMany({
+          where: and(
+            eq(phaseGroups.phaseId, group.phaseId),
+            eq(phaseGroups.order, group.order),
+            eq(phaseGroups.isDeleted, false),
+          ),
+        });
+        for (const sibling of siblingGroups) {
+          if (sibling.id === groupId) continue;
+          const siblingStandings = await calculateGroupStandings(sibling.id);
+          const siblingRanked = rankParticipants(
+            siblingStandings,
+            qualification.tiebreakerRules,
+          );
+          additionalCandidates.push(
+            ...siblingRanked.slice(qualification.advanceCount),
+          );
+        }
+        additionalCandidates.sort(
+          (a, b) =>
+            (b.stats.points ?? 0) - (a.stats.points ?? 0) ||
+            (b.stats.scoreDifference ?? 0) - (a.stats.scoreDifference ?? 0) ||
+            (b.stats.scoreFor ?? 0) - (a.stats.scoreFor ?? 0),
+        );
+      }
+
+      const outcome = applyQualificationToRanking(
+        sortedParticipants as any[],
+        qualification,
+        { groupName: group.name || undefined, additionalCandidates },
+      );
+      qualifiedRegistrationIds = [
+        ...outcome.qualified,
+        ...outcome.additionalQualified,
+      ].map((p) => p.registrationId);
     }
     // CAS 2: Phase elimination - Recuperer les winners des brackets
     else if (phaseType === "ELIMINATION" || phaseType === "KNOCKOUT") {
@@ -729,21 +774,36 @@ export async function markGroupCompleteAction(
     // CAS 3: Ronde Suisse
     else if (phaseType === "SWISS") {
       const standings = await calculateGroupStandings(groupId);
-      const sortedParticipants = rankParticipants(standings, [
-        "POINTS",
-        "GOAL_DIFF",
-      ]);
-      qualifiedRegistrationIds = sortedParticipants
-        .slice(0, advanceCount)
-        .map((p) => p.registrationId);
+      const sortedParticipants = rankParticipants(
+        standings,
+        qualification.tiebreakerRules,
+      );
+      const outcome = applyQualificationToRanking(
+        sortedParticipants as any[],
+        qualification,
+        { groupName: group.name || undefined },
+      );
+      qualifiedRegistrationIds = [
+        ...outcome.qualified,
+        ...outcome.additionalQualified,
+      ].map((p) => p.registrationId);
     }
     // CAS 4: Fallback
     else {
       const standings = await calculateGroupStandings(groupId);
-      const sortedParticipants = rankParticipants(standings, ["POINTS"]);
-      qualifiedRegistrationIds = sortedParticipants
-        .slice(0, advanceCount)
-        .map((p) => p.registrationId);
+      const sortedParticipants = rankParticipants(
+        standings,
+        qualification.tiebreakerRules,
+      );
+      const outcome = applyQualificationToRanking(
+        sortedParticipants as any[],
+        qualification,
+        { groupName: group.name || undefined },
+      );
+      qualifiedRegistrationIds = [
+        ...outcome.qualified,
+        ...outcome.additionalQualified,
+      ].map((p) => p.registrationId);
     }
 
     return await db.transaction(async (tx) => {
@@ -1099,7 +1159,11 @@ export async function markPhaseCompleteAction(phaseId: string) {
 
     if (isMatchdayRoundRobin) {
       const phaseResults = await computeMatchdayPhaseResults(phaseId, phaseConfig, groups);
-      const advanceCount = getEffectiveAdvanceCount(phase, groups[0]);
+      const advanceCount = resolveQualification({
+        group: { config: groups[0]?.config },
+        phase: { config: phaseConfig, phaseType: phase.phaseType },
+        edition: { editionConfig: phase.edition?.editionConfig },
+      }).advanceCount;
       persistedQualifiers = phaseResults
         .slice(0, advanceCount)
         .map((r, index) => ({
@@ -1600,10 +1664,10 @@ export async function organizeNextPhaseAction(
             where: eq(editionResults.editionId, phase.editionId),
             orderBy: asc(editionResults.position),
           });
-          const advanceCount =
-            (phase.config as any)?.advanceCount ||
-            (phase.config as any)?.advanceFromGroup ||
-            2;
+          const advanceCount = resolveQualification({
+            phase: { config: phase.config, phaseType: phase.phaseType },
+            edition: { editionConfig: phase.edition?.editionConfig },
+          }).advanceCount;
           const groupsCount = previousGroups.length || 1;
           participantRegIds = editionResultsList
             .slice(0, advanceCount * groupsCount)
@@ -1689,7 +1753,20 @@ export async function organizeNextPhaseAction(
               groupType: "STANDARD",
               config: {
                 isHomeAway: isHomeAway,
-                advanceCount: getEffectiveAdvanceCount(phase),
+                // Ne recopier que si la phase définit explicitement le top-N :
+                // une valeur héritée reste héritée (addendum §4).
+                ...(() => {
+                  const explicit = resolveQualification({
+                    phase: {
+                      config: phase.config,
+                      phaseType: phase.phaseType,
+                    },
+                    edition: { editionConfig: phase.edition?.editionConfig },
+                  });
+                  return explicit.source === "PHASE" || explicit.source === "GROUP"
+                    ? { advanceCount: explicit.advanceCount }
+                    : {};
+                })(),
               },
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -1779,7 +1856,6 @@ export async function organizeNextPhaseAction(
         const participantCount = participants.length;
         const totalRounds = Math.ceil(Math.log2(participantCount));
         const nodePrefix = (phase.config as any)?.nodePrefix || "Match";
-        const advanceCountGlobal = (phase.config as any)?.advanceCount || 1;
 
         let currentParticipants = [...participants];
 

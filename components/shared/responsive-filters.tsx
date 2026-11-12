@@ -38,10 +38,20 @@ import { Badge } from "@/components/ui/badge"
 
 export type FilterType = "simple" | "dialog" | "drawer" | "sheet"
 
+export interface ActiveFilterChip {
+  key: string
+  label: string
+  onRemove?: () => void
+}
+
 interface ResponsiveFiltersProps {
   children?: React.ReactNode
   onReset?: () => void
+  /** Appelé par le bouton « Appliquer » (filtres non immédiats). */
+  onApply?: () => void
   activeFiltersCount?: number
+  /** Critères actifs affichés sous forme de chips supprimables. */
+  activeFilters?: ActiveFilterChip[]
   searchTerm?: string
   onSearchChange?: (value: string) => void
   searchPlaceholder?: string
@@ -55,7 +65,9 @@ interface ResponsiveFiltersProps {
 export function ResponsiveFilters({
   children,
   onReset,
+  onApply,
   activeFiltersCount = 0,
+  activeFilters = [],
   searchTerm,
   onSearchChange,
   searchPlaceholder = "Rechercher...",
@@ -97,6 +109,42 @@ export function ResponsiveFilters({
     </Button>
   )
 
+  // Chips des critères actifs : suppression individuelle + « tout effacer ».
+  // Une puce sans `onRemove` reste informative (non supprimable).
+  const ActiveFilterChips = activeFilters.length > 0 && (
+    <div className="flex flex-wrap items-center gap-2">
+      {activeFilters.map((filter) => (
+        <Badge
+          key={filter.key}
+          variant="secondary"
+          className="h-7 gap-1.5 pl-2.5 pr-1 text-xs font-normal"
+        >
+          <span className="max-w-[180px] truncate">{filter.label}</span>
+          {filter.onRemove && (
+            <button
+              type="button"
+              aria-label={`Retirer le filtre ${filter.label}`}
+              onClick={filter.onRemove}
+              className="rounded-full p-0.5 transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </Badge>
+      ))}
+      {onReset && activeFilters.length > 1 && (
+        <Button
+          variant="link"
+          size="sm"
+          onClick={onReset}
+          className="h-7 px-1 text-xs text-muted-foreground"
+        >
+          Tout effacer
+        </Button>
+      )}
+    </div>
+  )
+
   const FilterTrigger = (
     <Button variant="outline" className="h-10 relative gap-2">
       <SlidersHorizontal className="h-4 w-4" />
@@ -127,7 +175,12 @@ export function ResponsiveFilters({
           <Button variant="outline" className="flex-1">Fermer</Button>
         </Close>
         <Close asChild>
-          <Button className="flex-1">Appliquer</Button>
+          <Button
+            className="flex-1"
+            onClick={() => onApply?.()}
+          >
+            Appliquer
+          </Button>
         </Close>
       </div>
     )
@@ -160,13 +213,17 @@ export function ResponsiveFilters({
             </Sheet>
           )}
         </div>
-        {activeFiltersCount > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-            <Typography variant="caption2" theme="muted" className="shrink-0">
-              {activeFiltersCount} filtre(s) actif(s)
-            </Typography>
-            {ResetButton}
-          </div>
+        {activeFilters.length > 0 ? (
+          ActiveFilterChips
+        ) : (
+          activeFiltersCount > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+              <Typography variant="caption2" theme="muted" className="shrink-0">
+                {activeFiltersCount} filtre(s) actif(s)
+              </Typography>
+              {ResetButton}
+            </div>
+          )
         )}
       </div>
     )
@@ -188,7 +245,9 @@ export function ResponsiveFilters({
               {ResetButton}
             </div>
           </div>
-          
+
+          {ActiveFilterChips}
+
           {children && (
             <div className="flex flex-wrap items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
               <Typography variant="caption2" weight="medium" className="flex items-center gap-2 text-muted-foreground mr-2">
@@ -204,76 +263,85 @@ export function ResponsiveFilters({
 
     if (type === "dialog") {
       return (
-        <div className={cn("flex items-center gap-3", className)}>
-          {SearchBar}
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              {FilterTrigger}
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                {HeaderContent}
-              </DialogHeader>
-              <div className="py-4 space-y-6">
-                {children}
-              </div>
-              <DialogFooter>
-                {FooterContent(DialogClose)}
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          {ResetButton}
+        <div className={cn("space-y-3", className)}>
+          <div className="flex items-center gap-3">
+            {SearchBar}
+            <Dialog open={isOpen} onOpenChange={setIsOpen}>
+              <DialogTrigger asChild>
+                {FilterTrigger}
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  {HeaderContent}
+                </DialogHeader>
+                <div className="py-4 space-y-6">
+                  {children}
+                </div>
+                <DialogFooter>
+                  {FooterContent(DialogClose)}
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            {ResetButton}
+          </div>
+          {ActiveFilterChips}
         </div>
       )
     }
 
     if (type === "drawer") {
       return (
-        <div className={cn("flex items-center gap-3", className)}>
-          {SearchBar}
-          <Drawer open={isOpen} onOpenChange={setIsOpen}>
-            <DrawerTrigger asChild>
-              {FilterTrigger}
-            </DrawerTrigger>
-            <DrawerContent>
-              <div className="mx-auto w-full max-w-sm">
-                <DrawerHeader>
-                  <DrawerTitle>{title}</DrawerTitle>
-                </DrawerHeader>
-                <div className="p-4 space-y-6">
-                  {children}
+        <div className={cn("space-y-3", className)}>
+          <div className="flex items-center gap-3">
+            {SearchBar}
+            <Drawer open={isOpen} onOpenChange={setIsOpen}>
+              <DrawerTrigger asChild>
+                {FilterTrigger}
+              </DrawerTrigger>
+              <DrawerContent>
+                <div className="mx-auto w-full max-w-sm">
+                  <DrawerHeader>
+                    <DrawerTitle>{title}</DrawerTitle>
+                  </DrawerHeader>
+                  <div className="p-4 space-y-6">
+                    {children}
+                  </div>
+                  <DrawerFooter>
+                    {FooterContent(DrawerClose)}
+                    {ResetButton}
+                  </DrawerFooter>
                 </div>
-                <DrawerFooter>
-                  {FooterContent(DrawerClose)}
-                  {ResetButton}
-                </DrawerFooter>
-              </div>
-            </DrawerContent>
-          </Drawer>
+              </DrawerContent>
+            </Drawer>
+          </div>
+          {ActiveFilterChips}
         </div>
       )
     }
 
     if (type === "sheet") {
       return (
-        <div className={cn("flex items-center gap-3", className)}>
-          {SearchBar}
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              {FilterTrigger}
-            </SheetTrigger>
-            <SheetContent side="right" className="sm:max-w-sm flex flex-col p-0">
-              <SheetHeader className="p-4 border-b">
-                {HeaderContent}
-              </SheetHeader>
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {children}
-              </div>
-              <SheetFooter className="p-4 border-t">
-                {FooterContent(SheetClose)}
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
+        <div className={cn("space-y-3", className)}>
+          <div className="flex items-center gap-3">
+            {SearchBar}
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                {FilterTrigger}
+              </SheetTrigger>
+              <SheetContent side="right" className="sm:max-w-sm flex flex-col p-0">
+                <SheetHeader className="p-4 border-b">
+                  {HeaderContent}
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                  {children}
+                </div>
+                <SheetFooter className="p-4 border-t">
+                  {FooterContent(SheetClose)}
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+          </div>
+          {ActiveFilterChips}
         </div>
       )
     }
