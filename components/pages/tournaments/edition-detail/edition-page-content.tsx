@@ -27,13 +27,8 @@ import { useJoinEdition } from "@/hooks/use-editions";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CommentsSection } from "@/components/comments/comments-section";
-import { StatsCarousel } from "@/components/shared/stats-carousel";
 import {
-  Users,
-  Target,
-  Trophy,
   Calendar,
-  Wallet,
   Info,
   LayoutGrid,
   Swords,
@@ -87,7 +82,6 @@ export function EditionPageContent({
 
   const isRegistered = !!currentUserRegistration;
   const registrations = edition.registrations || [];
-  const checkedInCount = registrations.filter((r) => r.checkedIn).length;
 
   // Synchroniser l'URL sans rechargement lourd
   const handleTabChange = (tabId: string) => {
@@ -100,48 +94,6 @@ export function EditionPageContent({
     }
   };
 
-  const editionStats = [
-    {
-      icon: <Users className="h-5 w-5" />,
-      label: "Participants",
-      value: `${edition.currentParticipants || registrations.length}/${edition.maxParticipants || "∞"}`,
-      color: "text-blue-500",
-      className: "bg-gradient-to-br from-blue-500/20 to-blue-600/5 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]",
-    },
-    {
-      icon: <Target className="h-5 w-5" />,
-      label: "Check-in",
-      value: checkedInCount,
-      color: "text-indigo-500",
-      className: "bg-gradient-to-br from-indigo-500/20 to-indigo-600/5 border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]",
-    },
-    {
-      icon: <Trophy className="h-5 w-5" />,
-      label: "Matchs joués",
-      value: edition.completedMatchCount || 0,
-      color: "text-green-500",
-      className: "bg-gradient-to-br from-green-500/20 to-green-600/5 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]",
-    },
-    {
-      icon: <Calendar className="h-5 w-5" />,
-      label: "Phases",
-      value: phases.length,
-      color: "text-purple-500",
-      className: "bg-gradient-to-br from-purple-500/20 to-purple-600/5 border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]",
-    },
-    ...(Number(edition.entryFee) > 0
-      ? [
-          {
-            icon: <Wallet className="h-5 w-5" />,
-            label: "Frais d'entrée",
-            value: `${edition.entryFee} ${edition.prizeCurrency || "GTC"}`,
-            color: "text-amber-500",
-            className: "bg-gradient-to-br from-amber-500/20 to-orange-500/5 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]",
-          },
-        ]
-      : []),
-  ];
-
   const handleJoinClick = () => {
     if (!user) {
       toast.error("Vous devez être connecté pour participer");
@@ -150,6 +102,13 @@ export function EditionPageContent({
     }
     setShowJoinDialog(true);
   };
+
+  // ?join=1 (QR code / lien partagé) : ouvre directement le dialogue d'inscription.
+  useEffect(() => {
+    const wantsToJoin = searchParams.get("join") === "1";
+    if (!wantsToJoin || isRegistered || !user || showJoinDialog) return;
+    setShowJoinDialog(true);
+  }, [searchParams, isRegistered, user, showJoinDialog]);
 
   const handleConfirmJoin = async () => {
     if (!user) return;
@@ -204,15 +163,6 @@ export function EditionPageContent({
       />
 
       <div className="container mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6 md:space-y-10 relative z-10">
-        {/* CARROUSEL STATS ESORTS */}
-        <div className="bg-card/40 backdrop-blur-xl rounded-3xl p-3 md:p-4 border border-white/5 shadow-xl">
-          <StatsCarousel
-            data={editionStats}
-            className="w-full"
-            itemsPerView={{ mobile: 2, lg: 4, xl: 5 }}
-          />
-        </div>
-
         {/* CTA D'INSCRIPTION RAPIDE SI NON INSCRIT */}
         {!isRegistered && (
           <div className="relative overflow-hidden bg-gradient-to-br from-card via-card/70 to-card/40 border border-primary/20 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_30px_rgba(var(--primary),0.1)] group">

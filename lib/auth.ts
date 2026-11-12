@@ -10,6 +10,7 @@ import { lastLoginMethod } from "better-auth/plugins";
 import { admin } from "better-auth/plugins/admin";
 import { oneTap } from "better-auth/plugins"; // Ajouter cette ligne
 import { migrateAnonymousUserData } from "@/actions/users";
+import { getAppHostEnv, getAppUrlEnv } from "@/utils/app-url";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -206,7 +207,11 @@ export const auth = betterAuth({
     lastLoginMethod({
       storeInDatabase: true,
     }),
-    passkey(),
+    passkey({
+      rpID: getAppHostEnv(),
+      rpName: "Games-Trafics",
+      origin: getAppUrlEnv(),
+    }),
     oneTap(),
     nextCookies(),
   ],

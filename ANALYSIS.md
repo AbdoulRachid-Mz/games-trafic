@@ -1597,7 +1597,7 @@ L'ancien `ANALYSIS.md` affirmait :
 
 **Protégé**
 
-- `/dashboard`, `/dashboard/my-purchases`, `/dashboard/notifications`, `/dashboard/products`, `/dashboard/shops`, `/dashboard/subscriptions`, `/dashboard/tournaments`.
+- `/dashboard`, `/dashboard/orders`, `/dashboard/notifications`, `/dashboard/products`, `/dashboard/shops`, `/dashboard/subscriptions`, `/dashboard/tournaments`.
 - `/profile`, `/profile/settings`, `/profile/[id]`.
 - `/wallet`, `/wallet/create`, `/wallet/claims`, `/wallet/settings`, `/wallet/transactions`, `/wallet/transactions/create`, `/wallet/transactions/history`, `/wallet/transactions/qr`, `/wallet/transactions/[id]`, `/wallet/verification`.
 - `/chats`, `/chats/groups/create`, `/chats/groups/[groupId]`, `/chats/groups/[groupId]/edit`.

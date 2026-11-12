@@ -7,9 +7,14 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { generateAuthenticationOptions, verifyAuthenticationResponse } from "@simplewebauthn/server";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
 import { createHash, randomBytes } from "node:crypto";
+import { getAppHostEnv, getAppUrlEnv } from "@/utils/app-url";
 
-const RP_ID = process.env.NEXT_PUBLIC_RP_ID || "localhost";
-const ORIGIN = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+// Passkey transaction challenge.
+// RP_ID/ORIGIN sont dérivés du contexte d'exécution :
+// - développement : localhost
+// - production : games-trafic.vercel.app
+const RP_ID = getAppHostEnv();
+const ORIGIN = getAppUrlEnv();
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
 export interface PasskeyChallengeParams {

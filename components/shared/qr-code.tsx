@@ -157,8 +157,11 @@ export function TransactionQRCode({
   );
 }
 
-// Helper pour arrondir les rectangles
-if (!(window as any).CanvasRenderingContext2D.prototype.roundRect) {
+// Helper pour arrondir les rectangles (client uniquement : jamais exécuté en SSR)
+if (
+  typeof window !== "undefined" &&
+  !(window as any).CanvasRenderingContext2D.prototype.roundRect
+) {
   (window as any).CanvasRenderingContext2D.prototype.roundRect = function (x: number, y: number, w: number, h: number, r: number) {
     if (w < 2 * r) r = w / 2;
     if (h < 2 * r) r = h / 2;

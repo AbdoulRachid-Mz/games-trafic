@@ -25,6 +25,7 @@ import {
   Zap,
   CheckCircle2,
   ExternalLink,
+  QrCode,
 } from "lucide-react";
 import Image from "next/image";
 import { format } from "date-fns";
@@ -43,6 +44,7 @@ import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
 import { InteractionButton } from "@/components/shared/interaction-button";
+import { EditionQrDialog } from "./edition-qr-dialog";
 import { toast } from "sonner";
 
 export interface CompetitionTabItem {
@@ -93,6 +95,7 @@ export function EditionDetailHeader({
   const { isMobile } = useScreenSize();
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
+  const [showQrDialog, setShowQrDialog] = useState(false);
 
   // ─── Compact sticky header detection ─────────────────────────────────────
   // When the hero banner scrolls out of view, we show a compact edition info
@@ -209,28 +212,6 @@ export function EditionDetailHeader({
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background/60" />
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
-        </div>
-
-        {/* Boutons Flottants en haut à droite : Partager & Suivre */}
-        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShare}
-            className="bg-background/60 backdrop-blur-xl border-white/10 hover:bg-background/90 text-foreground gap-1.5 shadow-xl text-xs font-bold"
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Partager</span>
-          </Button>
-
-          <InteractionButton
-            entityType="EDITION"
-            entityId={edition.id}
-            type="follow"
-            className="bg-background/60 text-foreground backdrop-blur-xl border border-white/10 shadow-xl hover:bg-background/90"
-            withCount
-            iconOnly={true}
-          />
         </div>
 
         {/* Champion Spotlight si tournoi terminé */}
@@ -371,7 +352,7 @@ export function EditionDetailHeader({
             </div>
 
             {/* Actions principales */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {/* Bouton d'inscription dynamique */}
               {isRegistered ? (
                 <div className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-sm font-black uppercase tracking-wider">
@@ -403,6 +384,42 @@ export function EditionDetailHeader({
                 </Button>
               )}
 
+              {/* Partager l'édition */}
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handleShare}
+                aria-label="Partager l'édition"
+                className="font-bold border-white/15 bg-background/60 hover:bg-background/90 py-6 gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Partager</span>
+              </Button>
+
+              {/* Suivre l'édition */}
+              <InteractionButton
+                entityType="EDITION"
+                entityId={edition.id}
+                type="follow"
+                size="lg"
+                variant="outline"
+                withCount
+                iconOnly={isMobile}
+                className="border-white/15 bg-background/60 hover:bg-background/90 hover:text-foreground font-bold"
+              />
+
+              {/* QR code — partager / scanner une édition */}
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setShowQrDialog(true)}
+                aria-label="Scanner ou partager le QR code de l'édition"
+                className="font-bold border-white/15 bg-background/60 hover:bg-background/90 py-6 gap-2"
+              >
+                <QrCode className="w-4 h-4" />
+                <span className="hidden md:inline">QR Code</span>
+              </Button>
+
               {/* Menu Plus d'actions */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -411,10 +428,6 @@ export function EditionDetailHeader({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 bg-card/95 backdrop-blur-2xl border-white/10">
-                  <DropdownMenuItem onClick={handleShare} className="cursor-pointer">
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Partager l&apos;édition
-                  </DropdownMenuItem>
                   <DropdownMenuItem asChild className="cursor-pointer">
                     <Link href={`/chats?entityType=tournament&entityId=${tournament.id}`}>
                       <MessageCircle className="w-4 h-4 mr-2" />
@@ -548,6 +561,14 @@ export function EditionDetailHeader({
           </div>
         </div>
       </div>
+
+      <EditionQrDialog
+        open={showQrDialog}
+        onOpenChange={setShowQrDialog}
+        tournamentId={tournament.id}
+        editionId={edition.id}
+        editionLabel={edition.name || `Édition #${edition.editionNumber}`}
+      />
     </div>
   );
 }
