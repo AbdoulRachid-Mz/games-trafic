@@ -14,9 +14,9 @@ import type { DocumentBrand } from "./types";
 export const GAMES_TRAFICS_BRAND: DocumentBrand = {
   name: "Games-Trafics",
   tagline: "Plateforme gaming & esports",
-  logoPath: "/icons/gt-primary.png",
+  logoPath: "/icons/icon-128.png",
   email: "support@games-trafics.com",
-  address: "Abidjan, Côte d'Ivoire",
+  address: "Tahoua, Niger",
 };
 
 export function getDocumentBrand(): DocumentBrand {

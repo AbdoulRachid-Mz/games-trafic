@@ -11,6 +11,7 @@
 
 export interface BracketNodeInput {
   round?: number | null;
+  bracketType?: string | null;
   isCompleted?: boolean | null;
   winnerRegistrationId?: string | null;
   metadata?: unknown;
@@ -49,6 +50,40 @@ export function computeBracketStandings(
 ): BracketStandingViewRow[] {
   const entries = new Map<string, Entry>();
 
+  // Identifier un éventuel match pour la 3ème place (CONSOLATION)
+  const consolationNode = nodes.find(
+    (n) =>
+      n.bracketType === "CONSOLATION" ||
+      ((n.metadata as any)?.isThirdPlace === true),
+  );
+
+  let thirdPlaceWinnerId: string | null = null;
+  let fourthPlaceLoserId: string | null = null;
+
+  if (consolationNode && consolationNode.isCompleted && consolationNode.winnerRegistrationId) {
+    thirdPlaceWinnerId = consolationNode.winnerRegistrationId;
+    const ids = participantIds(consolationNode);
+    fourthPlaceLoserId = ids.find((id) => id !== thirdPlaceWinnerId) || null;
+  }
+
+  // Identifier la Grande Finale (round max, hors consolation)
+  const maxRound = Math.max(0, ...nodes.map((n) => n.round ?? 0));
+  const finalNode = nodes.find(
+    (n) =>
+      (n.round ?? 0) === maxRound &&
+      n.bracketType !== "CONSOLATION" &&
+      !((n.metadata as any)?.isThirdPlace),
+  );
+
+  let firstPlaceWinnerId: string | null = null;
+  let secondPlaceLoserId: string | null = null;
+
+  if (finalNode && finalNode.isCompleted && finalNode.winnerRegistrationId) {
+    firstPlaceWinnerId = finalNode.winnerRegistrationId;
+    const ids = participantIds(finalNode);
+    secondPlaceLoserId = ids.find((id) => id !== firstPlaceWinnerId) || null;
+  }
+
   for (const node of nodes) {
     const round = node.round ?? 0;
     const ids = participantIds(node);
@@ -81,18 +116,31 @@ export function computeBracketStandings(
     }
   }
 
-  return [...entries.values()]
-    .sort((a, b) => {
-      if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
-      if (b.round !== a.round) return b.round - a.round;
-      return a.registrationId.localeCompare(b.registrationId);
-    })
-    .map((entry, index) => ({
-      registrationId: entry.registrationId,
-      participantName: namesById.get(entry.registrationId),
-      round: entry.round,
-      won: entry.won,
-      eliminated: entry.eliminated,
-      position: index + 1,
-    }));
+  const sorted = [...entries.values()].sort((a, b) => {
+    // Top 4 exact quand final et consolation sont résolues
+    if (firstPlaceWinnerId && a.registrationId === firstPlaceWinnerId) return -1;
+    if (firstPlaceWinnerId && b.registrationId === firstPlaceWinnerId) return 1;
+
+    if (secondPlaceLoserId && a.registrationId === secondPlaceLoserId) return -1;
+    if (secondPlaceLoserId && b.registrationId === secondPlaceLoserId) return 1;
+
+    if (thirdPlaceWinnerId && a.registrationId === thirdPlaceWinnerId) return -1;
+    if (thirdPlaceWinnerId && b.registrationId === thirdPlaceWinnerId) return 1;
+
+    if (fourthPlaceLoserId && a.registrationId === fourthPlaceLoserId) return -1;
+    if (fourthPlaceLoserId && b.registrationId === fourthPlaceLoserId) return 1;
+
+    if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+    if (b.round !== a.round) return b.round - a.round;
+    return a.registrationId.localeCompare(b.registrationId);
+  });
+
+  return sorted.map((entry, index) => ({
+    registrationId: entry.registrationId,
+    participantName: namesById.get(entry.registrationId),
+    round: entry.round,
+    won: entry.won,
+    eliminated: entry.eliminated,
+    position: index + 1,
+  }));
 }

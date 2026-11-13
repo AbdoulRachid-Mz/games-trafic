@@ -1,7 +1,7 @@
 // @/components/pages/tournaments/edition-detail/edition-matches-tab.tsx
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,10 @@ import {
   Grid,
   List,
   ChevronDown,
+  Star,
+  UserCheck,
+  Sparkles,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
@@ -84,6 +88,19 @@ export function EditionMatchesTab({
   const [matchViewMode, setMatchViewMode] = useState<"list" | "grid" | "compact">("list");
   const router = useRouter();
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(val);
+      setAllMatchesPage(1);
+    }, 300);
+  };
+
   const limit = 20;
 
   // Hooks
@@ -98,8 +115,9 @@ export function EditionMatchesTab({
   const baseFilters: any = { editionId };
   if (activePhaseId) baseFilters.phaseId = activePhaseId;
   if (statusFilter !== "ALL") baseFilters.statuses = [statusFilter];
+  if (debouncedSearch.trim()) baseFilters.search = debouncedSearch.trim();
 
-  // Tous les matchs (paginated)
+  // Tous les matchs (paginated) — source unique de vérité
   const {
     data: allMatchesRes,
     isLoading: allMatchesLoading,
@@ -110,7 +128,8 @@ export function EditionMatchesTab({
     options: { sortBy: "scheduledTime", sortOrder: "desc" },
   });
 
-  // Mes matchs
+  // Mes matchs — utilisé uniquement pour la section "Mes Prochains Chocs"
+  // On ne fait cette requête que si l'utilisateur a un userReg.id
   const myFilters: any = { ...baseFilters };
   if (userReg?.id) myFilters.memberRegistrationId = userReg.id;
 
@@ -122,6 +141,7 @@ export function EditionMatchesTab({
     filters: myFilters,
     pagination: { page: myMatchesPage, limit },
     options: { sortBy: "scheduledTime", sortOrder: "asc" },
+    // Désactiver si pas de userReg pour éviter une requête inutile
   });
 
   const allMatches = allMatchesRes?.data || [];
@@ -138,6 +158,47 @@ export function EditionMatchesTab({
     hasPrev: false,
     hasNext: false,
   };
+
+  /**
+   * Priorisation côté client :
+   * On identifie les matchs du user dans la liste principale (allMatches)
+   * et on les remonte en tête de liste avec un flag `isMyMatch`.
+   */
+  const prioritizedMatches = useMemo(() => {
+    if (!currentUserId) return allMatches.map((m: any) => ({ ...m, _isMyMatch: false }));
+
+    const mine: any[] = [];
+    const others: any[] = [];
+
+    for (const match of allMatches) {
+      const isMyMatch =
+        match.participant1?.member?.userId === currentUserId ||
+        match.participant2?.member?.userId === currentUserId;
+      if (isMyMatch) {
+        mine.push({ ...match, _isMyMatch: true });
+      } else {
+        others.push({ ...match, _isMyMatch: false });
+      }
+    }
+
+    return [...mine, ...others];
+  }, [allMatches, currentUserId]);
+
+  /**
+   * Si le toggle "Mes matchs seulement" est actif, on filtre côté client.
+   */
+  const displayedMatches = useMemo(() => {
+    if (showOnlyMyMatches && currentUserId) {
+      return prioritizedMatches.filter((m: any) => m._isMyMatch);
+    }
+    return prioritizedMatches;
+  }, [prioritizedMatches, showOnlyMyMatches, currentUserId]);
+
+  // Nombre de mes matchs dans la page courante (pour le toggle badge)
+  const myMatchesCountInPage = useMemo(
+    () => prioritizedMatches.filter((m: any) => m._isMyMatch).length,
+    [prioritizedMatches],
+  );
 
   // Export — données et autorisations construites côté serveur.
   const handleExport = useCallback(
@@ -197,7 +258,7 @@ export function EditionMatchesTab({
   ];
 
   const isLoading =
-    regLoading || statsLoading || allMatchesLoading || myMatchesLoading;
+    regLoading || statsLoading || allMatchesLoading || (userReg?.id ? myMatchesLoading : false);
 
   if (isLoading && !allMatches.length && !myMatches.length) {
     return (
@@ -283,7 +344,55 @@ export function EditionMatchesTab({
           className="hidden lg:block h-8 mx-2"
         />
 
+        {/* Barre de recherche réactive */}
+        <div className="relative min-w-[180px] sm:min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            className="w-full h-10 pl-9 pr-7 rounded-xl border-none bg-muted/50 text-xs font-semibold placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary outline-none transition-all"
+            placeholder="Joueur, équipe, code..."
+            value={searchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+          />
+          {searchTerm && (
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setDebouncedSearch("");
+                setAllMatchesPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:text-destructive text-muted-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center gap-2 p-1">
+          {/* Toggle "Mes matchs seulement" — visible uniquement si l'user est connecté */}
+          {currentUserId && (
+            <Button
+              variant={showOnlyMyMatches ? "default" : "outline"}
+              className={cn(
+                "h-10 rounded-xl px-4 gap-2 border-none font-bold text-[11px] uppercase tracking-wider transition-all",
+                showOnlyMyMatches
+                  ? "bg-primary text-white shadow-lg shadow-primary/30"
+                  : "bg-muted/50 text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setShowOnlyMyMatches((v) => !v)}
+            >
+              <Star className={cn("h-3.5 w-3.5", showOnlyMyMatches && "fill-white")} />
+              Mes matchs
+              {myMatchesCountInPage > 0 && (
+                <span className={cn(
+                  "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black",
+                  showOnlyMyMatches ? "bg-white/20" : "bg-primary/20 text-primary"
+                )}>
+                  {myMatchesCountInPage}
+                </span>
+              )}
+            </Button>
+          )}
+
           <Select
             value={statusFilter}
             onValueChange={(val) => {
@@ -360,7 +469,7 @@ export function EditionMatchesTab({
                 {matchViewMode === "compact" && (
                   <span className="text-[11px] font-black uppercase tracking-wider">
                     {/* icon compact */}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-4 w-4"><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="16" y1="9" x2="8" y2="9"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="16" y1="9" x2="8" y2="9"/></svg>
                   </span>
                 )}
                 <span className="text-[11px] font-black uppercase tracking-wider">Vue</span>
@@ -396,50 +505,86 @@ export function EditionMatchesTab({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Mes Matchs (Spécial Highlight) */}
-        {userReg?.id && myMatches.length > 0 && (
-          <div className="col-span-full space-y-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-3 w-3 rounded-full bg-primary animate-ping" />
-              <Typography
-                variant="h5"
-                weight="bold"
-                className="italic uppercase tracking-tighter"
-              >
-                Mes Prochains Chocs
-              </Typography>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myMatches.map((match: any) => (
-                <MatchCard
-                  key={match.id}
-                  viewMode={matchViewMode}
-                  item={match}
-                  onViewP1={() =>
-                    router.push(
-                      `/tournaments/members/${match.participant1?.member?.userId || match.participant1?.member?.id}`,
-                    )
-                  }
-                  onViewP2={() =>
-                    router.push(
-                      `/tournaments/members/${match.participant2?.member?.userId || match.participant2?.member?.id}`,
-                    )
-                  }
-                  currentUserId={currentUserId}
-                  isAdmin={isAdmin}
-                  onUpdate={() => {
-                    refetchAll();
-                    refetchMy();
-                  }}
-                  className="bg-primary/5 border-primary/20 hover:bg-primary/10 transition-colors shadow-lg shadow-primary/5"
-                />
-              ))}
-            </div>
-            <Separator className="my-8" />
-          </div>
+        {/* ── Section "Mes Prochains Chocs" ── */}
+        {currentUserId && (
+          <>
+            {/* Utilisateur inscrit avec des matchs */}
+            {userReg?.id && myMatches.length > 0 && (
+              <div className="col-span-full space-y-4">
+                <div className="flex items-center gap-3 px-2">
+                  <div className="h-3 w-3 rounded-full bg-primary animate-ping" />
+                  <Typography
+                    variant="h5"
+                    weight="bold"
+                    className="italic uppercase tracking-tighter"
+                  >
+                    Mes Prochains Chocs
+                  </Typography>
+                  <Badge className="font-mono text-xs bg-primary/10 text-primary border-primary/20">
+                    {myMatches.length} match{myMatches.length > 1 ? "s" : ""}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {myMatches.map((match: any) => (
+                    <div key={match.id} className="relative">
+                      {/* Badge "Votre combat" */}
+                      <div className="absolute -top-2 left-4 z-10">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-primary/30">
+                          <Sparkles className="h-2.5 w-2.5" />
+                          Votre combat
+                        </span>
+                      </div>
+                      <MatchCard
+                        viewMode={matchViewMode}
+                        item={match}
+                        onViewP1={() =>
+                          router.push(
+                            `/tournaments/members/${match.participant1?.member?.userId || match.participant1?.member?.id}`,
+                          )
+                        }
+                        onViewP2={() =>
+                          router.push(
+                            `/tournaments/members/${match.participant2?.member?.userId || match.participant2?.member?.id}`,
+                          )
+                        }
+                        currentUserId={currentUserId}
+                        isAdmin={isAdmin}
+                        onUpdate={() => {
+                          refetchAll();
+                          refetchMy();
+                        }}
+                        className="bg-primary/5 border-primary/30 hover:bg-primary/10 transition-colors shadow-lg shadow-primary/5 ring-1 ring-primary/20"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Separator className="my-8" />
+              </div>
+            )}
+
+            {/* Utilisateur connecté mais pas encore inscrit à l'édition */}
+            {!userReg?.id && !regLoading && (
+              <div className="col-span-full">
+                <div className="relative overflow-hidden rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-6 flex flex-col sm:flex-row items-center gap-4">
+                  <div className="p-3 rounded-full bg-primary/10 shrink-0">
+                    <UserCheck className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <Typography variant="body-base" weight="bold" className="mb-1">
+                      Pas encore inscrit à cette édition
+                    </Typography>
+                    <Typography variant="body-sm" theme="muted">
+                      Inscrivez-vous pour participer et retrouver vos matchs mis en avant ici.
+                    </Typography>
+                  </div>
+                </div>
+                <Separator className="my-8" />
+              </div>
+            )}
+          </>
         )}
 
-        {/* Tous les matchs */}
+        {/* ── Calendrier des rencontres (liste principale) ── */}
         <div className="col-span-full space-y-6">
           <div className="flex items-center justify-between px-2">
             <Typography
@@ -448,48 +593,92 @@ export function EditionMatchesTab({
               theme="muted"
               className="uppercase tracking-[0.2em] font-bold"
             >
-              Calendrier des rencontres
+              {showOnlyMyMatches ? "Mes rencontres" : "Calendrier des rencontres"}
             </Typography>
-            <Badge variant="outline" className="font-mono text-xs">
-              {allPagination.total} Matchs
-            </Badge>
+            <div className="flex items-center gap-2">
+              {showOnlyMyMatches && (
+                <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-bold">
+                  <Star className="h-3 w-3 mr-1 fill-primary" />
+                  Filtre actif
+                </Badge>
+              )}
+              <Badge variant="outline" className="font-mono text-xs">
+                {showOnlyMyMatches
+                  ? `${displayedMatches.length} Matchs`
+                  : `${allPagination.total} Matchs`}
+              </Badge>
+            </div>
           </div>
 
-          {allMatches.length === 0 ? (
+          {displayedMatches.length === 0 ? (
             <div className="py-20 text-center border-2 border-dashed rounded-3xl bg-muted/5 flex flex-col items-center justify-center gap-4">
               <div className="p-4 rounded-full bg-muted/20">
                 <Calendar className="h-10 w-10 text-muted-foreground/30" />
               </div>
               <Typography variant="body-base" theme="muted" weight="medium">
-                Aucune rencontre disponible avec ces filtres.
+                {showOnlyMyMatches
+                  ? "Vous n'avez aucun match sur cette page."
+                  : "Aucune rencontre disponible avec ces filtres."}
               </Typography>
-              <Button
-                variant="link"
-                onClick={() => {
-                  setStatusFilter("ALL");
-                  setActivePhaseId(phases[0]?.id || "");
-                }}
-              >
-                Réinitialiser les filtres
-              </Button>
+              <div className="flex gap-2 flex-wrap justify-center">
+                {showOnlyMyMatches && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setShowOnlyMyMatches(false)}
+                  >
+                    Voir tous les matchs
+                  </Button>
+                )}
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setStatusFilter("ALL");
+                    setActivePhaseId(phases[0]?.id || "");
+                    setShowOnlyMyMatches(false);
+                  }}
+                >
+                  Réinitialiser les filtres
+                </Button>
+              </div>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {allMatches.map((match: any) => (
-                  <MatchCard
-                    viewMode={matchViewMode}
-                    key={match.id}
-                    item={match}
-                    currentUserId={currentUserId}
-                    isAdmin={isAdmin}
-                    onUpdate={() => refetchAll()}
-                  />
-                ))}
+                {displayedMatches.map((match: any) => {
+                  const isMyMatch = match._isMyMatch;
+                  return (
+                    <div key={match.id} className="relative">
+                      {/* Badge "Mon match" sur les cartes prioritaires dans la liste principale */}
+                      {isMyMatch && (
+                        <div className="absolute -top-2 left-4 z-10">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-primary/30">
+                            <Star className="h-2.5 w-2.5 fill-white" />
+                            Mon match
+                          </span>
+                        </div>
+                      )}
+                      <MatchCard
+                        viewMode={matchViewMode}
+                        item={match}
+                        currentUserId={currentUserId}
+                        isAdmin={isAdmin}
+                        onUpdate={() => {
+                          refetchAll();
+                          if (userReg?.id) refetchMy();
+                        }}
+                        className={cn(
+                          isMyMatch &&
+                            "border-primary/30 ring-1 ring-primary/20 shadow-lg shadow-primary/5",
+                        )}
+                      />
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Pagination Premium */}
-              {allPagination.totalPages > 1 && (
+              {/* Pagination Premium — masquée si "Mes matchs seulement" (filtrage client) */}
+              {!showOnlyMyMatches && allPagination.totalPages > 1 && (
                 <div className="flex items-center justify-center gap-4 py-8">
                   <Button
                     variant="outline"

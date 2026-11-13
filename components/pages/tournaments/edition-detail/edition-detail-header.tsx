@@ -34,7 +34,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Tournament, TournamentEditionWithRelations } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
-import { useAppShellStore } from "@/stores/app-shell-store";
+import { useAppShellStore, useAppShellStickyOffset } from "@/stores/app-shell-store";
 import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
@@ -129,12 +129,11 @@ export function EditionDetailHeader({
     }
   };
 
-  const topMiddle = useAppShellStore((s) => s.topMiddle);
-  const stickyTop = topMiddle.visible ? topMiddle.height : 0;
+  const stickyTop = useAppShellStickyOffset();
 
   // ─── Compact sticky header detection ─────────────────────────────────────
-  // When the hero banner scrolls out of view, we show a compact edition info
-  // bar above the sticky tabs using an IntersectionObserver (no scroll events).
+  // Quand la carte principale de l'édition a défilé et que les onglets atteignent
+  // le bas du shell, les onglets deviennent sticky et affichent la barre compacte.
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [isCompact, setIsCompact] = useState(false);
 
@@ -142,18 +141,17 @@ export function EditionDetailHeader({
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setIsCompact(!entry.isIntersecting),
+      ([entry]) => {
+        setIsCompact(!entry.isIntersecting && entry.boundingClientRect.top < stickyTop + 20);
+      },
       {
         threshold: 0,
-        // rootMargin accounts for the TopMiddle bar height (h-16 = 64px)
-        // which hides on scroll (hideTopMiddleOnScroll: true), so we use 0
-        // once it's gone; this gives a clean trigger right at hero bottom.
-        rootMargin: "0px 0px 0px 0px",
+        rootMargin: `-${Math.max(0, stickyTop)}px 0px 0px 0px`,
       }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [stickyTop]);
 
   // ─── Derived values ───────────────────────────────────────────────────────
   const currentParticipants = edition.registrations?.length || edition.currentParticipants || 0;
@@ -273,9 +271,6 @@ export function EditionDetailHeader({
             </div>
           </div>
         )}
-
-        {/* Sentinel: triggers compact header when hero exits viewport */}
-        <div ref={sentinelRef} className="absolute bottom-0 left-0 w-full h-px pointer-events-none" />
       </div>
 
       {/* 2. MAIN TOURNAMENT CARD */}
@@ -456,7 +451,7 @@ export function EditionDetailHeader({
                       asChild
                     >
                       <Link
-                        href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard/matches`}
+                        href={`/tournaments/${tournament.id}/editions/${edition.id}/matches`}
                         onClick={() => setShowActions(false)}
                       >
                         <Swords className="h-4 w-4" />
@@ -555,8 +550,11 @@ export function EditionDetailHeader({
         </div>
       </div>
 
+      {/* Sentinelle sticky liée à la position réelle des onglets dans la page */}
+      <div ref={sentinelRef} className="w-full h-px pointer-events-none" />
+
       {/* 3. COMPETITION TABS NAVIGATION BAR — sticky avec compact header */}
-      <div className="sticky z-30" style={{ top: stickyTop }}>
+      <div className="sticky z-30 transition-[top] duration-150" style={{ top: stickyTop }}>
         {/* ── Compact edition info bar (visible seulement quand le hero est scrollé) */}
         <AnimatePresence>
           {isCompact && (

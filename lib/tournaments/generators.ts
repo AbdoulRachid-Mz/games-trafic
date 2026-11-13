@@ -29,6 +29,7 @@ export interface GeneratorOptions {
   isHomeAway?: boolean;
   nodePrefix?: string;
   matchFormat?: string;
+  thirdPlaceMatch?: boolean;
 }
 
 /**
@@ -425,6 +426,70 @@ export async function setupEliminationGroups(
     }
 
     previousRoundNodes = currentRoundNodes;
+  }
+
+  // Petite Finale (Match pour la 3ème place)
+  const hasThirdPlace =
+    totalRounds >= 2 &&
+    (options.thirdPlaceMatch === true ||
+      (phase.config as any)?.thirdPlaceMatch === true);
+
+  if (hasThirdPlace) {
+    const [tpGroup] = await tx
+      .insert(phaseGroups)
+      .values({
+        phaseId: phase.id,
+        name: "Petite Finale (3ème Place)",
+        order: totalRounds,
+        participantCount: 0,
+        groupType: "CONSOLATION",
+        config: {
+          isHomeAway: options.isHomeAway || false,
+          generateMatches: options.generateMatches !== false,
+          advanceCount: 0,
+          isThirdPlace: true,
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    createdGroups.push(tpGroup);
+
+    const [tpNode] = await tx
+      .insert(bracketNodes)
+      .values({
+        phaseId: phase.id,
+        groupId: tpGroup.id,
+        nodeCode: `R${totalRounds}-3RD`,
+        round: totalRounds,
+        matchNumber: matchCounter++,
+        depth: 0,
+        bracketType: "CONSOLATION",
+        order: matchCounter,
+        parentNodeId: null,
+        childPosition: null,
+        metadata: {
+          participants: [],
+          requiresMatch: true,
+          generateMatches: options.generateMatches !== false,
+          matchesCount: options.isHomeAway ? 2 : 1,
+          format: "BEST_OF_1",
+          isThirdPlace: true,
+          name: "Petite Finale (3ème Place)",
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    allCreatedNodes.push({
+      node: tpNode,
+      round: totalRounds,
+      i: 1,
+      p1: null,
+      p2: null,
+    });
   }
 
   return createdGroups;

@@ -56,6 +56,8 @@ import {
   updateEdition,
   updateTournamentEditionModeAction,
 } from "@/actions/editions";
+import { getEditionDetailTree } from "@/actions/tournaments";
+import { EditionStructureRevealDialog } from "./edition-structure-reveal-dialog";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -129,6 +131,7 @@ type DraftPhase = {
     pointsPerLoss?: number;
     advanceCount?: number;
     nodePrefix?: string; // "Journée", "Round", "Match"
+    thirdPlaceMatch?: boolean; // Match pour la 3ème place (Petite finale)
 
     // For SWISS
     roundsCount?: number;
@@ -158,6 +161,7 @@ type AutoConfig = {
   roundsCount?: number;
   isHomeAwayGroups: boolean;
   isHomeAwayElimination: boolean;
+  thirdPlaceMatch: boolean;
   nodePrefix: string;
 
   // New granular gen for AUTO mode
@@ -341,6 +345,7 @@ const DEFAULT_PHASE_CONFIGS: Record<
     matchFormat: "BEST_OF_1",
     seedingMethod: "RANDOM",
     nodePrefix: "Round",
+    thirdPlaceMatch: false,
   },
   SWISS: {
     roundsCount: 5,
@@ -353,6 +358,7 @@ const DEFAULT_PHASE_CONFIGS: Record<
     matchFormat: "BEST_OF_3",
     seedingMethod: "RANDOM",
     nodePrefix: "Round",
+    thirdPlaceMatch: false,
   },
 };
 
@@ -442,6 +448,7 @@ export function OrganizeWizardClient({
     })() as "LEAGUE" | "CHAMPIONS" | "SWISS" | "CUSTOM",
     isHomeAwayGroups: edition?.editionConfig?.isHomeAwayGroups ?? edition?.editionConfig?.isHomeAway ?? false,
     isHomeAwayElimination: edition?.editionConfig?.isHomeAwayElimination ?? false,
+    thirdPlaceMatch: edition?.editionConfig?.thirdPlaceMatch ?? false,
     groupsQualifiedCount: edition?.editionConfig?.advanceCount ?? DEFAULT_ADVANCE_COUNT,
     groupsCount: edition?.editionConfig?.groupsCount || 4,
     nodePrefix: edition?.editionConfig?.nodePrefix || "Journée",
@@ -457,6 +464,8 @@ export function OrganizeWizardClient({
   const [hasPendingConfigChange, setHasPendingConfigChange] = useState(false);
   const [showConfigConfirm, setShowConfigConfirm] = useState(false);
   const [pendingConfig, setPendingConfig] = useState<AutoConfig | null>(null);
+  const [revealStructure, setRevealStructure] = useState<any | null>(null);
+  const [isRevealOpen, setIsRevealOpen] = useState(false);
 
   // Sync mode if editionConfig changes after mount (e.g. router refresh)
   useEffect(() => {
@@ -572,6 +581,7 @@ export function OrganizeWizardClient({
       preset,
       isHomeAwayGroups,
       isHomeAwayElimination,
+      thirdPlaceMatch,
       groupsQualifiedCount,
       nodePrefix,
       groupsCount,
@@ -643,6 +653,7 @@ export function OrganizeWizardClient({
           isHomeAway: isHomeAwayElimination,
           nodePrefix: "Match",
           knockoutStrategy, // Pour transmission éventuelle
+          thirdPlaceMatch,
         },
       });
 
@@ -874,6 +885,17 @@ export function OrganizeWizardClient({
             description: `${phasesToCreate.length} phase(s) créée(s), ${totalMatches} match(s) généré(s)`,
             duration: 5000,
           });
+
+          try {
+            const tree = await getEditionDetailTree(editionId);
+            if (tree && tree.phases?.length > 0) {
+              setRevealStructure(tree);
+              setIsRevealOpen(true);
+              return;
+            }
+          } catch (e) {
+            console.warn("Could not load tree for reveal dialog:", e);
+          }
 
           setTimeout(() => {
             router.push(
@@ -1185,6 +1207,19 @@ export function OrganizeWizardClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditionStructureRevealDialog
+        open={isRevealOpen}
+        onOpenChange={setIsRevealOpen}
+        editionName={edition?.name}
+        structure={revealStructure}
+        onFinish={() => {
+          router.push(
+            `/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`,
+          );
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
@@ -1373,6 +1408,23 @@ function AutoModeConfig({
                 checked={autoConfig.isHomeAwayElimination}
                 onCheckedChange={(v) =>
                   onConfigChange({ ...autoConfig, isHomeAwayElimination: !!v })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-b pb-3 border-primary/10">
+              <div>
+                <Label className="text-sm font-bold">
+                  Match pour la 3ème place
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Générer une petite finale opposant les deux perdants des demi-finales
+                </p>
+              </div>
+              <Checkbox
+                checked={autoConfig.thirdPlaceMatch}
+                onCheckedChange={(v) =>
+                  onConfigChange({ ...autoConfig, thirdPlaceMatch: !!v })
                 }
               />
             </div>
@@ -2201,6 +2253,27 @@ function EliminationConfig({ phase, onUpdate, participantsForPhase }: any) {
             ⚠️ Nombre impair : des BYE seront générés
           </span>
         )}
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-border/30">
+        <div>
+          <Label
+            className="text-xs font-bold cursor-pointer"
+            htmlFor={`third-place-${phase.id}`}
+          >
+            Match pour la 3ème place
+          </Label>
+          <p className="text-[10px] text-muted-foreground">
+            Petite finale opposant les deux perdants des demi-finales
+          </p>
+        </div>
+        <Checkbox
+          id={`third-place-${phase.id}`}
+          checked={phase.config?.thirdPlaceMatch || false}
+          onCheckedChange={(v) =>
+            onUpdate({ config: { ...phase.config, thirdPlaceMatch: !!v } })
+          }
+        />
       </div>
     </div>
   );

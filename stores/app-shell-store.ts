@@ -244,8 +244,25 @@ export const useAppShellStore = create<AppShellState>((set) => ({
     })),
 }));
 
+export function getAppShellStickyOffset(state: AppShellState): number {
+  if (state.route.layout === "none") return 0;
+  let offset = 0;
+  if (state.topMiddle.enabled && state.topMiddle.visible) {
+    offset += state.topMiddle.height;
+  }
+  if (state.breadcrumbs.enabled && state.breadcrumbs.visible) {
+    offset += state.breadcrumbs.height;
+  }
+  return offset;
+}
+
+export function useAppShellStickyOffset(): number {
+  return useAppShellStore((state) => getAppShellStickyOffset(state));
+}
+
 export function useAppShell() {
   const state = useAppShellStore();
+  const stickyOffset = getAppShellStickyOffset(state);
   return {
     route: state.route,
     layout: state.route.layout,
@@ -255,5 +272,6 @@ export function useAppShell() {
     sidebars: state.sidebars,
     scroll: state.scroll,
     viewport: state.viewport,
+    stickyOffset,
   };
 }

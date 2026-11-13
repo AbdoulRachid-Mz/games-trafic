@@ -413,11 +413,19 @@ export function buildMatchWhereConditions(
 ) {
   const conditions = [];
 
-  if (!filters.editionId) {
-    throw new Error("editionId is required in filters");
+  // isDeleted = false est toujours ajouté sauf si includeDeleted est explicitement activé
+  if (!options.includeDeleted) {
+    conditions.push(eq(matches.isDeleted, false));
   }
 
-  conditions.push(eq(matches.editionId, filters.editionId));
+  if (filters.id) {
+    conditions.push(eq(matches.id, filters.id));
+  }
+
+  // editionId est optionnel : on peut filtrer par groupId seul (ex: useMatchGenerationValidation)
+  if (filters.editionId) {
+    conditions.push(eq(matches.editionId, filters.editionId));
+  }
 
   if (filters.phaseId != null) {
     conditions.push(eq(matches.phaseId, filters.phaseId));
@@ -431,13 +439,60 @@ export function buildMatchWhereConditions(
     conditions.push(eq(matches.bracketNodeId, filters.bracketNodeId));
   }
 
+  if (filters.participant1RegistrationId) {
+    conditions.push(
+      eq(matches.participant1RegistrationId, filters.participant1RegistrationId),
+    );
+  }
+
+  if (filters.participant2RegistrationId) {
+    conditions.push(
+      eq(matches.participant2RegistrationId, filters.participant2RegistrationId),
+    );
+  }
+
+  if (filters.memberRegistrationId) {
+    conditions.push(
+      or(
+        eq(matches.participant1RegistrationId, filters.memberRegistrationId),
+        eq(matches.participant2RegistrationId, filters.memberRegistrationId),
+      ),
+    );
+  }
+
   if (Array.isArray(filters.statuses) && filters.statuses.length > 0) {
-    conditions.push(inArray(matches.status, filters.statuses));
+    const validStatuses = filters.statuses.filter(
+      (s) => s && (s as any) !== "ALL",
+    );
+    if (validStatuses.length > 0) {
+      conditions.push(inArray(matches.status, validStatuses));
+    }
+  } else if ((filters as any).status && (filters as any).status !== "ALL") {
+    conditions.push(eq(matches.status, (filters as any).status));
+  }
+
+  if (filters.scheduledTimeFrom) {
+    conditions.push(
+      gte(matches.scheduledTime, new Date(filters.scheduledTimeFrom)),
+    );
+  }
+
+  if (filters.scheduledTimeTo) {
+    conditions.push(
+      lte(matches.scheduledTime, new Date(filters.scheduledTimeTo)),
+    );
+  }
+
+  if (filters.matchNumberMin !== undefined) {
+    conditions.push(gte(matches.matchNumber, filters.matchNumberMin));
+  }
+
+  if (filters.matchNumberMax !== undefined) {
+    conditions.push(lte(matches.matchNumber, filters.matchNumberMax));
   }
 
   // Recherche texte : code de match OU nom de joueur / team (membres des
-  // registrations participantes). Jusqu'ici `filters.search` était
-  // silencieusement ignoré (l'UI promettait une recherche qui ne filtrait rien).
+  // registrations participantes).
   if (filters.search && filters.search.trim() !== "") {
     const term = `%${filters.search.trim()}%`;
     const participantRegistrationIds = db
@@ -465,5 +520,5 @@ export function buildMatchWhereConditions(
     );
   }
 
-  return and(...conditions);
+  return conditions.length > 0 ? and(...conditions) : undefined;
 }

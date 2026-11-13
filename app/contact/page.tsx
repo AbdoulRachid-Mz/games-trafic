@@ -73,7 +73,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h4 className="text-lg font-bold mb-1">Localisation</h4>
-                    <p className="text-muted-foreground italic">Abidjan, Côte d'Ivoire</p>
+                    <p className="text-muted-foreground italic">Tahoua, Niger</p>
                     <p className="text-xs text-muted-foreground mt-1 italic">Siège social Games-Trafics</p>
                   </div>
                 </div>

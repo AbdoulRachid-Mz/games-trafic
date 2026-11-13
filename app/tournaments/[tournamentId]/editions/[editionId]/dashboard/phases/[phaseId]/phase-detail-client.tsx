@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { updateTournamentEditionModeAction } from "@/actions/editions";
 import { isMatchdayGroup } from "@/lib/tournaments/config";
+import { GroupCard } from "@/components/cards/group-card";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -296,26 +297,17 @@ export function PhaseDetailClient({
               </Typography>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {groups.map((group, idx) => (
-                <div key={group.id} className="group relative border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/50 hover:bg-primary/5 transition-all">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Typography variant="body-base" weight="bold">{group.name}</Typography>
-                      <Badge variant="outline" className="text-[10px] h-5 bg-background font-bold tracking-wider">ORDRE {group.order}</Badge>
-                      {isMatchdayPhase && (
-                        <Badge variant="outline" className="text-[10px] h-5 bg-primary/5 border-primary/30 font-bold tracking-wider">
-                          JOURNÉE {(group as any).config?.dayNumber ?? String.fromCharCode(65 + idx)}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
-                      <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {group.participantCount ?? 0} participants</span>
-                      <span className="flex items-center gap-1.5"><Swords className="h-3.5 w-3.5" /> {group.matchCount ?? 0} matchs</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
+                <div key={group.id} className="space-y-2">
+                  <GroupCard
+                    item={{ ...group, phaseName: phase?.name || "Phase" }}
+                    viewMode="grid"
+                    tournamentId={tournamentId}
+                    editionId={editionId}
+                    onView={() => router.push(`${basePath}/groups/${group.id}`)}
+                  />
+                  <div className="flex items-center gap-2">
                     {(!group.matchCount || group.matchCount === 0) && (
                       <GenerateGroupMatchesDialog
                         groupId={group.id}

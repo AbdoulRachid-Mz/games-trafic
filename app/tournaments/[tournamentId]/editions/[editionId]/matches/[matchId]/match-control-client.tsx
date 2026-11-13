@@ -110,7 +110,7 @@ export function MatchControlClient({
   const canSubmitResult = (isParticipant || isAdmin) && (!isMatchCompleted || (isAdmin && adminForceEdit));
   
   // Déterminer si l'utilisateur peut confirmer/admin valider
-  const canConfirmMatch = isAdmin && !isMatchCompleted;
+  const canConfirmMatch = isAdmin && (!isMatchCompleted || adminForceEdit);
   
   // Déterminer si l'utilisateur peut modifier le score (admin ou participant si match non terminé)
   const canEditScore = (isAdmin && (!isMatchCompleted || adminForceEdit)) || (isParticipant && isMatchPending);
@@ -288,6 +288,30 @@ export function MatchControlClient({
             >
               <Unlock className="h-4 w-4 mr-2" />
               Déverrouiller le résultat
+            </Button>
+          </div>
+        )}
+
+        {isAdmin && isMatchCompleted && adminForceEdit && (
+          <div className="px-6 pb-2 flex gap-2">
+            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/40 text-[10px] font-bold uppercase py-1 px-3">
+              Mode modification administrateur actif
+            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setAdminForceEdit(false);
+                setFormData({
+                  score1: match.score1 ?? 0,
+                  score2: match.score2 ?? 0,
+                  proofUrl: match.proofUrl || "",
+                  disputeReason: match.disputeReason || "",
+                });
+              }}
+              className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+            >
+              Annuler
             </Button>
           </div>
         )}

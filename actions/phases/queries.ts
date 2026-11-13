@@ -1308,16 +1308,27 @@ export async function getMatchesWithParticipants(
 
     const whereConditions = buildMatchWhereConditions(filters, options);
 
+    const sortOrderFn = options.sortOrder === "desc" ? desc : asc;
+    let orderClauses: any[] = [asc(matches.scheduledTime)];
+    if (options.sortBy) {
+      if (options.sortBy === "scheduledTime") {
+        orderClauses = [sortOrderFn(matches.scheduledTime)];
+      } else if (options.sortBy === "createdAt") {
+        orderClauses = [sortOrderFn(matches.createdAt)];
+      } else if (options.sortBy === "matchNumber") {
+        orderClauses = [sortOrderFn(matches.matchNumber)];
+      } else if (options.sortBy === "status") {
+        orderClauses = [sortOrderFn(matches.status)];
+      } else if (options.sortBy in matches) {
+        orderClauses = [sortOrderFn((matches as any)[options.sortBy])];
+      }
+    }
+
     const matchesData = await db.query.matches.findMany({
       where: whereConditions,
       limit: pagination.limit,
       offset,
-      orderBy:
-        options.sortBy === "scheduledTime"
-          ? [asc(matches.scheduledTime)]
-          : options.sortBy === "createdAt"
-            ? [desc(matches.createdAt)]
-            : [asc(matches.scheduledTime)],
+      orderBy: orderClauses,
       with: {
         participant1: {
           with: {
@@ -1357,6 +1368,14 @@ export async function getMatchesWithParticipants(
         },
         phase: { columns: { id: true, name: true, phaseType: true } },
         group: { columns: { id: true, name: true } },
+        bracketNode: {
+          columns: {
+            id: true,
+            nodeCode: true,
+            round: true,
+            matchNumber: true,
+          },
+        },
       },
     });
 

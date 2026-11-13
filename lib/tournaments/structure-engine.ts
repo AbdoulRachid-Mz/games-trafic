@@ -134,6 +134,7 @@ export async function createStructureEngine({
         generateMatches: phaseConfig.generateMatches !== false,
         isHomeAway: phaseConfig.isHomeAway || false,
         nodePrefix: phaseConfig.nodePrefix,
+        thirdPlaceMatch: phaseConfig.thirdPlaceMatch === true,
       };
 
       if (phase.phaseType === "ROUND_ROBIN") {

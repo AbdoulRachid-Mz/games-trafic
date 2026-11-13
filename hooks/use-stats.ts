@@ -1,6 +1,6 @@
 // @/hook/use-stats
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import { getStats, getGlobalStats, getDashboardStats, getPerformanceMetrics, getRecentActivities } from '@/actions/stats';
 import type { StatsFilters, StatsResponse, GlobalStats, RecentActivity } from '@/actions/stats';
 
@@ -113,10 +113,19 @@ export function useRealtimeStats(filters: StatsFilters = {}, intervalMs: number 
 // Optimized hook for multiple stat entities
 export function useMultipleStats(entities: Array<{ entity: string; statId?: string; filters?: Omit<StatsFilters, 'entity' | 'statId'> }>) {
   const queryClient = useQueryClient();
-  
-  const results = entities.map(({ entity, statId, filters = {} }) => 
-    useEntityStats(entity, statId, filters)
-  );
+
+  // useQueries is the correct pattern for a dynamic number of queries —
+  // calling hooks inside .map() violates Rules of Hooks.
+  const results = useQueries({
+    queries: entities.map(({ entity, statId, filters = {} }) => ({
+      queryKey: statsKeys.entity(entity, statId),
+      queryFn: () => getStats({ ...filters, entity, statId }),
+      staleTime: STALE_TIME,
+      gcTime: STATS_CACHE_TIME,
+      retry: RETRY_COUNT,
+      enabled: Boolean(entity),
+    })),
+  });
 
   const isLoading = results.some(result => result.isLoading);
   const isError = results.some(result => result.isError);

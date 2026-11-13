@@ -1,7 +1,7 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/matches/edition-matches-client.tsx
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowLeft,
+  Search,
+  X,
+  Star,
 } from "lucide-react";
 import {
   Select,
@@ -183,7 +186,13 @@ function PublicMatchCard({
     <CardContent className="p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {(isUserParticipant || match._isMyMatch) && (
+            <Badge className="bg-primary text-primary-foreground text-[9px] font-black uppercase tracking-wider gap-1 px-2 py-0.5 shadow-md shadow-primary/20">
+              <Star className="h-2.5 w-2.5 fill-current" />
+              Votre match
+            </Badge>
+          )}
           <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider border-white/10 bg-white/5">
             #{String(match.matchNumber || 1).padStart(2, "0")}
           </Badge>
@@ -584,6 +593,19 @@ export function EditionMatchesClient({
   const [viewMode, setViewMode] = useState<"tree" | "list">("list");
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(val);
+    }, 300);
+  };
 
   // Fetch data
   const { data: edition } = useEdition(editionId);
@@ -596,19 +618,48 @@ export function EditionMatchesClient({
   );
   const router = useRouter();
 
-  // Fetch matches for list view
+  // Fetch matches for list view with active filters
   const { data: matchesRes, isLoading: isLoadingMatches } = useMatchList({
     filters: {
       editionId,
       phaseId: selectedPhaseId !== "all" ? selectedPhaseId : undefined,
+      groupId: selectedGroupId !== "all" ? selectedGroupId : undefined,
+      statuses: statusFilter !== "ALL" ? ([statusFilter] as any) : undefined,
+      search: debouncedSearch.trim() || undefined,
     },
     pagination: { limit: 200, page: 1 },
+    options: { sortBy: "scheduledTime", sortOrder: "asc" },
   });
 
   const { data: myMatches } = useMyMatches(editionId, user?.id || "");
 
   const phases = phasesRes?.data || [];
-  const matches = matchesRes?.data || [];
+  const rawMatches = matchesRes?.data || [];
+
+  // Priorisation : mettre les matchs du user en premier dans la liste
+  const prioritizedMatches = useMemo(() => {
+    if (!user?.id) return rawMatches;
+    const mine: any[] = [];
+    const others: any[] = [];
+    for (const m of rawMatches) {
+      const isMine =
+        m.participant1?.member?.userId === user.id ||
+        m.participant2?.member?.userId === user.id;
+      if (isMine) {
+        mine.push({ ...m, _isMyMatch: true });
+      } else {
+        others.push({ ...m, _isMyMatch: false });
+      }
+    }
+    return [...mine, ...others];
+  }, [rawMatches, user?.id]);
+
+  const matches = useMemo(() => {
+    if (showOnlyMyMatches && user?.id) {
+      return prioritizedMatches.filter((m: any) => m._isMyMatch);
+    }
+    return prioritizedMatches;
+  }, [prioritizedMatches, showOnlyMyMatches, user?.id]);
 
   // Match statistics for StatsCarousel
   const stats = useMemo(() => {
@@ -731,6 +782,58 @@ export function EditionMatchesClient({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Recherche textuelle en temps réel */}
+          <div className="relative min-w-[200px] sm:min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              className="w-full h-9 pl-9 pr-7 rounded-xl border border-white/10 bg-card/60 text-xs font-semibold placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary outline-none transition-all"
+              placeholder="Rechercher joueur, équipe..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setDebouncedSearch("");
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:text-destructive text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filtre par statut */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px] h-9 bg-card/60 border-white/10 text-xs font-semibold">
+              <SelectValue placeholder="Tous les statuts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tous statuts</SelectItem>
+              <SelectItem value="PENDING">À venir</SelectItem>
+              <SelectItem value="IN_PROGRESS">En direct</SelectItem>
+              <SelectItem value="COMPLETED">Terminés</SelectItem>
+              <SelectItem value="DISPUTED">Litiges</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Toggle Mes matchs */}
+          {user?.id && (
+            <Button
+              variant={showOnlyMyMatches ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowOnlyMyMatches(!showOnlyMyMatches)}
+              className={cn(
+                "h-9 gap-1.5 font-bold text-xs rounded-xl border-white/10",
+                showOnlyMyMatches && "shadow-lg shadow-primary/20",
+              )}
+            >
+              <Star className={cn("h-3.5 w-3.5", showOnlyMyMatches && "fill-white")} />
+              <span className="hidden sm:inline">Mes matchs</span>
+            </Button>
+          )}
+
           {/* Phase filter for list view */}
           {viewMode === "list" && phases.length > 0 && (
             <Select value={selectedPhaseId} onValueChange={setSelectedPhaseId}>

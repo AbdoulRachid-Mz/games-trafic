@@ -300,6 +300,16 @@ export async function handleEliminationProgression(
   // 1. Advance winner to the next round
   await advanceWinnerToNextRound(tx, node, match.winnerRegistrationId);
 
+  // 1b. Advance loser to third-place match if this was a semi-final
+  const loserId =
+    match.winnerRegistrationId === match.participant1RegistrationId
+      ? match.participant2RegistrationId
+      : match.participant1RegistrationId;
+
+  if (loserId) {
+    await advanceLoserToThirdPlaceNode(tx, node, loserId);
+  }
+
   // 2. Update stats idempotently
   await updateEditionResultsFromBracketNodeSafe(tx, node.id);
 
@@ -523,16 +533,15 @@ export async function isEliminationPhaseComplete(
 
   if (!nodes.length) return false;
 
-  // 🔹 Trouver dernier round
+  // 🔹 Trouver la Grande Finale (round max, bracketType !== 'CONSOLATION')
   const maxRound = Math.max(...nodes.map((n: any) => n.round || 0));
-  const finalNodes = nodes.filter((n: any) => n.round === maxRound);
+  const finalNode = nodes.find(
+    (n: any) => n.round === maxRound && n.bracketType !== "CONSOLATION",
+  );
 
-  // 🔹 Check structure: A final should have only 1 node (usually)
-  if (finalNodes.length !== 1) return false;
+  if (!finalNode) return false;
 
-  const finalNode = finalNodes[0];
-
-  // 🔹 Check matches completed
+  // 🔹 Check matches completed pour la Grande Finale
   const matchesList = await tx.query.matches.findMany({
     where: eq(matches.bracketNodeId, finalNode.id),
   });
@@ -557,7 +566,115 @@ export async function isEliminationPhaseComplete(
 
   if (!winnerExists) return false;
 
+  // 🔹 Si un match de 3ème place (CONSOLATION) existe, il doit être terminé
+  const consolationNode = nodes.find(
+    (n: any) =>
+      n.bracketType === "CONSOLATION" ||
+      (n.metadata as any)?.isThirdPlace === true,
+  );
+
+  if (consolationNode) {
+    const consolationMatches = await tx.query.matches.findMany({
+      where: eq(matches.bracketNodeId, consolationNode.id),
+    });
+
+    if (!consolationMatches.length) return false;
+    const consolationAllCompleted = consolationMatches.every(
+      (m: any) => m.status === "COMPLETED",
+    );
+    if (!consolationAllCompleted) return false;
+    if (!consolationMatches.some((m: any) => m.winnerRegistrationId))
+      return false;
+  }
+
   return true;
+}
+
+async function advanceLoserToThirdPlaceNode(
+  tx: any,
+  currentNode: any,
+  loserId: string,
+) {
+  // Vérifier si currentNode est une demi-finale (parent est la finale à depth === 0)
+  let isSemiFinal = currentNode.depth === 1;
+
+  if (!isSemiFinal && currentNode.parentNodeId) {
+    const parentNode = await tx.query.bracketNodes.findFirst({
+      where: eq(bracketNodes.id, currentNode.parentNodeId),
+    });
+    if (
+      parentNode &&
+      parentNode.depth === 0 &&
+      parentNode.bracketType !== "CONSOLATION"
+    ) {
+      isSemiFinal = true;
+    }
+  }
+
+  if (!isSemiFinal) return;
+
+  // Trouver le nœud de troisième place dans cette phase
+  const thirdPlaceNode = await tx.query.bracketNodes.findFirst({
+    where: and(
+      eq(bracketNodes.phaseId, currentNode.phaseId),
+      eq(bracketNodes.bracketType, "CONSOLATION"),
+    ),
+  });
+
+  if (!thirdPlaceNode) return;
+
+  const metadata = (thirdPlaceNode.metadata as any) || {};
+  let participants: string[] = metadata.participants || [];
+
+  if (participants.includes(loserId)) return;
+
+  if (participants.length < 2) {
+    participants.push(loserId);
+  }
+
+  console.log(
+    "[PROGRESSION] Advancing loser to third-place match:",
+    loserId,
+    "→ node",
+    thirdPlaceNode.id,
+  );
+
+  await tx
+    .update(bracketNodes)
+    .set({
+      metadata: {
+        ...metadata,
+        participants,
+        isPlaceholder: participants.length < 2,
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(bracketNodes.id, thirdPlaceNode.id));
+
+  // Ajouter aux participants du groupe si applicable
+  if (thirdPlaceNode.groupId) {
+    const existingParticipation =
+      await tx.query.phaseGroupParticipants.findFirst({
+        where: and(
+          eq(phaseGroupParticipants.groupId, thirdPlaceNode.groupId),
+          eq(phaseGroupParticipants.registrationId, loserId),
+        ),
+      });
+
+    if (!existingParticipation) {
+      await tx.insert(phaseGroupParticipants).values({
+        groupId: thirdPlaceNode.groupId,
+        registrationId: loserId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  // Si 2 perdants sont qualifiés pour la petite finale → générer le match
+  if (participants.length === 2) {
+    await createMatchesIfReady(tx, thirdPlaceNode.id);
+  }
 }
 
 async function updateEditionResultsFromBracketNodeSafe(

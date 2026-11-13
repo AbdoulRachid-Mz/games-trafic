@@ -95,10 +95,12 @@ export function MatchCard({
     p2?.profileImage ||
     "/icons/avatar-500.png";
 
-  const isParticipant =
-    currentUserId &&
-    (match.participant1?.member?.userId === currentUserId ||
-      match.participant2?.member?.userId === currentUserId);
+  const isParticipant = Boolean(
+    (currentUserId &&
+      (match.participant1?.member?.userId === currentUserId ||
+        match.participant2?.member?.userId === currentUserId)) ||
+      (match as any)._isMyMatch,
+  );
 
   // Navigation fiable : ne jamais construire une URL avec un id vide.
   // match → édition → tournoi, avec repli sur les relations de la phase.
@@ -379,7 +381,13 @@ export function MatchCard({
       <div className="relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isParticipant && (
+              <Badge className="bg-primary text-primary-foreground text-[9px] font-black uppercase tracking-wider gap-1 px-2 py-0.5 shadow-md shadow-primary/20">
+                <Trophy className="h-2.5 w-2.5 fill-current" />
+                Votre combat
+              </Badge>
+            )}
             <div className="flex items-center gap-1.5 px-2 py-1 bg-background/50 rounded-md border border-white/5 backdrop-blur-sm text-[10px] sm:text-xs text-muted-foreground font-bold uppercase tracking-wider">
               <Clock className={cn("h-3 w-3", isCompactView && "h-2.5 w-2.5")} />
               {match.scheduledTime
@@ -521,85 +529,81 @@ export function MatchCard({
         </div>
 
         {/* Footer Actions */}
-        {(canSubmit || canAdminValidate || match.proofUrl) && (
-          <div 
-            className={cn("mt-4 flex gap-2 pt-3 border-t border-white/5", isCompactView ? "mt-3 pt-2" : "mt-5")}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {canSubmit && (
-              <Link
-                href={matchHref ? `${matchHref}?submit=true` : "#"}
-                className="flex-1"
-                onClick={(event) => {
-                  if (!matchHref) {
-                    event.preventDefault();
-                    onView?.(match);
-                  }
-                }}
-              >
-                <Button
-                  variant="default"
-                  size={isCompactView ? "xs" : "sm"}
-                  className="w-full gap-2 font-bold uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(var(--primary),0.2)] hover:shadow-[0_0_25px_rgba(var(--primary),0.4)] transition-shadow"
-                >
-                  <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Saisir le score
-                </Button>
-              </Link>
-            )}
-            
-            {!canSubmit && (
-              <Link
-                href={matchHref ?? "#"}
-                className="flex-1"
-                onClick={(event) => {
-                  if (!matchHref) {
-                    event.preventDefault();
-                    onView?.(match);
-                  }
-                }}
-              >
-                 <Button
-                  variant="outline"
-                  size={isCompactView ? "xs" : "sm"}
-                  className="w-full gap-2 font-bold uppercase tracking-wider text-xs border-white/10 hover:bg-white/5"
-                >
-                  <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Détails
-                </Button>
-              </Link>
-            )}
-
-            {canAdminValidate && (
-              <ConfirmationDialog
-                title="Validation Administrateur"
-                description={`Valider officiellement le score (${match.score1 ?? 0} - ${match.score2 ?? 0}) ?`}
-                onConfirm={handleAdminValidate}
-                confirmLabel="Valider"
+        <div 
+          className={cn("mt-4 flex gap-2 pt-3 border-t border-white/5", isCompactView ? "mt-3 pt-2" : "mt-5")}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {canSubmit ? (
+            <Link
+              href={matchHref ? `${matchHref}?submit=true` : "#"}
+              className="flex-1"
+              onClick={(event) => {
+                if (!matchHref) {
+                  event.preventDefault();
+                  onView?.(match);
+                }
+              }}
+            >
+              <Button
                 variant="default"
+                size={isCompactView ? "xs" : "sm"}
+                className="w-full gap-2 font-bold uppercase tracking-wider text-xs shadow-[0_0_15px_rgba(var(--primary),0.2)] hover:shadow-[0_0_25px_rgba(var(--primary),0.4)] transition-shadow"
               >
-                <Button
-                  size={isCompactView ? "xs" : "sm"}
-                  variant="outline"
-                  className="shrink-0 border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/40"
-                  title="Validation Admin"
-                >
-                  <ShieldAlert className="h-4 w-4" />
-                </Button>
-              </ConfirmationDialog>
-            )}
+                <Trophy className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Saisir le score
+              </Button>
+            </Link>
+          ) : (
+            <Link
+              href={matchHref ?? "#"}
+              className="flex-1"
+              onClick={(event) => {
+                if (!matchHref) {
+                  event.preventDefault();
+                  onView?.(match);
+                }
+              }}
+            >
+              <Button
+                variant="outline"
+                size={isCompactView ? "xs" : "sm"}
+                className="w-full gap-2 font-bold uppercase tracking-wider text-xs border-white/10 hover:bg-white/5"
+              >
+                <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Détails du match
+              </Button>
+            </Link>
+          )}
 
-            {match.proofUrl && match.status !== "COMPLETED" && (
+          {canAdminValidate && (
+            <ConfirmationDialog
+              title="Validation Administrateur"
+              description={`Valider officiellement le score (${match.score1 ?? 0} - ${match.score2 ?? 0}) ?`}
+              onConfirm={handleAdminValidate}
+              confirmLabel="Valider"
+              variant="default"
+            >
               <Button
                 size={isCompactView ? "xs" : "sm"}
                 variant="outline"
-                className="shrink-0 border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/40"
-                title="Preuve disponible"
-                onClick={() => window.open(match.proofUrl, '_blank')}
+                className="shrink-0 border-amber-500/20 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/40"
+                title="Validation Admin"
               >
-                <Camera className="h-4 w-4" />
+                <ShieldAlert className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-        )}
+            </ConfirmationDialog>
+          )}
+
+          {match.proofUrl && match.status !== "COMPLETED" && (
+            <Button
+              size={isCompactView ? "xs" : "sm"}
+              variant="outline"
+              className="shrink-0 border-blue-500/20 text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/40"
+              title="Preuve disponible"
+              onClick={() => window.open(match.proofUrl, '_blank')}
+            >
+              <Camera className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </motion.div>
   );

@@ -1,8 +1,8 @@
 // @/components/pages/tournaments/edition-detail/matches-dashboard-filters.tsx
 "use client";
 
-import React from "react";
-import { Search, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Search, X, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,8 @@ interface MatchesDashboardFiltersProps {
   status?: string;
   phaseId?: string;
   groupId?: string;
+  sortBy?: string;
+  sortOrder?: string;
   phases?: any[];
   /** Groupes de la phase active — prop groupes utilisée seulement ici. */
   groups?: any[];
@@ -34,17 +36,37 @@ const STATUS_LABELS: Record<string, string> = {
   DISPUTED: "Litige",
 };
 
-export function MatchesDashboardFilters({ 
-  search, 
-  status, 
-  phaseId, 
-  groupId, 
+const SORT_OPTIONS = [
+  { value: "scheduledTime_asc", label: "Date ↑" },
+  { value: "scheduledTime_desc", label: "Date ↓" },
+  { value: "matchNumber_asc", label: "N° match ↑" },
+  { value: "matchNumber_desc", label: "N° match ↓" },
+  { value: "status_asc", label: "Statut ↑" },
+  { value: "status_desc", label: "Statut ↓" },
+];
+
+export function MatchesDashboardFilters({
+  search,
+  status,
+  phaseId,
+  groupId,
+  sortBy,
+  sortOrder,
   phases = [],
   groups = [],
 }: MatchesDashboardFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Controlled search input with debounce 300ms
+  const [searchValue, setSearchValue] = useState(search ?? "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync controlled value when URL changes externally
+  useEffect(() => {
+    setSearchValue(search ?? "");
+  }, [search]);
 
   const updateParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -59,87 +81,168 @@ export function MatchesDashboardFilters({
     if ("phaseId" in updates && updates.phaseId) {
       params.delete("groupId");
     }
-    params.set("page", "1");
+    // Always reset pagination on filter change (unless explicitly changing page)
+    if (!("page" in updates)) {
+      params.set("page", "1");
+    }
     // replace : les filtres ne doivent pas polluer l'historique de navigation.
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      updateParams({ search: e.currentTarget.value || null });
-    }
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchValue(val);
+
+    // Debounce URL update by 300ms
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateParams({ search: val || null });
+    }, 300);
   };
 
   const clearFilters = () => {
-    router.push(pathname);
+    setSearchValue("");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    router.replace(pathname);
   };
 
-  const hasActiveFilters = !!(search || (status && status !== "ALL") || phaseId || groupId);  return (
+  // Compute current sort composite value for the Select
+  const currentSort =
+    sortBy && sortOrder ? `${sortBy}_${sortOrder}` : "scheduledTime_asc";
+
+  const handleSortChange = (value: string) => {
+    const lastUnderscore = value.lastIndexOf("_");
+    const newSortBy = value.slice(0, lastUnderscore);
+    const newSortOrder = value.slice(lastUnderscore + 1);
+    updateParams({ sortBy: newSortBy, sortOrder: newSortOrder });
+  };
+
+  const hasActiveFilters = !!(
+    search ||
+    (status && status !== "ALL") ||
+    phaseId ||
+    groupId
+  );
+
+  return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Main filter row — responsive: stacks on mobile, horizontal on desktop */}
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
+        {/* Search */}
         <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input 
+          <input
             className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:ring-1 focus:ring-primary outline-none"
             placeholder="Rechercher par joueur, équipe, code match..."
-            defaultValue={search}
-            onKeyDown={handleSearch}
+            value={searchValue}
+            onChange={handleSearchChange}
           />
+          {searchValue && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:text-destructive"
+              onClick={() => {
+                setSearchValue("");
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                updateParams({ search: null });
+              }}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
+        {/* Status filter */}
         <Select
-          defaultValue={status || "ALL"}
-          onValueChange={(value) => updateParams({ status: value === "ALL" ? null : value })}
+          value={status || "ALL"}
+          onValueChange={(value) =>
+            updateParams({ status: value === "ALL" ? null : value })
+          }
         >
-          <SelectTrigger className="w-[160px] max-w-full h-10">
+          <SelectTrigger className="w-full sm:w-[160px] h-10">
             <SelectValue placeholder="Statut" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">Tous les statuts</SelectItem>
             {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>{label}</SelectItem>
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
+        {/* Phase filter */}
         {phases.length > 0 && (
           <Select
-            defaultValue={phaseId || "ALL"}
-            onValueChange={(value) => updateParams({ phaseId: value === "ALL" ? null : value, groupId: null })}
+            value={phaseId || "ALL"}
+            onValueChange={(value) =>
+              updateParams({
+                phaseId: value === "ALL" ? null : value,
+                groupId: null,
+              })
+            }
           >
-            <SelectTrigger className="w-[180px] max-w-full h-10">
+            <SelectTrigger className="w-full sm:w-[180px] h-10">
               <SelectValue placeholder="Phase" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Toutes les phases</SelectItem>
               {phases.map((phase) => (
-                <SelectItem key={phase.id} value={phase.id}>{phase.name}</SelectItem>
+                <SelectItem key={phase.id} value={phase.id}>
+                  {phase.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
 
+        {/* Group filter (contextual) */}
         {phaseId && groups.length > 0 && (
           <Select
-            defaultValue={groupId || "ALL"}
-            onValueChange={(value) => updateParams({ groupId: value === "ALL" ? null : value })}
+            value={groupId || "ALL"}
+            onValueChange={(value) =>
+              updateParams({ groupId: value === "ALL" ? null : value })
+            }
           >
-            <SelectTrigger className="w-[160px] max-w-full h-10">
+            <SelectTrigger className="w-full sm:w-[160px] h-10">
               <SelectValue placeholder="Groupe" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tous les groupes</SelectItem>
               {groups.map((group) => (
-                <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                <SelectItem key={group.id} value={group.id}>
+                  {group.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
 
+        {/* Sort */}
+        <Select value={currentSort} onValueChange={handleSortChange}>
+          <SelectTrigger className="w-full sm:w-[150px] h-10">
+            <ArrowUpDown className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
+            <SelectValue placeholder="Trier par" />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Reset */}
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-10 gap-1 shrink-0"
+          >
             <X className="h-4 w-4" />
-            Effacer
+            Réinitialiser
           </Button>
         )}
       </div>
@@ -150,15 +253,24 @@ export function MatchesDashboardFilters({
           {search && (
             <Badge variant="secondary" className="gap-1">
               Recherche: {search}
-              <button onClick={() => updateParams({ search: null })} className="ml-1 hover:text-destructive">
+              <button
+                onClick={() => {
+                  setSearchValue("");
+                  updateParams({ search: null });
+                }}
+                className="ml-1 hover:text-destructive"
+              >
                 <X className="h-3 w-3" />
               </button>
             </Badge>
           )}
-          {(status && status !== "ALL") && (
+          {status && status !== "ALL" && (
             <Badge variant="secondary" className="gap-1">
               Statut: {STATUS_LABELS[status] ?? status}
-              <button onClick={() => updateParams({ status: null })} className="ml-1 hover:text-destructive">
+              <button
+                onClick={() => updateParams({ status: null })}
+                className="ml-1 hover:text-destructive"
+              >
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -166,15 +278,21 @@ export function MatchesDashboardFilters({
           {groupId && (
             <Badge variant="secondary" className="gap-1">
               Groupe: {groups.find((g) => g.id === groupId)?.name ?? groupId}
-              <button onClick={() => updateParams({ groupId: null })} className="ml-1 hover:text-destructive">
+              <button
+                onClick={() => updateParams({ groupId: null })}
+                className="ml-1 hover:text-destructive"
+              >
                 <X className="h-3 w-3" />
               </button>
             </Badge>
           )}
-          {phaseId && phases.find(p => p.id === phaseId) && (
+          {phaseId && phases.find((p) => p.id === phaseId) && (
             <Badge variant="secondary" className="gap-1">
-              Phase: {phases.find(p => p.id === phaseId)?.name}
-              <button onClick={() => updateParams({ phaseId: null })} className="ml-1 hover:text-destructive">
+              Phase: {phases.find((p) => p.id === phaseId)?.name}
+              <button
+                onClick={() => updateParams({ phaseId: null })}
+                className="ml-1 hover:text-destructive"
+              >
                 <X className="h-3 w-3" />
               </button>
             </Badge>

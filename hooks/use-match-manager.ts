@@ -11,8 +11,8 @@ import type { MatchFilters, ListQuery } from "@/types/api";
 
 export const matchManagerKeys = {
   all: ["matches"] as const,
-  list: (filters: MatchFilters) =>
-    [...matchManagerKeys.all, "list", filters] as const,
+  list: (query: ListQuery<MatchFilters> | MatchFilters) =>
+    [...matchManagerKeys.all, "list", query] as const,
   stats: (editionId: string) =>
     [...matchManagerKeys.all, "stats", editionId] as const,
 };
@@ -62,11 +62,11 @@ export function useMatchManager(phaseId?: string) {
 
 /**
  * useMatchList — Récupération paginée et filtrée des matchs
- * Supporte "Mes Matchs", par phase, par groupe, etc.
+ * Supporte "Mes Matchs", par phase, par groupe, pagination, tri et recherche.
  */
 export function useMatchList(query: ListQuery<MatchFilters>) {
   return useQuery({
-    queryKey: matchManagerKeys.list(query.filters || {}),
+    queryKey: matchManagerKeys.list(query),
     queryFn: () => getMatchesWithParticipants(query),
     staleTime: 1000 * 60, // 1 minute
   });

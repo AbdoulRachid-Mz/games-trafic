@@ -1432,7 +1432,7 @@
 //       userId: player1.id,
 //       ipAddress: "192.168.1.2",
 //       userAgent: "Mozilla/5.0 (Android)",
-//       metadata: { device: "mobile", location: "Abidjan, CI" },
+//       metadata: { device: "mobile", location: "Tahoua, NG" },
 //       viewedAt: new Date(Date.now() - 1000),
 //     }
 //   ]);

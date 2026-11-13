@@ -686,7 +686,12 @@ export function GroupDetailClient({
                             item={match}
                             isAdmin={true}
                             viewMode="list"
-                            onUpdate={() => window.location.reload()}
+                            onView={(m) =>
+                              router.push(
+                                `/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`,
+                              )
+                            }
+                            onUpdate={() => router.refresh()}
                           />
                         ))}
                       </div>
@@ -726,7 +731,12 @@ export function GroupDetailClient({
                                 item={match}
                                 viewMode="list"
                                 isAdmin={true}
-                                onUpdate={() => window.location.reload()}
+                                onView={(m) =>
+                                  router.push(
+                                    `/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`,
+                                  )
+                                }
+                                onUpdate={() => router.refresh()}
                               />
                             ))}
                         </TabsContent>
@@ -743,7 +753,12 @@ export function GroupDetailClient({
                     item={match}
                     viewMode="list"
                     isAdmin={true}
-                    onUpdate={() => window.location.reload()}
+                    onView={(m) =>
+                      router.push(
+                        `/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`,
+                      )
+                    }
+                    onUpdate={() => router.refresh()}
                   />
                 ))}
               </div>

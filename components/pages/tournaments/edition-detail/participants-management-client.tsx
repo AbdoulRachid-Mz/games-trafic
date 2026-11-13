@@ -201,7 +201,7 @@ export function ParticipantsManagementClient({
           </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          <Table className="min-w-[720px]">
+          <Table className="hidden md:table min-w-[720px]">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="w-[50px] px-6">
@@ -215,7 +215,7 @@ export function ParticipantsManagementClient({
                 </TableHead>
                 <TableHead>Joueur</TableHead>
                 <TableHead>Équipe</TableHead>
-                <TableHead>Téléphone</TableHead>
+                <TableHead className="hidden sm:table-cell">Téléphone</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Paiement</TableHead>
                 <TableHead className="text-right px-6">Actions</TableHead>
@@ -260,7 +260,7 @@ export function ParticipantsManagementClient({
                          </span>
                        </div>
                     </TableCell>
-                    <TableCell>
+                     <TableCell className="hidden sm:table-cell">
                        <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono">
                          <Phone className="h-3 w-3" />
                          {reg.member.contactPhone || reg.member.user?.phoneNumber || "N/A"}
@@ -289,6 +289,60 @@ export function ParticipantsManagementClient({
               )}
             </TableBody>
           </Table>
+
+          {/* Vue cartes pour petits écrans */}
+          <div className="md:hidden space-y-3 p-3">
+            {filteredParticipants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Aucun participant trouvé pour cette recherche.
+              </div>
+            ) : (
+              filteredParticipants.map((reg) => (
+                <Card key={reg.id} className="p-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border-2 border-background shadow-sm shrink-0">
+                      <AvatarImage src={reg.member.user?.profileImage || ""} />
+                      <AvatarFallback><UserIcon className="h-5 w-5 text-muted-foreground" /></AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm truncate">
+                        {reg.member.displayName || reg.member.user?.username || "Joueur"}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {reg.member.team?.name || "Solo"}
+                      </div>
+                    </div>
+                    <Checkbox
+                      checked={selectedParticipants.includes(reg.id)}
+                      onCheckedChange={(c) => {
+                        if (c) setSelectedParticipants((prev) => [...prev, reg.id]);
+                        else setSelectedParticipants((prev) => prev.filter((i) => i !== reg.id));
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant={reg.status === "REGISTERED" ? "secondary" : "default"}>
+                      {reg.status}
+                    </Badge>
+                    <Badge variant={reg.feePaid ? "outline" : "destructive"} className={reg.feePaid ? "border-green-600 text-green-600" : ""}>
+                      {reg.feePaid ? "Payé" : "Impayé"}
+                    </Badge>
+                    <span className="text-muted-foreground font-mono">
+                      {reg.member.contactPhone || reg.member.user?.phoneNumber || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-end">
+                    <ParticipantRowActions
+                      registrationId={reg.id}
+                      checkedIn={reg.checkedIn || false}
+                      feePaid={reg.feePaid || false}
+                      status={reg.status || "REGISTERED"}
+                    />
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -308,8 +362,8 @@ export function ParticipantsManagementClient({
              )}
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="hidden md:table min-w-[500px]">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="w-[50px] px-6">
@@ -329,7 +383,7 @@ export function ParticipantsManagementClient({
             <TableBody>
               {unregisteredMembers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
                     Tous les membres du tournoi sont déjà dans cette édition.
                   </TableCell>
                 </TableRow>
@@ -390,6 +444,65 @@ export function ParticipantsManagementClient({
               )}
             </TableBody>
           </Table>
+
+          {/* Vue cartes mobile pour membres non inscrits */}
+          <div className="md:hidden space-y-3 p-3">
+            {unregisteredMembers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Tous les membres du tournoi sont déjà dans cette édition.
+              </div>
+            ) : (
+              unregisteredMembers.map((row) => (
+                <Card key={row.member.id} className="p-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border-2 border-background shadow-sm shrink-0">
+                      <AvatarImage src={row.user?.profileImage || ""} />
+                      <AvatarFallback><UserIcon className="h-5 w-5 text-muted-foreground" /></AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm truncate">
+                        {row.member.displayName || row.user?.username || "Joueur"}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {row.member.contactEmail || "Non renseigné"}
+                      </div>
+                    </div>
+                    <Checkbox 
+                      checked={selectedUnregistered.includes(row.member.id)}
+                      onCheckedChange={(c) => {
+                        if (c) setSelectedUnregistered(prev => [...prev, row.member.id]);
+                        else setSelectedUnregistered(prev => prev.filter(i => i !== row.member.id));
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-primary hover:text-primary hover:bg-primary/10 text-xs font-bold"
+                      onClick={async () => {
+                        try {
+                          await addEditionParticipantAction({
+                            editionId,
+                            tournamentId,
+                            userId: row.member.userId,
+                            displayName: row.member.displayName,
+                          });
+                          toast.success(`${row.member.displayName} ajouté.`);
+                          router.refresh();
+                        } catch (e: any) {
+                          toast.error(e.message || "Erreur lors de l'ajout.");
+                        }
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      Inscrire
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 

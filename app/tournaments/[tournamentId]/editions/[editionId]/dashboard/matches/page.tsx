@@ -1,6 +1,7 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/dashboard/matches/page.tsx
 "use client";
 
+import { Suspense } from "react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
@@ -32,7 +33,7 @@ import { ExportMatchesButton } from "@/components/pages/tournaments/edition-deta
 import { useQuery } from "@tanstack/react-query";
 import { getTournamentPhases, getEditionDetailTree } from "@/actions/tournaments";
 import { getMatchesWithParticipants } from "@/actions/phases";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams, useRouter, usePathname, useParams } from "next/navigation";
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const s = status || "PENDING";
@@ -246,53 +247,91 @@ function MatchTreeNode({ node, tournamentId, editionId, depth = 0 }: { node: any
   );
 }
 
-export default function MatchesDashboardPage({ params }: { params: { tournamentId: string; editionId: string } }) {
-  const { tournamentId, editionId } = params;
+export default function MatchesDashboardPage({
+  params,
+}: {
+  params: { tournamentId: string; editionId: string };
+}) {
+  const routeParams = useParams();
+  const tournamentId =
+    params?.tournamentId || (routeParams?.tournamentId as string);
+  const editionId =
+    params?.editionId || (routeParams?.editionId as string);
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  
+
   const page = searchParams.get("page") || "1";
   const phaseId = searchParams.get("phaseId") || undefined;
   const groupId = searchParams.get("groupId") || undefined;
   const bracketNodeId = searchParams.get("bracketNodeId") || undefined;
-  const status = searchParams.get("status") || undefined;
+  const rawStatus = searchParams.get("status");
+  const status = rawStatus && rawStatus !== "ALL" ? rawStatus : undefined;
   const search = searchParams.get("search") || undefined;
+  const sortBy = searchParams.get("sortBy") || "scheduledTime";
+  const sortOrder = (searchParams.get("sortOrder") as "asc" | "desc") || "asc";
   const view = (searchParams.get("view") as "list" | "tree" | "grid") || "grid";
-  
-  const currentPage = parseInt(page);
+
+  const currentPage = parseInt(page, 10) || 1;
   const limit = 20;
 
   // Fetch data with React Query
   const { data: phasesRes, isLoading: phasesLoading } = useQuery({
     queryKey: ["tournament-phases", editionId],
     queryFn: () => getTournamentPhases({ filters: { editionId } }),
+    enabled: !!editionId,
   });
-  
-  const { data: matchesRes, isLoading: matchesLoading } = useQuery({
-    queryKey: ["matches", editionId, phaseId, groupId, bracketNodeId, status, search, currentPage],
-    queryFn: () => getMatchesWithParticipants({
-      filters: { 
-        editionId, 
-        phaseId,
-        groupId,
-        bracketNodeId,
-        statuses: status ? [status] as any : undefined,
-        search
-      },
-      pagination: { page: currentPage, limit },
-      options: { sortBy: "scheduledTime", sortOrder: "asc" }
-    }),
+
+  const {
+    data: matchesRes,
+    isLoading: matchesLoading,
+    isError: matchesError,
+    error: matchesFetchError,
+    refetch: refetchMatches,
+  } = useQuery({
+    queryKey: [
+      "matches",
+      editionId,
+      phaseId,
+      groupId,
+      bracketNodeId,
+      status,
+      search,
+      sortBy,
+      sortOrder,
+      currentPage,
+    ],
+    queryFn: () =>
+      getMatchesWithParticipants({
+        filters: {
+          editionId,
+          phaseId,
+          groupId,
+          bracketNodeId,
+          statuses: status ? ([status] as any) : undefined,
+          search,
+        },
+        pagination: { page: currentPage, limit },
+        options: { sortBy, sortOrder },
+      }),
+    enabled: !!editionId,
   });
-  
+
   const { data: editionTree, isLoading: treeLoading } = useQuery({
     queryKey: ["edition-tree", editionId],
     queryFn: () => getEditionDetailTree(editionId).catch(() => null),
+    enabled: !!editionId,
   });
 
   const phases = phasesRes?.data || [];
   const matches = matchesRes?.data || [];
-  const pagination = matchesRes?.pagination || { total: 0, totalPages: 0, hasPrev: false, hasNext: false };
+  const pagination = matchesRes?.pagination || {
+    total: 0,
+    totalPages: 0,
+    hasPrev: false,
+    hasNext: false,
+  };
   const isLoading = phasesLoading || matchesLoading || treeLoading;
 
   // Build tree structure for tree view
@@ -479,14 +518,37 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
             status={status} 
             phaseId={phaseId}
             groupId={groupId}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
             phases={phases}
             groups={activePhaseGroups}
           />
         </CardContent>
       </Card>
 
+      {/* Error state */}
+      {matchesError && (
+        <Card className="border-destructive/30 bg-destructive/5 p-6 rounded-2xl text-center space-y-3">
+          <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
+          <Typography variant="h5" weight="bold" className="text-destructive">
+            Erreur de chargement des matchs
+          </Typography>
+          <Typography variant="body-sm" theme="muted">
+            {(matchesFetchError as any)?.message || "Impossible de récupérer les matchs pour le moment."}
+          </Typography>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchMatches()}
+            className="border-destructive/30 text-destructive hover:bg-destructive/10"
+          >
+            Réessayer
+          </Button>
+        </Card>
+      )}
+
       {/* Content based on view */}
-      {view === "tree" ? (
+      {!matchesError && (view === "tree" ? (
         <Card className="border-none shadow-xl">
           <CardHeader className="border-b pb-3">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -574,7 +636,7 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
             ))
           )}
         </div>
-      )}
+      ))}
 
       {/* Pagination */}
       {view !== "tree" && pagination.totalPages > 1 && (

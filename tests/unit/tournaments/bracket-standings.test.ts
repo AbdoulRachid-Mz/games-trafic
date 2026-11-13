@@ -56,4 +56,43 @@ describe("computeBracketStandings", () => {
     const ids = rows.map((row) => row.registrationId);
     expect(ids).toContain("winner-only");
   });
+
+  it("correctly ranks 1st, 2nd, 3rd and 4th with a completed consolation match", () => {
+    const rows = computeBracketStandings([
+      // Semi-finals (round 1)
+      {
+        round: 1,
+        isCompleted: true,
+        winnerRegistrationId: "p1",
+        metadata: { participants: ["p1", "p3"] },
+      },
+      {
+        round: 1,
+        isCompleted: true,
+        winnerRegistrationId: "p2",
+        metadata: { participants: ["p2", "p4"] },
+      },
+      // Final (round 2) - p1 beats p2
+      {
+        round: 2,
+        isCompleted: true,
+        bracketType: "FINAL",
+        winnerRegistrationId: "p1",
+        metadata: { participants: ["p1", "p2"] },
+      },
+      // Consolation / 3rd place (round 2) - p3 beats p4
+      {
+        round: 2,
+        isCompleted: true,
+        bracketType: "CONSOLATION",
+        winnerRegistrationId: "p3",
+        metadata: { participants: ["p3", "p4"], isThirdPlace: true },
+      },
+    ]);
+
+    expect(rows.find((r) => r.registrationId === "p1")?.position).toBe(1);
+    expect(rows.find((r) => r.registrationId === "p2")?.position).toBe(2);
+    expect(rows.find((r) => r.registrationId === "p3")?.position).toBe(3);
+    expect(rows.find((r) => r.registrationId === "p4")?.position).toBe(4);
+  });
 });

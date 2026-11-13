@@ -28,6 +28,7 @@ import { BracketNodeCard } from "@/components/cards/bracket-node-card";
 import { BracketExportButton } from "./bracket-export-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MatchCard } from "@/components/cards/match-card";
 
@@ -44,6 +45,7 @@ export function EditionBracketsTab({
   phases = [],
   isOrganizer = false,
 }: EditionBracketsTabProps) {
+  const router = useRouter();
   // Filtrer les phases qui sont de type ELIMINATION, KNOCKOUT ou contiennent des mots-clés d'arbre
   const bracketPhases = useMemo(() => {
     return phases.filter(
@@ -265,22 +267,45 @@ export function EditionBracketsTab({
 
                   {/* Matches list in round */}
                   <div className="flex flex-col gap-4">
-                    {roundMatches.map((match: any) => (
-                      <div
-                        key={match.id}
-                        className={cn(
-                          "transition-all duration-300 hover:scale-[1.02]",
-                          isFinal && "border-2 border-yellow-500/30 rounded-2xl"
-                        )}
-                      >
-                        <MatchCard
-                          item={match}
-                          viewMode="compact"
-                          showMinInfo={false}
-                          className="w-full bg-card/90 backdrop-blur-md border border-white/10 shadow-xl"
-                        />
-                      </div>
-                    ))}
+                    {roundMatches.map((match: any) => {
+                      const isThirdPlace =
+                        match.bracketNode?.bracketType === "CONSOLATION" ||
+                        match.metadata?.isThirdPlace === true ||
+                        match.bracketNode?.metadata?.isThirdPlace === true;
+
+                      return (
+                        <div key={match.id} className="space-y-1">
+                          {isThirdPlace && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-wider">
+                              <Trophy className="h-3 w-3 text-amber-500" />
+                              <span>Petite Finale (3ème Place)</span>
+                            </div>
+                          )}
+                          <div
+                            className={cn(
+                              "transition-all duration-300 hover:scale-[1.02]",
+                              isFinal &&
+                                !isThirdPlace &&
+                                "border-2 border-yellow-500/30 rounded-2xl",
+                              isThirdPlace &&
+                                "border-2 border-amber-500/30 rounded-2xl",
+                            )}
+                          >
+                            <MatchCard
+                              item={match}
+                              viewMode="compact"
+                              showMinInfo={false}
+                              onView={(m) =>
+                                router.push(
+                                  `/tournaments/${tournamentId}/editions/${editionId}/matches/${m.id}`,
+                                )
+                              }
+                              className="w-full bg-card/90 backdrop-blur-md border border-white/10 shadow-xl cursor-pointer hover:border-primary/40 transition-colors"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

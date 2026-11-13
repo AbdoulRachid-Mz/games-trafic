@@ -652,6 +652,13 @@ export default function MemberDetailPage() {
                       item={match}
                       currentUserId={user?.id}
                       viewMode="list"
+                      onView={(m) => {
+                        if (m.editionId) {
+                          router.push(
+                            `/tournaments/${tournamentId}/editions/${m.editionId}/matches/${m.id}`,
+                          );
+                        }
+                      }}
                     />
                   ))}
                 </div>

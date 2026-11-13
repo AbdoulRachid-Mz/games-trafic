@@ -28,7 +28,7 @@ const edition = {
   startDate: "2026-01-01",
   endDate: null,
   organizerName: "Org",
-  location: "Abidjan",
+  location: "Tahoua, NG",
 };
 
 describe("edition document builders", () => {

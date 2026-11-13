@@ -188,6 +188,7 @@ export function PhaseOrganizeClient({
       seedingMethod: inheritedConfig?.seedingMethod || "RANDOM",
       generateNodes: inheritedConfig?.generateNodes !== false,
       generateMatches: inheritedConfig?.generateMatches !== false,
+      thirdPlaceMatch: inheritedConfig?.thirdPlaceMatch === true,
       nodesType:
         inheritedConfig?.nodesType ||
         (phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "ELIMINATION"),
@@ -205,6 +206,9 @@ export function PhaseOrganizeClient({
   >(defaultConfig.seedingMethod);
   const [generateMatches, setGenerateMatches] = useState(
     defaultConfig.generateMatches,
+  );
+  const [thirdPlaceMatch, setThirdPlaceMatch] = useState(
+    defaultConfig.thirdPlaceMatch,
   );
   const [groupPrefix, setGroupPrefix] = useState(
     phaseType === "ROUND_ROBIN" ? "Ligue" : "Groupe",
@@ -308,6 +312,7 @@ export function PhaseOrganizeClient({
                 generateGroups: true,
                 generateNodes: true,
                 generateMatches,
+                thirdPlaceMatch,
                 nodePrefix: groupPrefix,
               },
             },
@@ -817,6 +822,20 @@ export function PhaseOrganizeClient({
                         className="text-xs font-medium cursor-pointer"
                       >
                         Générer les matches immédiatement
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="third-place"
+                        checked={thirdPlaceMatch}
+                        onCheckedChange={(v) => setThirdPlaceMatch(!!v)}
+                        disabled={phaseType !== "ELIMINATION" && phaseType !== "KNOCKOUT"}
+                      />
+                      <Label
+                        htmlFor="third-place"
+                        className="text-xs font-medium cursor-pointer"
+                      >
+                        Générer le match pour la 3e place
                       </Label>
                     </div>
                   </div>
