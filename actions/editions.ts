@@ -27,12 +27,6 @@ import {
   buildTournamentEntryPostings,
 } from "@/lib/finance";
 import { verifyWalletPin } from "./wallets";
-import { getMatchesWithParticipants } from "./phases";
-
-import { Parser } from "@json2csv/plainjs";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 
 // Type for Edition with Relations
 // export type TournamentEditionWithRelations = TournamentEdition & {
@@ -796,205 +790,6 @@ export async function finishEditionAction(editionId: string) {
 }
 
 /**
- * Export des participants d'une édition
- */
-export async function exportEditionParticipants(
-  editionId: string,
-  format: "csv" | "json" | "pdf",
-): Promise<{
-  success: boolean;
-  data?: string;
-  error?: string;
-  filename?: string;
-}> {
-  try {
-    // 1. Récupérer les données enrichies
-    const registrations = await db.query.editionRegistrations.findMany({
-      where: eq(editionRegistrations.editionId, editionId),
-      with: {
-        member: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                username: true,
-                fullName: true,
-                email: true,
-                profileImage: true,
-              },
-            },
-            team: { columns: { id: true, name: true, logo: true } },
-          },
-        },
-        results: true,
-        groupParticipations: {
-          with: { group: { with: { phase: true } } },
-        },
-      },
-    });
-
-    // 2. Transformer les données pour l'export
-    const exportData = registrations.map((reg) => {
-      const result = reg.results?.[0];
-      return {
-        Nom: reg.member?.displayName || reg.member?.user?.username || "N/A",
-        Email: reg.member?.user?.email || reg.member?.contactEmail || "N/A",
-        Équipe: reg.member?.team?.name || "Individuel",
-        Statut: reg.status,
-        "Check-in": reg.checkedIn ? "Oui" : "Non",
-        Payé: reg.feePaid ? "Oui" : "Non",
-        "Matches joués": result?.matchesPlayed || 0,
-        Victoires: result?.matchesWon || 0,
-        Défaites: result?.matchesLost || 0,
-        // 'Points': result?.points || 0,
-        Position: result?.position || "N/A",
-        "Date inscription": reg.registeredAt
-          ? new Date(reg.registeredAt).toLocaleDateString("fr-FR")
-          : "N/A",
-      };
-    });
-
-    let data: string | undefined;
-    let filename: string | undefined;
-    let contentType: string | undefined;
-
-    if (format === "csv") {
-      const parser = new Parser();
-      data = parser.parse(exportData);
-      filename = `participants_${editionId}_${Date.now()}.csv`;
-      contentType = "text/csv";
-    } else if (format === "json") {
-      data = JSON.stringify(exportData, null, 2);
-      filename = `participants_${editionId}_${Date.now()}.json`;
-      contentType = "application/json";
-      data = JSON.stringify(exportData);
-      filename = `participants_${editionId}_${Date.now()}`;
-    }
-
-    return { success: true, data, filename, error: undefined };
-  } catch (error) {
-    console.error("Export failed:", error);
-    return {
-      success: false,
-      error: String(error),
-      data: undefined,
-      filename: undefined,
-    };
-  }
-}
-
-/**
- * Export des matchs d'une édition
- */
-// actions/editions.ts
-
-/**
- * Export des matchs d'une édition
- * Formats: CSV, JSON, PDF
- */
-export async function exportEditionMatches(
-  editionId: string,
-  format: "csv" | "json" | "pdf",
-): Promise<{
-  success: boolean;
-  data?: string;
-  error?: string;
-  filename?: string;
-}> {
-  try {
-    // 🔒 sécurité critique
-    if (!editionId) {
-      throw new Error("editionId is required for export");
-    }
-
-    // 1. Récupérer les matchs
-    const matchesRes = await getMatchesWithParticipants({
-      filters: { editionId },
-      pagination: { page: 1, limit: 1000 },
-    });
-
-    return {
-      success: true,
-      data: JSON.stringify(matchesRes.data),
-      filename: `matches_${editionId}_${Date.now()}`,
-    };
-  } catch (error) {
-    console.error("Export matches failed:", error);
-    return { success: false, error: String(error) };
-  }
-}
-
-function getMatchStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    PENDING: "Programmé",
-    IN_PROGRESS: "En cours",
-    COMPLETED: "Terminé",
-    CANCELLED: "Annulé",
-    PENDING_REVIEW: "En attente",
-    AWAITING_ADMIN_CONFIRMATION: "Validation admin",
-    DISPUTED: "Litige",
-  };
-  return labels[status] || status;
-}
-
-// Ajouter dans actions/editions.ts
-
-export type ExportFormat = "csv" | "json" | "pdf" | "excel";
-
-export interface ExportMatchesFilters {
-  editionId: string;
-  phaseId?: string;
-  groupId?: string;
-  bracketNodeId?: string;
-  status?: string;
-  search?: string;
-  phaseName?: string;
-}
-
-/**
- * Export des matchs avec support des filtres et différents formats
- */
-export async function exportMatchesToFormat(
-  editionId: string,
-  format: ExportFormat,
-  filters?: ExportMatchesFilters,
-): Promise<{
-  success: boolean;
-  data?: string;
-  error?: string;
-  filename?: string;
-  count?: number;
-}> {
-  try {
-    // Construire les filtres
-    const matchFilters: any = { editionId };
-    if (filters?.phaseId) matchFilters.phaseId = filters.phaseId;
-    if (filters?.groupId) matchFilters.groupId = filters.groupId;
-    if (filters?.bracketNodeId)
-      matchFilters.bracketNodeId = filters.bracketNodeId;
-    if (filters?.status) matchFilters.statuses = [filters.status];
-    if (filters?.search) matchFilters.search = filters.search;
-
-    // Récupérer les matchs enrichis
-    const matchesRes = await getMatchesWithParticipants({
-      filters: matchFilters,
-      pagination: { page: 1, limit: 5000 },
-      options: { sortBy: "scheduledTime", sortOrder: "asc" },
-    });
-
-    return {
-      success: true,
-      data: JSON.stringify(matchesRes.data),
-      filename: `matches_${editionId}_${Date.now()}`,
-      count: matchesRes.pagination.total,
-    };
-  } catch (error) {
-    console.error("Export matches failed:", error);
-    return { success: false, error: String(error) };
-  }
-}
-
-/**
  * Récupère les meilleures statistiques individuelles pour une édition
  */
 export async function getEditionBestPlayersStats(editionId: string) {
@@ -1023,14 +818,16 @@ export async function getEditionBestPlayersStats(editionId: string) {
       },
     });
 
-    // On ne garde que les participants de cette édition (filtrer manuellement car relation complexe via groupes)
+    // On ne garde que les participants de cette édition (filtre manuel car
+    // la relation passe par groupe → phase).
     const validParticipants = participants.filter(
       (p) => p.group?.phase?.editionId === editionId,
     );
 
     if (validParticipants.length === 0) return null;
 
-    // Agréger les stats par registrationId (un joueur peut être dans plusieurs phases)
+    // Agréger les stats par registrationId (un joueur peut être dans
+    // plusieurs phases).
     const statsMap = new Map();
 
     validParticipants.forEach((p) => {
@@ -1079,78 +876,6 @@ export async function getEditionBestPlayersStats(editionId: string) {
   } catch (error) {
     console.error("Error getting best players stats:", error);
     return null;
-  }
-}
-
-/**
- * Export des classements (Standings)
- */
-export async function exportStandingsAction(
-  data: any[],
-  format: "pdf" | "csv" | "json" | "excel",
-  fileName: string,
-): Promise<{
-  success: boolean;
-  data?: string;
-  filename: string;
-  error?: string;
-}> {
-  try {
-    let resultData: string = "";
-    const timestamp = Date.now();
-    const fullFileName = `${fileName}_${timestamp}`;
-
-    if (format === "json") {
-      resultData = JSON.stringify(data, null, 2);
-      return {
-        success: true,
-        data: resultData,
-        filename: `${fullFileName}.json`,
-      };
-    }
-
-    if (format === "csv") {
-      const parser = new Parser();
-      resultData = parser.parse(data);
-      return {
-        success: true,
-        data: resultData,
-        filename: `${fullFileName}.csv`,
-      };
-    }
-
-    if (format === "excel") {
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Classement");
-      const excelBuffer = XLSX.write(workbook, {
-        bookType: "xlsx",
-        type: "base64",
-      });
-      return {
-        success: true,
-        data: excelBuffer,
-        filename: `${fullFileName}.xlsx`,
-      };
-    }
-
-    if (format === "pdf") {
-      // For PDF, we return JSON and handle it on client or a basic string
-      return {
-        success: true,
-        data: JSON.stringify(data),
-        filename: `${fullFileName}.pdf`,
-      };
-    }
-
-    return {
-      success: false,
-      filename: fullFileName,
-      error: "Format non supporté",
-    };
-  } catch (error: any) {
-    console.error("Export standings failed:", error);
-    return { success: false, filename: fileName, error: error.message };
   }
 }
 

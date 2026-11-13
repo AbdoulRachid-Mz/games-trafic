@@ -47,6 +47,7 @@ import { getShopStatsById, getShopLedgerStats } from "@/actions/shops";
 import { getShopOrderStats } from "@/actions/orders";
 import { getProductStats } from "@/actions/products";
 import { AdvancedChart } from "@/components/ui/advanced-chart";
+import { ShopExportButton } from "@/components/pages/shops/shop-export-button";
 import { useAuthContext } from "@/contexts/auth-context";
 import { Input } from "@/components/ui/input";
 import { transferBetweenIdentities } from "@/actions/wallets";
@@ -221,10 +222,7 @@ export default function ShopOverviewPage() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="sm" className="gap-2">
-            <Download className="h-4 w-4" />
-            Exporter
-          </Button>
+          <ShopExportButton shopId={params.shopId as string} />
 
           <Button variant="outline" size="sm" className="gap-2">
             <Filter className="h-4 w-4" />

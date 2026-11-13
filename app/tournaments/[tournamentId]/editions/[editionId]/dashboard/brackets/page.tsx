@@ -276,9 +276,10 @@ export default async function BracketsDashboardPage({
                   <Badge variant="secondary" className="text-[10px] uppercase">
                     {phaseTypeLabel(phase.phaseType)}
                   </Badge>
-                  <BracketExportButton 
-                    phase={phase} 
-                    nodes={nodes} 
+                  <BracketExportButton
+                    editionId={editionId}
+                    phase={phase}
+                    nodes={nodes}
                   />
                   <Button size="sm" variant="outline" asChild>
                     <Link

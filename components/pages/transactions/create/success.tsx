@@ -28,6 +28,7 @@ import {
 import { TransactionType, TransactionEntity } from "@/types/transaction-types";
 import { fireConfettiPreset } from "@/utils/confetti";
 import { generateEnhancedReceipt } from "@/utils/receipt-templates";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -146,10 +147,11 @@ export function TransactionSuccess({
   const TypeIcon = getTypeIcon();
 
   const handleDownloadReceipt = () => {
-    generateEnhancedReceipt({
+    void generateEnhancedReceipt({
       transactionId: transactionId || transactionReference,
       amount: transactionData.amount,
       type: transactionData.type,
+      status: isRequest ? "PENDING" : "COMPLETED",
       fees,
       totalAmount: totalAmount ?? transactionData.amount + fees,
       date: new Date(),
@@ -157,6 +159,8 @@ export function TransactionSuccess({
       newBalance,
       entityData: transactionData.entity,
       metadata: transactionData.metadata,
+    }).catch(() => {
+      toast.error("Impossible de générer le reçu pour le moment.");
     });
   };
 

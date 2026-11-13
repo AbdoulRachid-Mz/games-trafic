@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ShopExportButton } from "@/components/pages/shops/shop-export-button";
 import {
   Select,
   SelectContent,
@@ -149,11 +150,6 @@ export default function ShopProductsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleExport = () => {
-    // Logique d'export
-    toast.success("Export lancé");
-  };
-
   const filteredProducts = products.filter(product => {
     if (activeTab === "active") return product.isActive;
     if (activeTab === "inactive") return !product.isActive;
@@ -246,10 +242,7 @@ export default function ShopProductsPage() {
         </Tabs>
         
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
-            <Copy className="h-4 w-4" />
-            Exporter
-          </Button>
+          <ShopExportButton shopId={params.shopId as string} kind="products" />
           <Button variant="outline" size="sm" className="gap-2">
             <Filter className="h-4 w-4" />
             Plus de filtres

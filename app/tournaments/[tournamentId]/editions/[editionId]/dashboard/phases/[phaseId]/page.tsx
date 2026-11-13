@@ -1,7 +1,17 @@
 // app/tournaments/[tournamentId]/editions/[editionId]/dashboard/phases/[phaseId]/page.tsx
-import { getTournamentPhases } from "@/actions/phases";
-import { getPhaseGroups } from "@/actions/phases";
+import {
+  getBracketNodes,
+  getPhaseGroups,
+  getPhaseStandings,
+  getTournamentPhases,
+} from "@/actions/phases";
+import { getEditionRegistrations } from "@/actions/tournaments/members";
 import { getTournamentEditionById } from "@/actions/editions";
+import { computeBracketStandings } from "@/lib/tournaments/bracket-standings";
+import type {
+  BracketStandingRow,
+  StandingRow,
+} from "@/components/pages/tournaments/edition-detail/standings-table";
 import { PhaseDetailClient } from "./phase-detail-client";
 
 interface PageProps {
@@ -26,22 +36,78 @@ const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: s
 export default async function PhaseDetailPage({ params }: PageProps) {
   const { tournamentId, editionId, phaseId } = await params;
 
-  const [allPhasesRes, edition] = await Promise.all([
-    getTournamentPhases({
-      filters: { editionId },
-      options: { sortBy: "order", sortOrder: "asc" },
-    }),
-    getTournamentEditionById(editionId)
-  ]);
+  const [allPhasesRes, edition, groupsRes, phaseStandings, registrationsRes] =
+    await Promise.all([
+      getTournamentPhases({
+        filters: { editionId },
+        options: { sortBy: "order", sortOrder: "asc" },
+      }),
+      getTournamentEditionById(editionId),
+      getPhaseGroups({
+        filters: { phaseId },
+        options: { sortBy: "order", sortOrder: "asc" },
+        pagination: { page: 1, limit: 500 },
+      }),
+      getPhaseStandings(phaseId),
+      getEditionRegistrations({
+        filters: { editionId },
+        options: {
+          populate: ["member", "member.user", "member.team"],
+          sortBy: "registeredAt",
+          sortOrder: "asc",
+        },
+        pagination: { page: 1, limit: 1000 },
+      }),
+    ]);
 
   const allPhases = allPhasesRes.data;
   const phase = allPhases.find((p) => p.id === phaseId);
 
-  const groupsRes = await getPhaseGroups({
-    filters: { phaseId },
-    options: { sortBy: "order", sortOrder: "asc" },
-    pagination: { page: 1, limit: 500 },
-  });
+  const hasGroupStandings = phaseStandings.length > 0;
+
+  const registrations = registrationsRes.data ?? [];
+  const namesById = new Map<string, string>(
+    registrations.map((registration: any) => [
+      registration.id,
+      registration.member?.displayName ||
+        registration.member?.user?.username ||
+        registration.member?.user?.fullName ||
+        "Joueur",
+    ]),
+  );
+  const imagesById = new Map<string, string | undefined>(
+    registrations.map((registration: any) => [
+      registration.id,
+      registration.member?.user?.profileImage ||
+        registration.member?.user?.image ||
+        undefined,
+    ]),
+  );
+
+  const standingGroups = phaseStandings.map((group: any) => ({
+    ...group,
+    rows: (group.rows ?? []).map((row: any) => ({
+      ...row,
+      participantName: row.participantName || row.displayName,
+      participantImage: row.participantImage || row.avatar,
+    })) as StandingRow[],
+  }));
+
+  let bracketRows: BracketStandingRow[] = [];
+  if (!hasGroupStandings) {
+    const nodesRes = await getBracketNodes({
+      filters: { phaseId },
+      options: { sortBy: "round", sortOrder: "asc" },
+      pagination: { page: 1, limit: 500 },
+    });
+
+    bracketRows = computeBracketStandings(nodesRes.data ?? [], namesById).map(
+      (row) => ({
+        ...row,
+        participantImage: imagesById.get(row.registrationId),
+      }),
+    );
+  }
 
   const basePath = `/tournaments/${tournamentId}/editions/${editionId}/dashboard`;
   const typeConf = phaseTypeConfig[phase?.phaseType || ""] || phaseTypeConfig.CUSTOM;
@@ -57,6 +123,9 @@ export default async function PhaseDetailPage({ params }: PageProps) {
       basePath={basePath}
       typeConf={typeConf}
       editionConfig={(edition?.editionConfig as any) || {}}
+      standings={standingGroups}
+      bracketRows={bracketRows}
+      registrations={registrations}
     />
   );
 }

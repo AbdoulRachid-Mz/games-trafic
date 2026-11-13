@@ -13,6 +13,7 @@ import { canSkipWelcome } from "@/lib/routes/safe-redirect";
 import type { UserRoles, ResolvedRoute } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
+import { useAppShellStore } from "@/stores/app-shell-store";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { PulseLoading } from "../loading-ui/pulse-loader";
@@ -172,7 +173,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return resolveRoute(pathname, userRoles);
   }, [pathname, userRoles]);
 
-  // Gestion des annonces (différée et non-bloquante)
+  // Synchronise l'état de la route dans le store global AppShell
+  useEffect(() => {
+    if (!resolved) return;
+    const store = useAppShellStore.getState();
+    if (resolved.layout === "none") {
+      store.resetForNoneLayout();
+    }
+    store.syncRoute(resolved, userRoles);
+  }, [resolved, userRoles]);
+
+  // Synchronise le scroll global
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const store = useAppShellStore.getState();
+      store.setScroll({
+        scrollY: y,
+        isScrolled: y > 10,
+        scrollDirection: y > lastY ? "down" : y < lastY ? "up" : "none",
+      });
+      lastY = y;
+    };
+    const onResize = () => {
+      useAppShellStore.getState().setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize);
+    onResize();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
   useEffect(() => {
     if (
       !authLoading &&

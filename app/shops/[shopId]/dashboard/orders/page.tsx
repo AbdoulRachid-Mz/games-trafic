@@ -32,6 +32,7 @@ import { getOrdersByShopId, approveOrderShop, rejectOrder } from "@/actions/orde
 import { getProductById } from "@/actions/products";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useOrdersByShopId } from "@/hooks/use-orders";
+import { ShopExportButton } from "@/components/pages/shops/shop-export-button";
 import Image from "next/image";
 
 type UiOrder = {
@@ -156,13 +157,16 @@ export default function ShopOrdersPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <Typography variant="h1" weight="bold" className="mb-2">
-          Commandes de la boutique
-        </Typography>
-        <Typography variant="body-base" theme="muted">
-          Filtrer, rechercher et approuver les commandes
-        </Typography>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <Typography variant="h1" weight="bold" className="mb-2">
+            Commandes de la boutique
+          </Typography>
+          <Typography variant="body-base" theme="muted">
+            Filtrer, rechercher et approuver les commandes
+          </Typography>
+        </div>
+        <ShopExportButton shopId={shopId} kind="orders" />
       </div>
 
       <Card className="bg-card/40 backdrop-blur-xl border-border/50">

@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Tournament, TournamentEditionWithRelations } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
+import { useAppShellStore } from "@/stores/app-shell-store";
 import { useRouter } from "next/navigation";
 import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,9 @@ export function EditionDetailHeader({
       toast.error(error?.message || "Impossible de supprimer l'édition");
     }
   };
+
+  const topMiddle = useAppShellStore((s) => s.topMiddle);
+  const stickyTop = topMiddle.visible ? topMiddle.height : 0;
 
   // ─── Compact sticky header detection ─────────────────────────────────────
   // When the hero banner scrolls out of view, we show a compact edition info
@@ -449,13 +453,29 @@ export function EditionDetailHeader({
                     <Button
                       variant="ghost"
                       className="h-11 w-full justify-start gap-3 font-medium"
-                      onClick={() => {
-                        setShowActions(false);
-                        void handleShare();
-                      }}
+                      asChild
                     >
-                      <Share2 className="h-4 w-4" />
-                      Partager l&apos;édition
+                      <Link
+                        href={`/tournaments/${tournament.id}/editions/${edition.id}/dashboard/matches`}
+                        onClick={() => setShowActions(false)}
+                      >
+                        <Swords className="h-4 w-4" />
+                        Voir tous les matchs
+                      </Link>
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      className="h-11 w-full justify-start gap-3 font-medium"
+                      asChild
+                    >
+                      <Link
+                        href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}
+                        onClick={() => setShowActions(false)}
+                      >
+                        <Calendar className="h-4 w-4" />
+                        Voir le calendrier complet
+                      </Link>
                     </Button>
 
                     <div className="flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium hover:bg-accent">
@@ -536,7 +556,7 @@ export function EditionDetailHeader({
       </div>
 
       {/* 3. COMPETITION TABS NAVIGATION BAR — sticky avec compact header */}
-      <div className="sticky top-0 z-30">
+      <div className="sticky z-30" style={{ top: stickyTop }}>
         {/* ── Compact edition info bar (visible seulement quand le hero est scrollé) */}
         <AnimatePresence>
           {isCompact && (

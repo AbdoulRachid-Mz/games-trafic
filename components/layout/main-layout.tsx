@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { Suspense, useState, useCallback } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import Footer from "./footer";
 import { LeftBar } from "./left-bar";
 import { RightBar } from "./right-bar";
@@ -15,6 +15,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { QrTransaction } from "@/components/pages/transactions/qr-transaction";
 import OnTapPopup from "../auth/on-tap-popup";
 import { useNetworkStatus } from "@/hooks/network-status";
+import { useAppShellStore } from "@/stores/app-shell-store";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -56,6 +57,14 @@ export function MainLayout({
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+
+  // Synchronise l'état d'ouverture des sidebars dans le store AppShell
+  useEffect(() => {
+    useAppShellStore.getState().setLeftOpen(leftOpen);
+  }, [leftOpen]);
+  useEffect(() => {
+    useAppShellStore.getState().setRightOpen(rightOpen);
+  }, [rightOpen]);
 
   const topPadding =
     topMiddle && !shouldExcludeContainer && breadcrumbs

@@ -6,8 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Settings2, Users, Swords, ChevronLeft, PlusCircle, RefreshCcw, AlertTriangle } from "lucide-react";
+import { Settings2, Users, Swords, ChevronLeft, PlusCircle, RefreshCcw, AlertTriangle, Trophy } from "lucide-react";
 import type { TournamentPhase, PhaseGroup } from "@/database/schema";
+import {
+  StandingsTable,
+  type BracketStandingRow,
+  type StandingGroup,
+} from "@/components/pages/tournaments/edition-detail/standings-table";
 import { PhaseDetailActions } from "@/components/pages/tournaments/edition-detail/phase-detail-actions";
 import { GroupItemActions } from "@/components/pages/tournaments/edition-detail/group-item-actions";
 import { CreateGroupDialog } from "@/components/pages/tournaments/edition-detail/create-group-dialog";
@@ -44,6 +49,11 @@ interface PhaseDetailClientProps {
     competitionMode?: "AUTO" | "MANUAL";
     [key: string]: any;
   };
+  /** Classements de phase calculés côté serveur (groupes/journées). */
+  standings?: StandingGroup[];
+  /** Repli bracket/élimination quand la phase n'a pas de groupes. */
+  bracketRows?: BracketStandingRow[];
+  registrations?: any[];
 }
 
 const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -66,7 +76,10 @@ export function PhaseDetailClient({
   allPhases, 
   basePath, 
   typeConf,
-  editionConfig 
+  editionConfig,
+  standings = [],
+  bracketRows = [],
+  registrations = [],
 }: PhaseDetailClientProps) {
 
   const isAutoMode = editionConfig.competitionMode === "AUTO";
@@ -324,6 +337,49 @@ export function PhaseDetailClient({
           )}
         </CardContent>
       </Card>
+
+      {/* Classement de la phase (groupes/journées) ou repli bracket */}
+      {(standings.length > 0 || bracketRows.length > 0) && (
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader className="flex flex-row items-center gap-3 border-b py-5 px-4">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Trophy className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Classement de la phase</CardTitle>
+              <Typography variant="caption1" theme="muted" className="mt-0.5">
+                {standings.length > 0
+                  ? "Statistiques calculées par le moteur officiel de classement."
+                  : "Participants classés selon leur progression dans le bracket."}
+              </Typography>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3">
+            {standings.length > 0 ? (
+              <StandingsTable
+                mode="group"
+                groups={standings}
+                registrations={registrations}
+                title=""
+                showFilter
+                editionId={editionId}
+                phaseId={phaseId}
+                phaseName={phase?.name ?? undefined}
+              />
+            ) : (
+              <StandingsTable
+                mode="bracket"
+                bracketRows={bracketRows}
+                registrations={registrations}
+                title=""
+                editionId={editionId}
+                phaseId={phaseId}
+                phaseName={phase?.name ?? undefined}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <DynamicActionMenu 
         floatingLabel="Actions"

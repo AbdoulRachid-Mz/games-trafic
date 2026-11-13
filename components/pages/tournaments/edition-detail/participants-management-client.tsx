@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { User as UserIcon, Phone, MessageCircle, Plus, Trash2 } from "lucide-react";
+import { User as UserIcon, Phone, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ParticipantRowActions } from "@/components/pages/tournaments/edition-detail/participant-row-actions";
 import { AddParticipantForm } from "@/components/pages/tournaments/edition-detail/add-participant-dialog";
@@ -25,8 +25,10 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { FileDown, Search, Download, FileJson, FileText, FileSpreadsheet, Settings2 } from "lucide-react";
-import { exportToCSV, exportToJSON, exportToPDF } from "@/lib/utils/member-export-utils";
+import { Search, FileText, FileSpreadsheet, Settings2 } from "lucide-react";
+import { getEditionParticipantsDocument } from "@/actions/documents";
+import { downloadDocument } from "@/lib/documents/engine";
+import type { DocumentFormat } from "@/lib/documents/types";
 import { DynamicActionMenu, MenuItemAction } from "@/components/shared/dynamic-action-menu";
 import Link from "next/link";
 
@@ -47,6 +49,7 @@ export function ParticipantsManagementClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [search, setSearch] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const filteredParticipants = participants.filter(p => {
     const name = (p.member.displayName || p.member.user?.username || "").toLowerCase();
@@ -54,20 +57,26 @@ export function ParticipantsManagementClient({
     return name.includes(search.toLowerCase()) || team.includes(search.toLowerCase());
   });
 
-  const handleExport = (format: 'csv' | 'json' | 'pdf') => {
-    const exportData = {
-      appName: "Games-Trafics",
-      appContact: "contact@gamestrafics.com | +221 78 274 40 23",
-      editionName: "Édition de tournoi", // Idéalement passer le nom de l'édition
-      members: participants.map(p => ({
-        ...p.member,
-        joinedAt: p.registeredAt
-      }))
-    };
-
-    if (format === 'csv') exportToCSV(exportData);
-    if (format === 'json') exportToJSON(exportData);
-    if (format === 'pdf') exportToPDF(exportData);
+  // Export serveur : données, mise en page et autorisations côté serveur.
+  const handleExport = async (format: DocumentFormat) => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const result = await getEditionParticipantsDocument(editionId);
+      if (!result.success || !result.document) {
+        toast.error(result.error || "Erreur lors de l'export");
+        return;
+      }
+      await downloadDocument(result.document, format);
+      const count = result.document.meta.totalRecords ?? 0;
+      toast.success(`Export ${format.toUpperCase()} réussi`, {
+        description: `${count} participant(s) exporté(s)`,
+      });
+    } catch (error: any) {
+      toast.error(error?.message || "Erreur lors de l'export");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Bulk Actions
@@ -140,7 +149,7 @@ export function ParticipantsManagementClient({
       label: "Exporter en PDF",
       icon: FileText,
       variant: "outline",
-      onClick: () => handleExport('pdf')
+      onClick: () => void handleExport("pdf")
     },
     {
       id: "export-csv",
@@ -149,7 +158,7 @@ export function ParticipantsManagementClient({
       label: "Exporter en CSV",
       icon: FileSpreadsheet,
       variant: "outline",
-      onClick: () => handleExport('csv')
+      onClick: () => void handleExport("csv")
     }
   ];
 
@@ -191,8 +200,8 @@ export function ParticipantsManagementClient({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-[720px]">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="w-[50px] px-6">

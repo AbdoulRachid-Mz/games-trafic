@@ -352,6 +352,7 @@ export function EditionPageContent({
           {activeTab === "standings" && (
             <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-3 md:p-6 shadow-xl">
               <EditionStandingsTab
+                editionId={edition.id}
                 activePhaseId={activePhaseId}
                 registrations={edition.registrations || []}
                 currentRegistrationId={currentUserRegistration?.id}

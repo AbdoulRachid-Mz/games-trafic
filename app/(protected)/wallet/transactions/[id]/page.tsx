@@ -148,19 +148,25 @@ export default function TransactionDetailPage() {
       return;
     }
 
-    generateEnhancedReceipt({
+    const amount = parseFloat(transaction.amount);
+    const fees = parseFloat(transaction.fees || "0");
+
+    void generateEnhancedReceipt({
       transactionId: transaction.id,
-      amount: parseFloat(transaction.amount),
+      amount,
       type: transaction.type as any,
-      fees: parseFloat(transaction.fees || "0"),
-      totalAmount: parseFloat(transaction.netAmount),
-      date: transaction.createdAt
-        ? new Date(transaction.createdAt)
-        : new Date(),
+      status: transaction.status ?? "PENDING",
+      fees,
+      netAmount: parseFloat(transaction.netAmount),
+      currency: transaction.currency ?? "GTC",
+      totalAmount: amount + fees,
+      date: new Date(transaction.createdAt ?? Date.now()),
       reference: `TX-${transaction.id.slice(-8)}`,
       newBalance: parseFloat(transaction.balanceAfter),
       entityData: (transaction.metadata as Record<string, any>)?.entity,
       metadata: transaction.metadata as Record<string, any> | undefined,
+    }).catch(() => {
+      toast.error("Impossible de générer le reçu pour le moment.");
     });
   };
 

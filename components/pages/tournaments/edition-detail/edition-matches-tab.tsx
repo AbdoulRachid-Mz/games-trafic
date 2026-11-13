@@ -45,7 +45,9 @@ import { StatsCarousel } from "@/components/shared/stats-carousel";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { toast } from "sonner";
-import { exportMatchesToFormat } from "@/actions/editions";
+import { getEditionMatchesDocument } from "@/actions/documents";
+import { downloadDocument } from "@/lib/documents/engine";
+import type { DocumentFormat } from "@/lib/documents/types";
 import { useMatchList, useEditionMatchStats } from "@/hooks/use-match-manager";
 import { useUserRegistration } from "@/hooks/use-editions";
 import { MatchCard } from "@/components/cards/match-card";
@@ -137,46 +139,34 @@ export function EditionMatchesTab({
     hasNext: false,
   };
 
-  // Export
+  // Export — données et autorisations construites côté serveur.
   const handleExport = useCallback(
-    async (format: "csv" | "json" | "pdf" | "excel", scope: "all" | "my") => {
+    async (format: DocumentFormat) => {
       setIsExporting(true);
       try {
-        const { exportData: exportToFormat, createExportData } =
-          await import("@/utils/export-utils");
-
-        const filters: any = { editionId };
+        const filters: { phaseId?: string; status?: string } = {};
         if (activePhaseId) filters.phaseId = activePhaseId;
-        if (statusFilter !== "ALL") filters.statuses = [statusFilter];
-        if (scope === "my" && userReg?.id)
-          filters.memberRegistrationId = userReg.id;
+        if (statusFilter !== "ALL") filters.status = statusFilter;
 
-        const result = await exportMatchesToFormat(editionId, format, filters);
+        const result = await getEditionMatchesDocument(editionId, filters);
 
-        if (result.success && result.data) {
-          const rawData = JSON.parse(result.data);
-          const config = {
-            filename: result.filename || `matches_${scope}_${editionId}`,
-            title: scope === "my" ? "Mes matchs" : "Tous les matchs",
-            subtitle: `Édition: ${editionId.slice(0, 8)}`,
-          };
-
-          const tableData = createExportData(rawData, "matches");
-          await exportToFormat(format, tableData, config);
-
-          toast.success(`Export ${format.toUpperCase()} réussi`, {
-            description: `${result.count || rawData.length} matchs exportés`,
-          });
-        } else {
+        if (!result.success || !result.document) {
           toast.error(result.error || "Erreur lors de l'export");
+          return;
         }
+
+        await downloadDocument(result.document, format);
+        const count = result.document.meta.totalRecords ?? 0;
+        toast.success(`Export ${format.toUpperCase()} réussi`, {
+          description: `${count} match(s) exporté(s)`,
+        });
       } catch (error: any) {
-        toast.error(error.message || "Erreur lors de l'export");
+        toast.error(error?.message || "Erreur lors de l'export");
       } finally {
         setIsExporting(false);
       }
     },
-    [editionId, activePhaseId, statusFilter, userReg],
+    [editionId, activePhaseId, statusFilter],
   );
 
   const matchStats = [
@@ -338,19 +328,19 @@ export function EditionMatchesTab({
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => handleExport("excel", "all")}
+                onClick={() => void handleExport("xlsx")}
                 className="rounded-lg gap-2 cursor-pointer font-bold"
               >
                 <div className="h-2 w-2 rounded-full bg-green-500" /> Excel
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleExport("pdf", "all")}
+                onClick={() => void handleExport("pdf")}
                 className="rounded-lg gap-2 cursor-pointer font-bold"
               >
                 <div className="h-2 w-2 rounded-full bg-red-500" /> PDF
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleExport("csv", "all")}
+                onClick={() => void handleExport("csv")}
                 className="rounded-lg gap-2 cursor-pointer font-bold"
               >
                 <div className="h-2 w-2 rounded-full bg-blue-500" /> CSV

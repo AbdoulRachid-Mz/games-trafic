@@ -30,7 +30,8 @@ import Image from "next/image";
 import { MatchesDashboardFilters } from "@/components/pages/tournaments/edition-detail/matches-dashboard-filters";
 import { ExportMatchesButton } from "@/components/pages/tournaments/edition-detail/export-matches-button";
 import { useQuery } from "@tanstack/react-query";
-import { getTournamentPhases, getMatches, getEditionDetailTree } from "@/actions/tournaments";
+import { getTournamentPhases, getEditionDetailTree } from "@/actions/tournaments";
+import { getMatchesWithParticipants } from "@/actions/phases";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
@@ -270,7 +271,7 @@ export default function MatchesDashboardPage({ params }: { params: { tournamentI
   
   const { data: matchesRes, isLoading: matchesLoading } = useQuery({
     queryKey: ["matches", editionId, phaseId, groupId, bracketNodeId, status, search, currentPage],
-    queryFn: () => getMatches({
+    queryFn: () => getMatchesWithParticipants({
       filters: { 
         editionId, 
         phaseId,

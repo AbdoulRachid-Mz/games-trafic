@@ -37,6 +37,7 @@ import { useAuthContext } from "@/contexts/auth-context";
 import { useUserProfile } from "@/hooks/use-profile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
+import { useAppShellStore } from "@/stores/app-shell-store";
 import { AlignLeftIcon } from "../icons/align-left";
 
 interface TopMiddleProps {
@@ -72,6 +73,38 @@ const TopMiddle = ({
   const isDark = theme === "dark";
 
   const headerRef = useRef<HTMLDivElement>(null);
+  const breadcrumbRef = useRef<HTMLDivElement>(null);
+
+  // Synchronise les mesures et la visibilité réelles dans le store AppShell
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const store = useAppShellStore.getState();
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const cr = breadcrumbRef.current?.getBoundingClientRect();
+      store.setTopMiddle({
+        visible: isVisible,
+        height: rect.height,
+        top: rect.top,
+        bottom: rect.bottom,
+        zIndex: 50,
+      });
+      store.setBreadcrumbs({
+        enabled: !!breadcrumbItems && breadcrumbItems.length > 0,
+        visible: !!breadcrumbItems && breadcrumbItems.length > 0,
+        height: cr ? cr.height : 0,
+        top: cr ? cr.top : 0,
+        bottom: cr ? cr.bottom : 0,
+        zIndex: 40,
+      });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    if (breadcrumbRef.current) ro.observe(breadcrumbRef.current);
+    return () => ro.disconnect();
+  }, [isVisible, breadcrumbItems]);
 
   // Track scroll direction and update visibility
   useMotionValueEvent(scrollY, "change", (latest) => {
@@ -333,6 +366,7 @@ const TopMiddle = ({
       {/* Breadcrumbs */}
       {breadcrumbItems && breadcrumbItems.length > 0 && (
         <motion.div
+          ref={breadcrumbRef}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}

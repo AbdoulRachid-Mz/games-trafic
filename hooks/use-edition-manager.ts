@@ -3,9 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getEditionMatchStats } from "@/actions/phases";
 import {
-  exportEditionParticipants,
-  exportEditionMatches,
-} from "@/actions/editions";
+  getEditionMatchesDocument,
+  getEditionParticipantsDocument,
+} from "@/actions/documents";
+import { downloadDocument } from "@/lib/documents/engine";
+import type { DocumentFormat } from "@/lib/documents/types";
 import { updateEdition } from "@/actions/editions";
 import type { NewTournamentEdition } from "@/database/schema";
 
@@ -75,24 +77,13 @@ export function useEditionManager(editionId: string, tournamentId?: string) {
 
   // ---- EXPORT PARTICIPANTS ----
   const exportParticipants = useMutation({
-    mutationFn: async (format: "csv" | "json" | "pdf" | "excel") => {
-      const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
-      
-      const result = await exportEditionParticipants(editionId, format as any);
-      if (!result.success || !result.data) {
+    mutationFn: async (format: DocumentFormat) => {
+      const result = await getEditionParticipantsDocument(editionId);
+      if (!result.success || !result.document) {
         throw new Error(result.error || "Erreur lors de l'export");
       }
-
-      const rawData = JSON.parse(result.data);
-      const config = {
-        filename: result.filename || `participants_${editionId}`,
-        title: "Liste des participants",
-      };
-
-      const tableData = createExportData(rawData, "tournamentMembers");
-      await exportToFormat(format as any, tableData, config);
-
-      return result;
+      await downloadDocument(result.document, format);
+      return result.document.meta.totalRecords ?? 0;
     },
     onSuccess: (_, format) => {
       toast.success(`Export participants (${format.toUpperCase()}) téléchargé`);
@@ -104,24 +95,13 @@ export function useEditionManager(editionId: string, tournamentId?: string) {
 
   // ---- EXPORT MATCHES ----
   const exportMatches = useMutation({
-    mutationFn: async (format: "csv" | "json" | "pdf" | "excel") => {
-      const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
-
-      const result = await exportEditionMatches(editionId, format as any);
-      if (!result.success || !result.data) {
+    mutationFn: async (format: DocumentFormat) => {
+      const result = await getEditionMatchesDocument(editionId);
+      if (!result.success || !result.document) {
         throw new Error(result.error || "Erreur lors de l'export");
       }
-
-      const rawData = JSON.parse(result.data);
-      const config = {
-        filename: result.filename || `matches_${editionId}`,
-        title: "Calendrier des matchs",
-      };
-
-      const tableData = createExportData(rawData, "matches");
-      await exportToFormat(format as any, tableData, config);
-
-      return result;
+      await downloadDocument(result.document, format);
+      return result.document.meta.totalRecords ?? 0;
     },
     onSuccess: (_, format) => {
       toast.success(`Export matchs (${format.toUpperCase()}) téléchargé`);

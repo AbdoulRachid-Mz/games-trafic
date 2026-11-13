@@ -107,7 +107,7 @@ export function MatchControlClient({
   const isSubmittedByAdmin = match.submittedByUserId && !isSubmittedByParticipant1 && !isSubmittedByParticipant2;
   
   // Déterminer si l'utilisateur peut soumettre un résultat
-  const canSubmitResult = !isMatchCompleted && (isParticipant || isAdmin);
+  const canSubmitResult = (isParticipant || isAdmin) && (!isMatchCompleted || (isAdmin && adminForceEdit));
   
   // Déterminer si l'utilisateur peut confirmer/admin valider
   const canConfirmMatch = isAdmin && !isMatchCompleted;
@@ -414,7 +414,7 @@ export function MatchControlClient({
         </CardContent>
 
         {/* Bouton de soumission pour les participants */}
-        {canSubmitResult && !isMatchCompleted && (
+        {canSubmitResult && (
           <CardFooter className="bg-primary/5 border-t border-primary/10 py-4">
             <Button
               onClick={onSubmitResult}
@@ -450,7 +450,7 @@ export function MatchControlClient({
                 variant="default"
               >
                 <Button
-                  disabled={isPending || isMatchCompleted}
+                  disabled={isPending || (isMatchCompleted && !adminForceEdit)}
                   className="flex-1 min-w-[200px] h-11 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-500/20"
                 >
                   {isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

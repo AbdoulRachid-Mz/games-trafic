@@ -57,7 +57,9 @@ import { useMatchList, useMyMatches } from "@/hooks/use-match-manager";
 import { useEditionDetailTree } from "@/hooks/use-tournament-editions";
 import { useEdition } from "@/hooks/use-editions";
 import { useIsUserTournamentOrganizer } from "@/hooks/use-tournaments";
-import { exportMatchesToFormat } from "@/actions/editions";
+import { getEditionMatchesDocument } from "@/actions/documents";
+import { downloadDocument } from "@/lib/documents/engine";
+import type { DocumentFormat } from "@/lib/documents/types";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -646,44 +648,28 @@ export function EditionMatchesClient({
 
   const isLoading = isLoadingTree || isLoadingPhases || isLoadingMatches;
 
-  // Export handlers
+  // Export — données et autorisations construites côté serveur.
   const handleExport = useCallback(
-    async (
-      format: "csv" | "json" | "pdf" | "excel",
-      scope: "all" | "phase",
-    ) => {
+    async (format: DocumentFormat, scope: "all" | "phase") => {
       try {
-        const { exportData: exportToFormat, createExportData } =
-          await import("@/utils/export-utils");
-
-        const filters: any = { editionId };
+        const filters: { phaseId?: string } = {};
         if (scope === "phase" && selectedPhaseId !== "all") {
           filters.phaseId = selectedPhaseId;
         }
 
-        const result = await exportMatchesToFormat(editionId, format, filters);
-        if (result.success && result.data) {
-          const rawData = JSON.parse(result.data);
-          const config = {
-            filename: result.filename || `matches_${scope}_${editionId}`,
-            title:
-              scope === "phase"
-                ? `Matchs - Phase ${selectedPhaseId}`
-                : "Tous les matchs",
-            subtitle: `Édition: ${editionId.slice(0, 8)}`,
-          };
-
-          const tableData = createExportData(rawData, "matches");
-          await exportToFormat(format, tableData, config);
-
-          toast.success(`Export ${format.toUpperCase()} réussi`, {
-            description: `${result.count || rawData.length} matchs exportés`,
-          });
-        } else {
+        const result = await getEditionMatchesDocument(editionId, filters);
+        if (!result.success || !result.document) {
           toast.error(result.error || "Erreur lors de l'export");
+          return;
         }
+
+        await downloadDocument(result.document, format);
+        const count = result.document.meta.totalRecords ?? 0;
+        toast.success(`Export ${format.toUpperCase()} réussi`, {
+          description: `${count} match(s) exporté(s)`,
+        });
       } catch (error: any) {
-        toast.error(error.message || "Erreur lors de l'export");
+        toast.error(error?.message || "Erreur lors de l'export");
       }
     },
     [editionId, selectedPhaseId],
@@ -784,39 +770,41 @@ export function EditionMatchesClient({
             </Button>
           </div>
 
-          {/* Export button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 border-white/10 bg-card/60 text-xs font-bold rounded-xl h-8">
-                <Download className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Exporter</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-xl border-white/10">
-              <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Format d&apos;export</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem onClick={() => handleExport("excel", "all")} className="text-xs font-medium cursor-pointer">
-                <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" /> Excel - Tous les matchs
-              </DropdownMenuItem>
-              {selectedPhaseId !== "all" && (
-                <DropdownMenuItem
-                  onClick={() => handleExport("excel", "phase")}
-                  className="text-xs font-medium cursor-pointer"
-                >
-                  <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" /> Excel - Phase active
+          {/* Export button — réservé aux organisateurs (vérifié aussi serveur) */}
+          {isOrganizer && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 border-white/10 bg-card/60 text-xs font-bold rounded-xl h-8">
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Exporter</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-xl border-white/10">
+                <DropdownMenuLabel className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Format d&apos;export</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={() => void handleExport("xlsx", "all")} className="text-xs font-medium cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" /> Excel - Tous les matchs
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => handleExport("csv", "all")} className="text-xs font-medium cursor-pointer">
-                <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-400" /> CSV - Tous les matchs
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("json", "all")} className="text-xs font-medium cursor-pointer">
-                <FileJson className="h-4 w-4 mr-2 text-amber-400" /> JSON
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf", "all")} className="text-xs font-medium cursor-pointer">
-                <FileText className="h-4 w-4 mr-2 text-red-400" /> PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {selectedPhaseId !== "all" && (
+                  <DropdownMenuItem
+                    onClick={() => void handleExport("xlsx", "phase")}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2 text-emerald-400" /> Excel - Phase active
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => void handleExport("csv", "all")} className="text-xs font-medium cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4 mr-2 text-blue-400" /> CSV - Tous les matchs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleExport("json", "all")} className="text-xs font-medium cursor-pointer">
+                  <FileJson className="h-4 w-4 mr-2 text-amber-400" /> JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleExport("pdf", "all")} className="text-xs font-medium cursor-pointer">
+                  <FileText className="h-4 w-4 mr-2 text-red-400" /> PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

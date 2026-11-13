@@ -40,6 +40,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getShopClients } from "@/actions/shops";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ShopExportButton } from "@/components/pages/shops/shop-export-button";
 import { toast } from "sonner";
 
 export default function ShopClientsPage() {
@@ -102,6 +103,7 @@ export default function ShopClientsPage() {
           <Badge variant="outline" className="px-3 py-1 text-sm font-medium">
             {clients.length} Clients au total
           </Badge>
+          <ShopExportButton shopId={shopId} kind="clients" />
         </div>
       </div>
 

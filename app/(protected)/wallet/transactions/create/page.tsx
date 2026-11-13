@@ -729,18 +729,25 @@ function CreateTransactionContent({
     // Confetti : lancé par TransactionSuccess au montage du succès —
     // ne pas en tirer un second ici.
 
-    generateEnhancedReceipt({
+    const serverAmount = parseFloat(transaction.amount ?? String(transactionData.amount));
+    const serverFees = parseFloat(transaction.fees || "0");
+
+    void generateEnhancedReceipt({
       transactionId: transaction.id,
-      amount: transactionData.amount,
+      amount: serverAmount,
       type: transactionData.type,
-      fees: feesObj.amount,
-      totalAmount: feesObj.totalAmount,
-      date: new Date(),
+      status: transaction.status ?? "COMPLETED",
+      fees: serverFees,
+      netAmount: parseFloat(transaction.netAmount),
+      currency: transaction.currency ?? "GTC",
+      totalAmount: serverAmount + serverFees,
+      date: new Date(transaction.createdAt ?? Date.now()),
       reference: `TX-${transaction.id.slice(-8)}`,
-      newBalance:
-        parseFloat(completeData.ledgerBalance || "0") - feesObj.totalAmount,
+      newBalance: parseFloat(transaction.balanceAfter),
       entityData: transactionData.entity,
       metadata: transactionData.metadata,
+    }).catch(() => {
+      toast.error("La transaction est réussie, mais le reçu n'a pas pu être généré.");
     });
 
     toast.success("Transaction effectuée !");

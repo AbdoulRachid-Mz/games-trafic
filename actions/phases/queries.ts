@@ -50,6 +50,7 @@ import {
   isMatchCountable,
 } from "@/lib/tournaments/scoring";
 import { getEffectiveAdvanceCount } from "@/lib/tournaments/config";
+import { computeEditionStandings } from "@/lib/tournaments/edition-standings";
 
 
 export async function getTournamentPhaseById(
@@ -558,6 +559,136 @@ export async function getPhaseStandings(phaseId: string) {
     }));
   } catch (error) {
     console.error("Error fetching phase standings:", error);
+    throw error;
+  }
+}
+
+/**
+ * Classement GLOBAL d'une édition (toutes phases confondues).
+ *
+ * ⚠️ Aucun recalcul côté client : les statistiques proviennent des matches
+ * décomptables de l'édition et des moteurs officiels
+ * (`syncStandingsWithMatches` + `rankParticipants`).
+ */
+export interface EditionStandingViewRow {
+  registrationId: string;
+  position: number;
+  points: number;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesDrawn: number;
+  matchesLost: number;
+  scoreFor: number;
+  scoreAgainst: number;
+  scoreDifference: number;
+  displayName: string;
+  avatar?: string | null;
+  teamName?: string | null;
+  teamLogo?: string | null;
+  status?: string | null;
+  qualified?: boolean;
+}
+
+export async function getEditionStandings(
+  editionId: string,
+): Promise<{
+  editionId: string;
+  editionName: string;
+  tournamentName: string;
+  rows: EditionStandingViewRow[];
+} | null> {
+  try {
+    const edition = await db.query.tournamentEditions.findFirst({
+      where: eq(tournamentEditions.id, editionId),
+      with: {
+        tournament: { columns: { name: true, game: true } },
+        registrations: {
+          where: and(eq(editionRegistrations.isDeleted, false)),
+          with: {
+            member: {
+              with: {
+                user: {
+                  columns: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    profileImage: true,
+                    image: true,
+                  },
+                },
+                team: { columns: { id: true, name: true, logo: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!edition) return null;
+
+    const registrations = edition.registrations ?? [];
+    const participantIds = registrations.map((registration: any) => registration.id);
+
+    const editionMatches = await db.query.matches.findMany({
+      where: and(
+        eq(matches.editionId, editionId),
+        eq(matches.isDeleted, false),
+      ),
+    });
+    const countableMatches = editionMatches.filter(isMatchCountable);
+
+    const editionConfig = (edition.editionConfig as any) || {};
+    const scoring = resolveScoring(editionConfig, null);
+    const tiebreakerOverride = Array.isArray(editionConfig.tiebreakerRules)
+      ? { tiebreakerRules: editionConfig.tiebreakerRules as string[] }
+      : {};
+
+    const ranked = computeEditionStandings(
+      participantIds,
+      countableMatches as any,
+      { ...scoring, ...tiebreakerOverride },
+    );
+
+    const registrationById = new Map<string, any>(
+      registrations.map((registration: any) => [registration.id, registration]),
+    );
+
+    const rows: EditionStandingViewRow[] = ranked.map((entry) => {
+      const registration = registrationById.get(entry.registrationId);
+      const member = registration?.member;
+      const user = member?.user;
+      const team = member?.team;
+      return {
+        registrationId: entry.registrationId,
+        position: entry.position,
+        points: entry.stats.points,
+        matchesPlayed: entry.stats.matchesPlayed,
+        matchesWon: entry.stats.matchesWon,
+        matchesDrawn: entry.stats.matchesDrawn,
+        matchesLost: entry.stats.matchesLost,
+        scoreFor: entry.stats.scoreFor,
+        scoreAgainst: entry.stats.scoreAgainst,
+        scoreDifference: entry.stats.scoreDifference,
+        displayName:
+          member?.displayName ||
+          user?.username ||
+          user?.fullName ||
+          "Anonyme",
+        avatar: user?.profileImage || user?.image || null,
+        teamName: team?.name ?? null,
+        teamLogo: team?.logo ?? null,
+        status: registration?.status ?? null,
+      };
+    });
+
+    return {
+      editionId,
+      editionName:
+        edition.name || `Édition ${edition.editionNumber}`,
+      tournamentName: edition.tournament?.name ?? "",
+      rows,
+    };
+  } catch (error) {
+    console.error("Error fetching edition standings:", error);
     throw error;
   }
 }

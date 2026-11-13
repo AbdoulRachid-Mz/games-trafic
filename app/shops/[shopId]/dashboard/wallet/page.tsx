@@ -17,6 +17,7 @@ import {
     CreditCard
 } from "lucide-react";
 import { getShopFinancialStats } from "@/actions/shops";
+import { ShopExportButton } from "@/components/pages/shops/shop-export-button";
 import { getWalletTransactions, transferBetweenIdentities } from "@/actions/wallets";
 import { useAuthContext } from "@/contexts/auth-context";
 import { motion } from "framer-motion";
@@ -91,10 +92,13 @@ export default function ShopWalletPage() {
                     <Typography variant="h1" weight="bold">Portefeuille Boutique</Typography>
                     <Typography variant="body-base" theme="muted">Gérez vos revenus et retirez vos bénéfices</Typography>
                 </div>
-                <Button variant="outline" size="sm" onClick={loadData} className="gap-2">
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Actualiser
-                </Button>
+                <div className="flex items-center gap-2">
+                    <ShopExportButton shopId={shopId} kind="wallet" label="Exporter" />
+                    <Button variant="outline" size="sm" onClick={loadData} className="gap-2">
+                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        Actualiser
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

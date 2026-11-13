@@ -1,7 +1,7 @@
 // @/components/pages/tournaments/edition-detail/export-matches-button.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,10 +14,25 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, FileSpreadsheet, FileJson, FileText, File, Loader2 } from "lucide-react";
+import {
+  Download,
+  FileSpreadsheet,
+  FileJson,
+  FileText,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
-import { exportMatchesToFormat, type ExportFormat } from "@/actions/editions";
 import { useSearchParams } from "next/navigation";
+import { getEditionMatchesDocument } from "@/actions/documents";
+import { downloadDocument } from "@/lib/documents/engine";
+import type { DocumentFormat } from "@/lib/documents/types";
+
+/**
+ * Export des matchs d'une édition.
+ *
+ * Le client ne fournit que des identifiants de filtres ; les données, les
+ * libellés et les autorisations sont résolus côté serveur.
+ */
 
 interface ExportMatchesButtonProps {
   editionId: string;
@@ -26,133 +41,157 @@ interface ExportMatchesButtonProps {
   bracketNodeId?: string;
 }
 
-export function ExportMatchesButton({ editionId, phaseId, groupId, bracketNodeId }: ExportMatchesButtonProps) {
-  const [isPending, startTransition] = useTransition();
+type ExportScope = "all" | "phase" | "group" | "bracket";
+
+export function ExportMatchesButton({
+  editionId,
+  phaseId,
+  groupId,
+  bracketNodeId,
+}: ExportMatchesButtonProps) {
+  const [isExporting, setIsExporting] = useState(false);
   const searchParams = useSearchParams();
 
-  const handleExport = async (format: ExportFormat, scope: "all" | "phase" | "group" | "bracket") => {
-    let filters: any = { editionId };
-    
-    if (scope === "phase") {
-      filters.phaseId = phaseId || searchParams.get("phaseId") || undefined;
-    } else if (scope === "group") {
-      filters.groupId = groupId || searchParams.get("groupId") || undefined;
-    } else if (scope === "bracket") {
-      filters.bracketNodeId = bracketNodeId || searchParams.get("bracketNodeId") || undefined;
+  const resolvedPhaseId = phaseId || searchParams.get("phaseId") || undefined;
+  const resolvedGroupId = groupId || searchParams.get("groupId") || undefined;
+  const resolvedBracketNodeId =
+    bracketNodeId || searchParams.get("bracketNodeId") || undefined;
+
+  const handleExport = async (format: DocumentFormat, scope: ExportScope) => {
+    if (isExporting) return;
+
+    const filters: {
+      phaseId?: string;
+      groupId?: string;
+      bracketNodeId?: string;
+    } = {};
+
+    if (scope === "phase" && resolvedPhaseId) {
+      filters.phaseId = resolvedPhaseId;
+    } else if (scope === "group" && resolvedGroupId) {
+      filters.groupId = resolvedGroupId;
+    } else if (scope === "bracket" && resolvedBracketNodeId) {
+      filters.bracketNodeId = resolvedBracketNodeId;
     }
 
-    startTransition(async () => {
-      try {
-        const { exportData: exportToFormat, createExportData } = await import("@/utils/export-utils");
-        
-        const result = await exportMatchesToFormat(editionId, format, filters);
-        
-        if (result.success && result.data) {
-          const rawData = JSON.parse(result.data);
-          const config = {
-            filename: result.filename || `matches_${scope}_${editionId}`,
-            title: scope === "all" ? "Feuille de Matchs - Tous" : `Feuille de Matchs - ${scope.toUpperCase()}`,
-            subtitle: `Édition: ${editionId.slice(0, 8)}`,
-            header: {
-              title: "Games-Trafics - Tournois",
-              subtitle: scope === "all" ? "Liste complète des matchs" : `Extraction par ${scope}`,
-            },
-            footer: {
-              text: "Document généré par Games-Trafics",
-              pageNumbers: true
-            }
-          };
-
-          const tableData = createExportData(rawData, "matches");
-          await exportToFormat(format, tableData, config);
-
-          toast.success(`Export ${format.toUpperCase()} réussi`, {
-            description: `${result.count || rawData.length} matchs exportés`
-          });
-        } else {
-          toast.error(result.error || "Erreur lors de l'export");
-        }
-      } catch (error: any) {
-        toast.error(error.message || "Erreur lors de l'export");
+    if (scope !== "all") {
+      const hasFilter =
+        filters.phaseId || filters.groupId || filters.bracketNodeId;
+      if (!hasFilter) {
+        toast.error("Aucun filtre actif pour cet export.");
+        return;
       }
-    });
+    }
+
+    setIsExporting(true);
+    try {
+      const result = await getEditionMatchesDocument(editionId, filters);
+      if (!result.success || !result.document) {
+        toast.error(result.error || "Export impossible.");
+        return;
+      }
+
+      await downloadDocument(result.document, format);
+      const count = result.document.meta.totalRecords ?? 0;
+      toast.success(`Export ${format.toUpperCase()} réussi`, {
+        description: `${count} match(s) exporté(s)`,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossible de générer le document.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const getScopeLabel = () => {
-    if (bracketNodeId || searchParams.get("bracketNodeId")) return "ce bracket";
-    if (groupId || searchParams.get("groupId")) return "ce groupe";
-    if (phaseId || searchParams.get("phaseId")) return "cette phase";
+    if (resolvedBracketNodeId) return "ce bracket";
+    if (resolvedGroupId) return "ce groupe";
+    if (resolvedPhaseId) return "cette phase";
     return "tous les matchs";
   };
+
+  const scopeOptions: Array<{ scope: ExportScope; label: string; enabled: boolean }> = [
+    { scope: "all", label: "Tous les matchs", enabled: true },
+    {
+      scope: "phase",
+      label: "Cette phase",
+      enabled: Boolean(resolvedPhaseId),
+    },
+    {
+      scope: "group",
+      label: "Ce groupe",
+      enabled: Boolean(resolvedGroupId),
+    },
+    {
+      scope: "bracket",
+      label: "Ce bracket",
+      enabled: Boolean(resolvedBracketNodeId),
+    },
+  ];
+
+  const renderFormatSub = (
+    format: DocumentFormat,
+    label: string,
+    icon: React.ReactNode,
+  ) => (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        {icon}
+        {label}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        {scopeOptions
+          .filter((option) => option.enabled)
+          .map((option) => (
+            <DropdownMenuItem
+              key={`${format}-${option.scope}`}
+              onClick={() => void handleExport(format, option.scope)}
+              disabled={isExporting}
+            >
+              {label} - {option.label}
+            </DropdownMenuItem>
+          ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2" disabled={isPending}>
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          Exporter {isPending ? "..." : getScopeLabel()}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Exporter {isExporting ? "..." : getScopeLabel()}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>Format d'export</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Format d&apos;export</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Excel / CSV
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem onClick={() => handleExport("excel", "all")}>
-              Excel - Tous les matchs
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("excel", "phase")}>
-              Excel - {phaseId ? "Cette phase" : "Phase filtrée"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("excel", "group")}>
-              Excel - {groupId ? "Ce groupe" : "Groupe filtré"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("csv", "all")}>
-              CSV - Tous les matchs
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <FileJson className="h-4 w-4 mr-2" />
-            JSON
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem onClick={() => handleExport("json", "all")}>
-              JSON - Tous les matchs
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("json", "phase")}>
-              JSON - Cette phase
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("json", "group")}>
-              JSON - Ce groupe
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <FileText className="h-4 w-4 mr-2" />
-            PDF
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem onClick={() => handleExport("pdf", "all")}>
-              PDF - Tous les matchs
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("pdf", "phase")}>
-              PDF - Cette phase
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("pdf", "group")}>
-              PDF - Ce groupe
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        {renderFormatSub(
+          "xlsx",
+          "Excel",
+          <FileSpreadsheet className="h-4 w-4 mr-2" />,
+        )}
+        {renderFormatSub(
+          "csv",
+          "CSV",
+          <FileSpreadsheet className="h-4 w-4 mr-2" />,
+        )}
+        {renderFormatSub("json", "JSON", <FileJson className="h-4 w-4 mr-2" />)}
+        {renderFormatSub("pdf", "PDF", <FileText className="h-4 w-4 mr-2" />)}
       </DropdownMenuContent>
     </DropdownMenu>
   );

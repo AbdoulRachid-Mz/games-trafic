@@ -24,7 +24,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { exportData, createExportData, type ExportFormat } from "@/utils/export-utils";
+import { downloadDocument } from "@/lib/documents/engine";
+import type { DocumentFormat } from "@/lib/documents/types";
+import {
+  getBracketDocument,
+  getEditionStandingsDocument,
+} from "@/actions/documents";
+import { toast } from "sonner";
 import { DEFAULT_ADVANCE_COUNT } from "@/lib/tournaments/config";
 
 // ============================================================================
@@ -85,12 +91,22 @@ export interface BracketStandingRow {
 export interface StandingsTableProps {
   groups?: StandingGroup[];
   bracketRows?: BracketStandingRow[];
+  /**
+   * Lignes du classement GLOBAL d'édition, calculées côté serveur
+   * (`getEditionStandings`) : le composant ne les agrège jamais lui-même.
+   */
+  editionRows?: StandingRow[];
   registrations?: any[];
   title?: string;
   showFilter?: boolean;
   mode?: "group" | "bracket" | "edition";
   className?: string;
   currentRegistrationId?: string;
+  /** Édition concernée — requise pour les exports serveur. */
+  editionId?: string;
+  /** Phase concernée (exports de classement de phase / bracket). */
+  phaseId?: string;
+  phaseName?: string;
 }
 
 // ============================================================================
@@ -113,17 +129,22 @@ function getRoundLabel(round: number, maxRound: number): string {
 export function StandingsTable({
   groups = [],
   bracketRows = [],
+  editionRows = [],
   registrations = [],
   title = "Classement",
   showFilter = true,
   mode = "group",
   className,
   currentRegistrationId,
+  editionId,
+  phaseId,
+  phaseName,
 }: StandingsTableProps) {
   const { isMobile, isTablet, screenSize } = useScreenSize();
   const [selectedGroupId, setSelectedGroupId] = useState<string>(
     groups[0]?.groupId || ""
   );
+  const [isExporting, setIsExporting] = useState(false);
 
   // Version ultra compacte pour très petits écrans
   const isExtraSmall = screenSize.width < 480;
@@ -170,36 +191,11 @@ export function StandingsTable({
   const completedDays = dayGroups.filter((d) => d.isCompleted).length;
 
   // ---- EDITION MODE ----
-  const editionRows = useMemo<StandingRow[]>(() => {
-    if (mode !== "edition" || groups.length === 0) return [];
-    const map = new Map<string, StandingRow>();
-    for (const group of groups) {
-      for (const row of group.rows) {
-        const existing = map.get(row.registrationId);
-        if (existing) {
-          map.set(row.registrationId, {
-            ...existing,
-            points: existing.points + row.points,
-            matchesPlayed: existing.matchesPlayed + row.matchesPlayed,
-            matchesWon: existing.matchesWon + row.matchesWon,
-            matchesDrawn: existing.matchesDrawn + row.matchesDrawn,
-            matchesLost: existing.matchesLost + row.matchesLost,
-            scoreFor: existing.scoreFor + row.scoreFor,
-            scoreAgainst: existing.scoreAgainst + row.scoreAgainst,
-            scoreDifference: existing.scoreDifference + row.scoreDifference,
-          });
-        } else {
-          map.set(row.registrationId, { ...row });
-        }
-      }
-    }
-    return [...map.values()].sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.scoreDifference !== a.scoreDifference)
-        return b.scoreDifference - a.scoreDifference;
-      return b.matchesWon - a.matchesWon;
-    });
-  }, [mode, groups]);
+  // Le classement global est calculé côté serveur (moteurs officiels).
+  const sortedEditionRows = useMemo<StandingRow[]>(() => {
+    if (mode !== "edition") return [];
+    return editionRows;
+  }, [mode, editionRows]);
 
   // ---- BRACKET MODE ----
   const sortedBracketRows = useMemo<BracketStandingRow[]>(() => {
@@ -227,50 +223,82 @@ export function StandingsTable({
     return { name, image };
   };
 
-  const handleExport = async (format: ExportFormat) => {
-    let exportRows: any[] = [];
-    let fileName = "classement";
+  /**
+   * Export serveur : le client n'envoie que l'identifiant et le format.
+   * Les données et les autorisations sont vérifiées dans `actions/documents.ts`.
+   */
+  const handleExport = async (format: DocumentFormat) => {
+    if (isExporting) return;
 
-    if (mode === "group" && activeGroup) {
-      exportRows = sortedGroupRows.map((row, idx) => ({
-        ...row,
-        position: row.position || idx + 1,
-        participantName: getParticipantInfo(row.registrationId, row).name,
-        status: row.qualified ? "Qualifié" : row.eliminated ? "Éliminé" : "En cours",
-      }));
-      fileName = `classement_${activeGroup.groupName.replace(/\s+/g, "_")}`;
-    } else if (mode === "edition") {
-      exportRows = editionRows.map((row, idx) => ({
-        ...row,
-        position: row.position || idx + 1,
-        participantName: getParticipantInfo(row.registrationId, row).name,
-        status: row.qualified ? "Qualifié" : "En cours",
-      }));
-      fileName = "classement_general";
-    } else if (mode === "bracket") {
-      exportRows = sortedBracketRows.map((row, idx) => ({
-        position: row.position || idx + 1,
-        participantName: getParticipantInfo(row.registrationId, row).name,
-        round: row.round,
-        roundLabel: row.roundLabel,
-        status: row.won ? "Qualifié" : row.eliminated ? "Éliminé" : "En cours",
-      }));
-      fileName = "classement_phases_finales";
+    if (!editionId) {
+      toast.error("Export indisponible : édition non identifiée.");
+      return;
     }
 
-    const config = {
-      filename: fileName,
-      title: title || "Classement du Tournoi",
-      subtitle: mode === "group" ? `Groupe: ${activeGroup?.groupName}` : mode === "edition" ? "Classement Général" : "Phases Finales",
-      header: {
-        title: "Games-Trafics",
-        subtitle: "Export du classement automatique",
-      }
-    };
+    setIsExporting(true);
+    try {
+      const result =
+        mode === "bracket"
+          ? await getBracketDocument(editionId, phaseId ?? null)
+          : await getEditionStandingsDocument(
+              editionId,
+              mode === "group" ? phaseId ?? null : null,
+            );
 
-    const tableData = createExportData(exportRows, "standings");
-    await exportData(format, tableData, config);
+      if (!result.success || !result.document) {
+        toast.error(result.error || "Export impossible.");
+        return;
+      }
+
+      await downloadDocument(result.document, format);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossible de générer le document.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
+
+  const renderExportMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isExporting}
+          className="gap-1 md:gap-2 h-8 md:h-9 px-2 md:px-3"
+        >
+          <Download className="h-3 w-3 md:h-4 md:w-4" />
+          <span className="hidden sm:inline text-xs md:text-sm">
+            {isExporting ? "Export…" : "Exporter"}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel className="text-xs">Format d&apos;export</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleExport("xlsx")} className="text-xs">
+          <FileSpreadsheet className="h-3.5 w-3.5 mr-2 text-green-600" />
+          Excel (XLSX)
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("csv")} className="text-xs">
+          <FileText className="h-3.5 w-3.5 mr-2 text-blue-600" />
+          CSV
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("json")} className="text-xs">
+          <FileJson className="h-3.5 w-3.5 mr-2 text-orange-500" />
+          JSON
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("pdf")} className="text-xs">
+          <File className="h-3.5 w-3.5 mr-2 text-red-500" />
+          PDF
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   const renderEmpty = () => (
     <div className="text-center py-8 md:py-12 text-muted-foreground bg-card border rounded-xl">
@@ -286,11 +314,14 @@ export function StandingsTable({
     if (sortedBracketRows.length === 0) return renderEmpty();
     return (
       <div className={cn("space-y-3 md:space-y-4", className)}>
-        {title && (
-          <Typography variant={isExtraSmall ? "body-lg" : "h4"} weight="bold" className="text-base md:text-xl">
-            {title}
-          </Typography>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {title && (
+            <Typography variant={isExtraSmall ? "body-lg" : "h4"} weight="bold" className="text-base md:text-xl">
+              {title}
+            </Typography>
+          )}
+          <div className="flex items-center gap-2 ml-auto">{renderExportMenu()}</div>
+        </div>
         <Card className="overflow-hidden border-none shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-xs md:text-sm">
@@ -370,7 +401,7 @@ export function StandingsTable({
   // EDITION MODE (global)
   // ============================================================
   if (mode === "edition") {
-    if (editionRows.length === 0) return renderEmpty();
+    if (sortedEditionRows.length === 0) return renderEmpty();
     
     // Colonnes à afficher selon la taille d'écran
     const showFullStats = !isMediumOrSmall;
@@ -378,11 +409,14 @@ export function StandingsTable({
     
     return (
       <div className={cn("space-y-3 md:space-y-4", className)}>
-        {title && (
-          <Typography variant={isExtraSmall ? "body-lg" : "h4"} weight="bold" className="text-base md:text-xl">
-            {title}
-          </Typography>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {title && (
+            <Typography variant={isExtraSmall ? "body-lg" : "h4"} weight="bold" className="text-base md:text-xl">
+              {title}
+            </Typography>
+          )}
+          <div className="flex items-center gap-2 ml-auto">{renderExportMenu()}</div>
+        </div>
         <Card className="overflow-hidden border-none shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-xs md:text-sm">
@@ -410,7 +444,7 @@ export function StandingsTable({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {editionRows.map((row, idx) => {
+                {sortedEditionRows.map((row, idx) => {
                   const { name, image } = getParticipantInfo(row.registrationId, row);
                   return (
                     <tr
@@ -517,34 +551,7 @@ export function StandingsTable({
             </Select>
           )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1 md:gap-2 h-8 md:h-9 px-2 md:px-3">
-                <Download className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline text-xs md:text-sm">Exporter</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel className="text-xs">Format d'export</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleExport("excel")} className="text-xs">
-                <FileSpreadsheet className="h-3.5 w-3.5 mr-2 text-green-600" />
-                Excel (XLSX)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("csv")} className="text-xs">
-                <FileText className="h-3.5 w-3.5 mr-2 text-blue-600" />
-                CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("json")} className="text-xs">
-                <FileJson className="h-3.5 w-3.5 mr-2 text-orange-500" />
-                JSON
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf")} className="text-xs">
-                <File className="h-3.5 w-3.5 mr-2 text-red-500" />
-                PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {renderExportMenu()}
         </div>
       </div>
 

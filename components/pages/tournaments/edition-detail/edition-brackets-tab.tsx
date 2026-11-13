@@ -208,9 +208,9 @@ export function EditionBracketsTab({
           )}
 
           <BracketExportButton
+            editionId={editionId}
             phase={availablePhases.find((p) => p.id === selectedPhaseId) || availablePhases[0]}
             nodes={nodes}
-            tournamentName="Tournoi"
           />
         </div>
       </div>
