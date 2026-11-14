@@ -183,7 +183,7 @@ export function ParticipantsManagementClient({
       <DynamicActionMenu actions={menuActions} floatingPosition="bottom-6 right-6" />
       {/* SECTION 1: PARTICIPANTS DE L'ÉDITION */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-5 px-6">
+        <CardHeader className="flex flex-row max-lg:flex-wrap items-center justify-between py-5 px-6">
           <div>
             <CardTitle className="text-lg">Participants Actuels ({participants.length})</CardTitle>
             <CardDescription>Joueurs inscrits et actifs dans cette édition.</CardDescription>
@@ -348,7 +348,7 @@ export function ParticipantsManagementClient({
 
       {/* SECTION 2: MEMBRES NON INSCRITS */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-5 px-6">
+        <CardHeader className="flex flex-row max-lg:flex-wrap items-center justify-between py-5 px-6">
           <div>
             <CardTitle className="text-lg">Membres du Tournoi Non Inscrits ({unregisteredMembers.length})</CardTitle>
             <CardDescription>Joueurs présents dans le tournoi global mais pas dans cette édition.</CardDescription>

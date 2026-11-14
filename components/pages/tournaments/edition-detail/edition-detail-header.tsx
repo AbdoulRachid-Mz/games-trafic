@@ -510,6 +510,20 @@ export function EditionDetailHeader({
                         Discuter du tournoi
                       </Link>
                     </Button>
+                    
+                    <Button
+                      variant="outline"
+                      className="h-11 w-full justify-start gap-3 font-medium border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                      asChild
+                    >
+                      <Link
+                        href={`/tournaments/${tournament.id}/editions/${edition.id}/reveal`}
+                        onClick={() => setShowActions(false)}
+                      >
+                        <Zap className="h-4 w-4" />
+                        Révélation 3D
+                      </Link>
+                    </Button>
 
                     {isOrganizer && (
                       <>

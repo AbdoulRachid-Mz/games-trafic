@@ -75,7 +75,7 @@ export default async function DashboardParticipantsPage({ params }: PageProps) {
           },
         ]}
         itemsPerView={{ mobile: 1, md: 2, lg: 3 }}
-        gap={16}
+        gap={8}
       />
 
       <ParticipantsManagementClient 
