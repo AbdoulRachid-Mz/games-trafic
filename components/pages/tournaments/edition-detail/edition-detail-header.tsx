@@ -199,11 +199,11 @@ export function EditionDetailHeader({
   const statusConfig = getStatusConfig(edition.status || "UPCOMING");
 
   const competitionTabs: CompetitionTabItem[] = useMemo(() => [
+    { id: "standings", label: "Classement", icon: Award },
+    { id: "matches", label: "Matchs", icon: Swords, count: tabCounts?.matches },
     { id: "overview", label: "Vue d'ensemble", icon: Trophy },
     { id: "brackets", label: "Arbre & Playoffs", icon: GitBranch, highlight: true },
     { id: "phases", label: "Phases & Poules", icon: LayoutGrid, count: tabCounts?.phases },
-    { id: "matches", label: "Matchs", icon: Swords, count: tabCounts?.matches },
-    { id: "standings", label: "Classement", icon: Award },
     { id: "participants", label: "Participants", icon: Users, count: tabCounts?.participants },
     { id: "calendar", label: "Calendrier", icon: Calendar },
     { id: "stats", label: "MVPs & Stats", icon: Star },

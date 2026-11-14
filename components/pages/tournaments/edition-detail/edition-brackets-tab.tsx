@@ -31,6 +31,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MatchCard } from "@/components/cards/match-card";
+import { PlayoffBracketVisual } from "@/components/tournaments/playoffs/playoff-bracket-visual";
 
 interface EditionBracketsTabProps {
   editionId: string;
@@ -224,6 +225,17 @@ export function EditionBracketsTab({
           <Skeleton className="h-80 w-full rounded-2xl bg-card/40" />
           <Skeleton className="h-80 w-full rounded-2xl bg-card/40" />
         </div>
+      )}
+
+      {/* Visualisation officielle des Playoffs avec schéma esports */}
+      {!isNodesLoading && !isMatchesLoading && (
+        <PlayoffBracketVisual
+          matches={matches}
+          nodes={nodes}
+          tournamentId={tournamentId}
+          editionId={editionId}
+          tournamentName={availablePhases.find((p) => p.id === selectedPhaseId)?.name || "Playoffs"}
+        />
       )}
 
       {/* Visualisation par rounds horizontaux façon Liquipedia / Esports */}

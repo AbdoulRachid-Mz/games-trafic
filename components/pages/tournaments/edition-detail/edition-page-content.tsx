@@ -6,6 +6,7 @@ import {
   Tournament,
   TournamentPhase,
   TournamentMember,
+  TournamentEdition,
   EditionRegistrationWithRelations,
   TournamentEditionWithRelations,
   Team,
@@ -20,6 +21,7 @@ import { EditionBestParticipantsTab } from "./edition-best-participants-tab";
 import { EditionBracketsTab } from "./edition-brackets-tab";
 import { EditionRulesTab } from "./edition-rules-tab";
 import { EditionStandingsTab } from "./edition-standings-tab";
+import { EditionRelatedCarousel } from "./edition-related-carousel";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { useAuthContext } from "@/contexts/auth-context";
@@ -57,6 +59,8 @@ interface EditionPageContentProps {
   currentUserRegistration?: EditionRegistrationWithRelations;
   isOrganizer?: boolean;
   recentMatches?: any[];
+  otherEditions?: TournamentEdition[];
+  similarEditions?: TournamentEdition[];
 }
 
 export function EditionPageContent({
@@ -68,14 +72,16 @@ export function EditionPageContent({
   currentUserRegistration,
   isOrganizer = false,
   recentMatches = [],
+  otherEditions = [],
+  similarEditions = [],
 }: EditionPageContentProps) {
   const { user } = useAuthContext();
   const { isMobile } = useScreenSize();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Active tab synchronized with searchParams (?tab=...)
-  const initialTab = searchParams.get("tab") || searchParams.get("activeTab") || "overview";
+  // Active tab synchronized with searchParams (?tab=...) - Classements & Matchs en tête
+  const initialTab = searchParams.get("tab") || searchParams.get("activeTab") || "standings";
   const [activeTab, setActiveTab] = useState<string>(initialTab);
 
   const [showJoinDialog, setShowJoinDialog] = useState(false);
@@ -233,12 +239,20 @@ export function EditionPageContent({
                     <Info className="h-6 w-6 text-primary" />
                     À propos de la Compétition
                   </h3>
-                  <Button variant="outline" size="sm" asChild className="gap-2 border-white/10">
-                    <Link href={`/tournaments/${tournament.id}`}>
-                      Tournoi Principal
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" asChild className="gap-2 border-primary/30 bg-primary/10 text-primary hover:bg-primary/20">
+                      <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/reveal`}>
+                        <Zap className="w-3.5 h-3.5" />
+                        Révélation 3D
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild className="gap-2 border-white/10">
+                      <Link href={`/tournaments/${tournament.id}`}>
+                        Tournoi Principal
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="prose dark:prose-invert max-w-none text-muted-foreground leading-relaxed">
@@ -407,6 +421,15 @@ export function EditionPageContent({
             <EditionRulesTab tournament={tournament} edition={edition} />
           )}
         </div>
+
+        {/* CAROUSEL D'ÉDITIONS (AUTRES ÉDITIONS DU TOURNOI & ÉDITIONS SIMILAIRES) */}
+        <EditionRelatedCarousel
+          tournamentId={tournament.id}
+          currentEditionId={edition.id}
+          otherEditions={otherEditions}
+          similarEditions={similarEditions}
+          isOrganizer={isOrganizer}
+        />
       </div>
 
       {/* DIALOGS DE PARTICIPATION & PAIEMENT */}

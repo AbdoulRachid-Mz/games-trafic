@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  tournaments,
   tournamentEditions,
   editionRegistrations,
   registrationPayments,
@@ -13,9 +14,10 @@ import {
   matches,
   editionResults,
   type NewTournamentEdition,
+  type TournamentEdition,
 } from "@/database/schema";
 import { db } from "@/lib/db";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, ne, inArray } from "drizzle-orm";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/session";
 import { validateEditionWinnerCandidate } from "./tournaments/editions";
@@ -1010,3 +1012,93 @@ export async function designateEditionWinnerAction(
     return { success: false, error: String(error) };
   }
 }
+
+/**
+ * Récupère les autres éditions du même tournoi et les éditions similaires d'autres tournois.
+ */
+export async function getRelatedEditions(
+  tournamentId: string,
+  currentEditionId: string,
+  game?: string
+): Promise<{
+  otherEditions: TournamentEdition[];
+  similarEditions: TournamentEdition[];
+}> {
+  try {
+    // 1. Autres éditions du même tournoi
+    const otherEditions = await db
+      .select()
+      .from(tournamentEditions)
+      .where(
+        and(
+          eq(tournamentEditions.tournamentId, tournamentId),
+          ne(tournamentEditions.id, currentEditionId)
+        )
+      )
+      .orderBy(desc(tournamentEditions.editionNumber))
+      .limit(10);
+
+    // 2. Éditions similaires d'autres tournois
+    let similarEditions: TournamentEdition[] = [];
+
+    if (game) {
+      // Trouver les tournois du même jeu
+      const matchingTournaments = await db
+        .select({ id: tournaments.id })
+        .from(tournaments)
+        .where(
+          and(
+            eq(tournaments.game, game),
+            ne(tournaments.id, tournamentId)
+          )
+        )
+        .limit(10);
+
+      const matchingIds = matchingTournaments.map((t) => t.id);
+
+      if (matchingIds.length > 0) {
+        similarEditions = await db
+          .select()
+          .from(tournamentEditions)
+          .where(
+            and(
+              inArray(tournamentEditions.tournamentId, matchingIds),
+              ne(tournamentEditions.status, "CANCELLED")
+            )
+          )
+          .orderBy(desc(tournamentEditions.createdAt))
+          .limit(10);
+      }
+    }
+
+    // Si pas assez d'éditions similaires avec le même jeu, compléter avec d'autres tournois actifs
+    if (similarEditions.length < 4) {
+      const fallbackEditions = await db
+        .select()
+        .from(tournamentEditions)
+        .where(
+          and(
+            ne(tournamentEditions.tournamentId, tournamentId),
+            ne(tournamentEditions.status, "CANCELLED")
+          )
+        )
+        .orderBy(desc(tournamentEditions.createdAt))
+        .limit(8);
+
+      const existingIds = new Set(similarEditions.map((e) => e.id));
+      for (const e of fallbackEditions) {
+        if (!existingIds.has(e.id)) {
+          similarEditions.push(e);
+          existingIds.add(e.id);
+          if (similarEditions.length >= 8) break;
+        }
+      }
+    }
+
+    return { otherEditions, similarEditions };
+  } catch (error) {
+    console.error("Error fetching related editions:", error);
+    return { otherEditions: [], similarEditions: [] };
+  }
+}
+

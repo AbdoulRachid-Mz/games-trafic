@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { EditionPageContent } from "@/components/pages/tournaments/edition-detail/edition-page-content";
 import { TournamentMember } from "@/database/schema";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getTournamentEditionWithRelations, getEditionActivePhase } from "@/actions/editions";
+import {
+  getTournamentEditionWithRelations,
+  getEditionActivePhase,
+  getRelatedEditions,
+} from "@/actions/editions";
 import { getTournamentById, getTournamentEditionById, getTournamentMembers } from "@/actions/tournaments";
 import { getTournamentPhases, getEditionRecentMatches } from "@/actions/phases";
 import { TransactionQRCode } from "@/components/shared/qr-code";
@@ -11,6 +15,7 @@ import { encodeTransactionQR } from "@/utils/qr-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
+import { EditionRevealTrigger } from "@/components/pages/tournaments/edition-detail/edition-reveal-trigger";
 
 interface PageProps {
   params: Promise<{
@@ -51,13 +56,17 @@ export default async function EditionPage({ params }: PageProps) {
 
   const edition = editionWithRelations;
 
-  // 1. Phases & Active Phase Logic
-  const activePhase = await getEditionActivePhase(editionId);
-  const phasesResponse = await getTournamentPhases({
-    filters: { editionId },
-    options: { sortBy: "order", sortOrder: "asc" },
-  });
+  // 1. Phases & Active Phase Logic + Related Editions
+  const [activePhase, phasesResponse, related] = await Promise.all([
+    getEditionActivePhase(editionId),
+    getTournamentPhases({
+      filters: { editionId },
+      options: { sortBy: "order", sortOrder: "asc" },
+    }),
+    getRelatedEditions(tournamentId, editionId, tournament.game),
+  ]);
   const phases = phasesResponse.data || edition.phases;
+  const { otherEditions, similarEditions } = related;
 
   // 2. Vérifier si l'utilisateur est organisateur
   const isOrganizer = !!(user && tournament.organizerId === user.id);
@@ -96,6 +105,14 @@ export default async function EditionPage({ params }: PageProps) {
 
   return (
     <div className="w-full">
+      {/* Déclencheur de révélation de structure unique par utilisateur */}
+      <EditionRevealTrigger
+        tournamentId={tournamentId}
+        editionId={editionId}
+        hasStructure={Boolean(phases && phases.length > 0)}
+        status={edition.status || undefined}
+      />
+
       <EditionPageContent
         tournament={tournament}
         edition={edition}
@@ -105,6 +122,8 @@ export default async function EditionPage({ params }: PageProps) {
         currentUserRegistration={currentUserRegistration}
         isOrganizer={isOrganizer}
         recentMatches={recentMatches}
+        otherEditions={otherEditions}
+        similarEditions={similarEditions}
       />
 
       {/* Bannière de paiement QR code pour les inscrits en attente de paiement */}

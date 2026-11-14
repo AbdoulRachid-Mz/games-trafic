@@ -886,16 +886,11 @@ export function OrganizeWizardClient({
             duration: 5000,
           });
 
-          try {
-            const tree = await getEditionDetailTree(editionId);
-            if (tree && tree.phases?.length > 0) {
-              setRevealStructure(tree);
-              setIsRevealOpen(true);
-              return;
-            }
-          } catch (e) {
-            console.warn("Could not load tree for reveal dialog:", e);
-          }
+          // Redirection vers la nouvelle page dédiée à la révélation de structure
+          router.push(
+            `/tournaments/${tournamentId}/editions/${editionId}/reveal?level=all&autoRedirect=true`
+          );
+          return;
 
           setTimeout(() => {
             router.push(
