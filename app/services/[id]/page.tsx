@@ -2,219 +2,230 @@ import { getServiceById } from "@/actions/services";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { CheckCircle, ArrowLeft, Star, Shield, Zap, MessageSquare, Clock, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Shield,
+  MessageSquare,
+  Sparkles,
+  BookOpen,
+  HelpCircle,
+  ChevronRight,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 
-//revalidate
+function resolveServiceDocLink(title: string, description: string): { title: string; href: string; summary: string } {
+  const t = (title + " " + description).toLowerCase();
 
+  if (t.includes("tournoi") || t.includes("compétition") || t.includes("bracket")) {
+    return {
+      title: "Documentation officielle des Tournois",
+      href: "/docs/tournaments/overview",
+      summary: "Découvrez comment fonctionnent les tournois, les phases, les inscriptions et la gestion des résultats sur Games-Trafics.",
+    };
+  }
+  if (t.includes("boutique") || t.includes("vendeur") || t.includes("produit") || t.includes("commande")) {
+    return {
+      title: "Documentation officielle des Boutiques & Marketplace",
+      href: "/docs/shops/overview",
+      summary: "Consultez le guide complet sur la création de boutique, la publication de produits et le traitement des commandes.",
+    };
+  }
+  if (t.includes("wallet") || t.includes("finance") || t.includes("gtc") || t.includes("paiement") || t.includes("retrait")) {
+    return {
+      title: "Documentation officielle du Wallet GTC & Finances",
+      href: "/docs/transactions/overview",
+      summary: "Apprenez tout sur la gestion de votre solde GTC, les dépôts, transferts et la sécurisation par code PIN.",
+    };
+  }
+  if (t.includes("item") || t.includes("jeu") || t.includes("skin") || t.includes("coin")) {
+    return {
+      title: "Documentation officielle des Game Items",
+      href: "/docs/games/overview",
+      summary: "Comprenez le catalogue de jeux, les types d'items disponibles (coins, skins, équipements) et les commandes.",
+    };
+  }
+  return {
+    title: "Centre de documentation Games-Trafics",
+    href: "/docs",
+    summary: "Explorez l'ensemble des fonctionnalités et règles de fonctionnement de la plateforme Games-Trafics.",
+  };
+}
 
 export default async function ServiceDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params
+  const { id } = await params;
   const service = await getServiceById(id);
 
   if (!service || service.isDeleted || !service.isActive) {
     notFound();
   }
 
+  const relatedDoc = resolveServiceDocLink(service.title, service.description);
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Premium Hero Section */}
-      <section className="relative py-10 overflow-hidden">
-        {/* Background Accents */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] -mr-32 -mt-32" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary/5 rounded-full blur-[100px] -ml-32 -mb-32" />
+    <div className="min-h-screen bg-background pb-16">
+      {/* Hero Section */}
+      <section className="relative py-8 md:py-12 overflow-hidden border-b border-border/40">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[350px] h-[350px] bg-secondary/5 rounded-full blur-[100px] pointer-events-none" />
 
         <div className="container mx-auto px-4 relative z-10">
           <Link
             href="/services"
-            className="group inline-flex items-center gap-2 text-primary hover:text-primary dark:hover:text-secondary mb-6 md:mb-10 transition-all duration-300 bg-primary/20 px-4 py-2 rounded-full border border-border/50"
+            className="group inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors text-xs font-bold uppercase tracking-wider"
           >
             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm font-medium">Retour aux services</span>
+            <span>Retour aux services</span>
           </Link>
 
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            <div className="space-y-6">
-              <div className="flex flex-wrap gap-3">
-                <Badge className="bg-primary/10 text-primary border-primary/20 px-3 py-1 rounded-full gap-1.5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+            {/* Colonne gauche : Informations de la prestation */}
+            <div className="lg:col-span-7 space-y-6 text-start">
+              <div className="flex flex-wrap gap-2 items-center">
+                <Badge className="bg-primary/10 text-primary border-primary/20 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  Service Premium
+                  Prestation Officielle
                 </Badge>
-                <Badge variant="outline" className="px-3 py-1 rounded-full gap-1.5 border-amber-500/20 text-amber-500 bg-amber-500/5">
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  5.0 Rating
+                <Badge variant="outline" className="px-3 py-1 rounded-full text-xs font-semibold border-border/60">
+                  Games-Trafics Assistance
                 </Badge>
               </div>
 
-              <div className="space-y-4">
-                <Typography variant="h2" weight="bold" className="text-3xl lg:text-5xl tracking-tighter italic uppercase leading-tight">
+              <div className="space-y-3">
+                <Typography variant="h1" className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase tracking-tight leading-tight">
                   {service.title}
                 </Typography>
-                <div className="h-1.5 w-24 bg-primary rounded-full" />
+                <div className="h-1.5 w-20 bg-primary rounded-full" />
               </div>
 
-              <Typography
-                variant="lead"
-                className="text-xl text-muted-foreground leading-relaxed max-w-xl"
-              >
+              <Typography variant="lead" className="text-base sm:text-lg text-muted-foreground leading-relaxed font-normal">
                 {service.description}
               </Typography>
 
-              <div className="flex flex-wrap gap-4 pt-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-muted/30 flex items-center justify-center border border-border/50">
-                    <Shield className="w-6 h-6 text-primary" />
+              {/* Points clés vérifiés */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-card border border-border/50">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <Shield className="w-5 h-5" />
                   </div>
                   <div>
-                    <Typography variant="caption1" theme="muted" className="uppercase tracking-widest font-bold">Sécurité</Typography>
-                    <Typography variant="body-sm" weight="semibold">Garanti 100%</Typography>
+                    <Typography variant="caption1" className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Accompagnement</Typography>
+                    <Typography variant="body-sm" className="font-bold">Par équipe Games-Trafics</Typography>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-muted/30 flex items-center justify-center border border-border/50">
-                    <Zap className="w-6 h-6 text-primary" />
+
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-card border border-border/50">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <HelpCircle className="w-5 h-5" />
                   </div>
                   <div>
-                    <Typography variant="caption1" theme="muted" className="uppercase tracking-widest font-bold">Livraison</Typography>
-                    <Typography variant="body-sm" weight="semibold">Ultra Rapide</Typography>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-muted/30 flex items-center justify-center border border-border/50">
-                    <Clock className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <Typography variant="caption1" theme="muted" className="uppercase tracking-widest font-bold">Dispo</Typography>
-                    <Typography variant="body-sm" weight="semibold">24h / 7j</Typography>
+                    <Typography variant="caption1" className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Étude sur mesure</Typography>
+                    <Typography variant="body-sm" className="font-bold">Selon vos besoins réels</Typography>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button size="lg" className="rounded-xl md:rounded-2xl px-6 md:p-8 h-14 text-lg shadow-xl shadow-primary/20 gap-2">
-                  Commander Maintenant
-                  <Zap className="w-5 h-5 fill-current" />
+              {/* CTA Transparent & Réel (Prise de contact / Support) */}
+              <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <Button size="lg" asChild className="rounded-xl px-6 h-12 text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 gap-2">
+                  <Link href="/support">
+                    <MessageSquare className="w-4 h-4" />
+                    Contacter notre équipe
+                  </Link>
                 </Button>
-                <Button size="lg" variant="outline" className="rounded-xl md:rounded-2xl px-6 md:px-8 h-14 text-lg gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  En savoir plus
+
+                <Button size="lg" variant="outline" asChild className="rounded-xl px-6 h-12 text-sm font-bold gap-2 border-border/60">
+                  <Link href={relatedDoc.href}>
+                    <BookOpen className="w-4 h-4 text-primary" />
+                    Consulter la doc officielle
+                  </Link>
                 </Button>
               </div>
             </div>
 
-            {/* Visual Hero Element */}
-            <div className="relative group">
-              <div className="absolute -inset-4 bg-gradient-to-tr from-primary/20 to-secondary/20 rounded-[3rem] blur-2xl opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
-              <div className="relative aspect-square rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-border/50 bg-card/50 backdrop-blur-sm p-2 shadow-2xl">
+            {/* Colonne droite : Visuel de la prestation & Section documentaire */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="relative aspect-video sm:aspect-[4/3] rounded-3xl overflow-hidden border border-border/60 bg-card/60 backdrop-blur-sm p-4 shadow-xl flex items-center justify-center">
                 {service.images && service.images[0] ? (
                   <Image
                     src={service.images[0]}
                     alt={service.title}
                     fill
-                    className="object-cover rounded-[2rem] md:rounded-[2.5rem]"
+                    className="object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-muted/20">
-                    <Typography variant="h1" className="text-9xl opacity-20">{service.icon || "✨"}</Typography>
+                  <div className="flex flex-col items-center justify-center gap-3 text-center p-6">
+                    <div className="h-20 w-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-4xl shadow-md">
+                      {service.icon || "✨"}
+                    </div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Prestation Games-Trafics
+                    </p>
                   </div>
                 )}
               </div>
+
+              {/* Section EXPLICITE obligatoire : Comprendre la fonctionnalité */}
+              <Card className="rounded-2xl border-primary/30 bg-primary/5 backdrop-blur-sm overflow-hidden text-start">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-primary font-black uppercase tracking-wider text-xs">
+                    <BookOpen className="h-4 w-4" />
+                    <span>Comprendre la fonctionnalité</span>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {relatedDoc.summary}
+                  </p>
+
+                  <div className="pt-2">
+                    <Button
+                      variant="link"
+                      asChild
+                      className="p-0 h-auto font-black text-xs text-primary hover:text-primary/80 uppercase tracking-wider inline-flex items-center gap-1.5"
+                    >
+                      <Link href={relatedDoc.href}>
+                        {relatedDoc.title}
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Gallery Section if more than 1 image */}
+      {/* Galerie optionnelle si images supplémentaires */}
       {service.images && service.images.length > 1 && (
-        <section className="py-10 bg-muted/10">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center gap-4 mb-12">
-              <Typography variant="h2" weight="bold" className="text-3xl tracking-tight">Gallerie</Typography>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {service.images.slice(1).map((imageUrl, idx) => (
-                <div key={idx} className="relative aspect-video rounded-3xl overflow-hidden border border-border/50 group shadow-lg">
-                  <Image
-                    src={imageUrl}
-                    alt={`${service.title} - Image ${idx + 2}`}
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-              ))}
-            </div>
+        <section className="container mx-auto px-4 pt-12">
+          <div className="flex items-center gap-3 mb-6">
+            <Typography variant="h3" className="text-xl font-bold uppercase tracking-tight">
+              Aperçus du service
+            </Typography>
+            <div className="h-px flex-1 bg-border/50" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {service.images.slice(1).map((imageUrl, idx) => (
+              <div key={idx} className="relative aspect-video rounded-2xl overflow-hidden border border-border/50 bg-card">
+                <Image
+                  src={imageUrl}
+                  alt={`${service.title} - ${idx + 2}`}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            ))}
           </div>
         </section>
       )}
-
-      {/* Features Showcase */}
-      <section className="py-16 md:py-20">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center mb-10 md:mb-16 space-y-4">
-            <Typography variant="h2" weight="bold" className="text-4xl lg:text-5xl tracking-tighter italic uppercase">
-              Pourquoi nous choisir ?
-            </Typography>
-            <Typography theme="muted" className="text-lg">
-              Nous offrons une qualité de service inégalée avec des garanties solides pour votre tranquillité d'esprit.
-            </Typography>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              { title: "Expertise de Haut Niveau", desc: "Nos intervenants sont des experts reconnus dans le milieu e-sportif." },
-              { title: "Sécurité Maximale", desc: "Protocoles de sécurité stricts pour la protection de vos données et comptes." },
-              { title: "Support Dédié", desc: "Une équipe à votre écoute pour répondre à toutes vos questions en temps réel." },
-              { title: "Confidentialité", desc: "Discrétion totale garantie pour l'ensemble de nos interventions." },
-              { title: "Résultats Immédiats", desc: "Travail efficace pour des résultats visibles dès les premières heures." },
-              { title: "Garantie Satisfaction", desc: "Si vous n'êtes pas satisfait, nous nous engageons à corriger le tir." },
-            ].map((feature, idx) => (
-              <Card key={idx} className="group border-border/50 bg-card/50 hover:border-primary/50 transition-all duration-500 rounded-[1rem] md:rounded-[1.5rem] lg:rounded-[2rem] overflow-hidden">
-                <CardContent className="p-4 md:p-6 lg:p-8 space-y-4 max-md:space-y-3">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500 shadow-lg group-hover:shadow-primary/30">
-                    <CheckCircle className="h-7 w-7" />
-                  </div>
-                  <Typography variant="h3" weight="bold" className="text-xl pt-2">{feature.title}</Typography>
-                  <Typography theme="muted" className="leading-relaxed">{feature.desc}</Typography>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Contact CTA */}
-      <section className="container mx-auto px-4 py-10">
-        <Card className="relative rounded-[3rem] md:rounded-[4rem] overflow-hidden border-none shadow-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-blue-900" />
-          <CardContent className="relative z-10 p-8 lg:p-16 text-center">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <Typography variant="h2" weight="bold" className="text-3xl lg:text-5xl text-white tracking-tighter uppercase italic">
-                Prêt à passer au niveau supérieur ?
-              </Typography>
-              <Typography variant="lead" className="text-white/80 text-xl font-medium">
-                Contactez-nous aujourd'hui pour une consultation gratuite ou un devis personnalisé adapté à vos ambitions.
-              </Typography>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-                <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-[2rem] px-12 h-14 text-lg shadow-2xl transition-all hover:scale-105">
-                  Démarrer Maintenant
-                </Button>
-                <Button size="lg" variant="outline" className="border-white/20 hover:bg-white/10 rounded-[2rem] px-12 h-14 text-lg">
-                  Nous Contacter
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
     </div>
   );
 }

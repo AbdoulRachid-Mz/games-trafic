@@ -116,7 +116,7 @@ export function AdvancedVideoUpload({
                   setUploadProgress(0);
                   setIsUploading(false);
                 }, 1000);
-              } catch (parseError) {
+              } catch {
                 setError("Erreur lors de la lecture de la réponse du serveur");
                 setIsUploading(false);
               }

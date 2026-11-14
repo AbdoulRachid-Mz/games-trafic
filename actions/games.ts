@@ -1,6 +1,6 @@
 'use server';
 
-import { games, gameItems, requests, type Game, type NewGame, type GameItem, type NewGameItem, type Request, type NewRequest } from '@/database/schema';
+import { games, gameItems, requests, type Game, type NewGame, type GameItem, type NewGameItem, type Request, type NewRequest, type GameItemWithRelations } from '@/database/schema';
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull } from 'drizzle-orm';
 import { type GameFilters, type GameItemFilters, type GameItemRequestFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
@@ -138,17 +138,18 @@ export async function getGameStats(filters?: GameFilters) {
 /**
  * Récupère un item de jeu par son ID
  */
-export async function getGameItemById(id: string): Promise<GameItem | null> {
+export async function getGameItemById(id: string): Promise<GameItemWithRelations | null> {
   'use cache';
   cacheTag(`game-item-${id}`, 'game-items');
   cacheLife('minutes');
   try {
-    const result = await db
-      .select()
-      .from(gameItems)
-      .where(eq(gameItems.id, id))
-      .limit(1);
-    return result[0] || null;
+    const result = await db.query.gameItems.findFirst({
+      where: and(eq(gameItems.id, id), eq(gameItems.isDeleted, false)),
+      with: {
+        game: true,
+      },
+    });
+    return result || null;
   } catch (error) {
     console.error('Error getting game item by ID:', error);
     throw new Error('Failed to fetch game item');
@@ -969,7 +970,11 @@ function buildGameItemWhereConditions(filters: GameItemFilters, options: QueryOp
   const conditions = [];
 
   if (!options.includeDeleted) {
-    conditions.push(eq(gameItems.isActive, true));
+    conditions.push(eq(gameItems.isDeleted, false));
+  }
+
+  if (filters.isActive !== undefined) {
+    conditions.push(eq(gameItems.isActive, filters.isActive));
   }
 
   if (filters.gameId) {
@@ -1008,7 +1013,7 @@ function buildGameItemWhereConditions(filters: GameItemFilters, options: QueryOp
     conditions.push(
       or(
         ilike(gameItems.name, `%${filters.search}%`),
-        ilike(gameItems.description || '', `%${filters.search}%`)
+        ilike(gameItems.description, `%${filters.search}%`)
       )
     );
   }

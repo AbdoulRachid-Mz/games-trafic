@@ -1,6 +1,5 @@
 import { getAllDocs } from "@/lib/docs";
 import { DocsSidebar, NavItem } from "@/components/docs/sidebar";
-import { Home, Book, Shield, HelpCircle, Mail } from "lucide-react";
 
 export default async function DocsLayout({
   children,
@@ -40,7 +39,8 @@ export default async function DocsLayout({
       href: "#",
       children: [
         { title: "Guides CMS", href: "/docs/guides" },
-        { title: "Support", href: "/support" },
+        { title: "Signaler un Bug", href: "/signals" },
+        { title: "Support Officiel", href: "/support" },
         { title: "Contact", href: "/contact" },
       ]
     },
@@ -56,10 +56,9 @@ export default async function DocsLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <DocsSidebar navItems={dynamicNav} />
-      <div className="md:pl-[260px]">
+      <DocsSidebar navItems={dynamicNav}>
         {children}
-      </div>
+      </DocsSidebar>
     </div>
   );
 }

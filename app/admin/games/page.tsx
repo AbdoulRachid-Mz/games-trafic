@@ -76,7 +76,7 @@ export default function AdminGamesPage() {
       <tr key={game.id} className="border-b hover:bg-muted/50">
         <td className="p-4">
           <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 rounded overflow-hidden bg-muted">
+            <div className="relative h-10 w-10 rounded-xl overflow-hidden bg-muted border border-border/50 shrink-0 flex items-center justify-center">
               {game.profileImage ? (
                 <Image
                   src={game.profileImage}
@@ -85,7 +85,13 @@ export default function AdminGamesPage() {
                   className="object-cover"
                 />
               ) : (
-                <Gamepad2 className="h-6 w-6 m-2 text-muted-foreground" />
+                <Image
+                  src="/icons/gt-primary.png"
+                  alt="GT"
+                  width={24}
+                  height={24}
+                  className="object-contain opacity-60"
+                />
               )}
             </div>
             <div>
@@ -202,7 +208,7 @@ export default function AdminGamesPage() {
           <div className="flex flex-col h-full gap-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted">
+                <div className="relative h-12 w-12 rounded-xl overflow-hidden bg-muted border border-border/50 shrink-0 flex items-center justify-center">
                   {game.profileImage ? (
                     <Image
                       src={game.profileImage}
@@ -211,7 +217,13 @@ export default function AdminGamesPage() {
                       className="object-cover"
                     />
                   ) : (
-                    <Gamepad2 className="h-6 w-6 m-3 text-muted-foreground" />
+                    <Image
+                      src="/icons/gt-primary.png"
+                      alt="GT"
+                      width={28}
+                      height={28}
+                      className="object-contain opacity-60"
+                    />
                   )}
                 </div>
                 <div>
@@ -331,10 +343,10 @@ export default function AdminGamesPage() {
         <DialogTitle className="text-2xl font-bold hidden">
           Détails de {selectedGame?.name}
         </DialogTitle>
-        <DialogContent className="max-w-7xl p-0 overflow-hidden bg-background border-primary/20">
+        <DialogContent className="max-w-3xl max-h-[90vh] p-0 overflow-hidden bg-background border-border/60 rounded-3xl">
           {selectedGame && (
             <>
-              <div className="relative h-48 w-full bg-muted">
+              <div className="relative h-36 sm:h-48 w-full bg-muted">
                 {selectedGame.coverImage ? (
                   <Image
                     src={selectedGame.coverImage}
@@ -343,13 +355,19 @@ export default function AdminGamesPage() {
                     className="object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-purple-500/20">
-                    <Gamepad2 className="h-16 w-16 text-primary/40" />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 via-purple-500/10 to-background p-4">
+                    <Image
+                      src="/icons/gt-controller-600.png"
+                      alt="GT Controller"
+                      width={80}
+                      height={80}
+                      className="object-contain opacity-30"
+                    />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-                <div className="absolute bottom-4 left-6 flex items-center gap-4">
-                  <div className="h-20 w-20 rounded-xl border-4 border-background overflow-hidden bg-background shadow-xl scale-110">
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+                <div className="absolute bottom-3 left-4 sm:bottom-4 sm:left-6 flex items-center gap-3 sm:gap-4">
+                  <div className="h-14 w-14 sm:h-18 sm:w-18 rounded-2xl border-2 sm:border-4 border-background overflow-hidden bg-background shadow-xl shrink-0 relative flex items-center justify-center">
                     {selectedGame.profileImage ? (
                       <Image
                         src={selectedGame.profileImage}
@@ -358,21 +376,27 @@ export default function AdminGamesPage() {
                         className="object-cover"
                       />
                     ) : (
-                      <Gamepad2 className="h-10 w-10 m-5 text-muted-foreground" />
+                      <Image
+                        src="/icons/gt-primary.png"
+                        alt="GT"
+                        width={36}
+                        height={36}
+                        className="object-contain"
+                      />
                     )}
                   </div>
-                  <div>
-                    <Typography variant="h3" weight="bold">
+                  <div className="min-w-0">
+                    <Typography variant="h4" className="font-black text-base sm:text-xl truncate text-foreground drop-shadow-sm">
                       {selectedGame.name}
                     </Typography>
-                    <Typography variant="body-sm" theme="muted">
-                      {selectedGame.publisher}
+                    <Typography variant="caption2" className="text-muted-foreground truncate">
+                      {selectedGame.publisher || "Éditeur inconnu"}
                     </Typography>
                   </div>
                 </div>
               </div>
 
-              <ScrollArea className="max-h-[60vh] p-6">
+              <ScrollArea className="max-h-[50vh] p-4 sm:p-6">
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">

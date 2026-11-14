@@ -47,6 +47,7 @@ import { useGames, useCreateGame, useUpdateGame } from "@/hooks/use-games";
 import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
+import { GameAssetPicker } from "@/components/admin/game-asset-picker";
 
 const PLATFORMS = [
   { value: "PC", label: "PC" },
@@ -222,20 +223,21 @@ function GameFormContent() {
 
       {previewMode ? (
         <div className="space-y-6">
-          <div className="relative h-64 w-full rounded-xl overflow-hidden bg-muted group text-start">
+          <div className="relative min-h-[14rem] sm:h-64 w-full rounded-2xl overflow-hidden bg-muted group text-start flex flex-col justify-end p-4 sm:p-6">
             {formData.coverImage ? (
               <img
                 src={formData.coverImage}
                 alt="Cover"
-                className="h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-primary/10 to-background">
                 Pas de couverture
               </div>
             )}
-            <div className="absolute bottom-6 left-6 flex items-end gap-4">
-              <div className="h-24 w-24 rounded-lg border-4 border-background overflow-hidden bg-muted">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-end gap-3 sm:gap-4">
+              <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-xl border-2 sm:border-4 border-background overflow-hidden bg-background shadow-xl shrink-0 flex items-center justify-center">
                 {formData.profileImage ? (
                   <img
                     src={formData.profileImage}
@@ -248,15 +250,15 @@ function GameFormContent() {
                   </div>
                 )}
               </div>
-              <div className="pb-2">
-                <h2 className="text-2xl font-bold text-white drop-shadow-md">
+              <div className="pb-1 min-w-0">
+                <h2 className="text-xl sm:text-2xl font-black text-white drop-shadow-md truncate">
                   {formData.name || "Sans nom"}
                 </h2>
-                <div className="flex gap-2">
-                  <Badge variant="secondary">
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Badge variant="secondary" className="text-xs">
                     {formData.genre || "Genre inconnu"}
                   </Badge>
-                  <Badge variant={formData.isActive ? "default" : "secondary"}>
+                  <Badge variant={formData.isActive ? "default" : "secondary"} className="text-xs">
                     {formData.isActive ? "Actif" : "Inactif"}
                   </Badge>
                 </div>
@@ -524,10 +526,19 @@ function GameFormContent() {
                   </CardHeader>
                   <CardContent className="space-y-8">
                     <div className="space-y-4">
-                      <Label>Logo / Image Profil</Label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Image carrée recommandée (ex: 512x512px)
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label>Logo / Image Profil</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Image carrée recommandée (ex: 512x512px)
+                          </p>
+                        </div>
+                        <GameAssetPicker
+                          value={watch("profileImage")}
+                          onChange={(url) => setValue("profileImage", url, { shouldDirty: true })}
+                          title="Choisir une icône officielle ou 3D"
+                        />
+                      </div>
                       <Controller
                         control={control}
                         name="profileImage"

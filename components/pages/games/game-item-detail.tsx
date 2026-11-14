@@ -15,9 +15,7 @@ import {
   ChevronRight,
   QrCode,
   Sparkles,
-  Star,
   Zap,
-  Eye,
   Crown,
   Gem,
 } from "lucide-react";
@@ -233,19 +231,19 @@ export function GameItemDetail({ item }: GameItemDetailProps) {
               {item.icon ? (
                 <motion.div
                   animate={{
-                    scale: imageHovered ? 1.08 : 1,
-                    rotateY: imageHovered ? 5 : 0,
-                    rotateX: imageHovered ? -3 : 0,
+                    scale: imageHovered ? 1.05 : 1,
+                    rotateY: imageHovered ? 3 : 0,
+                    rotateX: imageHovered ? -2 : 0,
                   }}
                   transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute inset-0"
+                  className="absolute inset-0 flex items-center justify-center p-8"
                   style={{ perspective: 1000 }}
                 >
                   <Image
                     src={item.icon}
                     fill
                     alt={item.name}
-                    className="object-cover"
+                    className="object-contain p-8"
                     priority
                   />
                 </motion.div>
@@ -348,18 +346,14 @@ export function GameItemDetail({ item }: GameItemDetailProps) {
                 transition={{ delay: 0.1 }}
                 className="flex items-center gap-3"
               >
-                {item.popularity && item.popularity > 0 && (
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    {[...Array(Math.min(5, Math.ceil(item.popularity / 20)))].map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-amber-400" />
-                    ))}
-                    <span className="text-xs font-bold ml-1 text-muted-foreground">#{item.popularity}</span>
-                  </div>
+                {item.featured && (
+                  <Badge className="px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-[10px] font-black uppercase tracking-widest">
+                    ⭐ Mis en avant
+                  </Badge>
                 )}
-                <div className="flex items-center gap-1 text-muted-foreground/60">
-                  <Eye className="h-3.5 w-3.5" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Vérifié</span>
-                </div>
+                <Badge variant="outline" className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border", theme.accentBg)}>
+                  {item.type}
+                </Badge>
               </motion.div>
             </div>
 
@@ -480,14 +474,13 @@ export function GameItemDetail({ item }: GameItemDetailProps) {
                 <Badge variant="outline" className="rounded-full border-border/30 px-3 py-1 font-bold text-xs bg-card/50">
                   #Gaming
                 </Badge>
-                <Badge variant="outline" className="rounded-full border-border/30 px-3 py-1 font-bold text-xs bg-card/50">
-                  #{item.game?.name?.replace(/\s+/g, '')}
-                </Badge>
+                {item.game?.name && (
+                  <Badge variant="outline" className="rounded-full border-border/30 px-3 py-1 font-bold text-xs bg-card/50">
+                    #{item.game.name.replace(/\s+/g, '')}
+                  </Badge>
+                )}
                 <Badge variant="outline" className={cn("rounded-full px-3 py-1 font-bold text-xs", theme.accentBg)}>
                   #{gameItemTypeLabel(item.type)}
-                </Badge>
-                <Badge variant="outline" className="rounded-full border-border/30 px-3 py-1 font-bold text-xs bg-card/50">
-                  #Verified
                 </Badge>
               </div>
             </motion.div>

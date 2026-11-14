@@ -1213,6 +1213,11 @@ export function OrganizeWizardClient({
         onOpenChange={setIsRevealOpen}
         editionName={edition?.name}
         structure={revealStructure}
+        generationLevel={{
+          groups: mode === "AUTO" ? autoConfig.depth.groups : draftPhases.some((p) => p.generateGroups),
+          brackets: mode === "AUTO" ? autoConfig.depth.brackets : draftPhases.some((p) => p.generateNodes),
+          matches: mode === "AUTO" ? autoConfig.depth.matches : draftPhases.some((p) => p.generateMatches),
+        }}
         onFinish={() => {
           router.push(
             `/tournaments/${tournamentId}/editions/${editionId}/dashboard/phases`,

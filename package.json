@@ -13,6 +13,7 @@
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:reset": "tsx scripts/db/reset.ts",
     "db:seed": "tsx database/seed.ts",
+    "db:seed:guides-services": "tsx database/seed-guides-services.ts",
     "db:setup": "tsx scripts/db/setup.ts",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push:pg"

@@ -1,65 +1,56 @@
-# TASK — SUIVI PROGRESSIF
+# TASK — SUIVI PROGRESSIF : REFONTE GLOBALE GAMES-TRAFICS
 
 ## Statut global
-- [x] Push git initial
-- [x] Phase 1 AppShell / sticky
-- [x] Phase 2 — Dashboard matchs + filtres + "Mes matchs" + onView
-- [x] Phase 3 — Composants réutilisables (GroupCard, MatchCard, onView unifié)
-- [x] Phase 4 — Responsive participants (MemberCard grid/list, breakpoints sm→xl)
-- [x] Phase 5 Classements (bracket-standings, 3ème/4ème place)
-- [x] Phase 6 Organisation & animations (EditionStructureRevealDialog)
-- [x] Phase 7 Troisième place (Petite Finale, generators, progression-engine)
-- [x] Phase 8 Validation finale
+- [x] Refonte précédente (Tournois, Matchs, Standings, Petite Finale, Validation 270 tests)
+- [x] Refonte Visuelle 3D Gaming & Marketplace (`/games`, `/admin/games`, `<GameItemVisual>`, `<GameAssetPicker>`, Manifeste)
+- [x] Phase 1 — Refonte Documentation Officielle (`docs/content/**`, nouveaux modules account, wallet, games, teams, community, vip)
+- [x] Phase 2 — Guides Interactifs (`/docs/guides`, `/docs/guides/[guideId]`)
+- [x] Phase 3 — Refonte Services Officiels (`/services`, `/services/[id]`, section "Comprendre la fonctionnalité", lien doc)
+- [x] Phase 4 — Seed Idempotent & Non-destructif (`database/seed-guides-services.ts`, commande `db:seed:guides-services`)
+- [x] Phase 5 — Composants d'Upload Sécurisés (`advanced-multi-upload.tsx`, `advanced-upload.tsx`, `advanced-video-upload.tsx`)
+- [x] Phase 6 — Image PNG Placeholder Thématique (`public/images/placeholders/games-trafics-upload.png`)
+- [x] Phase 7 — Validation & Tests (TSC 0 erreur, ESLint 0 erreur, Vitest 270/270 passed)
+
+---
 
 ## Tâches détaillées
 
-### Phase 2 — Dashboard & Matchs (✅ COMPLET)
-- [x] `buildMatchWhereConditions` : supprimé le throw, ajouté soft-delete, search, memberRegistrationId.
-- [x] `getMatchesWithParticipants` : tri dynamique + relation bracketNode.
-- [x] `useMatchList` : clé de cache include filters + pagination + options.
-- [x] `dashboard/matches/page.tsx` : sync sortBy/sortOrder, error UI, lien "Gérer".
-- [x] `edition-matches-tab.tsx` : search debounce 300ms, "Mes matchs" prioritization, badge visuel.
-- [x] `edition-matches-client.tsx` : filtres statut/recherche/phase/group, toggle "Mes matchs", prioritization.
-- [x] `match-card.tsx` : badge "Votre combat", onView, footer toujours accessible.
-- [x] `app-shell-store.ts` : getAppShellStickyOffset, useAppShellStickyOffset.
-- [x] `edition-detail-header.tsx` : sticky tabs lié au scroll de page (sentinelRef au-dessus des tabs).
-- [x] `match-control-client.tsx` : canConfirmMatch admin + bannière edit active.
+### Phase 1 — Refonte Documentation Officielle
+- [x] Réécriture complète de `docs/content/getting-started.md` (vue d'ensemble, rôles réels, 5 étapes, sécurité).
+- [x] Création de `docs/content/account/overview.md` (profils, rôles BUYER/SELLER/TRADER/ORGANIZER/VIP, KYC, Passkeys Better-Auth).
+- [x] Création de `docs/content/wallet/overview.md` (architecture Wallet GTC, dépôts, retraits, transferts P2P, PIN, statuts PENDING/PROCESSING/COMPLETED/FAILED/REFUNDED).
+- [x] Création de `docs/content/games/overview.md` (catalogue, 5 types COIN/ITEM/SKIN/EQUIPMENT/CURRENCY, parcours d'achat réel).
+- [x] Création de `docs/content/teams/overview.md` (composition roster, rôles CAPTAIN/PLAYER/COACH/SUBSTITUTE, tournois).
+- [x] Création de `docs/content/community/overview.md` (clips vidéo, publications, messagerie directe et groupes, notifications).
+- [x] Création de `docs/content/vip/overview.md` (avantages statut VIP, réductions commissions, badge doré, formules).
+- [x] Modernisation de `app/docs/page.tsx` avec les 10 catégories complètes.
 
-### Phase 3 — Composants (✅ COMPLET)
-- [x] `GroupCard` : compact/list/grid viewModes, props onView/onEdit/onDelete/onManageGroup.
-- [x] `GroupCard` intégré dans `phase-detail-client.tsx` avec onView.
-- [x] `MatchCard` : onView unifié sur group-detail-client, edition-brackets-tab, member page.
-- [x] `edition-brackets-tab.tsx` : onView → router.push vers page match.
-- [x] `group-detail-client.tsx` : toutes les MatchCard utilisent onView + router.refresh.
-- [x] TypeScript clean (tsc --noEmit = 0 erreurs).
+### Phase 2 — Guides Interactifs
+- [x] Vérification de `app/docs/guides/page.tsx` et alignement des filtres.
+- [x] Rationalisation de `app/docs/guides/[guideId]/page.tsx` (gestion progressive des étapes, sans doublons).
 
-### Phase 4 — Responsive participants (✅ COMPLET)
-- [x] `EditionParticipantsList` : toggle grid/list, search, export PDF/CSV/JSON.
-- [x] `MemberCard` : grid (1→2→3→4 colonnes) + list (flex colonne) + compact.
-- [x] Breakpoints sm/md/lg/xl couverts.
+### Phase 3 — Services Officiels
+- [x] Suppression de tous les avis, étoiles fictives et badges marketing inventés ("5.0 Rating", "100% Garanti").
+- [x] Remplacement du bouton de commande fictif par un vrai CTA de contact vers `/support`.
+- [x] Ajout de la section obligatoire "Comprendre la fonctionnalité" avec `resolveServiceDocLink()` sur chaque page de service.
+- [x] Nettoyage de `ServiceCard` et de la grille `/services`.
 
-### Phase 5 — Classements (✅ COMPLET)
-- [x] `computeBracketStandings` : classement 1er/2ème/3ème/4ème place (nœuds consolation / isThirdPlace).
-- [x] `bracket-standings.test.ts` : 5/5 tests validés.
-- [x] Type check + tests OK.
+### Phase 4 — Seed Idempotent & Non-destructif
+- [x] Création de `database/seed-guides-services.ts`.
+- [x] Association dynamique avec un administrateur réel (`role = 'ADMIN'`).
+- [x] Insertion de 5 guides complets avec leurs étapes et 4 services officiels.
+- [x] Vérification d'idempotence stricte (aucune duplication lors d'exécutions successives).
+- [x] Ajout du script `"db:seed:guides-services"` dans `package.json`.
 
-### Phase 6 — Animations (✅ COMPLET)
-- [x] `EditionStructureRevealDialog` : composant de révélation multi-étapes (Phase, Group, Participant, Bracket, Match).
-- [x] Progress stepper, "Tout révéler", accessible + dark esports.
-- [x] Intégré dans `organize-wizard-client.tsx` après `organizeEditionStructure()`.
-- [x] Type check + build OK.
+### Phase 5 — Composants d'Upload
+- [x] `advanced-multi-upload.tsx` : Remplacement des `alert()` par `toast`, gestion de concurrence (max 3), contrôle strict des quotas, bouton retry sur échec, nettoyage mémoire via `URL.revokeObjectURL`.
+- [x] `advanced-upload.tsx` : Intégration du placeholder thématique GT et libération des URLs d'objet.
+- [x] `advanced-video-upload.tsx` : Sécurisation du cloud name via variable d'environnement avec fallback.
 
-### Phase 7 — Troisième place (✅ COMPLET)
-- [x] `generators.ts` : option `thirdPlaceMatch`, génération "Petite Finale (3ème Place)", `groupType: 'CONSOLATION'`, `isThirdPlace: true`.
-- [x] `structure-engine.ts` : transmission de l'option à `setupEliminationGroups`.
-- [x] `progression-engine.ts` : avance les perdants des demi-finales au nœud 3ème place, `isEliminationPhaseComplete` = Grand Final + Petite Finale.
-- [x] `edition-brackets-tab.tsx` : badge bronze "Petite Finale (3ème Place)" visuel.
-- [x] `organize-wizard-client.tsx` : checkbox `thirdPlaceMatch` en mode auto + manuel.
-- [x] Type check + tests OK.
+### Phase 6 — Placeholder PNG
+- [x] Création de `public/images/placeholders/games-trafics-upload.png` arborant la manette GT officielle.
 
-### Phase 8 — Validation Finale (✅ COMPLET)
-- [x] `bun x tsc --noEmit` → 0 erreurs TypeScript
-- [x] `bun x vitest run tests/unit` → 270/270 tests passés (29 fichiers)
-- [x] `bun run lint` → 0 erreurs (fix `hooks/use-stats.ts` : `useQueries` remplace `.map(useEntityStats)`)
-- [x] `bun run build` → 100% succès (0 erreurs, 193 pages et routes compilées/prerendered)
-- [x] Documentation → `REFONTE-FINALE.md`
+### Phase 7 — Validation & Tests
+- [x] `bunx tsc --noEmit` → 0 erreur.
+- [x] `bun x vitest run tests/unit` → 270/270 tests passés (100%).
+- [x] Tests d'idempotence validés en conditions réelles.

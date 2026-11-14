@@ -1,11 +1,9 @@
 import { getServices } from "@/actions/services";
 import { Button } from "@/components/ui/button";
 import { Typography } from "@/components/ui/typography";
-import { Search, SlidersHorizontal, Sparkles, Filter } from "lucide-react";
+import { Sparkles, Shield, Trophy, ShoppingBag, HelpCircle, BookOpen } from "lucide-react";
 import { ServiceCard } from "@/components/cards/service-card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-
+import Link from "next/link";
 
 export default async function ServicesPage() {
   let result: Awaited<ReturnType<typeof getServices>>;
@@ -25,117 +23,100 @@ export default async function ServicesPage() {
   const services = result.data;
 
   return (
-    <div className="min-h-screen bg-background/50">
-      {/* Premium Hero Section */}
-      <section className="relative pt-24 pb-20 md:pt-32 md:pb-24 overflow-hidden">
-        {/* Abstract Background Elemets */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -mr-64 -mt-64" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary/10 rounded-full blur-[100px] -ml-48 -mb-48" />
+    <div className="min-h-screen bg-background">
+      {/* Hero Section Premium */}
+      <section className="relative pt-16 pb-16 md:pt-24 md:pb-20 overflow-hidden border-b border-border/40">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-bold tracking-wider uppercase">Nos Solutions</span>
+          <div className="max-w-3xl mx-auto text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-black uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Prestations & Accompagnement</span>
             </div>
 
             <Typography
               variant="h1"
-              weight="bold"
-              className="text-4xl md:text-5xl lg:text-6xl tracking-tighter italic uppercase animate-in fade-in slide-in-from-bottom-6 duration-1000"
+              className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tight uppercase leading-[1.05]"
             >
-              Services <span className="text-primary">E-Sport</span> & Gaming
+              Services Officiels <br />
+              <span className="bg-gradient-to-r from-primary via-purple-400 to-blue-500 bg-clip-text text-transparent italic">
+                Games-Trafics
+              </span>
             </Typography>
 
             <Typography
               variant="lead"
-              theme="muted"
-              className="text-xl max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200"
+              className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed"
             >
-              Boostez votre expérience de jeu avec nos services professionnels.
-              Du coaching intensif aux solutions techniques sur mesure.
+              Bénéficiez de l'accompagnement officiel de notre équipe pour vos tournois, vos boutiques, votre compte ou vos intégrations techniques.
             </Typography>
 
-            {/* Quick Search/Filter Bar */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 max-w-2xl mx-auto pt-8 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
-              <div className="relative w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher un service..."
-                  className="pl-12 h-14 rounded-[2rem] md:rounded-[2.5rem] bg-background/80 backdrop-blur-md border-border/50 shadow-xl"
-                />
-              </div>
-              <Button size="lg" className="h-14 px-8 rounded-[2rem] md:rounded-[2.5rem] gap-2 w-full sm:w-auto shadow-lg shadow-primary/20">
-                <Filter className="w-5 h-5" />
-                Filtrer
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-3 pt-4 animate-in fade-in duration-1000 delay-500">
-              {["Coaching", "Boost", "Design", "Account Management", "Technical Support"].map((tag) => (
-                <Badge key={tag} variant="outline" className="px-4 py-1.5 rounded-full hover:bg-primary/5 cursor-pointer transition-colors border-border/50">
-                  {tag}
-                </Badge>
+            {/* Piliers des services réels */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 text-left">
+              {[
+                { icon: Trophy, label: "Tournois E-Sport", desc: "Organisation & Brackets" },
+                { icon: ShoppingBag, label: "Boutiques", desc: "Création & Certification" },
+                { icon: Shield, label: "Sécurité & Wallet", desc: "Assistance GTC & PIN" },
+                { icon: HelpCircle, label: "Support Pro", desc: "Assistance technique" },
+              ].map((pil, idx) => (
+                <div key={idx} className="p-3 rounded-2xl bg-card/60 border border-border/60 space-y-1">
+                  <pil.icon className="h-4 w-4 text-primary" />
+                  <p className="text-xs font-bold leading-tight">{pil.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{pil.desc}</p>
+                </div>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Services Grid */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="flex items-center justify-between mb-12">
+      {/* Grille des Prestations */}
+      <section className="container mx-auto px-4 py-12 md:py-16">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <Typography variant="h2" weight="bold" className="text-3xl tracking-tight">
-              Tous nos services
+            <Typography variant="h2" className="text-2xl sm:text-3xl font-black uppercase tracking-tight">
+              Toutes nos prestations
             </Typography>
-            <div className="h-1 w-20 bg-primary mt-2 rounded-full" />
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {services.length} prestation{services.length > 1 ? "s" : ""} disponible{services.length > 1 ? "s" : ""} sur la plateforme
+            </p>
           </div>
-          <Typography variant="body-sm" theme="muted" className="hidden sm:block">
-            Affiche <span className="text-foreground font-bold">{services.length}</span> services disponibles
-          </Typography>
+
+          <Button variant="outline" size="sm" asChild className="rounded-xl gap-2 text-xs font-bold">
+            <Link href="/docs">
+              <BookOpen className="w-3.5 h-3.5 text-primary" />
+              Consulter la documentation
+            </Link>
+          </Button>
         </div>
 
-        {!services || services.length === 0 ? (
-          <div className="text-center py-20 bg-muted/20 rounded-[2rem] md:rounded-[2.5rem] border border-dashed border-border">
-            <Typography variant="h3" theme="muted">Aucun service disponible pour le moment</Typography>
+        {services.length === 0 ? (
+          <div className="text-center py-16 px-4 bg-muted/20 rounded-3xl border border-dashed border-border/60 max-w-md mx-auto space-y-4">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto text-2xl">
+              ✨
+            </div>
+            <Typography variant="h4" className="font-bold text-lg">
+              Aucune prestation active pour le moment
+            </Typography>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Nos équipes préparent les prochaines offres d'accompagnement. Vous pouvez contacter le support pour toute demande particulière.
+            </p>
+            <Button size="sm" asChild className="rounded-xl text-xs font-bold">
+              <Link href="/support">Contacter le support</Link>
+            </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {services.map((service) => (
-              <ServiceCard key={service.id} item={service} />
+              <ServiceCard
+                key={service.id}
+                item={service}
+              />
             ))}
           </div>
         )}
-      </section>
-
-      {/* Premium CTA Section */}
-      <section className="container mx-auto px-4 py-24">
-        <div className="relative rounded-[4rem] overflow-hidden bg-primary p-12 lg:p-20 text-center">
-          {/* Animated background blobs */}
-          <div className="absolute top-0 left-0 w-full h-full opacity-30">
-            <div className="absolute top-1/2 left-1/4 w-[500px] h-[500px] bg-white rounded-full blur-[150px] animate-pulse" />
-            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-secondary rounded-full blur-[120px]" />
-          </div>
-
-          <div className="relative z-10 max-w-3xl mx-auto space-y-8">
-            <Typography variant="h2" weight="bold" className="text-4xl lg:text-6xl text-white tracking-tighter uppercase italic">
-              Besoin d'une solution sur mesure ?
-            </Typography>
-            <Typography variant="lead" className="text-white/80 text-xl">
-              Notre équipe d'experts est prête à répondre à vos besoins spécifiques.
-              Parlons de votre projet dès aujourd'hui.
-            </Typography>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-              <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-[2rem] md:rounded-[2.5rem] px-10 h-14 text-lg transition-transform hover:scale-105">
-                Nous Contacter
-              </Button>
-              <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 rounded-[2rem] md:rounded-[2.5rem] px-10 h-14 text-lg">
-                En savoir plus
-              </Button>
-            </div>
-          </div>
-        </div>
       </section>
     </div>
   );

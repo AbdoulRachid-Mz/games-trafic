@@ -7,9 +7,10 @@ import {
   Coins,
   Shield,
   Clock,
-  ShoppingCart,
   Gamepad2,
   ChevronRight,
+  Zap,
+  Gem,
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ import Image from "next/image";
 
 interface GameItemCardProps {
   item: GameItemWithRelations;
-  onView?: (id: number) => void;
+  onView?: (id: string) => void;
 }
 
 export function GameItemCard({ item, onView }: GameItemCardProps) {
@@ -46,26 +47,33 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
         return <Package className="h-4 w-4" />;
       case "SKIN":
         return <Shield className="h-4 w-4" />;
+      case "EQUIPMENT":
+        return <Zap className="h-4 w-4" />;
+      case "CURRENCY":
+        return <Gem className="h-4 w-4" />;
       default:
         return <Package className="h-4 w-4" />;
     }
   };
-
 
   const getTypeText = (type: string) => {
     switch (type) {
       case "COIN": return "Monnaie";
       case "ITEM": return "Objet";
       case "SKIN": return "Skin";
+      case "EQUIPMENT": return "Équipement";
+      case "CURRENCY": return "Devise";
       default: return "Pack";
     }
   };
 
-  const typeColorClasses = {
+  const typeColorClasses: Record<string, string> = {
     COIN: "text-amber-500 bg-amber-500/10 border-amber-500/20",
     ITEM: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-    SKIN: "text-purple-500 bg-purple-500/10 border-purple-500/20"
-  } as any;
+    SKIN: "text-purple-500 bg-purple-500/10 border-purple-500/20",
+    EQUIPMENT: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+    CURRENCY: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+  };
 
   return (
     <motion.div
@@ -79,20 +87,25 @@ export function GameItemCard({ item, onView }: GameItemCardProps) {
       <Card className="h-full overflow-hidden border-border/60 bg-card/40 backdrop-blur-xl transition-all duration-300 shadow-sm hover:shadow-2xl hover:shadow-primary/10 rounded-[2rem] flex flex-col group py-0">
         <CardContent className="p-0 flex-1">
           <Link href={`/games/${item.id}`} className="block h-full group/link">
-            {/* Media Section */}
-          <div className="relative aspect-[4/3] overflow-hidden bg-muted/30">
+          {/* Media Section */}
+          <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-card to-muted/50">
             {item.icon ? (
-              <div className="relative">
-              <Image
-                src={item.icon}
-                fill
-                alt={item.name}
-                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+              <div className="relative h-full w-full flex items-center justify-center p-4 bg-gradient-to-br from-background/60 to-muted/40">
+                <Image
+                  src={item.icon}
+                  fill
+                  alt={item.name}
+                  className="object-contain transition-transform duration-700 group-hover:scale-110 p-4"
                 />
+                {/* GT logo watermark */}
+                <div className="absolute bottom-2 right-2 opacity-20 pointer-events-none">
+                  <Image src="/icons/gt-primary.png" width={24} height={24} alt="GT" className="object-contain" />
                 </div>
+              </div>
             ) : (
-              <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-purple-500/10">
-                <Package className="h-14 w-14 text-muted-foreground/20" />
+              <div className="h-full w-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary/5 to-purple-500/10 p-4">
+                <Image src="/icons/gt-primary.png" width={40} height={40} alt="GT" className="object-contain opacity-20" />
+                <Package className="h-10 w-10 text-muted-foreground/20" />
               </div>
             )}
 

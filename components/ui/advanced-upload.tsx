@@ -391,15 +391,20 @@ export function AdvancedUpload({
               </div>
             ) : (
               <>
-                <div className="p-3 rounded-full bg-primary/10">
-                  <ImageIcon className="h-6 w-6 text-primary" />
+                <div className="relative h-14 w-14 mb-1">
+                  <Image
+                    src="/images/uploads/upload.png"
+                    alt="Upload Games-Trafics"
+                    fill
+                    className="object-contain opacity-80"
+                  />
                 </div>
                 {!isRounded && (
                   <div className="text-center space-y-1">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-xs font-bold uppercase tracking-wider text-foreground">
                       Glissez-déposez ou cliquez pour uploader
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       PNG, JPG, WEBP (max. {maxSizeMB}MB)
                     </p>
                   </div>

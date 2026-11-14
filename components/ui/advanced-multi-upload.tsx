@@ -8,10 +8,11 @@ import {
   X,
   ImageIcon,
   Loader2,
-  Plus,
   Grid3X3,
   Search,
+  RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -79,6 +80,7 @@ interface AdvancedMultiUploadProps {
 interface UploadingFile {
   id: string;
   name: string;
+  file?: File;
   progress: number;
   originalSize: number;
   compressedSize?: number;
@@ -96,7 +98,7 @@ export function AdvancedMultiUpload({
   uploadPath = "images",
   uploadPreset = "games_trafics",
   className,
-  previewClassName,
+  previewClassName: _previewClassName,
   emptyPreview,
   dropzoneOptions = {
     accept: {
@@ -123,6 +125,28 @@ export function AdvancedMultiUpload({
   const { isXLargeScreen: isDesktop } = useScreenSize();
   const inputRef = useRef<HTMLInputElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const valueRef = useRef<string[]>(value || []);
+  const createdObjectUrlsRef = useRef<Set<string>>(new Set());
+
+  // Maintenir valueRef toujours à jour
+  useEffect(() => {
+    valueRef.current = value || [];
+  }, [value]);
+
+  // Nettoyage de la mémoire au démontage
+  useEffect(() => {
+    const urlsToClean = createdObjectUrlsRef.current;
+    return () => {
+      urlsToClean.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      });
+      urlsToClean.clear();
+    };
+  }, []);
 
   // Charger les images internes lorsque le dialog s'ouvre
   useEffect(() => {
@@ -161,17 +185,128 @@ export function AdvancedMultiUpload({
     internalImagesFolder,
   ]);
 
+  const uploadSingleFile = useCallback(
+    async (fileInfo: { id: string; file: File; name: string; originalSize: number }) => {
+      try {
+        const compressedFile = await compressImage(fileInfo.file, {
+          maxSizeMB,
+          maxWidthOrHeight,
+          onProgress: (progress: number) => {
+            setUploadingFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileInfo.id
+                  ? { ...f, progress: 10 + Math.round(progress * 50) }
+                  : f
+              )
+            );
+          },
+        });
+
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileInfo.id
+              ? {
+                  ...f,
+                  status: "uploading",
+                  progress: 65,
+                  compressedSize: compressedFile.size,
+                }
+              : f
+          )
+        );
+
+        if (isAutoUpload) {
+          const result = await uploadToCloudinary(compressedFile, {
+            uploadPath,
+            uploadPreset,
+          });
+
+          if (!result.success || !result.url) {
+            throw new Error(result.error || "Échec du téléchargement Cloudinary");
+          }
+
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === fileInfo.id ? { ...f, status: "complete", progress: 100 } : f
+            )
+          );
+
+          // Ajout atomique dans value via ref
+          const updated = [...valueRef.current, result.url];
+          valueRef.current = updated;
+          onChange(updated);
+
+          setTimeout(() => {
+            setUploadingFiles((prev) => prev.filter((f) => f.id !== fileInfo.id));
+          }, 1500);
+
+          return result.url;
+        } else {
+          const objectUrl = URL.createObjectURL(compressedFile);
+          createdObjectUrlsRef.current.add(objectUrl);
+
+          setUploadingFiles((prev) =>
+            prev.map((f) =>
+              f.id === fileInfo.id ? { ...f, status: "complete", progress: 100 } : f
+            )
+          );
+
+          const updated = [...valueRef.current, objectUrl];
+          valueRef.current = updated;
+          onChange(updated);
+
+          setTimeout(() => {
+            setUploadingFiles((prev) => prev.filter((f) => f.id !== fileInfo.id));
+          }, 1500);
+
+          return objectUrl;
+        }
+      } catch (err: any) {
+        console.error("Upload error:", err);
+        setUploadingFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileInfo.id
+              ? {
+                  ...f,
+                  status: "error",
+                  progress: 0,
+                  error: err?.message || "Erreur de transfert",
+                }
+              : f
+          )
+        );
+        toast.error(`Échec pour ${fileInfo.name}: ${err?.message || "Erreur réseau"}`);
+        return null;
+      }
+    },
+    [isAutoUpload, maxSizeMB, maxWidthOrHeight, onChange, uploadPath, uploadPreset]
+  );
+
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
 
-      if (value.length + files.length > maxImages) {
-        alert(`Vous ne pouvez pas uploader plus de ${maxImages} images.`);
+      const currentActiveCount = (valueRef.current.length || 0) + uploadingFiles.filter((f) => f.status !== "error").length;
+      const remainingSlots = Math.max(0, maxImages - currentActiveCount);
+
+      if (remainingSlots <= 0) {
+        toast.error(`Limite maximale de ${maxImages} images déjà atteinte.`);
+        if (inputRef.current) inputRef.current.value = "";
         return;
       }
 
-      const filesToUpload = Array.from(files).map((file) => ({
+      const rawFilesArray = Array.from(files);
+      let selectedFiles = rawFilesArray;
+
+      if (rawFilesArray.length > remainingSlots) {
+        selectedFiles = rawFilesArray.slice(0, remainingSlots);
+        toast.warning(
+          `Seules ${remainingSlots} image(s) sur les ${rawFilesArray.length} sélectionnées ont été conservées (limite: ${maxImages}).`
+        );
+      }
+
+      const filesToUpload = selectedFiles.map((file) => ({
         id: Math.random().toString(36).substring(2, 9),
         file,
         name: file.name,
@@ -182,169 +317,80 @@ export function AdvancedMultiUpload({
 
       setUploadingFiles((prev) => [...prev, ...filesToUpload]);
 
-      const uploadPromises = filesToUpload.map(async (fileInfo) => {
-        try {
-          // Compression d'image
-          const compressedFile = await compressImage(fileInfo.file, {
-            maxSizeMB,
-            maxWidthOrHeight,
-            onProgress: (progress: number) => {
-              setUploadingFiles((prev) =>
-                prev.map((f) => {
-                  if (f.id === fileInfo.id) {
-                    return {
-                      ...f,
-                      progress: 10 + Math.round(progress * 60),
-                    };
-                  }
-                  return f;
-                })
-              );
-            },
-          });
+      // Traitement avec concurrence contrôlée (max 3 uploads simultanés)
+      const CONCURRENCY_LIMIT = 3;
+      const queue = [...filesToUpload];
+      const activeWorkers: Promise<void>[] = [];
 
-          setUploadingFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileInfo.id
-                ? {
-                    ...f,
-                    status: "uploading",
-                    progress: 70,
-                    compressedSize: compressedFile.size,
-                  }
-                : f
-            )
-          );
-
-          if (isAutoUpload) {
-            // Upload automatique
-            const result = await uploadToCloudinary(compressedFile, {
-              uploadPath,
-              uploadPreset,
-            });
-
-            setUploadingFiles((prev) =>
-              prev.map((f) =>
-                f.id === fileInfo.id
-                  ? {
-                      ...f,
-                      progress: 90,
-                    }
-                  : f
-              )
-            );
-
-            if (!result.success) {
-              throw new Error(result.error || "Upload failed");
-            }
-
-            setUploadingFiles((prev) =>
-              prev.map((f) =>
-                f.id === fileInfo.id
-                  ? {
-                      ...f,
-                      status: "complete",
-                      progress: 100,
-                    }
-                  : f
-              )
-            );
-
-            setTimeout(() => {
-              setUploadingFiles((prev) =>
-                prev.filter((f) => f.id !== fileInfo.id)
-              );
-            }, 2000);
-
-            return result.url;
-          } else {
-            // Stockage temporaire pour upload différé
-            const objectUrl = URL.createObjectURL(compressedFile);
-            setUploadingFiles((prev) =>
-              prev.map((f) =>
-                f.id === fileInfo.id
-                  ? {
-                      ...f,
-                      status: "complete",
-                      progress: 100,
-                    }
-                  : f
-              )
-            );
-
-            setTimeout(() => {
-              setUploadingFiles((prev) =>
-                prev.filter((f) => f.id !== fileInfo.id)
-              );
-            }, 2000);
-
-            return objectUrl;
+      const runWorker = async () => {
+        while (queue.length > 0) {
+          const nextItem = queue.shift();
+          if (nextItem) {
+            await uploadSingleFile(nextItem);
           }
-        } catch (error) {
-          console.error("Upload error:", error);
-          setUploadingFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileInfo.id
-                ? {
-                    ...f,
-                    status: "error",
-                    progress: 0,
-                    error:
-                      error instanceof Error ? error.message : "Unknown error",
-                  }
-                : f
-            )
-          );
-
-          setTimeout(() => {
-            setUploadingFiles((prev) =>
-              prev.filter((f) => f.id !== fileInfo.id)
-            );
-          }, 3000);
-
-          return null;
         }
-      });
+      };
 
-      const urls = await Promise.all(uploadPromises);
-      const validUrls = urls.filter((url): url is string => url !== null);
+      for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, filesToUpload.length); i++) {
+        activeWorkers.push(runWorker());
+      }
 
-      const newUrls = [...value, ...validUrls];
-      onChange(newUrls);
+      await Promise.all(activeWorkers);
 
       if (inputRef.current) {
         inputRef.current.value = "";
       }
     },
-    [
-      maxImages,
-      maxSizeMB,
-      maxWidthOrHeight,
-      onChange,
-      value,
-      uploadPath,
-      uploadPreset,
-      isAutoUpload,
-    ]
+    [maxImages, uploadSingleFile, uploadingFiles]
+  );
+
+  const handleRetry = useCallback(
+    async (fileId: string) => {
+      const target = uploadingFiles.find((f) => f.id === fileId);
+      if (!target || !target.file) return;
+
+      setUploadingFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "compressing", progress: 0, error: undefined } : f))
+      );
+
+      await uploadSingleFile({
+        id: target.id,
+        file: target.file,
+        name: target.name,
+        originalSize: target.originalSize,
+      });
+    },
+    [uploadSingleFile, uploadingFiles]
   );
 
   const handleRemove = useCallback(
     (index: number) => {
-      const newUrls = [...value];
+      const removedUrl = valueRef.current[index];
+      if (removedUrl && createdObjectUrlsRef.current.has(removedUrl)) {
+        try {
+          URL.revokeObjectURL(removedUrl);
+          createdObjectUrlsRef.current.delete(removedUrl);
+        } catch (_) {}
+      }
+      const newUrls = [...valueRef.current];
       newUrls.splice(index, 1);
+      valueRef.current = newUrls;
       onChange(newUrls);
     },
-    [onChange, value]
+    [onChange]
   );
 
   const handleInternalImageSelect = (image: ImageInfo) => {
-    if (value.length >= maxImages) {
-      alert(`Vous ne pouvez pas ajouter plus de ${maxImages} images.`);
+    const currentActiveCount = (valueRef.current.length || 0) + uploadingFiles.filter((f) => f.status !== "error").length;
+    if (currentActiveCount >= maxImages) {
+      toast.error(`Vous ne pouvez pas ajouter plus de ${maxImages} images.`);
       return;
     }
 
-    const newUrls = [...value, image.url];
+    const newUrls = [...valueRef.current, image.url];
+    valueRef.current = newUrls;
     onChange(newUrls);
+    toast.success("Image ajoutée depuis la bibliothèque");
   };
 
   const handleDialogOpenChange = (open: boolean) => {
@@ -501,16 +547,22 @@ export function AdvancedMultiUpload({
             {emptyPreview ? (
               emptyPreview
             ) : (
-              <>
-                <Plus className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-sm font-medium text-center">
+              <div className="flex flex-col items-center justify-center p-3 text-center">
+                <div className="relative h-12 w-12 mb-2 opacity-80">
+                  <Image
+                    src="/images/uploads/upload.png"
+                    alt="Upload Games-Trafics"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-wider text-foreground">
                   Ajouter une image
                 </p>
-                <p className="text-xs text-muted-foreground mt-1 text-center">
-                  {maxImages - value.length} restante
-                  {maxImages - value.length > 1 ? "s" : ""}
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {maxImages - value.length} restante{maxImages - value.length > 1 ? "s" : ""}
                 </p>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -527,45 +579,67 @@ export function AdvancedMultiUpload({
       />
 
       {uploadingFiles.length > 0 && (
-        <ScrollArea className="h-40 border rounded-lg p-4">
-          <div className="space-y-4">
+        <ScrollArea className="max-h-48 border border-border/60 rounded-xl p-3 bg-card/40">
+          <div className="space-y-3">
             {uploadingFiles.map((file) => (
-              <div key={file.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium truncate max-w-[200px]">
+              <div key={file.id} className="space-y-1.5 p-2 rounded-lg bg-background/50 border border-border/40">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <ImageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-semibold truncate max-w-[160px] sm:max-w-[240px]">
                       {file.name}
                     </span>
                   </div>
-                  <span
-                    className={`text-xs ${
-                      file.status === "error"
-                        ? "text-destructive"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {file.status === "compressing"
-                      ? "Compression..."
-                      : file.status === "uploading"
-                      ? "Upload..."
-                      : file.status === "complete"
-                      ? "Terminé"
-                      : file.error || "Erreur"}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[11px] font-medium ${
+                        file.status === "error"
+                          ? "text-destructive"
+                          : file.status === "complete"
+                          ? "text-emerald-500"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {file.status === "compressing"
+                        ? "Compression..."
+                        : file.status === "uploading"
+                        ? "Transfert..."
+                        : file.status === "complete"
+                        ? "Terminé"
+                        : file.error || "Erreur"}
+                    </span>
+                    {file.status === "error" && file.file && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-primary hover:bg-primary/10"
+                        onClick={() => handleRetry(file.id)}
+                        title="Réessayer"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={() => setUploadingFiles((prev) => prev.filter((f) => f.id !== file.id))}
+                      title="Retirer"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-                <Progress value={file.progress} className="h-1" />
+                <Progress value={file.progress} className="h-1 rounded-full" />
                 {file.compressedSize && (
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
                     <span>
-                      Original: {formatBytes(file.originalSize)} • Compressé:{" "}
-                      {formatBytes(file.compressedSize)}
+                      {formatBytes(file.originalSize)} → {formatBytes(file.compressedSize)}
                     </span>
                     <span>
-                      {Math.round(
-                        (file.compressedSize / file.originalSize) * 100
-                      )}
-                      %
+                      {Math.round((file.compressedSize / file.originalSize) * 100)}%
                     </span>
                   </div>
                 )}

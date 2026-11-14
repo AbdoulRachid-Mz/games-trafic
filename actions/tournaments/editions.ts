@@ -251,15 +251,83 @@ export async function getEditionDetailTree(
               orderBy: (groups, { asc }) => [asc(groups.order)],
               with: {
                 bracketNodes: true,
-                participants: true,
+                participants: {
+                  with: {
+                    registration: {
+                      with: {
+                        member: {
+                          with: {
+                            user: true,
+                            team: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
             bracketNodes: true,
-            matches: true,
+            matches: {
+              with: {
+                participant1: {
+                  with: {
+                    member: {
+                      with: {
+                        user: true,
+                        team: true,
+                      },
+                    },
+                  },
+                },
+                participant2: {
+                  with: {
+                    member: {
+                      with: {
+                        user: true,
+                        team: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
-        matches: true,
-        registrations: true,
+        matches: {
+          with: {
+            participant1: {
+              with: {
+                member: {
+                  with: {
+                    user: true,
+                    team: true,
+                  },
+                },
+              },
+            },
+            participant2: {
+              with: {
+                member: {
+                  with: {
+                    user: true,
+                    team: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        registrations: {
+          with: {
+            member: {
+              with: {
+                user: true,
+                team: true,
+              },
+            },
+          },
+        },
       },
     });
 

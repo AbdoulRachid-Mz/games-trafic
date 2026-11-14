@@ -10,6 +10,8 @@ import {
   Shield,
   Check,
   Sparkles,
+  Zap,
+  Gem,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +46,8 @@ export function GamesFilterSidebar({
     { value: "COIN", label: "Monnaies / Cash", icon: Coins },
     { value: "ITEM", label: "Items de jeu", icon: Package },
     { value: "SKIN", label: "Skins / Apparences", icon: Shield },
-    { value: "EQUIPMENT", label: "Équipements", icon: Gamepad2 },
+    { value: "EQUIPMENT", label: "Équipements", icon: Zap },
+    { value: "CURRENCY", label: "Devises gaming", icon: Gem },
   ];
 
   return (

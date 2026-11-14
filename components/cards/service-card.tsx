@@ -8,8 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
-import { ArrowRight, Star, Shield, Zap, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { ArrowRight, Shield, Zap, Sparkles } from "lucide-react";
 import { type ServiceCard as ServiceCardType } from "@/types/view-models";
 import { useRouter } from "next/navigation";
 import { BaseCardProps, CardActionMenu } from "./card-action-menu";
@@ -24,7 +23,7 @@ export function ServiceCard({
     item: service, 
     className, 
     viewMode = "grid", 
-    status,
+    status: _status,
     isCliquable = true,
     isMini = false,
     activeAction = "view",
@@ -135,12 +134,6 @@ export function ServiceCard({
                                     <Shield className="w-3 h-3" />
                                     Admin
                                 </Badge>
-                            )}
-                            {!isCompact && (
-                                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold bg-amber-500/10 px-2 py-1 rounded-full border border-amber-500/20 shrink-0">
-                                    <Star className="w-3 h-3 fill-current" />
-                                    5.0
-                                </div>
                             )}
                             {hasActions && (
                                 <CardActionMenu
