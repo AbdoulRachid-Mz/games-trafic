@@ -34,6 +34,8 @@ export const GAMING_ASSET_PRESETS: AssetPreset[] = [
   // Coins & Devises
   { name: "eFootball Coins 3D", url: "/images/games/football/items/efootball-coins.png", category: "coins", universe: "Football" },
   { name: "FC Points EA Sports 3D", url: "/images/games/football/items/fc-points.png", category: "coins", universe: "Football" },
+  { name: "Jeton GTC 3D", url: "/images/games/shared/coins/gtc-token.png", category: "coins", universe: "Shared" },
+  { name: "Ballon d'Or 3D", url: "/images/games/football/collectibles/golden-ball.png", category: "coins", universe: "Football" },
   { name: "Pièce 3D ISO Gold", url: "/images/icons/3d-icons/3dicons-3d-coin-iso-color.png", category: "coins" },
   { name: "Dollar 3D Dynamique", url: "/images/icons/3d-icons/3dicons-dollar-dynamic-color.png", category: "coins" },
   { name: "Portefeuille Money 3D", url: "/images/icons/3d-icons/3dicons-money-dynamic-color.png", category: "coins" },
@@ -41,11 +43,16 @@ export const GAMING_ASSET_PRESETS: AssetPreset[] = [
   // Caisses & Packs
   { name: "Caisse COD Points 3D", url: "/images/games/fps/items/cod-points-crate.png", category: "crates", universe: "FPS" },
   { name: "Airdrop PUBG 3D", url: "/images/games/battle-royale/items/pubg-airdrop.png", category: "crates", universe: "Battle Royale" },
+  { name: "Coffre Loot Chest 3D", url: "/images/games/shared/crates/loot-chest.png", category: "crates", universe: "Shared" },
   { name: "Cadeau Mystère 3D", url: "/images/icons/3d-icons/3dicons-gift-box-dynamic-color.png", category: "crates" },
   { name: "Coffre Locker 3D", url: "/images/icons/3d-icons/3dicons-locker-dynamic-color.png", category: "crates" },
 
   // Équipements, Armes & Véhicules
   { name: "Hypercar Racing 3D", url: "/images/games/racing/vehicles/racing-hypercar.png", category: "weapons", universe: "Racing" },
+  { name: "Fusil Cyber Skin 3D", url: "/images/games/fps/items/cyber-rifle-skin.png", category: "weapons", universe: "FPS" },
+  { name: "Casque Militaire Nv3 3D", url: "/images/games/battle-royale/items/level3-helmet.png", category: "weapons", universe: "Battle Royale" },
+  { name: "Crampons Football Pro 3D", url: "/images/games/football/items/football-boots.png", category: "weapons", universe: "Football" },
+  { name: "Nitro Boost Racing 3D", url: "/images/games/racing/items/nitro-boost.png", category: "weapons", universe: "Racing" },
   { name: "Bouclier Shield 3D", url: "/images/icons/3d-icons/3dicons-shield-dynamic-color.png", category: "weapons" },
   { name: "Cible Target 3D", url: "/images/icons/3d-icons/3dicons-target-dynamic-color.png", category: "weapons" },
   { name: "Flamme Nitro 3D", url: "/images/icons/3d-icons/3dicons-fire-dynamic-color.png", category: "weapons" },

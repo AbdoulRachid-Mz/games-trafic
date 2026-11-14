@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="goldOuter" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="50%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="purpleInner" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#5B21B6"/>
+    </linearGradient>
+  </defs>
+  <!-- Gold Ring -->
+  <circle cx="50" cy="50" r="46" fill="url(#goldOuter)" stroke="#FBBF24" stroke-width="2"/>
+  <circle cx="50" cy="50" r="38" fill="url(#purpleInner)"/>
+  <!-- GTC Lettering -->
+  <text x="50" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="900" text-anchor="middle" fill="#FCD34D" letter-spacing="-0.02em">
+    GTC
+  </text>
+  <!-- Sparkles -->
+  <polygon points="50,18 52,24 58,26 52,28 50,34 48,28 42,26 48,24" fill="#FFFFFF"/>
+</svg>

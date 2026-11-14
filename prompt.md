@@ -1,996 +1,698 @@
-# GAMES-TRAFICS — AUDIT ET REFONTE COMPLÈTE DE LA DOCUMENTATION, DES GUIDES, DES SERVICES ET DU SYSTÈME D’UPLOAD
+# AUDIT, COMPLÉTION ET REFONTE COMPLÈTE DES RESSOURCES PUBLIQUES — GAMES TRAFICS
 
-## OBJECTIF GÉNÉRAL
+## 1. Objectif général
 
-Réaliser une refonte approfondie et professionnelle de quatre domaines de Games-Trafics :
+Effectuer un audit approfondi et une refonte complète de l'environnement des ressources publiques de **Games Trafics**.
 
-1. La documentation officielle accessible sous `/docs/**`.
-2. Les guides interactifs accessibles sous `/docs/guides/**`, alimentés par les tables `guides` et `guide_steps`.
-3. Les services accessibles sous `/services/**`, alimentés par la table `services`.
-4. Les composants d'upload d'images, de vidéos et de médias, avec une attention particulière à la sélection multiple, à la fiabilité des uploads, à l'expérience responsive et au design.
+Le travail ne consiste pas simplement à ajouter quelques images ou à déplacer des fichiers. Il faut analyser tout ce qui existe déjà dans le projet, identifier les ressources produites par les précédents agents, retrouver les anciennes ressources toujours pertinentes, déterminer les besoins réels de l'application, compléter les éléments manquants et construire une bibliothèque de ressources propre, cohérente, organisée et adaptée à une application gaming moderne.
 
-L'objectif n'est pas simplement d'ajouter des textes ou de moderniser quelques composants. Il faut analyser l'application complète, comprendre ses fonctionnalités réellement implémentées, ses règles métier, ses permissions, ses limites et ses parcours, puis produire une documentation cohérente et des contenus seedés qui reflètent fidèlement le fonctionnement réel de Games-Trafics.
+Le périmètre concerne notamment :
 
-Le résultat doit être digne d'une plateforme gaming professionnelle en production.
+- Images et illustrations.
+- Logos et identité visuelle.
+- Icônes et pictogrammes.
+- SVG.
+- Vidéos et animations.
+- Images de jeux et ressources associées.
+- Placeholders et états vides.
+- Bannières, couvertures et arrière-plans.
+- Polices et autres ressources statiques.
+- Tous les autres fichiers présents dans `public/`.
+
+**Règle fondamentale : ne rien recréer inutilement, ne rien supprimer sans vérification et ne pas considérer le travail terminé tant que les ressources ne sont pas réellement intégrées dans l'application.**
 
 ---
 
-# PHASE 0 — AUDIT COMPLET AVANT MODIFICATION
+## 2. Phase 1 — Audit exhaustif de l'existant
 
-Avant toute modification, analyser le projet existant dans son intégralité.
+Commencer par examiner l'intégralité du projet et particulièrement le dossier `public/`.
 
-Ne pas commencer par modifier directement les pages concernées.
+### 2.1. Inventaire récursif
 
-### 0.1 Comprendre l'architecture
+Parcourir tous les dossiers et sous-dossiers, sans exception.
+
+Pour chaque ressource, identifier :
+
+- Son chemin actuel.
+- Son nom et son extension.
+- Sa catégorie.
+- Ses dimensions lorsqu'il s'agit d'une image.
+- Son poids.
+- Son éventuel rôle dans l'application.
+- Son utilisation effective dans le code.
+- Son état : utilisée, inutilisée, dupliquée, obsolète ou à conserver.
+- Son éventuelle appartenance à une identité graphique ou à une fonctionnalité particulière.
+
+Analyser les formats suivants, entre autres :
+
+`png`, `jpg`, `jpeg`, `webp`, `avif`, `gif`, `svg`, `ico`, `mp4`, `webm`, `mov`, `woff`, `woff2`, `ttf`, `otf`.
+
+Ne pas se limiter à une simple liste de fichiers. Il faut comprendre leur utilité.
+
+### 2.2. Examiner les ressources historiques
+
+Retrouver et analyser les ressources présentes depuis les premières versions du projet.
+
+Il faut notamment identifier :
+
+- Les anciens logos et variantes.
+- Les anciennes illustrations.
+- Les images de jeux.
+- Les icônes personnalisées.
+- Les images utilisées dans les pages publiques.
+- Les ressources conservées dans des dossiers historiques.
+- Les éventuels éléments graphiques encore utilisés indirectement.
+
+Ne pas supprimer automatiquement une ancienne ressource sous prétexte qu'elle semble dépassée. Vérifier si elle possède encore une utilité fonctionnelle ou visuelle.
+
+### 2.3. Examiner les ressources créées par les agents
+
+Identifier précisément les ressources produites par les précédents agents.
+
+Comparer les résultats obtenus aux besoins réels de l'application.
+
+Déterminer :
+
+- Ce qui a effectivement été créé.
+- Ce qui est incomplet.
+- Ce qui manque totalement.
+- Ce qui existe en plusieurs versions.
+- Ce qui n'a jamais été intégré.
+- Ce qui ne respecte pas l'identité visuelle de Games Trafics.
+- Ce qui nécessite une amélioration ou un remplacement.
+
+Ne pas supposer qu'une tâche est terminée parce que son agent a créé quelques fichiers.
+
+---
+
+## 3. Phase 2 — Audit des besoins de toute l'application
+
+L'objectif est de connaître les ressources réellement nécessaires à Games Trafics.
+
+Parcourir les pages, composants, fonctionnalités et parcours utilisateurs.
 
 Examiner notamment :
 
-- `database/schema.ts`
-- `database/relations.ts` si présent
-- `database/seed.ts`
-- `actions/**`
-- `hooks/**`
-- `app/**`
-- `components/**`
-- `lib/**`
-- `types/**`
-- `config/**`
-- les middlewares/proxy et les règles d'autorisation
-- les composants de navigation et d'AppShell
-- les configurations des comptes, rôles, limites et abonnements
-- les API utilisées par les fonctionnalités documentées.
+### Identité visuelle
+- Logo principal.
+- Logo secondaire.
+- Logo compact.
+- Variantes adaptées aux fonds clairs et sombres.
+- Favicon.
+- Icône PWA.
+- Images de marque.
+- Éventuels éléments décoratifs de marque.
 
-Identifier les fonctionnalités réellement disponibles dans l'application, les fonctionnalités réservées à certains rôles, les fonctionnalités conditionnelles et celles qui ne sont que partiellement implémentées.
+### Authentification et profils
+- Illustrations des pages de connexion et d'inscription.
+- Avatars par défaut.
+- Placeholders de profil.
+- Illustrations d'états vides.
+- Éléments graphiques liés aux comptes VIP et aux statuts.
 
-### 0.2 Construire une cartographie fonctionnelle
+### Marketplace et boutiques
+- Images par défaut des produits.
+- Illustrations des catégories.
+- Ressources des différents jeux.
+- Placeholders de boutiques.
+- Illustrations des produits indisponibles.
+- Visuels de présentation et de promotion.
 
-Établir une cartographie des fonctionnalités à partir du code et de la base de données.
+### Jeux
+Créer ou compléter les ressources nécessaires aux jeux effectivement pris en charge dans l'application, notamment :
 
-Examiner au minimum :
+- eFootball.
+- Call of Duty Mobile.
+- FC Mobile.
 
-- Authentification, inscription, connexion et sécurité.
-- Profils utilisateurs et paramètres.
-- Rôles et types de comptes.
-- Wallet GTC et comptes financiers.
-- Dépôts, retraits, transferts et transactions.
-- Paiements, reçus, réclamations et remboursements.
-- Abonnements VIP et avantages associés.
-- Boutiques et gestion des vendeurs.
-- Produits, catégories, commandes et suivi.
-- Jeux et catalogue de Game Items.
-- Demandes d'items et transactions associées.
-- Tournois et organisateurs.
-- Éditions, inscriptions et participants.
-- Phases, groupes, journées, brackets et matchs.
-- Résultats, classements et qualifications.
-- Équipes, membres et rôles.
-- Clips vidéo, publications et interactions.
-- Messagerie privée et conversations de groupe.
-- Notifications et annonces.
-- Partenaires et partenariats.
-- Thèmes et personnalisation.
-- Blog, support et assistance.
-- Services et autres modules effectivement présents.
-
-Pour chaque fonctionnalité, identifier :
-
-1. Ce qu'elle permet réellement de faire.
-2. Les utilisateurs qui peuvent l'utiliser.
-3. Les prérequis.
-4. Les limites et restrictions.
-5. Les étapes du parcours utilisateur.
-6. Les statuts et transitions importants.
-7. Les actions disponibles.
-8. Les éventuels frais, plafonds ou conditions configurés.
-9. Les pages et composants associés.
-10. Les éventuelles limites ou fonctionnalités incomplètes.
-
-Ne pas déduire une fonctionnalité uniquement à partir d'un nom de table ou d'un texte marketing.
-
-Vérifier les actions serveur, les API, les hooks, les composants et les conditions d'autorisation.
-
-### 0.3 Rapport d'audit
-
-Avant la réalisation, établir une cartographie interne des fonctionnalités et des contenus existants.
-
-Identifier :
-- Les documents existants.
-- Les guides existants et leurs étapes.
-- Les services existants.
-- Les doublons.
-- Les contenus obsolètes.
-- Les fonctionnalités documentées mais absentes du code.
-- Les fonctionnalités réelles qui ne sont pas documentées.
-- Les incohérences entre les données, les pages et les textes.
-
-Ce rapport doit guider les modifications. Ne pas supprimer de contenu existant simplement parce qu'il est ancien : le vérifier et le mettre à jour lorsque c'est pertinent.
-
----
-
-# PHASE 1 — REFONTE DE LA DOCUMENTATION OFFICIELLE `/docs/**`
-
-## 1.1 Rôle de la documentation
-
-La documentation officielle doit expliquer l'ensemble des fonctionnalités de Games-Trafics.
-
-Elle constitue la référence centrale pour comprendre le fonctionnement de la plateforme.
-
-Elle doit répondre à des questions telles que :
-
-- À quoi sert cette fonctionnalité ?
-- Qui peut l'utiliser ?
-- Comment y accéder ?
-- Comment l'utiliser correctement ?
-- Quelles sont les conditions nécessaires ?
-- Quelles sont les limites ?
-- Quels statuts peut-on rencontrer ?
-- Que faire en cas de problème ?
-- Quelles autres fonctionnalités sont liées ?
-
-Ne pas transformer la documentation en simple présentation commerciale.
-
-## 1.2 Organisation des pages
-
-Conserver le mécanisme de documentation existant fondé sur les fichiers Markdown/MDX dans `docs/content/**`, sauf si l'audit révèle un problème architectural qui justifie une correction.
-
-Créer une arborescence claire, cohérente et évolutive.
-
-Proposition de structure à adapter aux fonctionnalités réellement trouvées :
-
-### Découvrir Games-Trafics
-- Présentation de la plateforme.
-- Démarrage rapide.
-- Navigation et organisation de l'application.
-- Types de comptes et rôles.
-- Fonctionnement général de GTC.
-
-### Compte et sécurité
-- Création de compte.
-- Connexion et déconnexion.
-- Gestion du profil.
-- Paramètres du compte.
-- Sécurité et passkeys, si réellement disponibles.
-- Permissions et vérification du compte.
-
-### Wallet et finances
-- Présentation du Wallet GTC.
-- Solde et comptes financiers.
-- Dépôts.
-- Retraits.
-- Transferts.
-- Historique des transactions.
-- Paiements et reçus.
-- Remboursements et réclamations.
-- Statuts des transactions.
-- Frais et limites réellement configurés.
-
-### Marketplace
-- Découvrir les boutiques.
-- Créer et gérer une boutique.
-- Publier des produits.
-- Gérer les produits.
-- Découvrir les produits.
-- Commander un produit.
-- Suivre une commande.
-- Gestion des commandes côté vendeur.
-- Statuts et règles de commande.
-
-### Jeux et Game Items
-- Catalogue des jeux.
-- Types d'items disponibles.
-- Coins et monnaies virtuelles.
-- Skins et équipements.
-- Consulter un item.
-- Demander ou acheter un item selon le parcours réellement disponible.
-- Suivre une demande ou une transaction.
-- Conditions et limites.
+Examiner également les autres jeux réellement présents dans les fonctionnalités ou les données du projet.
 
 ### Tournois
-- Découvrir les tournois.
-- Créer et gérer un tournoi.
-- Organisateurs et permissions.
-- Fonctionnement des éditions.
-- Inscriptions et participants.
-- Gestion des paiements.
-- Phases et formats de compétition.
-- Groupes et journées.
-- Matchs et résultats.
-- Brackets et éliminations.
-- Classements et qualifications.
-- Gestion des litiges et validations si disponibles.
-- Règles spécifiques aux formats réellement implémentés.
+- Illustrations des tournois.
+- Bannières.
+- Visuels des compétitions.
+- Icônes des phases et formats.
+- Illustrations des groupes et matchs.
+- Ressources des classements et podiums.
+- Visuels des trophées et récompenses.
 
-### Équipes
-- Création d'une équipe.
-- Gestion des membres.
-- Rôles et responsabilités.
-- Gestion des invitations si disponible.
+### Clips et médias
+- Placeholders vidéo.
+- Miniatures par défaut.
+- Illustrations des médias indisponibles.
+- Ressources des lecteurs vidéo.
+- États de chargement et d'erreur.
 
-### Communauté
-- Publications.
-- Clips.
-- Interactions et visibilité.
-- Messagerie privée.
-- Conversations de groupe.
+### Communauté et interactions
+- Illustrations des publications.
+- Avatars.
+- Icônes sociales.
+- Réactions.
 - Notifications.
-- Annonces.
+- Messages et conversations.
+- États vides des discussions.
 
-### Autres fonctionnalités
-- VIP et abonnements.
-- Partenaires.
-- Thèmes et personnalisation.
-- Blog.
-- Assistance et support.
+### Wallet et transactions
+- Icônes des opérations.
+- Moyens de paiement réellement pris en charge.
+- Illustrations des transactions.
+- Visuels des différents statuts.
+- Ressources des documents et reçus si nécessaires.
 
-Cette structure est indicative. Adapter les catégories et les pages à la cartographie issue de l'audit. Ne pas créer une page pour une fonctionnalité inexistante.
+### Autres pages
+Examiner également les tableaux de bord, paramètres, pages d'administration, pages d'aide, notifications, services, pages publiques, erreurs, résultats de recherche et toutes les autres fonctionnalités existantes.
 
-## 1.3 Qualité rédactionnelle
-
-Chaque page doit être complète, claire et exploitable.
-
-Lorsque cela est pertinent, utiliser cette structure :
-
-1. Présentation.
-2. Objectif et fonctionnement.
-3. Conditions préalables.
-4. Accès à la fonctionnalité.
-5. Procédure détaillée.
-6. Règles métier.
-7. Statuts et cas particuliers.
-8. Limites et restrictions.
-9. Problèmes fréquents et solutions.
-10. Fonctionnalités associées.
-
-Éviter les textes génériques qui répètent simplement les mêmes informations dans toutes les pages.
-
-Les informations doivent être exactes et cohérentes avec le code.
-
-Ne jamais inventer :
-- Des moyens de paiement.
-- Des frais.
-- Des garanties.
-- Des délais.
-- Des plafonds.
-- Des avantages VIP.
-- Des permissions.
-- Des options de réservation.
-- Des fonctionnalités qui ne sont pas disponibles.
-
-Lorsque l'information dépend d'une configuration, documenter la valeur réellement configurée ou indiquer clairement qu'elle peut varier.
-
-## 1.4 Design documentaire
-
-Créer une expérience de lecture professionnelle, inspirée des meilleures documentations techniques et produits.
-
-La documentation doit rester fidèle à l'identité Games-Trafics : gaming premium, moderne, lisible et soignée.
-
-Améliorer :
-
-- La page d'accueil `/docs`.
-- La navigation latérale.
-- Les catégories.
-- Le header et le breadcrumb.
-- Les pages de contenu.
-- Le sommaire de chaque page.
-- La navigation précédent/suivant.
-- Les liens entre articles.
-- Les encadrés informatifs.
-- Les avertissements.
-- Les prérequis.
-- Les exemples.
-- Les tableaux.
-- Les listes et procédures.
-- Les blocs de code lorsque nécessaires.
-
-Prévoir des états :
-- Article non trouvé.
-- Catégorie vide.
-- Recherche sans résultat.
-- Chargement.
-- Erreur de récupération.
-
-Le contenu doit être parfaitement lisible sur mobile, tablette et desktop.
-
-Vérifier les débordements, les largeurs, les menus et les éléments sticky avec l'AppShell existant.
-
-Ne pas introduire de nouvelle bibliothèque lourde si les composants déjà disponibles suffisent.
-
-## 1.5 Liens officiels
-
-Les liens entre les pages de documentation doivent utiliser les véritables routes `/docs/...`.
-
-Créer une navigation interne cohérente et vérifier que chaque lien pointe vers une page existante.
-
-Les liens vers les guides interactifs doivent être utilisés lorsqu'un parcours étape par étape existe.
+**Ne pas créer de ressources fictives pour des fonctionnalités absentes du projet. L'inventaire des besoins doit être fondé sur le code et les fonctionnalités réelles.**
 
 ---
 
-# PHASE 2 — REFONTE DES GUIDES INTERACTIFS
+## 4. Phase 3 — Établir une architecture publique cohérente
 
-Les guides sont différents de la documentation.
+Après l'audit, proposer puis mettre en place une organisation claire de `public/`.
 
-- La documentation explique une fonctionnalité en profondeur.
-- Le guide accompagne l'utilisateur dans l'exécution concrète d'une action.
+La structure doit être logique, évolutive et facile à maintenir.
 
-Les guides utilisent actuellement les tables `guides` et `guide_steps`. Conserver cette architecture si elle répond aux besoins.
+Voici une architecture indicative à adapter aux besoins réellement constatés :
 
-## 2.1 Audit des données existantes
+```text
+public/
+├── images/
+│   ├── brand/
+│   ├── placeholders/
+│   ├── illustrations/
+│   ├── games/
+│   │   ├── efootball/
+│   │   ├── cod-mobile/
+│   │   └── fc-mobile/
+│   ├── marketplace/
+│   ├── tournaments/
+│   ├── community/
+│   ├── profiles/
+│   ├── banners/
+│   ├── backgrounds/
+│   └── misc/
+│
+├── icons/
+│   ├── games/
+│   ├── payments/
+│   ├── social/
+│   ├── status/
+│   └── custom/
+│
+├── svg/
+│   ├── brand/
+│   ├── illustrations/
+│   ├── decorative/
+│   └── custom/
+│
+├── videos/
+│   ├── previews/
+│   ├── backgrounds/
+│   └── tutorials/
+│
+├── fonts/
+│
+└── favicon.ico
+```
 
-Récupérer les guides existants depuis la base au moment de l'exécution du seed.
+Cette structure est une proposition de départ, pas une obligation de reproduire exactement ces dossiers.
 
-Ne jamais supposer que la base est vide.
+Adapter les catégories selon les besoins identifiés.
 
-Analyser :
-- Les titres.
-- Les descriptions.
-- Les catégories.
-- Les images.
-- Les étapes.
-- L'ordre des étapes.
-- Les statuts de publication.
-- Les compteurs de vues.
-- Les dates.
-- Les relations avec les administrateurs.
+Éviter les dossiers inutiles, les catégories vides sans justification et les niveaux d'imbrication excessifs.
 
-Conserver les données utiles et les guides déjà administrés.
+### Conventions de nommage
 
-## 2.2 Créer tous les guides importants
+Adopter des noms :
 
-À partir de la cartographie fonctionnelle, déterminer les parcours qui méritent un guide.
-
-Exemples à adapter au code :
-
-- Bien démarrer sur Games-Trafics.
-- Créer et compléter son profil.
-- Sécuriser son compte.
-- Comprendre le Wallet GTC.
-- Effectuer un dépôt.
-- Effectuer un retrait.
-- Effectuer un transfert.
-- Consulter ses transactions.
-- Créer une boutique.
-- Publier un produit.
-- Acheter un produit.
-- Gérer une commande.
-- Découvrir et acheter un Game Item.
-- Créer un tournoi.
-- Créer une édition.
-- Inscrire des participants.
-- Organiser les phases et les groupes.
-- Générer un bracket.
-- Gérer les matchs et les résultats.
-- Créer et gérer une équipe.
-- Publier un clip.
-- Créer une publication.
-- Utiliser la messagerie.
-- Gérer les notifications.
-- Découvrir les avantages VIP.
-
-Ne créer que les guides correspondant à des parcours réellement implémentés.
-
-## 2.3 Qualité des étapes
-
-Chaque guide doit être un véritable tutoriel.
-
-Les étapes doivent :
-- Être ordonnées.
-- Être suffisamment détaillées.
-- Décrire une action concrète.
-- Expliquer le résultat attendu.
-- Mentionner les éventuelles précautions.
-- Utiliser un vocabulaire cohérent avec l'interface réelle.
-- Être adaptées au rôle concerné.
-
-Ne pas créer des guides constitués de deux ou trois phrases génériques.
-
-Ajouter des captures ou illustrations uniquement lorsqu'elles apportent une réelle valeur. Ne pas fabriquer de fausses captures de l'application.
-
-Si les captures réelles ne sont pas disponibles, utiliser des illustrations explicatives cohérentes et clairement identifiables comme illustrations.
-
-## 2.4 Catégories et recherche
-
-Aligner les catégories de guides entre :
-- La page publique.
-- Les formulaires d'administration.
-- Les filtres.
-- Les données seedées.
-
-Éviter les catégories codées en dur à plusieurs endroits.
-
-Mettre en place une recherche et des filtres réellement fonctionnels si les composants existent déjà.
-
-## 2.5 Page détail d'un guide
-
-Améliorer :
-- Le titre et la description.
-- La progression.
-- La présentation des étapes.
-- Les images.
-- Les étapes terminées.
-- Les boutons précédent/suivant.
-- L'état de fin.
-- Les guides associés.
-- Le lien vers la documentation officielle correspondante.
-
-Corriger toute récupération redondante des étapes et vérifier les mécanismes de cache et d'invalidation.
-
-Le rendu du contenu doit supporter correctement les paragraphes, titres, listes et liens.
-
----
-
-# PHASE 3 — REFONTE DES SERVICES `/services/**`
-
-## 3.1 Positionnement fonctionnel
-
-IMPORTANT : `/services` ne doit PAS devenir une seconde page de documentation ni un catalogue artificiel de fonctionnalités.
-
-Cette section doit présenter clairement les prestations que l'utilisateur peut réellement obtenir ou demander auprès de Games-Trafics.
-
-La distinction est la suivante :
-
-- `/docs` explique les fonctionnalités de la plateforme.
-- `/services` présente les prestations proposées ou accessibles à l'utilisateur.
-- Les guides expliquent comment effectuer les actions dans l'application.
-
-Un service doit répondre à ces questions :
-
-1. Qu'est-ce que cette prestation ?
-2. À qui s'adresse-t-elle ?
-3. Qu'est-ce que l'utilisateur peut réellement obtenir ?
-4. Que doit-il fournir ou préparer ?
-5. Comment faire une demande ?
-6. Quelles sont les conditions ?
-7. Quelles sont les limites ?
-8. Comment contacter Games-Trafics ou accéder au parcours réellement disponible ?
-9. Quelle documentation officielle peut l'aider ?
-
-## 3.2 Audit des services existants
-
-Récupérer et analyser toutes les données existantes de la table `services`.
-
-Examiner les pages :
-- `/services`
-- `/services/[id]`
-- `/admin/services`
-- `/admin/services/create`
-
-Examiner aussi :
-- `actions/services.ts`
-- `hooks/use-services.ts`
-- Les composants de cartes.
-- Les formulaires.
-- Les API.
-- Les permissions d'administration.
-
-Ne pas supprimer les services existants sans justification.
-
-Corriger les descriptions qui présentent des offres inexistantes ou des garanties non vérifiées.
-
-## 3.3 Contenus de services
-
-Créer un ensemble cohérent de prestations réellement proposées ou pouvant être demandées.
-
-Les catégories doivent être déterminées à partir des prestations effectivement présentes dans le projet et de l'offre réelle de Games-Trafics.
-
-Exemples de pistes à vérifier, et non de fonctionnalités à inventer :
-
-- Accompagnement à la création et à la configuration d'une boutique.
-- Assistance à l'organisation d'un tournoi.
-- Accompagnement pour la configuration d'une compétition.
-- Assistance technique liée à l'utilisation de la plateforme.
-- Accompagnement à la publication ou à la gestion de contenus gaming.
-- Prestations gaming spécialisées uniquement si elles sont réellement proposées.
-
-Ne pas créer artificiellement des prestations de coaching, boosting, réservation, freelance ou gestion de comptes si Games-Trafics ne les propose pas réellement.
-
-Ne pas inventer de tarifs, de délais, de notes, d'avis, de garanties ou de disponibilité.
-
-Si le prix ou le délai n'est pas défini, ne pas afficher de prix ou de délai fictif. Utiliser une formulation transparente telle que « Nous contacter pour étudier votre demande », uniquement si un vrai moyen de contact est disponible.
-
-## 3.4 Parcours de demande
-
-Pour chaque service, déterminer le parcours réellement disponible.
-
-Si l'application dispose d'un formulaire ou d'une action de demande, le relier correctement.
-
-Si elle ne dispose pas de système de commande ou de réservation :
-- Ne pas créer de faux bouton « Commander ».
-- Ne pas afficher de faux statut de réservation.
-- Ne pas simuler une commande.
-- Proposer un CTA de contact uniquement si une route ou un canal fonctionnel existe.
-- Expliquer clairement comment soumettre une demande.
-
-Ne pas développer un système de commande complet sans nécessité fonctionnelle et sans validation de l'architecture existante.
-
-## 3.5 Liaison avec la documentation officielle
-
-C'est une exigence importante.
-
-Chaque service doit, lorsque c'est pertinent, renvoyer vers la documentation officielle correspondante.
+- Explicites.
+- Cohérents.
+- En minuscules.
+- Sans espaces.
+- Sans accents.
+- Avec des tirets lorsque nécessaire.
+- Sans suffixes ambigus comme `final2`, `new-final`, `copy`, `test`.
 
 Exemples :
-- Un service d'accompagnement à la création de boutique renvoie vers `/docs/shops/...`.
-- Un service d'accompagnement à l'organisation de tournoi renvoie vers `/docs/tournaments/...`.
-- Une prestation d'assistance Wallet renvoie vers `/docs/transactions/...`.
-- Une prestation liée aux Game Items renvoie vers la documentation officielle des Game Items.
 
-Les liens doivent être vérifiés et ne jamais pointer vers une route inexistante.
+```text
+games/
+  efootball-logo.webp
+  cod-mobile-logo.webp
+  fc-mobile-logo.webp
 
-Sur la page détail d'un service, prévoir une section explicite :
+placeholders/
+  image-upload.webp
+  video-upload.webp
+  empty-products.webp
+  empty-tournaments.webp
 
-**Comprendre la fonctionnalité**
+brand/
+  games-trafics-logo.svg
+  games-trafics-mark.svg
+```
 
-Une courte explication contextualisée, puis un lien du type :
-« Consulter la documentation officielle ».
-
-Ce lien doit mener à l'article qui explique réellement la fonctionnalité concernée.
-
-Ne pas transformer cette section en duplication intégrale de la documentation.
-
-## 3.6 Refonte UI/UX
-
-Refondre la page `/services` et les pages détail.
-
-Créer une expérience premium :
-- Hero clair et pertinent.
-- Présentation des prestations.
-- Cartes cohérentes.
-- Catégories réellement utilisées.
-- Recherche fonctionnelle.
-- Filtres fonctionnels.
-- États vides et erreurs.
-- CTA adaptés.
-- Informations utiles.
-- Liens vers la documentation.
-- Responsive sur tous les écrans.
-
-Supprimer les notes, garanties, badges et statistiques fictifs.
-
-Ne pas afficher des notes 5.0, « vérifié », « sécurisé », « garanti », « 24h/7j » ou « 100 % satisfait » sans données ou preuve réelle.
-
-Si le modèle `services` ne permet pas de représenter correctement les informations nécessaires, étudier les besoins avant de modifier le schéma.
-
-Toute évolution du schéma doit être justifiée, minimale, migrée correctement et compatible avec les données existantes.
+Éviter de mélanger les logos, les illustrations, les icônes et les images de contenu dans un même dossier.
 
 ---
 
-# PHASE 4 — SEED DES GUIDES ET SERVICES
+## 5. Phase 4 — Compléter toutes les ressources manquantes
 
-Créer un seed de contenu dédié, par exemple :
+Après l'inventaire et la définition de l'architecture, produire les ressources manquantes.
 
-`database/seed-guides-services.ts`
+Il faut privilégier des ressources originales, propres à Games Trafics et adaptées à son identité graphique.
 
-Adapter le nom et l'organisation aux conventions existantes.
+### 5.1. Direction artistique
 
-## 4.1 Règles impératives
+Respecter l'identité existante de Games Trafics :
 
-Le seed doit être :
-- Idempotent.
-- Non destructif.
-- Compatible avec les données existantes.
-- Exécutable sur une base déjà remplie.
-- Adapté aux environnements de développement et de production.
-- Facile à maintenir.
+- Univers gaming premium.
+- Esthétique moderne.
+- Palette violette et verte déjà utilisée dans le projet.
+- Éléments graphiques sobres et élégants.
+- Contrastes maîtrisés.
+- Design propre, lisible et professionnel.
+- Cohérence entre les modes clair et sombre.
+- Pas d'accumulation inutile d'effets lumineux.
+- Pas d'illustrations excessivement chargées.
 
-Ne jamais :
-- Vider les tables.
-- Supprimer tous les guides avant insertion.
-- Supprimer les services administrés.
-- Réinitialiser les compteurs de vues.
-- Écraser des modifications éditoriales existantes.
-- Créer des doublons à chaque exécution.
+Les illustrations doivent être conçues pour leur contexte d'utilisation réel.
 
-## 4.2 Récupération des données existantes
+Ne pas utiliser une seule illustration générique partout.
 
-Au démarrage du seed :
-1. Récupérer les guides existants.
-2. Récupérer leurs étapes.
-3. Récupérer les services existants.
-4. Identifier les contenus déjà présents.
-5. Comparer les contenus à ajouter.
-6. Insérer uniquement les éléments manquants.
+### 5.2. Images d'upload
 
-Prévoir une stratégie stable de détection des doublons.
+Une attention particulière doit être accordée aux images d'upload.
 
-Ne pas se baser uniquement sur les UUID générés.
+Une illustration minimaliste a déjà été générée pour Games Trafics : une manette gaming 3D, un symbole de transfert vers le cloud et un éclairage violet/bleu discret.
 
-Utiliser une clé stable ou un slug unique si le schéma le permet. Si ce n'est pas le cas, déterminer une stratégie de correspondance fiable et documentée.
+Retrouver et réutiliser cette direction visuelle lorsqu'elle est disponible.
 
-## 4.3 Protection des contenus administrés
+Créer les variantes nécessaires :
 
-Les contenus seedés doivent pouvoir être distingués des contenus créés par l'administration.
+- Upload d'une image.
+- Upload de plusieurs images.
+- Upload d'une vidéo.
+- État sans média.
+- État de chargement, si une illustration dédiée est pertinente.
 
-Ne jamais écraser une description ou une image modifiée manuellement par un administrateur.
+Les variantes doivent appartenir à la même famille graphique.
 
-Si le schéma nécessite un champ `source`, `seedKey` ou équivalent, étudier l'impact avant de l'ajouter.
+Éviter les compositions surchargées, les textes intégrés aux illustrations et les éléments décoratifs sans utilité.
 
-Ne pas multiplier les champs inutilement.
+### 5.3. Illustrations des états vides
 
-## 4.4 Administrateur associé
+Créer les illustrations réellement nécessaires pour les fonctionnalités concernées :
 
-Les tables qui nécessitent un `adminId` doivent utiliser un véritable utilisateur administrateur existant.
+- Aucun produit.
+- Aucune boutique.
+- Aucun tournoi.
+- Aucun match.
+- Aucun clip.
+- Aucune publication.
+- Aucune conversation.
+- Aucune notification.
+- Aucun résultat.
+- Aucune transaction.
 
-Ne jamais inventer un identifiant d'utilisateur.
+Ne pas créer des dizaines de variantes redondantes. Une illustration doit correspondre à un contexte précis et pouvoir être réutilisée intelligemment.
 
-Si aucun administrateur n'existe :
-- Afficher une erreur explicite.
-- Ne pas créer de contenu avec un faux administrateur.
-- Ne pas contourner les contraintes de clés étrangères.
+### 5.4. Qualité des images
 
-## 4.5 Commande d'exécution
+Pour chaque image :
 
-Ajouter une commande dédiée dans `package.json` en respectant les conventions existantes.
+- Choisir un format adapté à son usage.
+- Respecter les proportions.
+- Éviter les dimensions inutilement élevées.
+- Préférer WebP ou AVIF lorsque cela est pertinent.
+- Préserver une qualité visuelle suffisante.
+- Éviter les arrière-plans non désirés.
+- Éviter les images floues, pixelisées ou déformées.
+- Respecter les contraintes de transparence lorsque nécessaire.
 
-Documenter :
-- La commande.
-- Les variables d'environnement nécessaires.
-- Le comportement idempotent.
-- Les tables concernées.
-- Les protections contre l'écrasement.
+Ne pas remplacer une image de marque par une simple capture ou une image générique.
 
-Tester deux exécutions successives : la seconde ne doit pas créer de doublons ni écraser les modifications manuelles.
+Respecter les droits d'utilisation des ressources provenant de tiers.
 
 ---
 
-# PHASE 5 — AUDIT ET REFACTORING DES UPLOADS
+## 6. Phase 5 — Construire une bibliothèque SVG complète
 
-Composants principaux à analyser :
+C'est un point majeur de cette correction.
 
-- `components/ui/advanced-upload.tsx`
-- `components/ui/advanced-multi-upload.tsx`
-- `components/ui/advanced-video-upload.tsx`
-- `lib/upload.ts`
-- `utils/image-upload-utils.ts`
-- `app/api/upload/**`
-- Les autres composants et hooks qui utilisent les uploads.
-- Les intégrations Cloudinary.
-- Les composants de sélection des médias internes.
+Il faut créer un véritable ensemble d'icônes et d'illustrations SVG personnalisées pour Games Trafics.
 
-L'objectif est de fiabiliser les uploads sans casser les API ni les formulaires existants.
+### 6.1. Audit préalable
 
-## 5.1 Audit des usages
+Avant de créer des SVG :
 
-Rechercher tous les usages des composants d'upload dans le projet.
+- Identifier la bibliothèque d'icônes déjà installée.
+- Identifier les icônes déjà utilisées dans les composants.
+- Repérer les icônes manquantes.
+- Repérer les SVG existants.
+- Éviter les doublons avec les icônes de bibliothèque.
 
-Pour chacun, identifier :
-- Le type de média.
-- Le nombre maximum.
-- La taille maximale.
-- Les formats acceptés.
-- Le mode d'upload.
-- Le comportement de compression.
-- Le format des valeurs contrôlées.
-- Le stockage cible.
-- Les éventuels besoins de sélection d'images déjà présentes.
+Les icônes fonctionnelles génériques peuvent continuer à utiliser la bibliothèque existante si elle répond correctement au besoin.
 
-Ne pas modifier une signature publique sans analyser ses consommateurs.
+Les SVG personnalisés doivent couvrir en priorité les besoins propres à Games Trafics.
 
-Conserver la compatibilité avec les formulaires existants ou prévoir une migration complète.
+### 6.2. Catégories d'icônes à examiner
 
-## 5.2 Sélection multiple
+Créer les icônes nécessaires selon les fonctionnalités réellement présentes :
 
-La sélection multiple doit être entièrement fiable.
+**Identité et navigation**
+- Logo et symbole Games Trafics.
+- Éléments de navigation propres à la marque.
+- Icônes de sections personnalisées.
 
-Corriger notamment les risques suivants :
+**Gaming**
+- Jeux.
+- Manette.
+- Contrôleur.
+- Consoles.
+- Compétitions.
+- Récompenses.
+- Trophées.
+- Classements.
+- Équipes.
 
-- Le contrôle de `maxImages` doit inclure les images déjà sélectionnées et les fichiers en cours d'envoi.
-- Plusieurs sélections rapides ne doivent jamais dépasser la limite.
-- Deux lots envoyés simultanément ne doivent pas se remplacer.
-- Les résultats doivent être fusionnés correctement.
-- Les suppressions doivent rester synchronisées avec `value` et `onChange`.
-- Les doublons doivent être évités lorsque c'est pertinent.
-- Les fichiers invalides doivent être rejetés individuellement sans bloquer les autres fichiers valides.
-- Les sélections répétées du même fichier doivent fonctionner correctement.
-- Le composant doit gérer les valeurs contrôlées et les changements venant du parent.
+**Marketplace**
+- Produits.
+- Boutiques.
+- Vendeurs.
+- Achats.
+- Ventes.
+- Catalogue.
 
-Prévoir un système de file d'attente.
+**Wallet**
+- Portefeuille.
+- Dépôt.
+- Retrait.
+- Paiement.
+- Transactions.
+- Solde.
 
-Limiter la concurrence des uploads à une valeur raisonnable et configurable si nécessaire.
+**Communauté**
+- Clips.
+- Publications.
+- Discussions.
+- Groupes.
+- Réactions.
+- Partage.
 
-Éviter de lancer un nombre illimité de requêtes en parallèle.
-
-## 5.3 États des fichiers
-
-Chaque fichier doit posséder un état clair :
-
+**Statuts**
+- VIP.
+- Vérifié.
 - En attente.
-- Validation.
-- Compression.
-- Upload.
-- Terminé.
-- Erreur.
-- Annulé si l'annulation est supportée.
+- Réussi.
+- Échoué.
+- Annulé.
+- En cours.
 
-Afficher une progression compréhensible.
+Cette liste est indicative : vérifier chaque besoin dans le code avant de produire les fichiers.
 
-Ne pas afficher une progression artificielle qui prétend représenter le transfert réseau alors qu'elle ne mesure que la compression.
+### 6.3. Règles de qualité SVG
 
-Si nécessaire, utiliser une méthode d'upload permettant une véritable progression réseau, compatible avec Cloudinary.
+Tous les SVG doivent :
 
-## 5.4 Gestion des erreurs et récupération
+- Être valides.
+- Être propres et optimisés.
+- Utiliser `viewBox`.
+- Être redimensionnables.
+- Ne pas dépendre de dimensions fixes inutiles.
+- Utiliser des couleurs compatibles avec le contexte lorsque nécessaire.
+- Éviter les styles inline excessifs.
+- Être accessibles lorsque utilisés comme éléments informatifs.
+- Permettre une intégration simple dans React/Next.js.
 
-Prévoir :
-- Erreurs de format.
-- Taille dépassée.
-- Limite maximale atteinte.
-- Échec de compression.
-- Échec réseau.
-- Échec Cloudinary.
-- Fichier invalide.
-- Annulation.
-- Réessai individuel.
+Privilégier `currentColor` pour les icônes monochromes afin de faciliter leur adaptation aux thèmes clair et sombre.
 
-Les messages doivent être explicites.
+Éviter les SVG inutilement complexes et les énormes fichiers générés par des outils graphiques.
 
-Ne pas faire disparaître les erreurs trop rapidement.
+Ne pas transformer toutes les icônes de la bibliothèque existante en fichiers SVG locaux sans raison.
 
-Permettre à l'utilisateur de comprendre et corriger le problème.
+---
 
-## 5.5 Ressources et mémoire
+## 7. Phase 6 — Réorganiser et migrer toutes les ressources
 
-Gérer correctement :
-- `URL.createObjectURL`.
-- `URL.revokeObjectURL`.
-- Les previews.
-- Les références DOM.
-- Les requêtes annulables.
-- Le nettoyage au démontage.
+Une fois l'architecture définie et les ressources manquantes créées, déplacer les fichiers vers les emplacements appropriés.
+
+Attention : un déplacement de fichier peut casser de nombreux composants.
+
+Effectuer une recherche globale dans le projet pour retrouver toutes les références aux ressources concernées :
+
+- Chemins `/images/...`.
+- Chemins `/icons/...`.
+- Chemins `/svg/...`.
+- Imports statiques.
+- Imports dynamiques.
+- `next/image`.
+- Balises `img`.
+- Backgrounds CSS.
+- Variables de configuration.
+- Manifestes PWA.
+- Métadonnées.
+- Pages de partage.
+- Composants d'upload.
+- Composants de visualisation.
+- Données statiques et configurations.
+
+Mettre à jour toutes les références après les déplacements.
+
+Ne pas laisser de chemins cassés, de références vers les anciens dossiers ou de duplications temporaires.
+
+### Centralisation des ressources
+
+Si cela apporte une réelle valeur au projet, créer un point central de référencement des ressources.
+
+Par exemple :
+
+```text
+src/
+  config/
+    assets.ts
+```
+
+Ce fichier pourra centraliser les chemins des ressources réutilisées dans plusieurs endroits :
+
+```ts
+export const ASSETS = {
+  brand: {
+    logo: "/images/brand/games-trafics-logo.svg",
+    mark: "/images/brand/games-trafics-mark.svg",
+  },
+  placeholders: {
+    imageUpload: "/images/placeholders/image-upload.webp",
+    videoUpload: "/images/placeholders/video-upload.webp",
+  },
+};
+```
+
+Adapter cet exemple à l'architecture existante.
+
+Ne pas centraliser artificiellement toutes les ressources si cela rend le code plus complexe.
+
+---
+
+## 8. Phase 7 — Nettoyage approfondi
+
+Après la migration, effectuer un nettoyage de tous les dossiers et fichiers publics.
+
+Identifier :
+
+- Les doublons exacts.
+- Les images quasi identiques.
+- Les anciennes variantes inutilisées.
 - Les fichiers temporaires.
+- Les fichiers de test.
+- Les ressources orphelines.
+- Les dossiers vides inutiles.
+- Les anciennes structures remplacées.
+- Les fichiers qui ne servent plus à aucune fonctionnalité.
 
-Ne pas conserver inutilement des objets File ou des URL temporaires après la fin de leur utilisation.
+Avant toute suppression :
 
-## 5.6 Upload vidéo
+1. Vérifier les références dans tout le projet.
+2. Vérifier les références indirectes.
+3. Vérifier les usages dynamiques.
+4. Vérifier les références dans les configurations.
+5. Vérifier les éventuelles références externes ou publiques.
 
-Examiner séparément `AdvancedVideoUpload`.
+Ne pas supprimer un fichier uniquement parce qu'une recherche textuelle simple ne trouve pas son chemin.
 
-Vérifier :
-- Les formats acceptés.
-- La taille maximale.
-- La durée maximale si elle existe.
-- La génération ou sélection de miniature.
-- La prévisualisation.
-- La progression réelle.
-- Les erreurs.
-- La compatibilité mobile.
-- La cohérence avec le système d'upload des images.
+En cas de doute, conserver le fichier et le signaler dans le rapport final.
 
-Ne pas imposer une fonctionnalité de conversion ou de traitement vidéo qui n'existe pas dans l'architecture actuelle.
-
-## 5.7 Stockage et sécurité
-
-Analyser les destinations d'upload.
-
-Cloudinary doit être utilisé conformément à la configuration existante.
-
-Examiner le stockage local de `/api/upload`, notamment son comportement en production sur un environnement à système de fichiers éphémère.
-
-Vérifier :
-- Les contrôles de type MIME.
-- Les extensions.
-- Les tailles.
-- Les noms de fichiers.
-- Les permissions.
-- Les chemins.
-- Les paramètres Cloudinary.
-- Les signatures et variables sensibles.
-- Les protections contre les uploads non autorisés.
-
-Ne jamais exposer de secret Cloudinary côté client.
-
-Ne pas conserver un stockage local présenté comme permanent si l'environnement ne le garantit pas.
-
-## 5.8 Responsive et design
-
-Utiliser `hooks/use-screen.ts` lorsqu'il est pertinent.
-
-Le hook existant expose les informations de taille d'écran et de breakpoint. Vérifier ses conventions avant utilisation.
-
-Ne pas créer un second système de détection responsive.
-
-Privilégier Tailwind pour les adaptations de layout.
-
-Les composants doivent fonctionner de manière cohérente sur :
-- Petits mobiles.
-- Mobiles standards.
-- Grands mobiles.
-- Tablettes.
-- Ordinateurs.
-- Très grands écrans.
-
-Prévoir :
-- Zone de sélection facile à utiliser au tactile.
-- Aperçus adaptatifs.
-- Grille d'images responsive.
-- Barre d'actions accessible.
-- Dialog ou Drawer adapté à l'écran.
-- Pas de débordement horizontal involontaire.
-- Pas de boutons coupés.
-- Pas de textes superposés.
-- Pas de zones interactives trop petites.
-
-Conserver une expérience gaming premium, avec les couleurs, surfaces et composants de Games-Trafics.
-
-Ne pas surcharger visuellement les composants.
+Ne jamais supprimer les ressources nécessaires au fonctionnement de Next.js, de la PWA, des métadonnées ou d'autres dépendances.
 
 ---
 
-# PHASE 6 — IMAGE PNG PAR DÉFAUT POUR LES UPLOADS
+## 9. Phase 8 — Réajustement de toute l'application
 
-Créer une illustration originale Games-Trafics destinée à être utilisée comme image par défaut dans les composants d'upload.
+Le travail ne s'arrête pas à `public/`.
 
-Cette image doit être un véritable fichier PNG exploitable dans le projet.
+Examiner les composants qui utilisent les ressources afin de garantir une intégration homogène.
 
-## Direction artistique
+Vérifier particulièrement :
 
-- Identité Games-Trafics.
-- Univers gaming / e-sport.
-- Aspect premium.
-- Illustration 3D ou rendu 3D.
-- Éléments visuels liés aux médias et à la création de contenu.
-- Éclairage et profondeur maîtrisés.
-- Composition propre.
-- Bonne lisibilité sur fond clair et fond sombre.
-- Pas de texte illisible généré.
-- Pas de faux logo déformé.
-- Pas de surcharge d'éléments.
+- Les composants d'upload.
+- Les avatars et profils.
+- Les cartes produits.
+- Les cartes boutiques.
+- Les cartes tournois.
+- Les cartes matchs.
+- Les clips.
+- Les publications.
+- Les conversations.
+- Les notifications.
+- Les pages de dashboard.
+- Les états vides.
+- Les loaders.
+- Les pages d'erreur.
+- Les métadonnées et favicons.
+- Les écrans mobiles et desktop.
 
-Le visuel doit fonctionner dans un composant de sélection d'image vide.
+Corriger les ressources manquantes, les mauvais ratios, les images déformées, les arrière-plans inadaptés et les incohérences visuelles.
 
-Prévoir un fichier source et un format optimisé si nécessaire.
+Utiliser correctement les mécanismes de chargement d'images de Next.js.
 
-Emplacement suggéré :
+Vérifier également les règles de configuration des images distantes : ne pas introduire de domaines arbitraires ou de configuration inutile.
 
-`public/images/placeholders/games-trafics-upload.png`
-
-Adapter le chemin à l'organisation réelle des assets.
-
-Utiliser ce visuel par défaut uniquement lorsque l'utilisateur n'a fourni aucun média et qu'aucune miniature ou image pertinente n'est disponible.
-
-Ne jamais remplacer l'aperçu d'un fichier déjà sélectionné par ce placeholder.
-
-Prévoir un rendu cohérent pour :
-- Upload simple.
-- Upload multiple.
-- Upload vidéo.
-
-Pour la vidéo, le placeholder doit rester un placeholder visuel et ne doit jamais être interprété comme un fichier vidéo.
+Les ressources doivent être réellement intégrées et utilisées là où elles sont nécessaires.
 
 ---
 
-# PHASE 7 — COHÉRENCE GLOBALE ET INTÉGRATION
+## 10. Phase 9 — Optimisation des médias
 
-Vérifier la cohérence entre :
-- Documentation officielle.
-- Guides interactifs.
-- Services.
+Examiner les performances de chargement.
+
+### Images
+- Éviter les images trop lourdes.
+- Utiliser les formats adaptés.
+- Réduire les dimensions excessives.
+- Préserver la qualité.
+- Utiliser le lazy loading lorsque pertinent.
+- Prioriser uniquement les images réellement critiques.
+
+### SVG
+- Nettoyer les métadonnées inutiles.
+- Réduire la complexité.
+- Préserver la qualité vectorielle.
+- Éviter les répétitions inutiles.
+
+### Vidéos
+- Éviter les vidéos volumineuses dans les pages qui n'en ont pas besoin.
+- Utiliser des formats adaptés au navigateur.
+- Prévoir des posters lorsque nécessaire.
+- Vérifier les attributs de lecture et de chargement.
+- Éviter le chargement automatique des vidéos lourdes sans justification.
+
+Ne pas dégrader la qualité visuelle dans le seul but de réduire la taille des fichiers.
+
+---
+
+## 11. Phase 10 — Vérifications et critères de validation
+
+À la fin, effectuer une vérification complète.
+
+### Vérifications techniques
+- Aucune référence locale cassée.
+- Aucun import invalide.
+- Aucun chemin obsolète.
+- Aucun fichier essentiel supprimé.
+- Aucun SVG invalide.
+- Aucune erreur de build liée aux ressources.
+- Aucun problème de métadonnées ou favicon.
+- Aucun problème de chargement d'image.
+- Aucun problème de compilation TypeScript.
+
+### Vérifications visuelles
+- Mode clair.
+- Mode sombre.
+- Mobile.
+- Tablette.
+- Desktop.
 - Pages publiques.
+- Pages authentifiées.
 - Pages d'administration.
-- Actions serveur.
-- Hooks.
-- Schémas.
-- Navigation.
+- États vides.
+- Uploads.
+- Médias.
 
-Les trois espaces doivent se compléter :
+### Vérifications de qualité
+- Nommage cohérent.
+- Arborescence logique.
+- Absence de doublons inutiles.
+- Ressources bien catégorisées.
+- SVG personnalisés cohérents.
+- Images alignées avec l'identité de Games Trafics.
 
-**Documentation :** comprendre la fonctionnalité.
+Exécuter les commandes de vérification déjà prévues dans le projet : lint, typecheck, tests et build, selon les scripts disponibles.
 
-**Guide :** apprendre à effectuer une action.
-
-**Service :** découvrir une prestation que l'utilisateur peut réellement obtenir ou demander.
-
-Lorsqu'un service concerne une fonctionnalité de la plateforme, il doit proposer un lien vers l'article documentaire correspondant.
-
-Ne pas dupliquer la documentation dans les pages de services.
-
-Ne pas transformer une fonctionnalité gratuite ou native de la plateforme en prestation payante sans preuve dans le modèle commercial.
-
-Vérifier les routes et les liens internes.
+Ne pas contourner les erreurs en désactivant les contrôles ou en masquant les avertissements.
 
 ---
 
-# PHASE 8 — TESTS ET VALIDATION
+## 12. Rapport final obligatoire
 
-Effectuer les vérifications suivantes :
+À la fin, fournir un rapport précis qui présente :
 
-## Documentation
-- Toutes les pages sont accessibles.
-- Aucun lien interne cassé.
-- Les catégories et menus sont cohérents.
-- Les pages MDX sont correctement interprétées.
-- Le sommaire fonctionne.
-- Les états vides et erreurs sont corrects.
-- La navigation mobile est utilisable.
+### A. Audit initial
+- Nombre total de ressources trouvées.
+- Nombre d'images.
+- Nombre de SVG.
+- Nombre d'icônes.
+- Nombre de vidéos.
+- Nombre d'autres fichiers.
+- Ressources historiques conservées.
+- Ressources produites par les agents.
+- Ressources manquantes identifiées.
 
-## Guides
-- Les guides existants sont conservés.
-- Les nouveaux guides sont correctement insérés.
-- Les étapes sont ordonnées.
-- Aucun doublon après plusieurs exécutions du seed.
-- La progression fonctionne.
-- Les images s'affichent.
-- Les liens vers la documentation fonctionnent.
+### B. Travail réalisé
+- Ressources réutilisées.
+- Ressources créées.
+- Ressources optimisées.
+- Ressources déplacées.
+- Ressources supprimées.
+- Dossiers supprimés.
+- Dossiers créés.
+- Composants et pages mis à jour.
 
-## Services
-- Les prestations affichées sont réellement disponibles ou demandables.
-- Les textes ne contiennent aucune promesse inventée.
-- Les filtres et recherches fonctionnent.
-- Les pages détail sont cohérentes.
-- Les CTA fonctionnent réellement.
-- Les liens vers la documentation officielle sont valides.
+### C. Architecture finale
+Présenter l'arborescence finale complète de `public/`, avec une brève description des catégories.
 
-## Uploads
-- Sélection simple.
-- Sélection multiple.
-- Plusieurs lots successifs.
-- Sélections rapides.
-- Limite maximale.
-- Suppression d'un fichier.
-- Échec individuel.
-- Réessai.
-- Upload vidéo.
-- Prévisualisation.
-- Nettoyage des URL temporaires.
-- Responsive.
-- Gestion des erreurs réseau.
+### D. Intégration
+Présenter les principales références et composants modifiés, ainsi que les éventuels points nécessitant une intervention complémentaire.
 
-## Qualité du projet
-- TypeScript.
-- ESLint.
-- Build Next.js.
-- Tests unitaires pertinents.
-- Vérification des imports.
-- Vérification des routes.
-- Vérification des migrations si le schéma évolue.
+### E. Vérifications
+Indiquer les résultats réels du lint, du typecheck, des tests et du build.
 
-Corriger les erreurs introduites par les modifications.
+Ne jamais annoncer qu'une vérification a réussi si elle n'a pas été exécutée.
 
-Ne pas masquer les erreurs préexistantes en désactivant les règles TypeScript, ESLint ou les tests.
+### F. Ressources restantes
+Signaler les ressources conservées volontairement parce que leur suppression n'était pas suffisamment sûre.
 
 ---
 
-# PHASE 9 — LIVRABLES ET RAPPORT FINAL
+## 13. Consignes impératives
 
-À la fin du travail, fournir un rapport précis avec :
+1. Analyser avant de modifier.
+2. Examiner récursivement tous les dossiers publics et leurs sous-dossiers.
+3. Comparer les ressources historiques avec celles produites par les agents.
+4. Identifier les besoins à partir des fonctionnalités réelles.
+5. Ne pas recréer inutilement les ressources existantes.
+6. Compléter les ressources réellement manquantes.
+7. Respecter strictement l'identité visuelle Games Trafics.
+8. Construire une bibliothèque SVG cohérente et utile.
+9. Réorganiser toutes les ressources par catégorie.
+10. Mettre à jour toutes les références dans l'ensemble du projet.
+11. Nettoyer les anciens dossiers uniquement après vérification.
+12. Ne pas supprimer les ressources essentielles ou potentiellement utilisées dynamiquement.
+13. Ne pas introduire de dépendances inutiles.
+14. Ne pas modifier les fonctionnalités métier sans nécessité.
+15. Ne pas laisser de migration incomplète.
+16. Ne pas se contenter de créer des fichiers : les intégrer réellement dans l'application.
+17. Ne pas déclarer le travail terminé sans vérifications techniques.
 
-1. Les fonctionnalités réellement analysées.
-2. Les pages de documentation créées ou mises à jour.
-3. Les guides ajoutés et leurs étapes.
-4. Les services ajoutés ou corrigés.
-5. Les liens entre services et documentation.
-6. Les modifications apportées au seed.
-7. Les protections contre les doublons et l'écrasement.
-8. Les composants d'upload corrigés.
-9. Les améliorations de sélection multiple.
-10. Les améliorations responsive.
-11. Le fichier PNG créé et son emplacement.
-12. Les éventuelles migrations.
-13. Les commandes à exécuter.
-14. Les tests effectués et leurs résultats.
-15. Les limites qui restent à traiter.
+**Résultat attendu :** Games Trafics doit disposer d'un environnement public entièrement audité, complété, optimisé, organisé et cohérent. Chaque ressource doit avoir une catégorie, un nom explicite, une raison d'exister et une utilisation claire. L'ensemble doit pouvoir évoluer facilement sans accumuler des fichiers désorganisés, des doublons ou des ressources inutilisées.
 
-Ne pas annoncer une fonctionnalité comme terminée si elle n'a pas été implémentée et vérifiée.
-
----
-
-# CONSIGNES ABSOLUES
-
-- Travailler sur le code réel du projet fourni.
-- Ne pas se limiter à l'analyse superficielle des pages.
-- Ne pas inventer des fonctionnalités.
-- Ne pas inventer des services commerciaux.
-- Ne pas inventer des prix, délais, garanties ou statistiques.
-- Ne pas supprimer les données existantes.
-- Ne pas écraser les contenus administrés.
-- Ne pas créer de faux parcours de commande ou de réservation.
-- Ne pas dupliquer inutilement les fonctionnalités.
-- Ne pas créer une nouvelle architecture si l'existante peut être améliorée proprement.
-- Respecter les conventions Games-Trafics.
-- Réutiliser les composants existants lorsqu'ils sont adaptés.
-- Utiliser les types réels et éviter `any`.
-- Préserver les fonctionnalités déjà opérationnelles.
-- Tester les changements sur les petits et grands écrans.
-- Garder un code propre, modulaire, maintenable et prêt pour la production.
-
-**Priorité absolue : fidélité fonctionnelle, qualité du contenu, fiabilité des données, expérience utilisateur et cohérence visuelle Games-Trafics.**
-
-Ne pas s'arrêter après le rapport d'audit : effectuer réellement les corrections et livrer les fonctionnalités terminées.
+Commence par l'audit complet du dépôt et de son historique disponible, puis réalise la correction de bout en bout. Ne t'arrête pas à un simple rapport d'analyse : exécute effectivement les modifications nécessaires.

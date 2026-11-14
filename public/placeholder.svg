@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0e0720" />
+      <stop offset="100%" stop-color="#180b38" />
+    </linearGradient>
+    <linearGradient id="primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" rx="16" fill="url(#bg)" stroke="#372063" stroke-width="2"/>
+  <!-- Gaming controller silhouette -->
+  <g transform="translate(140, 90)" stroke="url(#primary)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M25 80 L35 25 C37 15 48 10 58 12 L70 15 C75 16 85 16 90 15 L102 12 C112 10 123 15 125 25 L135 80 C138 95 122 105 110 95 L95 82 C90 78 82 78 77 82 L62 95 C50 105 34 95 37 80 Z" fill="#201045" fill-opacity="0.6"/>
+    <!-- D-pad -->
+    <path d="M55 42 L55 58 M47 50 L63 50" stroke-width="3"/>
+    <!-- Action buttons -->
+    <circle cx="100" cy="45" r="3" fill="#06b6d4"/>
+    <circle cx="108" cy="53" r="3" fill="#8b5cf6"/>
+    <circle cx="92" cy="53" r="3" fill="#10b981"/>
+    <circle cx="100" cy="61" r="3" fill="#ec4899"/>
+  </g>
+  <text x="200" y="225" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#94a3b8" text-anchor="middle" letter-spacing="1">GAMES TRAFICS</text>
+  <text x="200" y="245" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#64748b" text-anchor="middle">Aperçu indisponible</text>
+</svg>

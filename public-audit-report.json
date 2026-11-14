@@ -1,0 +1,3864 @@
+[
+  {
+    "relPath": "file copy.svg",
+    "ext": ".svg",
+    "sizeBytes": 391,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "file.svg",
+    "ext": ".svg",
+    "sizeBytes": 391,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/Montserrat-Italic-VariableFont_wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 701156,
+    "dir": "fonts/Montserrat",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Montserrat/Montserrat-VariableFont_wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 688600,
+    "dir": "fonts/Montserrat",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Montserrat/OFL.txt",
+    "ext": ".txt",
+    "sizeBytes": 4494,
+    "dir": "fonts/Montserrat",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/README.txt",
+    "ext": ".txt",
+    "sizeBytes": 2905,
+    "dir": "fonts/Montserrat",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Black.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 343296,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-BlackItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 348396,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Bold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 335788,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-BoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 342016,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-ExtraBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 344052,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-ExtraBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 348532,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-ExtraLight.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 330488,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-ExtraLightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 336808,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Italic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 337132,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Light.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 330888,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-LightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 337208,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Medium.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 330872,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-MediumItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 337092,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Regular.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 330948,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-SemiBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 333988,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-SemiBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 339028,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-Thin.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 329864,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat/static/Montserrat-ThinItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 336148,
+    "dir": "fonts/Montserrat/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat-Italic-VariableFont_wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 701156,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Montserrat-VariableFont_wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 688600,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/OFL.txt",
+    "ext": ".txt",
+    "sizeBytes": 4479,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Black.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151396,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-BlackItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 171604,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Bold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153944,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-BoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 176588,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-ExtraBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152764,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-ExtraBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 173916,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-ExtraLight.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 161456,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-ExtraLightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 186168,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Italic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 182012,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Light.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 159892,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-LightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 184460,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Medium.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 156520,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-MediumItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 180444,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Regular.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 158240,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-SemiBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 155232,
+    "dir": "fonts/Poppins",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-SemiBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 178584,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-Thin.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 161652,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins/Poppins-ThinItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 187044,
+    "dir": "fonts/Poppins",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Black.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151396,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-BlackItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 171604,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Bold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153944,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-BoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 176588,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-ExtraBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152764,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-ExtraBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 173916,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-ExtraLight.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 161456,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-ExtraLightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 186168,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Italic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 182012,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Light.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 159892,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-LightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 184460,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Medium.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 156520,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-MediumItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 180444,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Regular.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 158240,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-SemiBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 155232,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-SemiBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 178584,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-Thin.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 161652,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Poppins-ThinItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 187044,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/OFL.txt",
+    "ext": ".txt",
+    "sizeBytes": 4487,
+    "dir": "fonts/Roboto",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/README.txt",
+    "ext": ".txt",
+    "sizeBytes": 4509,
+    "dir": "fonts/Roboto",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/Roboto-Italic-VariableFont_wdth,wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 497124,
+    "dir": "fonts/Roboto",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Roboto/Roboto-VariableFont_wdth,wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 468308,
+    "dir": "fonts/Roboto",
+    "usedInCode": true,
+    "references": [
+      "app/fonts.ts"
+    ]
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Black.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 147424,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-BlackItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153780,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Bold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146768,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-BoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153104,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-ExtraBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146900,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-ExtraBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153292,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-ExtraLight.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146044,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-ExtraLightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151664,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Italic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152208,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Light.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146056,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-LightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151944,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Medium.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146132,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-MediumItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152416,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Regular.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146004,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-SemiBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146760,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-SemiBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153036,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-Thin.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 145936,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto-ThinItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151148,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Black.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 147148,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-BlackItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153680,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Bold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146580,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-BoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152976,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-ExtraBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146812,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-ExtraBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153324,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146004,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-ExtraLightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152120,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Italic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152248,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Light.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 145952,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-LightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152392,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Medium.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 145916,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-MediumItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152424,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Regular.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 145908,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-SemiBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146516,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-SemiBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152660,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-Thin.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 145920,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_Condensed-ThinItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151588,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Black.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 147372,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-BlackItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153832,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Bold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146752,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-BoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153148,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-ExtraBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146860,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-ExtraBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 153360,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-ExtraLight.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146100,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-ExtraLightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152012,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Italic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152304,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Light.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146064,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-LightItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152304,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Medium.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146124,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-MediumItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152492,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Regular.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146048,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-SemiBold.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146720,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-SemiBoldItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 152836,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-Thin.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 146068,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto/static/Roboto_SemiCondensed-ThinItalic.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 151496,
+    "dir": "fonts/Roboto/static",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto-Italic-VariableFont_wdth,wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 497124,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "fonts/Roboto-VariableFont_wdth,wght.ttf",
+    "ext": ".ttf",
+    "sizeBytes": 468308,
+    "dir": "fonts",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "globe copy.svg",
+    "ext": ".svg",
+    "sizeBytes": 1035,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "globe.svg",
+    "ext": ".svg",
+    "sizeBytes": 1035,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/20260326_214544.png",
+    "ext": ".png",
+    "sizeBytes": 611637,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/20260326_214608.png",
+    "ext": ".png",
+    "sizeBytes": 556916,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/20260326_214640.png",
+    "ext": ".png",
+    "sizeBytes": 535796,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-128.png",
+    "ext": ".png",
+    "sizeBytes": 14257,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-192.png",
+    "ext": ".png",
+    "sizeBytes": 27557,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2-128.png",
+    "ext": ".png",
+    "sizeBytes": 18910,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/tournaments/[tournamentId]/editions/[editionId]/dashboard/page.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/avatar-2-192.png",
+    "ext": ".png",
+    "sizeBytes": 36229,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2-240.png",
+    "ext": ".png",
+    "sizeBytes": 52519,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2-360.png",
+    "ext": ".png",
+    "sizeBytes": 104906,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2-500.png",
+    "ext": ".png",
+    "sizeBytes": 295982,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2-76.png",
+    "ext": ".png",
+    "sizeBytes": 8191,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2-768.png",
+    "ext": ".png",
+    "sizeBytes": 421891,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-2.png",
+    "ext": ".png",
+    "sizeBytes": 1655889,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/cards/member-card.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/avatar-240.png",
+    "ext": ".png",
+    "sizeBytes": 40155,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/pages/home/activity-feed-section.tsx",
+      "components/pages/home/testimonials-section.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/avatar-360.png",
+    "ext": ".png",
+    "sizeBytes": 82250,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar-500.png",
+    "ext": ".png",
+    "sizeBytes": 149657,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/manifest.ts",
+      "app/tournaments/[tournamentId]/editions/[editionId]/dashboard/layout.tsx",
+      "components/cards/match-card.tsx",
+      "components/pages/game-clips/game-clip-player.tsx",
+      "components/pages/tournaments/edition-detail/edition-best-participants-tab.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/avatar-72.png",
+    "ext": ".png",
+    "sizeBytes": 5755,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/avatar.png",
+    "ext": ".png",
+    "sizeBytes": 1198786,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/(protected)/dashboard/dashboard-shell.tsx",
+      "app/tournaments/[tournamentId]/editions/[editionId]/matches/[matchId]/page.tsx",
+      "components/pages/tournaments/members/member-card.tsx",
+      "components/pages/tournaments/tournament-detail/membership-request-dialog.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/BackgroundEraser_20260325_232939936.png",
+    "ext": ".png",
+    "sizeBytes": 901757,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/BackgroundEraser_20260325_233119956.png",
+    "ext": ".png",
+    "sizeBytes": 772855,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/BackgroundEraser_20260325_233222173.png",
+    "ext": ".png",
+    "sizeBytes": 816111,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/community.png",
+    "ext": ".png",
+    "sizeBytes": 455347,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/gt-controller-600.png",
+    "ext": ".png",
+    "sizeBytes": 69126,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/admin/games/page.tsx",
+      "app/manifest.ts",
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/gt-gold.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/gt-icon-2.png",
+    "ext": ".png",
+    "sizeBytes": 1997463,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/gt-logo.png",
+    "ext": ".png",
+    "sizeBytes": 455347,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/gt-man.png",
+    "ext": ".png",
+    "sizeBytes": 2721028,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/pages/profile/new/profile-avatar.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/gt-primary-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/gt-primary.png",
+    "ext": ".png",
+    "sizeBytes": 1470041,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/admin/games/page.tsx",
+      "app/layout.tsx",
+      "app/manifest.ts",
+      "components/admin/game-asset-picker.tsx",
+      "components/docs/sidebar.tsx",
+      "components/pages/games/game-item-card.tsx",
+      "components/pages/games/game-item-visual.tsx",
+      "components/pages/games/games-hero.tsx",
+      "components/pages/wallet/advanced-user-card.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/gtc-icon.png",
+    "ext": ".png",
+    "sizeBytes": 1911861,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/icon-128-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-128.png",
+    "ext": ".png",
+    "sizeBytes": 9747,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/layout/footer.tsx",
+      "components/layout/left-bar.tsx",
+      "components/layout/top-middle.tsx",
+      "lib/documents/app-info.ts"
+    ]
+  },
+  {
+    "relPath": "icons/icon-144-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-144.png",
+    "ext": ".png",
+    "sizeBytes": 11644,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-192-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-192-maskable-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-192-maskable.png",
+    "ext": ".png",
+    "sizeBytes": 18954,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/manifest.ts"
+    ]
+  },
+  {
+    "relPath": "icons/icon-192.png",
+    "ext": ".png",
+    "sizeBytes": 18954,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "lib/optimized-pwa.ts"
+    ]
+  },
+  {
+    "relPath": "icons/icon-512-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-512-maskable-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-512-maskable.png",
+    "ext": ".png",
+    "sizeBytes": 18954,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/manifest.ts"
+    ]
+  },
+  {
+    "relPath": "icons/icon-512.png",
+    "ext": ".png",
+    "sizeBytes": 115698,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/manifest.ts"
+    ]
+  },
+  {
+    "relPath": "icons/icon-72-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-72.png",
+    "ext": ".png",
+    "sizeBytes": 4003,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "components/layout/app-shell.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/icon-96-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-96.png",
+    "ext": ".png",
+    "sizeBytes": 6143,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-128.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-144.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-192-maskable.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-192.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-512-maskable.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-512.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-72.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/icon-gold-96.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/market.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/marketplace-128.png",
+    "ext": ".png",
+    "sizeBytes": 9959,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/marketplace-240.png",
+    "ext": ".png",
+    "sizeBytes": 29326,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/marketplace-500.png",
+    "ext": ".png",
+    "sizeBytes": 103146,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/not-found.png",
+    "ext": ".png",
+    "sizeBytes": 2401497,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/offline.png",
+    "ext": ".png",
+    "sizeBytes": 27709,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/shop.png",
+    "ext": ".png",
+    "sizeBytes": 592362,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/shops/create/page.tsx"
+    ]
+  },
+  {
+    "relPath": "icons/tournament-128.png",
+    "ext": ".png",
+    "sizeBytes": 10064,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/tournament-240.png",
+    "ext": ".png",
+    "sizeBytes": 29600,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "icons/tournament-500.png",
+    "ext": ".png",
+    "sizeBytes": 103501,
+    "dir": "icons",
+    "usedInCode": true,
+    "references": [
+      "app/manifest.ts",
+      "app/tournaments/[tournamentId]/editions/[editionId]/page.tsx",
+      "components/pages/tournaments/create/create-tournament-form.tsx",
+      "lib/tournaments/edition-cover.ts"
+    ]
+  },
+  {
+    "relPath": "icons/tournament.png",
+    "ext": ".png",
+    "sizeBytes": 347013,
+    "dir": "icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/games/battle-royale/items/pubg-airdrop.png",
+    "ext": ".png",
+    "sizeBytes": 694902,
+    "dir": "images/games/battle-royale/items",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/games/football/items/efootball-coins.png",
+    "ext": ".png",
+    "sizeBytes": 666979,
+    "dir": "images/games/football/items",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/games/football/items/fc-points.png",
+    "ext": ".png",
+    "sizeBytes": 799159,
+    "dir": "images/games/football/items",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/games/fps/items/cod-points-crate.png",
+    "ext": ".png",
+    "sizeBytes": 607180,
+    "dir": "images/games/fps/items",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/games/racing/vehicles/racing-hypercar.png",
+    "ext": ".png",
+    "sizeBytes": 804693,
+    "dir": "images/games/racing/vehicles",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-3d-coin-iso-color.png",
+    "ext": ".png",
+    "sizeBytes": 99269,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-back-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 85629,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-bag-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 117906,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-ball-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 104977,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-battery-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 100548,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-bell-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 143218,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-boy-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 74715,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-brush-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 105617,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-bulb-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 126180,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-calculator-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 130655,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-calender-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 127079,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-call-end-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 106383,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-call-only-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 82202,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-call-ringing-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 134256,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-camera-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 163090,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-chart-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 149684,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-chat-bubble-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 86844,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-chat-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 86505,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-chat-text-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 94783,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-chess-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 107549,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-circle-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 89602,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-clock-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 138270,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-copy-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 111085,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-credit-card-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 171703,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-crown-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 187923,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-cup-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 145813,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-dollar-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 114126,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-figma-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 97366,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-file-fav-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 99839,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-file-text-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 106663,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-fire-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 91545,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-flag-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 69698,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-flash-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 47762,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-folder-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 95420,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-folder-fav-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 106507,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-gift-box-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 163980,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-gift-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 197286,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-girl-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 79739,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-hash-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 97998,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-headphone-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 96447,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-heart-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 78517,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-key-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 72303,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-link-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 83953,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-location-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 70766,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-lock-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 98618,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-locker-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 227663,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-mail-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 98076,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-medal-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 143741,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-megaphone-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 121599,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-mic-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 137337,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-mobile-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 72141,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-money-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 87217,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-next-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 86420,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-notebook-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 119676,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-notify-heart-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 132874,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-painting-brush-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 92784,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-painting-kit-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 136776,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-pause-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 74467,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-pencil-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 56032,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-picture-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 132307,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-pin-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 79659,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-play-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 58829,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-plus-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 61302,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-puzzle-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 106666,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-rupee-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 109952,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-setting-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 122631,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-shield-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 221877,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-sphere-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 102139,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-star-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 76903,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-takeway-cup-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 141882,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-target-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 103731,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx",
+      "lib/games/art-assets.ts"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-tea-cup-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 140942,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-text-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 85419,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-thumb-down-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 116591,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-thumb-up-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 121845,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-tick-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 48945,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-tools-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 108727,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-trash-can-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 118384,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-trophy-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 120542,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": true,
+    "references": [
+      "components/admin/game-asset-picker.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-video-cam-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 161811,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-wallet-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 204243,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-wifi-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 107227,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-yuan-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 109455,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/3dicons-zoom-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 96985,
+    "dir": "images/icons/3d-icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/3d-icons/users/3dicons-boy-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 74715,
+    "dir": "images/icons/3d-icons/users",
+    "usedInCode": true,
+    "references": [
+      "components/auth/profile/user-profile.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/3d-icons/users/3dicons-girl-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 79739,
+    "dir": "images/icons/3d-icons/users",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/5938247.webp",
+    "ext": ".webp",
+    "sizeBytes": 17428,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/analysis-message.png",
+    "ext": ".png",
+    "sizeBytes": 72900,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/app/gt-controller-1.png",
+    "ext": ".png",
+    "sizeBytes": 347013,
+    "dir": "images/icons/app",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/app/gt-controller-2.png",
+    "ext": ".png",
+    "sizeBytes": 443528,
+    "dir": "images/icons/app",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/app/gt-gold.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "images/icons/app",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/app/gt-logo.png",
+    "ext": ".png",
+    "sizeBytes": 455347,
+    "dir": "images/icons/app",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/app/gt-primary-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "images/icons/app",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/app/gt-primary.png",
+    "ext": ".png",
+    "sizeBytes": 1470041,
+    "dir": "images/icons/app",
+    "usedInCode": true,
+    "references": [
+      "app/(auth)/sign-in/page.tsx",
+      "app/(auth)/sign-up/page.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/app/gt-typography.png",
+    "ext": ".png",
+    "sizeBytes": 159708,
+    "dir": "images/icons/app",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/avatar/man.png",
+    "ext": ".png",
+    "sizeBytes": 74715,
+    "dir": "images/icons/avatar",
+    "usedInCode": true,
+    "references": [
+      "components/pages/profile/new/profile-avatar.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/avatar/woman.png",
+    "ext": ".png",
+    "sizeBytes": 79739,
+    "dir": "images/icons/avatar",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/back-arrow.png",
+    "ext": ".png",
+    "sizeBytes": 108981,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-1.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 14841,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-2.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 14063,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-3.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 21514,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-4.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 89334,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-5.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 22387,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-6.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 32332,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg-controller.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 56446,
+    "dir": "images/icons/background",
+    "usedInCode": true,
+    "references": [
+      "components/auth/profile/user-profile.tsx",
+      "components/pages/tournaments/create/create-tournament-form.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/background/bg-secured-data.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 13680,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/bg_news.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 802413,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/business-mans.png",
+    "ext": ".png",
+    "sizeBytes": 168359,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/business-succes.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 10363,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/businessman.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 14375,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/callofduty.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 31837,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/controller2.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 15530,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/efootball.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 56576,
+    "dir": "images/icons/background",
+    "usedInCode": true,
+    "references": [
+      "app/shops/create/page.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/background/gt-player.webp",
+    "ext": ".webp",
+    "sizeBytes": 434838,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/gt.webp",
+    "ext": ".webp",
+    "sizeBytes": 353748,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/money-win.png",
+    "ext": ".png",
+    "sizeBytes": 314594,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/register.png",
+    "ext": ".png",
+    "sizeBytes": 172740,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/secure-data.png",
+    "ext": ".png",
+    "sizeBytes": 32477,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/background/user-actions.png",
+    "ext": ".png",
+    "sizeBytes": 22678,
+    "dir": "images/icons/background",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/businessman.png",
+    "ext": ".png",
+    "sizeBytes": 2054939,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/camera.webp",
+    "ext": ".webp",
+    "sizeBytes": 13256,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/chat-love.png",
+    "ext": ".png",
+    "sizeBytes": 58481,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/controller2.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 2174656,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/details.webp",
+    "ext": ".webp",
+    "sizeBytes": 10020,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/actionsmobilebtn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 43910,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/addProduct-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 20090,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/addproduct-modal.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 24580,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/ajoutercomptemobile.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 34737,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/ajoutercomptemobilebtn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 21718,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/authmobile.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 42318,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/btn-window.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 23528,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/btn-window_1.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 23528,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/buy-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 18839,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/buying-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 12652,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/connexionmobile.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 36503,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/espace-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 11555,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/espace-btn_1.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 11555,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/forgotmodalmobile.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 29692,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/gmail-password-changed.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 17834,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/gmail-reset-int.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 48405,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/gmail-reset-out.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 13899,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/gmail-verify-out.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 20110,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/index-buy-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 14398,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/logoutmobilebtn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 41439,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/market-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 12948,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/market-btn_1.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 12948,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/md-hamburger-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 9429,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/md-login-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 12114,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/md-login-modal.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 9348,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/md-register-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 11966,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/md-register-modal.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 8821,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/number-buy-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 16312,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/password-changed.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 21080,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/productmobile.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 41080,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/registermodalmobile.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 29077,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/updateProfileModale.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 13379,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/verify-int.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 41134,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-connexionModal.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 15144,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-forgotModal.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 17654,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-insription.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 19360,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-login-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 20342,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-modalAddProduct.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 22857,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-product.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 28702,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/faq/w-register-btn.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 19139,
+    "dir": "images/icons/faq",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/5938247.webp",
+    "ext": ".webp",
+    "sizeBytes": 17428,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/analysis-message.png",
+    "ext": ".png",
+    "sizeBytes": 25470,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/back-arrow.png",
+    "ext": ".png",
+    "sizeBytes": 41046,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/bg-secured-data.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 13680,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/business-mans.png",
+    "ext": ".png",
+    "sizeBytes": 56436,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/business-succes.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 10363,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/businessman.png",
+    "ext": ".png",
+    "sizeBytes": 14375,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/camera.webp",
+    "ext": ".webp",
+    "sizeBytes": 13256,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/chat-love.png",
+    "ext": ".png",
+    "sizeBytes": 21547,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/controller2.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 30978,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/details.webp",
+    "ext": ".webp",
+    "sizeBytes": 4702,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/members-discussion.png",
+    "ext": ".png",
+    "sizeBytes": 30017,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/members1.webp",
+    "ext": ".webp",
+    "sizeBytes": 12644,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/members2.webp",
+    "ext": ".webp",
+    "sizeBytes": 6198,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/money-win.png",
+    "ext": ".png",
+    "sizeBytes": 90978,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/money-win_1.png",
+    "ext": ".png",
+    "sizeBytes": 146717,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/partenariat.png",
+    "ext": ".png",
+    "sizeBytes": 35071,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/question-location.png",
+    "ext": ".png",
+    "sizeBytes": 30061,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/register.png",
+    "ext": ".png",
+    "sizeBytes": 172740,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/reload.webp",
+    "ext": ".webp",
+    "sizeBytes": 13522,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/secure-data.png",
+    "ext": ".png",
+    "sizeBytes": 32477,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/user-actions.png",
+    "ext": ".png",
+    "sizeBytes": 22678,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/user-icon1.webp",
+    "ext": ".webp",
+    "sizeBytes": 5514,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/icons/view-3d-video-game-controller.png",
+    "ext": ".png",
+    "sizeBytes": 9588,
+    "dir": "images/icons/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/20240715_172728.png",
+    "ext": ".png",
+    "sizeBytes": 105323,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/2149484774.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 18991,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/2151005781.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 9476,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/controller.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 39495,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/hero_images.png",
+    "ext": ".png",
+    "sizeBytes": 194189,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/logo.png",
+    "ext": ".png",
+    "sizeBytes": 105323,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/money-win.png",
+    "ext": ".png",
+    "sizeBytes": 146717,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/register.png",
+    "ext": ".png",
+    "sizeBytes": 172740,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/secure-data.png",
+    "ext": ".png",
+    "sizeBytes": 99472,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/images/tumb.png",
+    "ext": ".png",
+    "sizeBytes": 94827,
+    "dir": "images/icons/images",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/logo/bg.png",
+    "ext": ".png",
+    "sizeBytes": 134579,
+    "dir": "images/icons/logo",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/logo/game_logo.png",
+    "ext": ".png",
+    "sizeBytes": 134579,
+    "dir": "images/icons/logo",
+    "usedInCode": true,
+    "references": [
+      "components/pages/wallet/create/wallet-preview.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/lotties/loading.webm",
+    "ext": ".webm",
+    "sizeBytes": 55281,
+    "dir": "images/icons/lotties",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/lotties/lottie-1.gif",
+    "ext": ".gif",
+    "sizeBytes": 279886,
+    "dir": "images/icons/lotties",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/lotties/lottie-2.gif",
+    "ext": ".gif",
+    "sizeBytes": 279886,
+    "dir": "images/icons/lotties",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/lotties/lottie-3.webm",
+    "ext": ".webm",
+    "sizeBytes": 33880,
+    "dir": "images/icons/lotties",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/lotties/lottie-4.gif",
+    "ext": ".gif",
+    "sizeBytes": 108934,
+    "dir": "images/icons/lotties",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/members-discussion.png",
+    "ext": ".png",
+    "sizeBytes": 80840,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/members1.webp",
+    "ext": ".webp",
+    "sizeBytes": 27484,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/members2.webp",
+    "ext": ".webp",
+    "sizeBytes": 12768,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/money-win.png",
+    "ext": ".png",
+    "sizeBytes": 444312,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/auth/sign-in.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 802413,
+    "dir": "images/icons/pages/auth",
+    "usedInCode": true,
+    "references": [
+      "components/auth/login-form.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/pages/auth/sign-up.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 56446,
+    "dir": "images/icons/pages/auth",
+    "usedInCode": true,
+    "references": [
+      "components/auth/signup-form.tsx"
+    ]
+  },
+  {
+    "relPath": "images/icons/pages/welcome/3dicons-bag-dynamic-color.png",
+    "ext": ".png",
+    "sizeBytes": 117906,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/avatar-2.png",
+    "ext": ".png",
+    "sizeBytes": 1655889,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/avatar.png",
+    "ext": ".png",
+    "sizeBytes": 1198786,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/businessman.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 14375,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/gt-player.webp",
+    "ext": ".webp",
+    "sizeBytes": 434838,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/gt-primary.png",
+    "ext": ".png",
+    "sizeBytes": 1470041,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/gt-typography.png",
+    "ext": ".png",
+    "sizeBytes": 159708,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/home.png",
+    "ext": ".png",
+    "sizeBytes": 159708,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img1.png",
+    "ext": ".png",
+    "sizeBytes": 99269,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img2.png",
+    "ext": ".png",
+    "sizeBytes": 85629,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img3.png",
+    "ext": ".png",
+    "sizeBytes": 105617,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img4.png",
+    "ext": ".png",
+    "sizeBytes": 74715,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img5.png",
+    "ext": ".png",
+    "sizeBytes": 143218,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img6.png",
+    "ext": ".png",
+    "sizeBytes": 100548,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/img7.png",
+    "ext": ".png",
+    "sizeBytes": 104977,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/market.png",
+    "ext": ".png",
+    "sizeBytes": 556916,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/marketplace.png",
+    "ext": ".png",
+    "sizeBytes": 772855,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/social.png",
+    "ext": ".png",
+    "sizeBytes": 592362,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/tournament.png",
+    "ext": ".png",
+    "sizeBytes": 816111,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/tournoi.png",
+    "ext": ".png",
+    "sizeBytes": 535796,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/pages/welcome/welcome.png",
+    "ext": ".png",
+    "sizeBytes": 611637,
+    "dir": "images/icons/pages/welcome",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/partenariat.png",
+    "ext": ".png",
+    "sizeBytes": 1463654,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/question-location.png",
+    "ext": ".png",
+    "sizeBytes": 81195,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/register.png",
+    "ext": ".png",
+    "sizeBytes": 526216,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/reload.webp",
+    "ext": ".webp",
+    "sizeBytes": 13522,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/secure-data.png",
+    "ext": ".png",
+    "sizeBytes": 283290,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/sounds/mouseDown.mp3",
+    "ext": ".mp3",
+    "sizeBytes": 49649,
+    "dir": "images/icons/sounds",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/sounds/mouseUp.mp3",
+    "ext": ".mp3",
+    "sizeBytes": 46645,
+    "dir": "images/icons/sounds",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/sounds/sendBtn.mp3",
+    "ext": ".mp3",
+    "sizeBytes": 57183,
+    "dir": "images/icons/sounds",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/user-actions.png",
+    "ext": ".png",
+    "sizeBytes": 1894366,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/user-icon1.webp",
+    "ext": ".webp",
+    "sizeBytes": 11888,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/video/game_trafic2.webm",
+    "ext": ".webm",
+    "sizeBytes": 48804,
+    "dir": "images/icons/video",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/icons/view-3d-video-game-controller.png",
+    "ext": ".png",
+    "sizeBytes": 1005272,
+    "dir": "images/icons",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/uploads/.gitkeep",
+    "ext": "",
+    "sizeBytes": 0,
+    "dir": "images/uploads",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/uploads/upload-1.png",
+    "ext": ".png",
+    "sizeBytes": 2083080,
+    "dir": "images/uploads",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "images/uploads/upload.png",
+    "ext": ".png",
+    "sizeBytes": 1110476,
+    "dir": "images/uploads",
+    "usedInCode": true,
+    "references": [
+      "components/ui/advanced-multi-upload.tsx",
+      "components/ui/advanced-upload.tsx"
+    ]
+  },
+  {
+    "relPath": "next copy.svg",
+    "ext": ".svg",
+    "sizeBytes": 1375,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "next.svg",
+    "ext": ".svg",
+    "sizeBytes": 1375,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "placeholder-logo.png",
+    "ext": ".png",
+    "sizeBytes": 958,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "placeholder.jpg",
+    "ext": ".jpg",
+    "sizeBytes": 1596,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-controller-1.png",
+    "ext": ".png",
+    "sizeBytes": 347013,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-controller-2.png",
+    "ext": ".png",
+    "sizeBytes": 443528,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-gold.png",
+    "ext": ".png",
+    "sizeBytes": 289333,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-logo.png",
+    "ext": ".png",
+    "sizeBytes": 455347,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-primary-2.png",
+    "ext": ".png",
+    "sizeBytes": 283624,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-primary.png",
+    "ext": ".png",
+    "sizeBytes": 1470041,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/gt-typography.png",
+    "ext": ".png",
+    "sizeBytes": 159708,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/home.png",
+    "ext": ".png",
+    "sizeBytes": 159708,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/marketplace.png",
+    "ext": ".png",
+    "sizeBytes": 772855,
+    "dir": "screenshots",
+    "usedInCode": true,
+    "references": [
+      "app/manifest.ts"
+    ]
+  },
+  {
+    "relPath": "screenshots/marketplace2.png",
+    "ext": ".png",
+    "sizeBytes": 347013,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "screenshots/tournament.png",
+    "ext": ".png",
+    "sizeBytes": 816111,
+    "dir": "screenshots",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "sw.js",
+    "ext": ".js",
+    "sizeBytes": 16857,
+    "dir": ".",
+    "usedInCode": true,
+    "references": [
+      "lib/optimized-pwa.ts",
+      "lib/routes/resolver.ts"
+    ]
+  },
+  {
+    "relPath": "vercel copy.svg",
+    "ext": ".svg",
+    "sizeBytes": 128,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "vercel.svg",
+    "ext": ".svg",
+    "sizeBytes": 128,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "window copy.svg",
+    "ext": ".svg",
+    "sizeBytes": 385,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  },
+  {
+    "relPath": "window.svg",
+    "ext": ".svg",
+    "sizeBytes": 385,
+    "dir": ".",
+    "usedInCode": false,
+    "references": []
+  }
+]

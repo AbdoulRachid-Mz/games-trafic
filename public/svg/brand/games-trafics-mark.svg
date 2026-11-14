@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="gtGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Shield -->
+  <rect width="100" height="100" rx="28" fill="url(#gtGradient)"/>
+  <!-- D-Pad Left -->
+  <path d="M28 45H36V37H44V45H52V53H44V61H36V53H28V45Z" fill="#FFFFFF" fill-opacity="0.95"/>
+  <!-- Buttons Right -->
+  <circle cx="68" cy="41" r="5" fill="url(#accentGradient)"/>
+  <circle cx="76" cy="49" r="5" fill="#FFFFFF" fill-opacity="0.95"/>
+  <circle cx="68" cy="57" r="5" fill="#FFFFFF" fill-opacity="0.95"/>
+  <circle cx="60" cy="49" r="5" fill="#FFFFFF" fill-opacity="0.95"/>
+  <!-- Central Accent Bar -->
+  <rect x="42" y="70" width="16" height="4" rx="2" fill="#FFFFFF" fill-opacity="0.6"/>
+</svg>

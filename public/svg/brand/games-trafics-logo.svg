@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" fill="none">
+  <defs>
+    <linearGradient id="logoBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon Mark -->
+  <rect x="10" y="10" width="60" height="60" rx="18" fill="url(#logoBg)"/>
+  <path d="M26 36H32V30H38V36H44V42H38V48H32V42H26V36Z" fill="#FFFFFF"/>
+  <circle cx="54" cy="34" r="3.5" fill="#10B981"/>
+  <circle cx="60" cy="40" r="3.5" fill="#FFFFFF"/>
+  <circle cx="54" cy="46" r="3.5" fill="#FFFFFF"/>
+  <circle cx="48" cy="40" r="3.5" fill="#FFFFFF"/>
+  <!-- Text Brand -->
+  <text x="86" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="900" letter-spacing="-0.04em" fill="currentColor">
+    GAMES<tspan fill="url(#textGrad)">TRAFICS</tspan>
+  </text>
+  <text x="88" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" letter-spacing="0.16em" fill="#9CA3AF" text-transform="uppercase">
+    ESPORT &amp; MARKETPLACE
+  </text>
+</svg>
