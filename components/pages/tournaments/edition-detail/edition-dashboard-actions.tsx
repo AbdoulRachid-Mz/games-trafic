@@ -6,6 +6,7 @@ import {
   Trophy, 
   Settings, 
   Users, 
+  UserPlus,
   LayoutGrid, 
   Calendar,
   AlertTriangle,
@@ -15,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { finalizeTournamentEditionAction } from "@/actions/tournaments";
 import { useRouter } from "next/navigation";
+import { AddParticipantDialog } from "@/components/pages/tournaments/edition-detail/add-participant-dialog";
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -44,6 +46,7 @@ export function EditionDashboardActions({
 }: EditionDashboardActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [showConfirmWinner, setShowConfirmWinner] = useState(false);
+  const [showAddParticipant, setShowAddParticipant] = useState(false);
   const router = useRouter();
 
   const handleFinalize = () => {
@@ -74,6 +77,13 @@ export function EditionDashboardActions({
       label: "Vue Publique",
       icon: Users,
       href: `/tournaments/${tournamentId}/editions/${editionId}`,
+    },
+    {
+      id: "add-participant",
+      label: "Ajouter un participant",
+      icon: UserPlus,
+      className: "text-primary font-bold",
+      onClick: () => setShowAddParticipant(true),
     },
     {
       id: "organize",
@@ -150,6 +160,14 @@ export function EditionDashboardActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AddParticipantDialog
+        editionId={editionId}
+        tournamentId={tournamentId}
+        open={showAddParticipant}
+        onOpenChange={setShowAddParticipant}
+        onSuccess={() => router.refresh()}
+      />
     </>
   );
 }

@@ -1,11 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { getEditionRegistrations } from "@/actions/tournaments";
-import {
-  EditionRegistration,
-  TournamentMember,
-  User as UserType,
-  Team,
-} from "@/database/schema";
+import { getUnifiedEditionParticipantsAction } from "@/actions/editions";
 import { ParticipantsManagementClient } from "@/components/pages/tournaments/edition-detail/participants-management-client";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 
@@ -16,73 +9,55 @@ interface PageProps {
   }>;
 }
 
-type RegistrationWithMember = EditionRegistration & {
-  member: TournamentMember & {
-    user: UserType | null;
-    team: Team | null;
-  };
-};
-
 export default async function DashboardParticipantsPage({ params }: PageProps) {
   const { tournamentId, editionId } = await params;
 
-  const [registrationsResponse, unregisteredResponse] = await Promise.all([
-    getEditionRegistrations({
-      filters: { editionId },
-      pagination: { limit: 100, page: 1 },
-      options: {
-        sortBy: "registeredAt",
-        sortOrder: "desc",
-        populate: ["member", "member.user", "member.team"],
-      },
-    }),
-    import("@/actions/tournaments").then((m) =>
-      m.getTournamentMembersNotInEdition(tournamentId, editionId, {
-        pagination: { limit: 100, page: 1 },
-      })
-    ),
-  ]);
+  // Récupération unifiée complète de la base de participants (inscrits + membres non inscrits)
+  const unifiedResponse = await getUnifiedEditionParticipantsAction(
+    tournamentId,
+    editionId,
+    { limit: 2000, statusFilter: "all" }
+  );
 
-  const participants = registrationsResponse.data as RegistrationWithMember[];
-  const unregisteredMembers = unregisteredResponse.data;
-
-  // Stats
-  const total = participants.length;
-  const checkedIn = participants.filter((p) => p.checkedIn).length;
-  const paid = participants.filter((p) => p.feePaid).length;
+  const { counts } = unifiedResponse;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Stats */}
+      {/* Statistiques globales réelles */}
       <StatsCarousel
         data={[
           {
-            value: total,
+            value: counts.registered,
             title: "Total Inscrits",
             className: "bg-muted/30 border-none shadow-none",
           },
           {
-            value: checkedIn,
+            value: counts.checkedIn,
             title: "Checked-in",
             className: "bg-green-500/5 border-none shadow-none",
             variant: "secondary",
           },
           {
-            value: paid,
-            title: "Payés",
+            value: counts.paid,
+            title: "Frais Payés",
             className: "bg-blue-500/5 border-none shadow-none",
             variant: "success",
           },
+          {
+            value: counts.unregistered,
+            title: "Membres Tournoi Non Inscrits",
+            className: "bg-amber-500/5 border-none shadow-none",
+            variant: "warning",
+          },
         ]}
-        itemsPerView={{ mobile: 1, md: 2, lg: 3 }}
+        itemsPerView={{ mobile: 1, md: 2, lg: 4 }}
         gap={8}
       />
 
       <ParticipantsManagementClient 
         editionId={editionId} 
         tournamentId={tournamentId}
-        participants={participants}
-        unregisteredMembers={unregisteredMembers}
+        initialUnified={unifiedResponse}
       />
     </div>
   );

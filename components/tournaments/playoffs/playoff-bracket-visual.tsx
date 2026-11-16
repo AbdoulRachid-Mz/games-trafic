@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import Image from "next/image";
 import {
   Trophy,
@@ -18,17 +18,24 @@ import {
   ChevronRight,
   Eye,
   CheckCircle2,
+  Download,
+  HelpCircle,
+  Flame,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   PlayoffMatchNode,
+  PlayoffParticipant,
   SymmetricalPlayoffTree,
   buildSymmetricalPlayoffTree,
   PLAYOFF_THEMES,
 } from "@/lib/tournaments/playoffs-engine";
+import { exportPlayoffBracketImage } from "@/lib/tournaments/playoffs-image-export";
 
 interface PlayoffBracketVisualProps {
   matches?: any[];
@@ -54,11 +61,16 @@ export function PlayoffBracketVisual({
   onMatchClick,
 }: PlayoffBracketVisualProps) {
   const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Mode de rendu : "symmetrical" (The Playoffs) | "horizontal" (Flow Esports) | "cards"
   const [viewMode, setViewMode] = useState<"symmetrical" | "horizontal" | "cards">("symmetrical");
   const [selectedThemeId, setSelectedThemeId] = useState<string>("classic-championship");
+  
+  // Plage de zoom débloquée : 35% (-100% de recul) à 200% (+100% de zoom)
   const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const tree: SymmetricalPlayoffTree = useMemo(() => {
     return buildSymmetricalPlayoffTree(matches, nodes);
@@ -73,19 +85,66 @@ export function PlayoffBracketVisual({
   const handleMatchSelect = (match: PlayoffMatchNode) => {
     if (onMatchClick) {
       onMatchClick(match.id);
-    } else if (tournamentId && editionId && !match.id.startsWith("mock-") && !match.id.startsWith("R16-") && !match.id.startsWith("QF-") && !match.id.startsWith("SF-")) {
+    } else if (
+      tournamentId &&
+      editionId &&
+      !match.id.startsWith("mock-") &&
+      !match.id.startsWith("R16-") &&
+      !match.id.startsWith("QF-") &&
+      !match.id.startsWith("SF-")
+    ) {
       router.push(`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`);
     }
   };
 
-  const handleZoomIn = () => setZoomLevel((prev) => Math.min(150, prev + 15));
-  const handleZoomOut = () => setZoomLevel((prev) => Math.max(70, prev - 15));
+  // Contrôles de zoom
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(200, prev + 15));
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(35, prev - 15));
   const handleZoomReset = () => setZoomLevel(100);
+
+  // Ajuster à l'écran (Fit to screen)
+  const handleFitScreen = () => {
+    if (containerRef.current && contentRef.current) {
+      const containerWidth = containerRef.current.clientWidth - 48;
+      const contentWidth = contentRef.current.scrollWidth;
+      if (contentWidth > 0) {
+        const calculatedScale = Math.max(
+          35,
+          Math.min(100, Math.floor((containerWidth / contentWidth) * 96))
+        );
+        setZoomLevel(calculatedScale);
+        toast.info(`Zoom ajusté à ${calculatedScale}% pour afficher l'ensemble de l'arbre`);
+      }
+    }
+  };
+
+  // Export d'image haute résolution
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      toast.loading("Génération de l'image haute résolution des Playoffs...");
+      await exportPlayoffBracketImage({
+        tree,
+        tournamentName,
+        editionName,
+        game,
+        format: "png",
+      });
+      toast.dismiss();
+      toast.success("Affiche officielle des Playoffs téléchargée avec succès (2400x1350)");
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err?.message || "Erreur lors de la génération de l'image");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div
+      ref={containerRef}
       className={cn(
-        "relative w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-[#08080f] select-none",
+        "relative w-full rounded-3xl overflow-hidden border border-border/80 dark:border-white/10 shadow-2xl bg-background/95 dark:bg-[#070512] select-none",
         className
       )}
     >
@@ -97,14 +156,14 @@ export function PlayoffBracketVisual({
             alt="Playoffs Arena Background"
             fill
             sizes="100vw"
-            className="object-cover object-center opacity-25 filter blur-[0.5px] scale-105 transition-opacity duration-700"
+            className="object-cover object-center opacity-20 dark:opacity-25 filter blur-[0.5px] scale-105 transition-opacity duration-700"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-b from-[#0a0518] via-[#050714] to-[#04020a]" />
+          <div className="w-full h-full bg-gradient-to-b from-primary/10 via-background to-background" />
         )}
         {/* Grille hexagonale et radial glows */}
         <div
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0 opacity-15 dark:opacity-20"
           style={{
             backgroundImage: `radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 70%),
               linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
@@ -116,7 +175,7 @@ export function PlayoffBracketVisual({
       </div>
 
       {/* ─── TOOLBAR SUPÉRIEURE : MODES ET CONTRÔLES ────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 md:px-6 border-b border-white/10 bg-background/60 backdrop-blur-xl relative z-20">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 md:px-6 border-b border-border/60 dark:border-white/10 bg-background/70 backdrop-blur-xl relative z-20">
         <div className="flex items-center gap-2">
           <Badge className="bg-primary/20 text-primary border-primary/40 uppercase tracking-widest text-[10px] font-black px-2.5 py-1">
             <Swords className="w-3 h-3 mr-1" />
@@ -130,15 +189,16 @@ export function PlayoffBracketVisual({
         </div>
 
         {/* View mode toggle */}
-        <div className="flex items-center gap-1.5 p-1 bg-black/40 rounded-xl border border-white/10 text-xs font-bold">
+        <div className="flex items-center gap-1 p-1 bg-black/10 dark:bg-black/40 rounded-xl border border-border/50 dark:border-white/10 text-xs font-bold">
           <button
             onClick={() => setViewMode("symmetrical")}
             className={cn(
               "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5",
               viewMode === "symmetrical"
                 ? "bg-gradient-to-r from-primary to-violet-600 text-white shadow-[0_0_15px_rgba(var(--primary),0.5)] font-black"
-                : "text-muted-foreground hover:text-white"
+                : "text-muted-foreground hover:text-foreground"
             )}
+            title="Arbre Symétrique de Championnat"
           >
             <GitBranch className="w-3.5 h-3.5 rotate-90" />
             <span className="hidden sm:inline">Symétrique</span>
@@ -149,8 +209,9 @@ export function PlayoffBracketVisual({
               "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5",
               viewMode === "horizontal"
                 ? "bg-gradient-to-r from-primary to-violet-600 text-white shadow-[0_0_15px_rgba(var(--primary),0.5)] font-black"
-                : "text-muted-foreground hover:text-white"
+                : "text-muted-foreground hover:text-foreground"
             )}
+            title="Arbre Linéaire Liquipedia"
           >
             <Layers className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Arbre Linéaire</span>
@@ -161,57 +222,84 @@ export function PlayoffBracketVisual({
               "px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5",
               viewMode === "cards"
                 ? "bg-gradient-to-r from-primary to-violet-600 text-white shadow-[0_0_15px_rgba(var(--primary),0.5)] font-black"
-                : "text-muted-foreground hover:text-white"
+                : "text-muted-foreground hover:text-foreground"
             )}
+            title="Vue Cartes Grille"
           >
             <Eye className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Cartes</span>
           </button>
         </div>
 
-        {/* Thèmes et Zoom */}
+        {/* Contrôles de Zoom et Export */}
         <div className="flex items-center gap-2">
           {/* Zoom controls */}
-          <div className="flex items-center bg-black/40 rounded-xl border border-white/10 p-0.5">
+          <div className="flex items-center bg-black/10 dark:bg-black/40 rounded-xl border border-border/50 dark:border-white/10 p-0.5">
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-white"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={handleZoomOut}
-              title="Zoom arrière"
+              title="Zoom arrière (jusqu'à 35% / -100%)"
+              aria-label="Zoom arrière"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </Button>
-            <span className="text-[11px] font-mono px-2 text-muted-foreground min-w-[42px] text-center">
+            <span className="text-[11px] font-mono px-2 text-muted-foreground min-w-[42px] text-center font-bold">
               {zoomLevel}%
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-white"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={handleZoomIn}
-              title="Zoom avant"
+              title="Zoom avant (jusqu'à 200% / +100%)"
+              aria-label="Zoom avant"
             >
               <ZoomIn className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground hidden sm:inline-flex"
+              onClick={handleFitScreen}
+              title="Ajuster l'arbre complet à l'écran"
+              aria-label="Ajuster à l'écran"
+            >
+              <Maximize2 className="w-3 h-3" />
             </Button>
             {zoomLevel !== 100 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-white"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 onClick={handleZoomReset}
-                title="Réinitialiser zoom"
+                title="Réinitialiser zoom à 100%"
+                aria-label="Réinitialiser zoom"
               >
                 <RotateCcw className="w-3 h-3" />
               </Button>
             )}
           </div>
+
+          {/* Bouton Téléchargement d'Image Haute Résolution */}
+          <Button
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting}
+            className="h-8 px-3 rounded-xl bg-gradient-to-r from-cyan-600 via-primary to-violet-600 text-white font-bold text-xs gap-1.5 shadow-md hover:scale-102 transition-all"
+            title="Générer et exporter l'image haute résolution des Playoffs (2400x1350 PNG)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Exporter Affiche</span>
+          </Button>
         </div>
       </div>
 
       {/* ─── CONTENEUR D'AFFICHAGE DU BRACKET AVEC ZOOM ─────────────────── */}
       <div className="overflow-x-auto overflow-y-hidden p-6 md:p-8 min-h-[580px] flex items-center justify-center">
         <div
+          ref={contentRef}
           className="transition-transform duration-200 ease-out origin-center min-w-max"
           style={{ transform: `scale(${zoomLevel / 100})` }}
         >
@@ -246,7 +334,7 @@ export function PlayoffBracketVisual({
 
 // ============================================================================
 // COMPOSANT 1 : ARBRE SYMÉTRIQUE DU CHAMPIONNAT ("THE PLAYOFFS")
-// Conforme au modèle de référence visuel avec les barres biseautées Cyan & Orange
+// Conforme au modèle officiel avec Aile Gauche, Trophée Central & Aile Droite
 // ============================================================================
 
 interface SymmetricalChampionshipBracketProps {
@@ -282,31 +370,53 @@ function SymmetricalChampionshipBracket({
       </div>
 
       {/* ── ARÈNE CENTRALE : AILE GAUCHE | CENTRE FINALE | AILE DROITE ── */}
-      <div className="flex items-center justify-center gap-6 md:gap-10">
+      <div className="flex items-center justify-center gap-4 md:gap-8">
         {/* AILE GAUCHE (CONVERGE VERS LA DROITE) */}
-        <div className="flex items-center gap-6">
-          {leftRounds.map((round, rIdx) => (
-            <div key={`left-r-${round.roundIndex}`} className="flex flex-col gap-6">
-              <div className="text-center pb-2 border-b border-cyan-500/20">
-                <span className="text-[11px] font-black uppercase tracking-wider text-cyan-400">
-                  {round.roundName}
-                </span>
-              </div>
-              <div
-                className="flex flex-col justify-around gap-6"
-                style={{ height: `${Math.max(1, round.matches.length) * 110}px` }}
-              >
-                {round.matches.map((m) => (
-                  <PlayoffCapsuleCard
-                    key={m.id}
-                    match={m}
-                    colorScheme="cyan"
-                    onClick={() => onMatchClick(m)}
+        <div className="flex items-center gap-4 md:gap-6">
+          {leftRounds.map((round, rIdx) => {
+            const matchCount = round.matches.length;
+            const height = Math.max(1, matchCount) * 115;
+
+            return (
+              <React.Fragment key={`left-r-${round.roundIndex}`}>
+                <div className="flex flex-col gap-4">
+                  <div className="text-center pb-2 border-b border-cyan-500/20">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-cyan-400">
+                      {round.roundName}
+                    </span>
+                  </div>
+                  <div
+                    className="flex flex-col justify-around gap-4"
+                    style={{ height: `${height}px` }}
+                  >
+                    {round.matches.map((m, mIdx) => {
+                      const isUpper = mIdx < matchCount / 2;
+                      const colorScheme = isUpper ? "cyan" : "orange";
+
+                      return (
+                        <PlayoffCapsuleCard
+                          key={m.id}
+                          match={m}
+                          colorScheme={colorScheme}
+                          onClick={() => onMatchClick(m)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Connecteurs SVG entre rounds de l'aile gauche */}
+                {rIdx < leftRounds.length - 1 && (
+                  <BracketConnectorColumn
+                    direction="left-to-right"
+                    sourceCount={matchCount}
+                    targetCount={leftRounds[rIdx + 1].matches.length}
+                    height={height}
                   />
-                ))}
-              </div>
-            </div>
-          ))}
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
 
         {/* CENTRE : TROPHÉE & GRANDE FINALE */}
@@ -324,11 +434,9 @@ function SymmetricalChampionshipBracket({
 
           {/* Carte du Match de Grande Finale */}
           {finalMatch ? (
-            <div className="w-56 md:w-64 flex flex-col gap-2">
+            <div className="w-60 md:w-72 flex flex-col gap-2">
               <FinalCapsule
-                name={finalMatch.participant1.name}
-                score={finalMatch.participant1.score}
-                isWinner={finalMatch.participant1.isWinner}
+                participant={finalMatch.participant1}
                 colorScheme="orange"
                 onClick={() => onMatchClick(finalMatch)}
               />
@@ -343,9 +451,7 @@ function SymmetricalChampionshipBracket({
                 )}
               </div>
               <FinalCapsule
-                name={finalMatch.participant2.name}
-                score={finalMatch.participant2.score}
-                isWinner={finalMatch.participant2.isWinner}
+                participant={finalMatch.participant2}
                 colorScheme="cyan"
                 onClick={() => onMatchClick(finalMatch)}
               />
@@ -358,29 +464,51 @@ function SymmetricalChampionshipBracket({
         </div>
 
         {/* AILE DROITE (CONVERGE VERS LA GAUCHE) */}
-        <div className="flex items-center gap-6">
-          {[...rightRounds].reverse().map((round) => (
-            <div key={`right-r-${round.roundIndex}`} className="flex flex-col gap-6">
-              <div className="text-center pb-2 border-b border-orange-500/20">
-                <span className="text-[11px] font-black uppercase tracking-wider text-orange-400">
-                  {round.roundName}
-                </span>
-              </div>
-              <div
-                className="flex flex-col justify-around gap-6"
-                style={{ height: `${Math.max(1, round.matches.length) * 110}px` }}
-              >
-                {round.matches.map((m) => (
-                  <PlayoffCapsuleCard
-                    key={m.id}
-                    match={m}
-                    colorScheme="orange"
-                    onClick={() => onMatchClick(m)}
+        <div className="flex items-center gap-4 md:gap-6">
+          {[...rightRounds].reverse().map((round, rIdx, arr) => {
+            const matchCount = round.matches.length;
+            const height = Math.max(1, matchCount) * 115;
+
+            return (
+              <React.Fragment key={`right-r-${round.roundIndex}`}>
+                {/* Connecteurs SVG entre rounds de l'aile droite */}
+                {rIdx > 0 && (
+                  <BracketConnectorColumn
+                    direction="right-to-left"
+                    sourceCount={arr[rIdx - 1].matches.length}
+                    targetCount={matchCount}
+                    height={height}
                   />
-                ))}
-              </div>
-            </div>
-          ))}
+                )}
+
+                <div className="flex flex-col gap-4">
+                  <div className="text-center pb-2 border-b border-orange-500/20">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-orange-400">
+                      {round.roundName}
+                    </span>
+                  </div>
+                  <div
+                    className="flex flex-col justify-around gap-4"
+                    style={{ height: `${height}px` }}
+                  >
+                    {round.matches.map((m, mIdx) => {
+                      const isUpper = mIdx < matchCount / 2;
+                      const colorScheme = isUpper ? "cyan" : "orange";
+
+                      return (
+                        <PlayoffCapsuleCard
+                          key={m.id}
+                          match={m}
+                          colorScheme={colorScheme}
+                          onClick={() => onMatchClick(m)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 
@@ -396,7 +524,60 @@ function SymmetricalChampionshipBracket({
 }
 
 // ============================================================================
+// COMPOSANT CONNECTEUR SVG DE BRACKET
+// ============================================================================
+
+function BracketConnectorColumn({
+  direction,
+  sourceCount,
+  targetCount,
+  height,
+}: {
+  direction: "left-to-right" | "right-to-left";
+  sourceCount: number;
+  targetCount: number;
+  height: number;
+}) {
+  const width = 28;
+  const pairCount = Math.floor(sourceCount / 2);
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      className="shrink-0 overflow-visible pointer-events-none"
+    >
+      {Array.from({ length: pairCount }).map((_, pairIdx) => {
+        const topY = (height / sourceCount) * (pairIdx * 2 + 0.5);
+        const bottomY = (height / sourceCount) * (pairIdx * 2 + 1.5);
+        const midY = (topY + bottomY) / 2;
+        const midX = width / 2;
+        const isCyan = pairIdx < pairCount / 2;
+        const strokeColor = isCyan ? "rgba(6, 182, 212, 0.45)" : "rgba(249, 115, 22, 0.45)";
+
+        if (direction === "left-to-right") {
+          return (
+            <g key={pairIdx} stroke={strokeColor} strokeWidth="2" fill="none">
+              <path d={`M 0 ${topY} H ${midX} V ${bottomY} H 0`} />
+              <path d={`M ${midX} ${midY} H ${width}`} />
+            </g>
+          );
+        } else {
+          return (
+            <g key={pairIdx} stroke={strokeColor} strokeWidth="2" fill="none">
+              <path d={`M ${width} ${topY} H ${midX} V ${bottomY} H ${width}`} />
+              <path d={`M ${midX} ${midY} H 0`} />
+            </g>
+          );
+        }
+      })}
+    </svg>
+  );
+}
+
+// ============================================================================
 // CAPSULE DE MATCH STYLE GAMING (Conforme aux badges 3D biseautés de l'image)
+// Intègre Avatar, Nom, Tag, Seed (#1), Score et Indicateur Vainqueur
 // ============================================================================
 
 interface PlayoffCapsuleCardProps {
@@ -407,7 +588,6 @@ interface PlayoffCapsuleCardProps {
 
 function PlayoffCapsuleCard({ match, colorScheme, onClick }: PlayoffCapsuleCardProps) {
   const isCyan = colorScheme === "cyan";
-
   const p1 = match.participant1;
   const p2 = match.participant2;
 
@@ -415,89 +595,144 @@ function PlayoffCapsuleCard({ match, colorScheme, onClick }: PlayoffCapsuleCardP
     <div
       onClick={onClick}
       className={cn(
-        "group cursor-pointer rounded-2xl p-2.5 transition-all duration-300 hover:scale-105 shadow-xl border w-44 md:w-52 flex flex-col gap-1.5",
+        "group cursor-pointer rounded-2xl p-2 transition-all duration-300 hover:scale-105 shadow-xl border w-48 md:w-56 flex flex-col gap-1.5 backdrop-blur-md",
         isCyan
-          ? "bg-[#0b1426]/90 border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-          : "bg-[#1f100a]/90 border-orange-500/30 hover:border-orange-400 hover:shadow-[0_0_20px_rgba(249,115,22,0.4)]"
+          ? "bg-[#0b1426]/95 border-cyan-500/30 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+          : "bg-[#1f100a]/95 border-orange-500/30 hover:border-orange-400 hover:shadow-[0_0_20px_rgba(249,115,22,0.4)]"
       )}
     >
-      {/* Barre Joueur 1 */}
-      <div
-        className={cn(
-          "px-3 py-1.5 rounded-lg flex items-center justify-between transition-all",
-          isCyan
-            ? "bg-gradient-to-r from-cyan-600 via-blue-600 to-blue-700 text-white shadow-[0_2px_8px_rgba(6,182,212,0.4)] border-t border-cyan-300/40"
-            : "bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 text-white shadow-[0_2px_8px_rgba(249,115,22,0.4)] border-t border-orange-300/40",
-          p1.isWinner && "ring-2 ring-yellow-400 ring-offset-1 ring-offset-black"
-        )}
-      >
-        <span className="font-black text-xs uppercase tracking-wider truncate max-w-[120px]">
-          {p1.name}
-        </span>
-        {p1.score !== null && p1.score !== undefined && (
-          <span className="font-mono font-black text-xs px-1.5 py-0.5 rounded bg-black/40 text-white">
-            {p1.score}
+      <ParticipantCapsuleRow participant={p1} colorScheme={colorScheme} />
+      <ParticipantCapsuleRow participant={p2} colorScheme={colorScheme} />
+    </div>
+  );
+}
+
+function ParticipantCapsuleRow({
+  participant,
+  colorScheme,
+}: {
+  participant: PlayoffParticipant;
+  colorScheme: "cyan" | "orange";
+}) {
+  const isCyan = colorScheme === "cyan";
+  const initials = participant.name ? participant.name.substring(0, 2).toUpperCase() : "??";
+
+  return (
+    <div
+      className={cn(
+        "px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-1.5 transition-all relative overflow-hidden",
+        isCyan
+          ? "bg-gradient-to-r from-cyan-600 via-blue-600 to-blue-700 text-white shadow-[0_2px_8px_rgba(6,182,212,0.4)] border-t border-cyan-300/40"
+          : "bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 text-white shadow-[0_2px_8px_rgba(249,115,22,0.4)] border-t border-orange-300/40",
+        participant.isWinner && "ring-2 ring-yellow-400 ring-offset-1 ring-offset-black",
+        participant.isPlaceholder && "opacity-70 border-dashed"
+      )}
+    >
+      <div className="flex items-center gap-1.5 min-w-0">
+        {/* Seed */}
+        {participant.seed && (
+          <span className="text-[9px] font-black text-white/80 bg-black/40 px-1 py-0.5 rounded font-mono shrink-0">
+            #{participant.seed}
           </span>
         )}
+
+        {/* Avatar */}
+        <Avatar className="w-5 h-5 shrink-0 border border-white/30 bg-black/40">
+          {participant.avatar ? (
+            <AvatarImage src={participant.avatar} alt={participant.name} />
+          ) : null}
+          <AvatarFallback className="text-[8px] font-black bg-black/50 text-white">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+
+        {/* Nom & Tag */}
+        <div className="flex flex-col min-w-0">
+          <span className="font-black text-xs uppercase tracking-wider truncate max-w-[95px] md:max-w-[125px] leading-tight">
+            {participant.name}
+          </span>
+          {participant.tag && (
+            <span className="text-[8px] opacity-75 font-mono truncate leading-none">
+              [{participant.tag}]
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Barre Joueur 2 */}
-      <div
-        className={cn(
-          "px-3 py-1.5 rounded-lg flex items-center justify-between transition-all",
-          isCyan
-            ? "bg-gradient-to-r from-cyan-600 via-blue-600 to-blue-700 text-white shadow-[0_2px_8px_rgba(6,182,212,0.4)] border-t border-cyan-300/40"
-            : "bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 text-white shadow-[0_2px_8px_rgba(249,115,22,0.4)] border-t border-orange-300/40",
-          p2.isWinner && "ring-2 ring-yellow-400 ring-offset-1 ring-offset-black"
+      {/* Score & Winner Trophy */}
+      <div className="flex items-center gap-1 shrink-0">
+        {participant.isWinner && (
+          <Trophy className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
         )}
-      >
-        <span className="font-black text-xs uppercase tracking-wider truncate max-w-[120px]">
-          {p2.name}
-        </span>
-        {p2.score !== null && p2.score !== undefined && (
-          <span className="font-mono font-black text-xs px-1.5 py-0.5 rounded bg-black/40 text-white">
-            {p2.score}
+        {participant.score !== null && participant.score !== undefined ? (
+          <span className="font-mono font-black text-xs px-1.5 py-0.5 rounded bg-black/50 text-white min-w-[20px] text-center">
+            {participant.score}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );
 }
 
 function FinalCapsule({
-  name,
-  score,
-  isWinner,
+  participant,
   colorScheme,
   onClick,
 }: {
-  name: string;
-  score?: number | null;
-  isWinner?: boolean;
+  participant: PlayoffParticipant;
   colorScheme: "cyan" | "orange";
   onClick: () => void;
 }) {
   const isCyan = colorScheme === "cyan";
+  const initials = participant.name ? participant.name.substring(0, 2).toUpperCase() : "??";
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        "cursor-pointer px-4 py-2.5 rounded-xl flex items-center justify-between transition-all duration-300 hover:scale-105 shadow-2xl",
+        "cursor-pointer px-4 py-2.5 rounded-xl flex items-center justify-between gap-3 transition-all duration-300 hover:scale-105 shadow-2xl",
         isCyan
           ? "bg-gradient-to-r from-cyan-600 via-blue-600 to-blue-800 text-white border-t border-cyan-300/50 shadow-[0_0_20px_rgba(6,182,212,0.4)]"
           : "bg-gradient-to-r from-orange-600 via-red-600 to-amber-700 text-white border-t border-orange-300/50 shadow-[0_0_20px_rgba(249,115,22,0.4)]",
-        isWinner && "ring-2 ring-amber-300 ring-offset-2 ring-offset-black"
+        participant.isWinner && "ring-2 ring-amber-300 ring-offset-2 ring-offset-black"
       )}
     >
-      <span className="font-black text-sm uppercase tracking-wider truncate max-w-[150px]">
-        {name}
-      </span>
-      {score !== null && score !== undefined && (
-        <span className="font-mono font-black text-sm px-2 py-0.5 rounded bg-black/50 text-white">
-          {score}
-        </span>
-      )}
+      <div className="flex items-center gap-2 min-w-0">
+        {participant.seed && (
+          <span className="text-[10px] font-black text-white/90 bg-black/40 px-1.5 py-0.5 rounded font-mono shrink-0">
+            #{participant.seed}
+          </span>
+        )}
+        <Avatar className="w-7 h-7 shrink-0 border border-white/40 bg-black/50">
+          {participant.avatar ? (
+            <AvatarImage src={participant.avatar} alt={participant.name} />
+          ) : null}
+          <AvatarFallback className="text-[10px] font-black bg-black/50 text-white">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col min-w-0">
+          <span className="font-black text-sm uppercase tracking-wider truncate max-w-[140px]">
+            {participant.name}
+          </span>
+          {participant.tag && (
+            <span className="text-[9px] opacity-80 font-mono truncate">
+              [{participant.tag}]
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0">
+        {participant.isWinner && (
+          <Trophy className="w-4 h-4 text-amber-300 animate-pulse" />
+        )}
+        {participant.score !== null && participant.score !== undefined ? (
+          <span className="font-mono font-black text-sm px-2 py-0.5 rounded bg-black/50 text-white">
+            {participant.score}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -515,7 +750,6 @@ function HorizontalFlowBracket({
   tournamentName: string;
   onMatchClick: (match: PlayoffMatchNode) => void;
 }) {
-  // Reconstituer les rounds linéaires
   const roundsMap: Record<number, PlayoffMatchNode[]> = {};
   tree.allMatches.forEach((m) => {
     if (!roundsMap[m.round]) roundsMap[m.round] = [];

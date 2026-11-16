@@ -71,8 +71,8 @@ export function MainLayout({
     state.overrides.find((o) => o.key === "footer")
   );
   const isFooterVisible =
-    footerOverride && typeof footerOverride.value.visible === "boolean"
-      ? footerOverride.value.visible
+    footerOverride && typeof (footerOverride.value as any)?.visible === "boolean"
+      ? (footerOverride.value as any).visible
       : footer;
 
   const dynamicTopPadding =

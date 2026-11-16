@@ -21,11 +21,15 @@ import { useRouter } from "next/navigation";
 interface AddParticipantDialogProps {
     editionId: string;
     tournamentId: string;
+    onSuccess?: () => void;
+    onCancel?: () => void;
 }
 
 export function AddParticipantForm({
     editionId,
     tournamentId,
+    onSuccess,
+    onCancel,
 }: AddParticipantDialogProps) {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -50,7 +54,13 @@ export function AddParticipantForm({
 
             if (result.success) {
                 toast.success("Participant ajouté avec succès");
-                router.back();
+                if (onSuccess) {
+                    onSuccess();
+                } else {
+                    router.back();
+                }
+            } else {
+                toast.error(result.error || "Erreur lors de l'ajout du participant");
             }
         } catch (error: any) {
             toast.error(error.message || "Erreur lors de l'ajout du participant");
@@ -114,7 +124,7 @@ export function AddParticipantForm({
                 <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => router.back()}
+                    onClick={() => (onCancel ? onCancel() : router.back())}
                     disabled={loading}
                     className="flex-1 sm:flex-none mr-2"
                 >
@@ -130,5 +140,44 @@ export function AddParticipantForm({
                 </Button>
             </div>
         </form>
+    );
+}
+
+export function AddParticipantDialog({
+    editionId,
+    tournamentId,
+    open,
+    onOpenChange,
+    onSuccess,
+}: {
+    editionId: string;
+    tournamentId: string;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSuccess?: () => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <UserPlus className="h-5 w-5 text-primary" />
+                        Ajouter un participant
+                    </DialogTitle>
+                    <DialogDescription>
+                        Inscrivez directement un joueur ou membre à cette édition de tournoi.
+                    </DialogDescription>
+                </DialogHeader>
+                <AddParticipantForm
+                    editionId={editionId}
+                    tournamentId={tournamentId}
+                    onSuccess={() => {
+                        onOpenChange(false);
+                        onSuccess?.();
+                    }}
+                    onCancel={() => onOpenChange(false)}
+                />
+            </DialogContent>
+        </Dialog>
     );
 }

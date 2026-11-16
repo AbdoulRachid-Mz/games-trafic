@@ -1102,3 +1102,205 @@ export async function getRelatedEditions(
   }
 }
 
+export interface UnifiedEditionParticipant {
+  id: string; // registration.id if registered, member.id if unregistered
+  type: "registered" | "unregistered";
+  memberId: string;
+  registrationId?: string;
+  userId?: string | null;
+  displayName: string;
+  username?: string | null;
+  teamName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  avatarUrl?: string | null;
+  status: string; // "REGISTERED", "PENDING", etc., or "UNREGISTERED"
+  feePaid: boolean;
+  checkedIn: boolean;
+  registeredAt?: Date | string | null;
+}
+
+export interface UnifiedParticipantsResponse {
+  data: UnifiedEditionParticipant[];
+  counts: {
+    total: number;
+    registered: number;
+    unregistered: number;
+    checkedIn: number;
+    paid: number;
+  };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export async function getUnifiedEditionParticipantsAction(
+  tournamentId: string,
+  editionId: string,
+  query: {
+    search?: string;
+    statusFilter?: "all" | "registered" | "unregistered";
+    page?: number;
+    limit?: number;
+  } = {}
+): Promise<UnifiedParticipantsResponse> {
+  const { search = "", statusFilter = "all", page = 1, limit = 50 } = query;
+
+  try {
+    // 1. Fetch all registrations for this edition (not capped at 100)
+    const registrationsData = await db.query.editionRegistrations.findMany({
+      where: and(
+        eq(editionRegistrations.editionId, editionId),
+        eq(editionRegistrations.isDeleted, false)
+      ),
+      orderBy: [desc(editionRegistrations.registeredAt)],
+      with: {
+        member: {
+          with: {
+            user: true,
+            team: true,
+          },
+        },
+      },
+    });
+
+    // 2. Fetch all members of this tournament
+    const tournamentMembersData = await db.query.tournamentMembers.findMany({
+      where: and(
+        eq(tournamentMembers.tournamentId, tournamentId),
+        eq(tournamentMembers.isDeleted, false)
+      ),
+      with: {
+        user: true,
+        team: true,
+      },
+    });
+
+    const registeredMemberIds = new Set(
+      registrationsData.map((r) => r.memberId)
+    );
+
+    // 3. Map registered participants
+    const registeredList: UnifiedEditionParticipant[] = registrationsData.map((reg) => ({
+      id: reg.id,
+      type: "registered" as const,
+      memberId: reg.memberId,
+      registrationId: reg.id,
+      userId: reg.member?.userId || null,
+      displayName:
+        reg.member?.displayName ||
+        reg.member?.user?.fullName ||
+        reg.member?.user?.username ||
+        "Joueur",
+      username: reg.member?.user?.username || null,
+      teamName: reg.member?.team?.name || null,
+      contactPhone: reg.member?.contactPhone || reg.member?.user?.phoneNumber || null,
+      contactEmail: reg.member?.contactEmail || reg.member?.user?.email || null,
+      avatarUrl:
+        reg.member?.user?.profileImage ||
+        reg.member?.user?.image ||
+        reg.member?.team?.logo ||
+        null,
+      status: reg.status || "REGISTERED",
+      feePaid: Boolean(reg.feePaid),
+      checkedIn: Boolean(reg.checkedIn),
+      registeredAt: reg.registeredAt,
+    }));
+
+    // 4. Map unregistered members
+    const unregisteredList: UnifiedEditionParticipant[] = tournamentMembersData
+      .filter((m) => !registeredMemberIds.has(m.id))
+      .map((m) => ({
+        id: m.id,
+        type: "unregistered" as const,
+        memberId: m.id,
+        registrationId: undefined,
+        userId: m.userId || null,
+        displayName:
+          m.displayName ||
+          m.user?.fullName ||
+          m.user?.username ||
+          "Membre",
+        username: m.user?.username || null,
+        teamName: m.team?.name || null,
+        contactPhone: m.contactPhone || m.user?.phoneNumber || null,
+        contactEmail: m.contactEmail || m.user?.email || null,
+        avatarUrl:
+          m.user?.profileImage ||
+          m.user?.image ||
+          m.team?.logo ||
+          null,
+        status: "UNREGISTERED",
+        feePaid: false,
+        checkedIn: false,
+        registeredAt: null,
+      }));
+
+    // 5. Global counts
+    const counts = {
+      total: registeredList.length + unregisteredList.length,
+      registered: registeredList.length,
+      unregistered: unregisteredList.length,
+      checkedIn: registeredList.filter((r) => r.checkedIn).length,
+      paid: registeredList.filter((r) => r.feePaid).length,
+    };
+
+    // 6. Filter by statusFilter
+    let combined: UnifiedEditionParticipant[] = [];
+    if (statusFilter === "registered") {
+      combined = registeredList;
+    } else if (statusFilter === "unregistered") {
+      combined = unregisteredList;
+    } else {
+      combined = [...registeredList, ...unregisteredList];
+    }
+
+    // 7. Global Search filter across all available fields
+    const normalizedSearch = search.trim().toLowerCase();
+    if (normalizedSearch) {
+      combined = combined.filter((item) => {
+        const name = (item.displayName || "").toLowerCase();
+        const user = (item.username || "").toLowerCase();
+        const team = (item.teamName || "").toLowerCase();
+        const phone = (item.contactPhone || "").toLowerCase();
+        const email = (item.contactEmail || "").toLowerCase();
+        return (
+          name.includes(normalizedSearch) ||
+          user.includes(normalizedSearch) ||
+          team.includes(normalizedSearch) ||
+          phone.includes(normalizedSearch) ||
+          email.includes(normalizedSearch)
+        );
+      });
+    }
+
+    // 8. Pagination
+    const total = combined.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const offset = (page - 1) * limit;
+    const paginatedData = combined.slice(offset, offset + limit);
+
+    return {
+      data: paginatedData,
+      counts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  } catch (error) {
+    console.error("Error in getUnifiedEditionParticipantsAction:", error);
+    return {
+      data: [],
+      counts: { total: 0, registered: 0, unregistered: 0, checkedIn: 0, paid: 0 },
+      pagination: { page: 1, limit, total: 0, totalPages: 1 },
+    };
+  }
+}
+
+
