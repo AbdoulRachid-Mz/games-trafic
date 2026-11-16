@@ -1,3 +1,4 @@
+// components/layout/FloatingActionButton.tsx
 "use client";
 
 import {
@@ -10,8 +11,6 @@ import {
   Trophy,
   Palette,
   Gamepad2,
-  Wallet,
-  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +22,8 @@ import {
 import {
   motion,
   AnimatePresence,
+  useScroll,
+  useMotionValueEvent,
 } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -31,12 +32,13 @@ import { Typography } from "@/components/ui/typography";
 import { useAuthContext } from "@/contexts/auth-context";
 import { useUserProfile } from "@/hooks/use-profile";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import type { FABAction as FABActionType } from "@/config/routes-config";
 import type { NavItem } from "@/types/routes";
 import { Badge } from "../ui/badge";
 import { resolveRoute } from "@/lib/routes/resolver";
+
+export type FABAction = FABActionType;
 
 interface FloatingActionButtonProps {
   hidden?: boolean;
@@ -54,115 +56,67 @@ export const FloatingActionButton = ({
   isFixed = true,
 }: FloatingActionButtonProps) => {
   const [showActions, setShowActions] = useState(false);
-  const [showNavLinks, setShowNavLinks] = useState(true); // Visible par défaut
   const [isMounted, setIsMounted] = useState(false);
-  const [fabVisible, setFabVisible] = useState(true);
-  const [dockVisible, setDockVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const [isPressed, setIsPressed] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
+  const scrollTrackRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
   const { isAuthenticated, isAdmin } = useAuthContext();
   const { data: profile } = useUserProfile({ mode: "partial", relations: ["wallet"] });
   const { pathname } = useActiveRoute();
+  const { scrollY } = useScroll();
+
   const resolved = useMemo(() => {
     try {
       return resolveRoute(pathname || "/", {
         isAuthenticated: !!isAuthenticated,
         isAdmin: !!isAdmin,
         isVip: false,
-        hasWallet: !!profile?.wallet?.id || !!(profile as any)?.hasWallet,
-      } as any);
+        hasWallet: !!profile?.wallet?.id || !!(profile as { hasWallet?: boolean })?.hasWallet,
+      });
     } catch {
-      return { pathname: pathname || "/" } as any;
+      return { pathname: pathname || "/" } as ReturnType<typeof resolveRoute>;
     }
-  }, [pathname, isAuthenticated, isAdmin, profile?.wallet?.id, (profile as any)?.hasWallet]);
+  }, [pathname, isAuthenticated, isAdmin, profile?.wallet?.id, (profile as { hasWallet?: boolean })?.hasWallet]);
 
   // Default nav items if none provided
-  const defaultNavItems: NavItem[] = [
-    { href: "/", label: "Accueil", icon: Home, requireAuth: false },
-    {
-      href: "/marketplace",
-      label: "Marketplace",
-      icon: Store,
-      requireAuth: false,
-    },
-    {
-      href: "/shops",
-      label: "Boutiques",
-      icon: ShoppingBag,
-      requireAuth: false,
-    },
-    {
-      href: "/tournaments",
-      label: "Tournois",
-      icon: Trophy,
-      requireAuth: false,
-    },
-    { href: "/games", label: "Jeux", icon: Gamepad2, requireAuth: false },
-    { href: "/game-clips", label: "Clips", icon: Palette, requireAuth: false },
-  ];
+  const defaultNavItems: NavItem[] = useMemo(
+    () => [
+      { href: "/", label: "Accueil", icon: Home, requireAuth: false },
+      { href: "/marketplace", label: "Marketplace", icon: Store, requireAuth: false },
+      { href: "/shops", label: "Boutiques", icon: ShoppingBag, requireAuth: false },
+      { href: "/tournaments", label: "Tournois", icon: Trophy, requireAuth: false },
+      { href: "/games", label: "Jeux", icon: Gamepad2, requireAuth: false },
+      { href: "/game-clips", label: "Clips", icon: Palette, requireAuth: false },
+    ],
+    []
+  );
 
   const navItems = propNavItems.length > 0 ? propNavItems : defaultNavItems;
 
   useEffect(() => {
     setIsMounted(true);
-
-    // Animation d'entrée initiale
     const timer = setTimeout(() => {
       setIsInitialLoad(false);
     }, 300);
-
     return () => clearTimeout(timer);
   }, []);
 
-  // Gestion du scroll pour cacher/afficher
-  useEffect(() => {
-    if (!isFixed) return;
-
-    const handleScroll = () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-
-      const currentScrollY = window.scrollY;
-      const scrollingDown = currentScrollY > lastScrollY;
-      const isAtTop = currentScrollY < 100;
-
-      // Masquer seulement si on descend et qu'on n'est pas en haut
-      if (scrollingDown && !isAtTop && !showActions) {
-        setFabVisible(false);
-        setDockVisible(false);
-      } else {
-        // Afficher quand on remonte ou qu'on est en haut
-        setFabVisible(true);
-        setDockVisible(true);
-      }
-
-      setLastScrollY(currentScrollY);
-
-      // Réafficher après un certain temps d'inactivité de scroll
-      scrollTimeoutRef.current = setTimeout(() => {
-        setFabVisible(true);
-        setDockVisible(true);
-      }, 1500); // Réapparaît après 1.5s sans scroll
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, [isFixed, lastScrollY, showActions]);
+  // Harmonized scroll detection via framer-motion (same pattern as top-middle.tsx)
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    if (!isFixed || showActions) return;
+    if (latest > lastScrollY && latest > 100) {
+      setIsVisible(false);
+    } else {
+      setIsVisible(true);
+    }
+    setLastScrollY(latest);
+  });
 
   // Close menus on outside click
   useEffect(() => {
@@ -215,364 +169,245 @@ export const FloatingActionButton = ({
 
       setShowActions(false);
     },
-    [isAuthenticated, router],
+    [isAuthenticated, router]
   );
 
-  // Handle press start (long press)
-  const handlePressStart = () => {
-    setIsPressed(true);
-    pressTimerRef.current = setTimeout(() => {
-      // Long press pour basculer les nav links
-      setShowNavLinks(!showNavLinks);
-      setShowActions(false);
-    }, 500); // 500ms pour le long press
-  };
-
-  const handlePressEnd = () => {
-    setIsPressed(false);
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
-  };
-
-  // Handle click (court press)
-  const handleClick = () => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
-
-    // Click court pour basculer les actions
-    if (filteredActions.length > 0) {
-      setShowActions(!showActions);
-    }
-  };
-
-  // Don't render if hidden or not mounted
   if (!isMounted || hidden) return null;
 
-  // Si le dock est caché par le scroll ET par long press, ne rien afficher
-  if (isFixed && !dockVisible && !showNavLinks && !fabVisible) {
-    return null;
-  }
+  const hasFab = filteredActions.length > 0;
 
   return (
     <TooltipProvider>
-      {/* Navigation Dock (Bottom Center) */}
       <AnimatePresence>
-        {showNavLinks && filteredNavItems.length > 0 && dockVisible && (
+        {(isVisible || showActions) && (
           <motion.div
             initial={{
               y: isInitialLoad ? 100 : 0,
               opacity: isInitialLoad ? 0 : 1,
-              scale: isInitialLoad ? 0.8 : 1
+              scale: isInitialLoad ? 0.9 : 1,
             }}
             animate={{
               y: 0,
               opacity: 1,
-              scale: 1
+              scale: 1,
             }}
             exit={{
               y: 100,
               opacity: 0,
-              scale: 0.8
+              scale: 0.9,
             }}
             transition={{
               type: "spring",
               stiffness: 400,
-              damping: 25,
+              damping: 28,
             }}
-            className="fixed bottom-10 max-md:bottom-4 left-1/2 -translate-x-1/2 z-40"
+            className={cn(
+              "z-40",
+              isFixed
+                ? "fixed bottom-5 max-md:bottom-3 left-1/2 -translate-x-1/2"
+                : "relative flex justify-center"
+            )}
           >
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-background/30 backdrop-blur-lg border border-border/50 shadow-2xl">
-              {(() => {
-                const normalizeHref = (href: string) =>
-                  href.endsWith("/") && href !== "/" ? href.slice(0, -1) : href;
-                const activeItem = filteredNavItems.find(
-                  (i) => resolved.pathname === normalizeHref(i.href),
-                );
-                const activeHref = activeItem ? normalizeHref(activeItem.href) : "";
-                return filteredNavItems.map((item, idx) => {
-                  const isActiveRoute = activeHref !== "" && normalizeHref(item.href) === activeHref;
-                  const Icon = item.icon as React.ElementType;
+            {/* Conteneur principal du Dock unifié */}
+            <div
+              ref={containerRef}
+              className={cn(
+                "relative flex items-center p-1.5 rounded-2xl bg-background/85 dark:bg-neutral-950/85 backdrop-blur-xl border border-border/60 shadow-2xl transition-all duration-300",
+                "ring-1 ring-white/10 dark:ring-white/5",
+                hasFab ? "pr-16" : "pr-1.5"
+              )}
+            >
+              {/* Zone scrollable horizontalement (4 max mobile/md, 6 max lg+) */}
+              <div
+                ref={scrollTrackRef}
+                className={cn(
+                  "flex items-center gap-1 overflow-x-auto scroll-smooth",
+                  // Hide scrollbar cleanly across browsers
+                  "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+                  // Responsive container width: 4 items max on mobile/md (4*58px + gaps = ~248px), 6 on lg+ (6*58px + gaps = ~374px)
+                  "max-w-[248px] lg:max-w-[374px]"
+                )}
+              >
+                {(() => {
+                  const normalizeHref = (href: string) =>
+                    href.endsWith("/") && href !== "/" ? href.slice(0, -1) : href;
+                  const activeItem = filteredNavItems.find(
+                    (i) => resolved.pathname === normalizeHref(i.href)
+                  );
+                  const activeHref = activeItem ? normalizeHref(activeItem.href) : "";
 
-                  return (
-                    <Tooltip key={idx}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => router.push(item.href)}
-                          className="flex flex-col items-center justify-center p-1 rounded-xl transition-all duration-300 hover:shadow-lg cursor-pointer min-w-[50px] relative group"
-                          aria-label={item.label}
-                        >
-                          <motion.div
-                            whileHover={{ scale: 1.15, y: -5 }}
-                            whileTap={{ scale: 0.9 }}
+                  return filteredNavItems.map((item, idx) => {
+                    const isActiveRoute =
+                      activeHref !== "" && normalizeHref(item.href) === activeHref;
+                    const Icon = item.icon as React.ElementType;
+
+                    return (
+                      <Tooltip key={idx}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => router.push(item.href)}
                             className={cn(
-                              "flex flex-col items-center justify-center",
-                              isActiveRoute
-                                ? "bg-primary/10 text-primary"
-                                : "hover:bg-primary/5",
+                              "flex flex-col items-center justify-center p-1 rounded-xl transition-all duration-200 cursor-pointer",
+                              "flex-shrink-0 w-[58px] min-w-[58px] h-[52px] relative group",
+                              isActiveRoute ? "text-primary" : "text-muted-foreground hover:text-foreground"
                             )}
+                            aria-label={item.label}
                           >
-                            {/* Indicateur actif */}
-                            {isActiveRoute && (
-                              <motion.div
-                                className="absolute -top-1 h-1 w-6 rounded-full bg-gradient-to-r from-primary to-purple-600"
-                                initial={{ scaleX: 0 }}
-                                animate={{ scaleX: 1 }}
-                                transition={{ duration: 0.3 }}
-                              />
-                            )}
-
-                            <div className={cn(
-                              "p-2 rounded-lg mb-1 transition-all duration-300",
-                              isActiveRoute
-                                ? "bg-primary text-white shadow-lg"
-                                : "bg-primary/10 text-primary group-hover:bg-gradient-to-r group-hover:from-primary/20 group-hover:to-purple-600/20"
-                            )}>
-                              <Icon className="h-5 w-5" />
-                            </div>
-
-                            <Typography
-                              variant="caption2"
-                              weight="medium"
-                              className={cn(
-                                "text-xs transition-colors duration-300",
-                                isActiveRoute
-                                  ? "text-primary font-bold"
-                                  : "text-muted-foreground group-hover:text-foreground"
-                              )}
+                            <motion.div
+                              whileHover={{ scale: 1.08, y: -2 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="flex flex-col items-center justify-center w-full h-full"
                             >
-                              {item.label}
-                            </Typography>
+                              {isActiveRoute && (
+                                <motion.div
+                                  layoutId="activeDockIndicator"
+                                  className="absolute -top-1 h-1 w-6 rounded-full bg-gradient-to-r from-primary to-purple-600 shadow-sm"
+                                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                                />
+                              )}
 
-                            {/* Effet de halo sur l'élément actif */}
-                            {isActiveRoute && (
-                              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-purple-600/5 -z-10" />
+                              <div
+                                className={cn(
+                                  "p-1.5 rounded-lg mb-0.5 transition-all duration-300",
+                                  isActiveRoute
+                                    ? "bg-primary text-white shadow-md shadow-primary/25"
+                                    : "bg-primary/10 text-primary group-hover:bg-primary/20"
+                                )}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </div>
+
+                              <Typography
+                                variant="caption2"
+                                weight={isActiveRoute ? "bold" : "medium"}
+                                className={cn(
+                                  "text-[10px] leading-tight truncate max-w-full transition-colors",
+                                  isActiveRoute ? "text-primary" : "text-muted-foreground"
+                                )}
+                              >
+                                {item.label}
+                              </Typography>
+                            </motion.div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {item.label}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Bouton FAB : Intégré au dock, positionné en absolu à droite */}
+              {hasFab && (
+                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        ref={fabRef}
+                        size="icon"
+                        onClick={() => setShowActions((prev) => !prev)}
+                        className={cn(
+                          "rounded-xl w-12 h-12 shadow-lg transition-all duration-300",
+                          "bg-gradient-to-br from-primary via-primary to-pink-600 hover:from-primary hover:via-purple-700 hover:to-pink-700",
+                          "relative overflow-hidden group",
+                          showActions && "ring-2 ring-primary/60 ring-offset-2 ring-offset-background"
+                        )}
+                        aria-label="Actions rapides"
+                      >
+                        <AnimatePresence mode="wait">
+                          <motion.div
+                            key={showActions ? "close" : "open"}
+                            initial={{ rotate: -90, scale: 0.8 }}
+                            animate={{ rotate: 0, scale: 1 }}
+                            exit={{ rotate: 90, scale: 0.8 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex items-center justify-center"
+                          >
+                            {showActions ? (
+                              <X className="h-5 w-5 text-primary-foreground" />
+                            ) : (
+                              <Plus className="h-5 w-5 text-primary-foreground" />
                             )}
                           </motion.div>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <Typography variant="caption1">{item.label}</Typography>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                });
-              })()}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                        </AnimatePresence>
 
-      {/* Actions Menu */}
-      <AnimatePresence>
-        {showActions && filteredActions.length > 0 && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm"
-              onClick={() => setShowActions(false)}
-            />
+                        {/* Badge avec nombre d'actions */}
+                        {filteredActions.length > 0 && !showActions && (
+                          <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-white dark:bg-black border border-primary text-[10px] font-bold text-primary flex items-center justify-center shadow-sm">
+                            {filteredActions.length}
+                          </span>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      {showActions ? "Fermer les actions" : "Actions rapides"}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
 
-            {/* Actions List - Positionné près du bouton FAB */}
-            <motion.div
-              ref={containerRef}
-              initial={{ scale: 0.8, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 20 }}
-              transition={{
-                type: "spring",
-                stiffness: 400,
-                damping: 25,
-              }}
-              className="fixed bottom-24 right-6 z-50 rounded-2xl shadow-2xl p-2 min-w-[200px] bg-background/95 backdrop-blur-lg border border-border/50"
-            >
-              {filteredActions.map((action, index) => (
-                <motion.div
-                  key={action.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <button
-                    onClick={() => executeAction(action)}
-                    className={cn(
-                      "w-full flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-200 group",
-                      "hover:scale-[1.02] active:scale-[0.98]",
-                      action.id === activeActionId
-                        ? "bg-gradient-to-r from-primary/20 to-purple-600/20 text-primary"
-                        : "hover:bg-primary/5",
-                    )}
+              {/* Popup des Actions rapides (au-dessus du dock) */}
+              <AnimatePresence>
+                {showActions && filteredActions.length > 0 && (
+                  <motion.div
+                    initial={{ scale: 0.85, opacity: 0, y: 15 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.85, opacity: 0, y: 15 }}
+                    transition={{ type: "spring", stiffness: 450, damping: 28 }}
+                    className="absolute bottom-full right-0 mb-3 z-50 rounded-2xl shadow-2xl p-2 min-w-[220px] bg-background/95 dark:bg-neutral-950/95 backdrop-blur-xl border border-border/60"
                   >
-                    <div
-                      className={cn(
-                        "flex-shrink-0 p-2 rounded-lg transition-colors",
-                        action.id === activeActionId
-                          ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg"
-                          : "bg-primary/10 text-primary group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-purple-600 group-hover:text-white",
-                      )}
-                    >
-                      {action.icon || <Plus className="h-4 w-4" />}
-                    </div>
-                    <Typography
-                      variant="body-sm"
-                      weight="medium"
-                      className="text-left"
-                    >
-                      {action.label}
-                    </Typography>
-                  </button>
-                </motion.div>
-              ))}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Main FAB Button - Positionné en bas à droite */}
-      <AnimatePresence>
-        {fabVisible && (
-          <motion.div
-            initial={{
-              x: isInitialLoad ? 100 : 0,
-              opacity: isInitialLoad ? 0 : 1,
-              scale: isInitialLoad ? 0.8 : 1
-            }}
-            animate={{
-              x: 0,
-              opacity: 1,
-              scale: 1
-            }}
-            exit={{
-              x: 100,
-              opacity: 0,
-              scale: 0.8
-            }}
-            transition={{
-              type: "spring",
-              stiffness: 400,
-              damping: 25,
-            }}
-            className="fixed bottom-16 right-6 z-50"
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button
-                    ref={fabRef}
-                    size="icon"
-                    onMouseDown={handlePressStart}
-                    onMouseUp={handlePressEnd}
-                    onMouseLeave={handlePressEnd}
-                    onTouchStart={handlePressStart}
-                    onTouchEnd={handlePressEnd}
-                    onClick={handleClick}
-                    className={cn(
-                      "rounded-full w-16 h-16 shadow-2xl hover:shadow-3xl transition-all duration-300",
-                      "bg-gradient-to-br from-primary via-primary to-pink-600 hover:from-primary hover:via-purple-700 hover:to-pink-700",
-                      "relative overflow-hidden group",
-                      (showActions || isPressed) &&
-                      "ring-3 ring-primary/50 ring-offset-2 ring-offset-background",
-                    )}
-                  >
-                    {/* Shine effect */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                    {/* Glow effect */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-purple-600/30 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={showActions ? "close" : "open"}
-                          initial={{ rotate: 0, scale: 1 }}
-                          animate={{
-                            rotate: showActions ? 180 : 0,
-                            scale: showActions ? 0.8 : 1,
-                          }}
-                          transition={{ duration: 0.3 }}
-                          className="flex items-center justify-center"
-                        >
-                          {showActions ? (
-                            <X className="h-7 w-7 text-primary-foreground" />
-                          ) : filteredActions.length > 0 ? (
-                            <Plus className="h-7 w-7 text-primary-foreground" />
-                          ) : (
-                            <Sparkles className="h-7 w-7 text-primary-foreground" />
-                          )}
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Badge for actions count */}
-                    {filteredActions.length > 0 && !showActions && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-white border-2 border-primary shadow-lg flex items-center justify-center"
-                      >
-                        <Typography
-                          variant="caption2"
-                          weight="bold"
-                          className="text-primary"
-                        >
-                          {filteredActions.length}
-                        </Typography>
-                      </motion.div>
-                    )}
-
-                    {/* Indicateur de long press */}
-                    {isPressed && (
-                      <motion.div
-                        className="absolute inset-0 rounded-full border-2 border-primary/50"
-                        initial={{ scale: 0.8 }}
-                        animate={{ scale: 1.2 }}
-                        transition={{ duration: 0.5, repeat: Infinity }}
-                      />
-                    )}
-                  </Button>
-                </motion.div>
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <div className="flex flex-col gap-1">
-                  <Typography variant="caption1" weight="medium">
-                    {showActions
-                      ? "Actions rapides"
-                      : "Menu de navigation"}
-                  </Typography>
-                  <Typography variant="caption2" className="text-muted-foreground">
-                    {filteredActions.length > 0 ? (
-                      <>
-                        <span className="text-primary">Cliquez</span> pour les actions
-                        <br />
-                        <span className="text-primary">Maintenez</span> pour {showNavLinks ? "masquer" : "afficher"} la navigation
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-primary">Maintenez</span> pour {showNavLinks ? "masquer" : "afficher"} la navigation
-                      </>
-                    )}
-                  </Typography>
-                  {!showActions && filteredActions.length > 0 && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {filteredActions.length} action{filteredActions.length > 1 ? 's' : ''}
+                    <div className="px-3 py-1.5 border-b border-border/40 mb-1 flex items-center justify-between">
+                      <Typography variant="caption1" weight="semibold" className="text-muted-foreground uppercase text-[10px] tracking-wider">
+                        Actions rapides
+                      </Typography>
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                        {filteredActions.length}
                       </Badge>
                     </div>
-                  )}
-                </div>
-              </TooltipContent>
-            </Tooltip>
+
+                    <div className="space-y-1">
+                      {filteredActions.map((action, index) => (
+                        <motion.button
+                          key={action.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.04 }}
+                          onClick={() => executeAction(action)}
+                          className={cn(
+                            "w-full flex items-center gap-3 py-2 px-3 rounded-xl transition-all duration-200 group text-left",
+                            "hover:scale-[1.02] active:scale-[0.98]",
+                            action.id === activeActionId
+                              ? "bg-primary/15 text-primary"
+                              : "hover:bg-primary/10 text-foreground"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex-shrink-0 p-1.5 rounded-lg transition-colors",
+                              action.id === activeActionId
+                                ? "bg-primary text-white shadow-md shadow-primary/25"
+                                : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white"
+                            )}
+                          >
+                            {action.icon || <Sparkles className="h-4 w-4" />}
+                          </div>
+                          <Typography variant="body-sm" weight="medium" className="truncate text-xs">
+                            {action.label}
+                          </Typography>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
     </TooltipProvider>
   );
 };
+
+export default FloatingActionButton;

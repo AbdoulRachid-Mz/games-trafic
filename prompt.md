@@ -1,698 +1,415 @@
-# AUDIT, COMPLÉTION ET REFONTE COMPLÈTE DES RESSOURCES PUBLIQUES — GAMES TRAFICS
+# Refonte du système App Shell, des layouts et de la page Tournament Edition Detail
 
-## 1. Objectif général
+## Objectif général
 
-Effectuer un audit approfondi et une refonte complète de l'environnement des ressources publiques de **Games Trafics**.
+Nous allons maintenant procéder à une refonte ciblée du système de layout de Games Trafics, notamment pour les pages Dashboard, Profile, Tournament et Edition.
 
-Le travail ne consiste pas simplement à ajouter quelques images ou à déplacer des fichiers. Il faut analyser tout ce qui existe déjà dans le projet, identifier les ressources produites par les précédents agents, retrouver les anciennes ressources toujours pertinentes, déterminer les besoins réels de l'application, compléter les éléments manquants et construire une bibliothèque de ressources propre, cohérente, organisée et adaptée à une application gaming moderne.
+L'objectif n'est pas de créer un nouveau système parallèle, mais de faire évoluer intelligemment l'architecture existante afin que les layouts et les composants puissent communiquer entre eux, se piloter mutuellement et adapter leur comportement selon la page active, les besoins des composants enfants et la position de défilement.
 
-Le périmètre concerne notamment :
-
-- Images et illustrations.
-- Logos et identité visuelle.
-- Icônes et pictogrammes.
-- SVG.
-- Vidéos et animations.
-- Images de jeux et ressources associées.
-- Placeholders et états vides.
-- Bannières, couvertures et arrière-plans.
-- Polices et autres ressources statiques.
-- Tous les autres fichiers présents dans `public/`.
-
-**Règle fondamentale : ne rien recréer inutilement, ne rien supprimer sans vérification et ne pas considérer le travail terminé tant que les ressources ne sont pas réellement intégrées dans l'application.**
+**IMPORTANT : avant toute modification, relis et analyse le dépôt Git dans son état actuel.** Ne te base pas uniquement sur les descriptions de ce prompt ou sur tes connaissances des anciennes versions du projet. Le code présent dans le dépôt constitue la référence.
 
 ---
 
-## 2. Phase 1 — Audit exhaustif de l'existant
+# PHASE 1 — AUDIT OBLIGATOIRE DU DÉPÔT
 
-Commencer par examiner l'intégralité du projet et particulièrement le dossier `public/`.
+Commence par examiner les éléments suivants et leurs dépendances :
 
-### 2.1. Inventaire récursif
+- `@components/dashboard/`
+- `@components/layout/`
+- `@components/layout/top-middle.tsx`
+- `@components/layout/FloatingActionButton.tsx`
+- `@components/layout/floating-dock.tsx`
+- `@stores/app-shell-store.ts`
+- `route-config` et tous les fichiers qui participent à sa configuration.
+- `@docks.md`
+- Le layout principal de l'application et ses éventuels layouts secondaires.
+- Les pages Dashboard, Profile, Tournament et Edition.
+- La page `@app/tournaments/[tournamentId]/editions/[editionId]`.
 
-Parcourir tous les dossiers et sous-dossiers, sans exception.
+Il faut également identifier :
 
-Pour chaque ressource, identifier :
+1. Comment `AppShell` assemble actuellement ses différents composants.
+2. Comment `route-config` détermine les composants visibles selon la route.
+3. Comment `app-shell-store` gère actuellement les états et les interactions.
+4. Comment les composants communiquent avec le layout parent.
+5. Comment le scroll est actuellement détecté et géré par `top-middle.tsx`.
+6. Comment les composants fixes, flottants et sticky sont positionnés.
+7. Comment les breakpoints responsive sont définis et utilisés.
+8. Si plusieurs systèmes de gestion du scroll, de visibilité ou de positionnement coexistent déjà.
 
-- Son chemin actuel.
-- Son nom et son extension.
-- Sa catégorie.
-- Ses dimensions lorsqu'il s'agit d'une image.
-- Son poids.
-- Son éventuel rôle dans l'application.
-- Son utilisation effective dans le code.
-- Son état : utilisée, inutilisée, dupliquée, obsolète ou à conserver.
-- Son éventuelle appartenance à une identité graphique ou à une fonctionnalité particulière.
+Ne crée pas de doublons si une logique équivalente existe déjà.
 
-Analyser les formats suivants, entre autres :
+À la fin de cet audit, définis une stratégie de modification compatible avec l'architecture actuelle.
 
-`png`, `jpg`, `jpeg`, `webp`, `avif`, `gif`, `svg`, `ico`, `mp4`, `webm`, `mov`, `woff`, `woff2`, `ttf`, `otf`.
+# PHASE 2 — UN SYSTÈME DE PILOTAGE CENTRALISÉ DU APP SHELL
 
-Ne pas se limiter à une simple liste de fichiers. Il faut comprendre leur utilité.
+Nous voulons faire évoluer `@stores/app-shell-store.ts` pour en faire un véritable système de communication entre le layout principal et les composants des pages.
 
-### 2.2. Examiner les ressources historiques
+Actuellement, le layout définit une partie du comportement de l'application. Nous voulons aller plus loin : les composants enfants doivent également pouvoir transmettre des informations au layout et piloter certains de ses éléments.
 
-Retrouver et analyser les ressources présentes depuis les premières versions du projet.
+## 2.1. Contrôle des composants du App Shell
 
-Il faut notamment identifier :
+Il faut pouvoir piloter dynamiquement les éléments suivants :
 
-- Les anciens logos et variantes.
-- Les anciennes illustrations.
-- Les images de jeux.
-- Les icônes personnalisées.
-- Les images utilisées dans les pages publiques.
-- Les ressources conservées dans des dossiers historiques.
-- Les éventuels éléments graphiques encore utilisés indirectement.
+- Top Middle.
+- Header Dashboard.
+- Left Bar.
+- Right Bar.
+- Footer.
+- Floating Dock.
+- Éventuels autres éléments du App Shell identifiés pendant l'audit.
 
-Ne pas supprimer automatiquement une ancienne ressource sous prétexte qu'elle semble dépassée. Vérifier si elle possède encore une utilité fonctionnelle ou visuelle.
+Exemples de comportements attendus :
 
-### 2.3. Examiner les ressources créées par les agents
+- Une page peut demander de masquer le Top Middle.
+- Un composant peut demander de masquer temporairement le Footer.
+- Une page peut désactiver la Left Bar ou la Right Bar.
+- Un composant enfant peut modifier la visibilité du Floating Dock.
+- Une page peut demander un comportement particulier du Header Dashboard.
+- Lorsqu'un utilisateur quitte une page, les modifications spécifiques à cette page ne doivent pas contaminer les autres routes.
 
-Identifier précisément les ressources produites par les précédents agents.
+Ces changements doivent pouvoir être déclenchés depuis les composants enfants sans avoir à modifier directement le layout principal.
 
-Comparer les résultats obtenus aux besoins réels de l'application.
+## 2.2. Communication entre les composants et le layout
 
-Déterminer :
+Définis une API propre, typée et cohérente dans `app-shell-store.ts`.
 
-- Ce qui a effectivement été créé.
-- Ce qui est incomplet.
-- Ce qui manque totalement.
-- Ce qui existe en plusieurs versions.
-- Ce qui n'a jamais été intégré.
-- Ce qui ne respecte pas l'identité visuelle de Games Trafics.
-- Ce qui nécessite une amélioration ou un remplacement.
+Elle doit permettre aux composants enfants :
 
-Ne pas supposer qu'une tâche est terminée parce que son agent a créé quelques fichiers.
+- D'envoyer des informations au App Shell.
+- De demander l'affichage ou le masquage d'un composant.
+- De modifier certains paramètres de comportement.
+- De signaler des besoins spécifiques à la page.
+- De réinitialiser leurs modifications lorsqu'ils sont démontés.
+- De gérer des comportements temporaires sans écraser la configuration initiale de la route.
 
----
+Attention à la gestion des priorités : une demande temporaire d'un composant ne doit pas écraser définitivement la configuration définie dans `route-config`.
 
-## 3. Phase 2 — Audit des besoins de toute l'application
+Prévois un système de configuration de base par route et de surcharges temporaires pilotées par les composants.
 
-L'objectif est de connaître les ressources réellement nécessaires à Games Trafics.
+Évite les états globaux difficiles à réinitialiser, les effets de bord et les conflits entre plusieurs composants enfants.
 
-Parcourir les pages, composants, fonctionnalités et parcours utilisateurs.
+## 2.3. Route Config et App Shell Store
 
-Examiner notamment :
-
-### Identité visuelle
-- Logo principal.
-- Logo secondaire.
-- Logo compact.
-- Variantes adaptées aux fonds clairs et sombres.
-- Favicon.
-- Icône PWA.
-- Images de marque.
-- Éventuels éléments décoratifs de marque.
-
-### Authentification et profils
-- Illustrations des pages de connexion et d'inscription.
-- Avatars par défaut.
-- Placeholders de profil.
-- Illustrations d'états vides.
-- Éléments graphiques liés aux comptes VIP et aux statuts.
-
-### Marketplace et boutiques
-- Images par défaut des produits.
-- Illustrations des catégories.
-- Ressources des différents jeux.
-- Placeholders de boutiques.
-- Illustrations des produits indisponibles.
-- Visuels de présentation et de promotion.
-
-### Jeux
-Créer ou compléter les ressources nécessaires aux jeux effectivement pris en charge dans l'application, notamment :
-
-- eFootball.
-- Call of Duty Mobile.
-- FC Mobile.
-
-Examiner également les autres jeux réellement présents dans les fonctionnalités ou les données du projet.
-
-### Tournois
-- Illustrations des tournois.
-- Bannières.
-- Visuels des compétitions.
-- Icônes des phases et formats.
-- Illustrations des groupes et matchs.
-- Ressources des classements et podiums.
-- Visuels des trophées et récompenses.
-
-### Clips et médias
-- Placeholders vidéo.
-- Miniatures par défaut.
-- Illustrations des médias indisponibles.
-- Ressources des lecteurs vidéo.
-- États de chargement et d'erreur.
-
-### Communauté et interactions
-- Illustrations des publications.
-- Avatars.
-- Icônes sociales.
-- Réactions.
-- Notifications.
-- Messages et conversations.
-- États vides des discussions.
-
-### Wallet et transactions
-- Icônes des opérations.
-- Moyens de paiement réellement pris en charge.
-- Illustrations des transactions.
-- Visuels des différents statuts.
-- Ressources des documents et reçus si nécessaires.
-
-### Autres pages
-Examiner également les tableaux de bord, paramètres, pages d'administration, pages d'aide, notifications, services, pages publiques, erreurs, résultats de recherche et toutes les autres fonctionnalités existantes.
-
-**Ne pas créer de ressources fictives pour des fonctionnalités absentes du projet. L'inventaire des besoins doit être fondé sur le code et les fonctionnalités réelles.**
-
----
-
-## 4. Phase 3 — Établir une architecture publique cohérente
-
-Après l'audit, proposer puis mettre en place une organisation claire de `public/`.
-
-La structure doit être logique, évolutive et facile à maintenir.
-
-Voici une architecture indicative à adapter aux besoins réellement constatés :
-
-```text
-public/
-├── images/
-│   ├── brand/
-│   ├── placeholders/
-│   ├── illustrations/
-│   ├── games/
-│   │   ├── efootball/
-│   │   ├── cod-mobile/
-│   │   └── fc-mobile/
-│   ├── marketplace/
-│   ├── tournaments/
-│   ├── community/
-│   ├── profiles/
-│   ├── banners/
-│   ├── backgrounds/
-│   └── misc/
-│
-├── icons/
-│   ├── games/
-│   ├── payments/
-│   ├── social/
-│   ├── status/
-│   └── custom/
-│
-├── svg/
-│   ├── brand/
-│   ├── illustrations/
-│   ├── decorative/
-│   └── custom/
-│
-├── videos/
-│   ├── previews/
-│   ├── backgrounds/
-│   └── tutorials/
-│
-├── fonts/
-│
-└── favicon.ico
-```
-
-Cette structure est une proposition de départ, pas une obligation de reproduire exactement ces dossiers.
-
-Adapter les catégories selon les besoins identifiés.
-
-Éviter les dossiers inutiles, les catégories vides sans justification et les niveaux d'imbrication excessifs.
-
-### Conventions de nommage
-
-Adopter des noms :
-
-- Explicites.
-- Cohérents.
-- En minuscules.
-- Sans espaces.
-- Sans accents.
-- Avec des tirets lorsque nécessaire.
-- Sans suffixes ambigus comme `final2`, `new-final`, `copy`, `test`.
-
-Exemples :
-
-```text
-games/
-  efootball-logo.webp
-  cod-mobile-logo.webp
-  fc-mobile-logo.webp
-
-placeholders/
-  image-upload.webp
-  video-upload.webp
-  empty-products.webp
-  empty-tournaments.webp
+`route-config` doit rester la source de configuration initiale du comportement de chaque route.
 
-brand/
-  games-trafics-logo.svg
-  games-trafics-mark.svg
-```
+`app-shell-store` doit permettre d'appliquer les ajustements dynamiques nécessaires pendant l'utilisation de la page.
 
-Éviter de mélanger les logos, les illustrations, les icônes et les images de contenu dans un même dossier.
+Il faut donc distinguer clairement :
 
----
+- La configuration par défaut de la route.
+- Les modifications temporaires demandées par les composants.
+- L'état réellement appliqué au App Shell.
 
-## 5. Phase 4 — Compléter toutes les ressources manquantes
+La navigation vers une autre route doit correctement nettoyer ou remplacer les surcharges qui ne sont plus pertinentes.
 
-Après l'inventaire et la définition de l'architecture, produire les ressources manquantes.
+Ne duplique pas inutilement les informations entre `route-config` et `app-shell-store`.
 
-Il faut privilégier des ressources originales, propres à Games Trafics et adaptées à son identité graphique.
+# PHASE 3 — HEADER DASHBOARD ET COMPORTEMENT DE TOP MIDDLE
 
-### 5.1. Direction artistique
+Nous voulons harmoniser le comportement du Header Dashboard situé dans `@components/dashboard/` avec celui de :
 
-Respecter l'identité existante de Games Trafics :
+`@components/layout/top-middle.tsx`
 
-- Univers gaming premium.
-- Esthétique moderne.
-- Palette violette et verte déjà utilisée dans le projet.
-- Éléments graphiques sobres et élégants.
-- Contrastes maîtrisés.
-- Design propre, lisible et professionnel.
-- Cohérence entre les modes clair et sombre.
-- Pas d'accumulation inutile d'effets lumineux.
-- Pas d'illustrations excessivement chargées.
+Le Header Dashboard doit adopter le même principe de comportement au scroll.
 
-Les illustrations doivent être conçues pour leur contexte d'utilisation réel.
+## Comportement attendu
 
-Ne pas utiliser une seule illustration générique partout.
+- Lorsque l'utilisateur descend dans la page, le header suit son comportement normal et peut quitter la zone visible.
+- Lorsque l'utilisateur dépasse sa position initiale puis commence à remonter, le header doit réapparaître en position fixe.
+- Il doit rester visible pendant la remontée.
+- Son positionnement doit être calculé correctement pour éviter les chevauchements avec le contenu.
+- Il doit retrouver un comportement normal lorsque l'utilisateur revient à sa position initiale.
 
-### 5.2. Images d'upload
-
-Une attention particulière doit être accordée aux images d'upload.
-
-Une illustration minimaliste a déjà été générée pour Games Trafics : une manette gaming 3D, un symbole de transfert vers le cloud et un éclairage violet/bleu discret.
-
-Retrouver et réutiliser cette direction visuelle lorsqu'elle est disponible.
-
-Créer les variantes nécessaires :
-
-- Upload d'une image.
-- Upload de plusieurs images.
-- Upload d'une vidéo.
-- État sans média.
-- État de chargement, si une illustration dédiée est pertinente.
-
-Les variantes doivent appartenir à la même famille graphique.
-
-Éviter les compositions surchargées, les textes intégrés aux illustrations et les éléments décoratifs sans utilité.
-
-### 5.3. Illustrations des états vides
-
-Créer les illustrations réellement nécessaires pour les fonctionnalités concernées :
-
-- Aucun produit.
-- Aucune boutique.
-- Aucun tournoi.
-- Aucun match.
-- Aucun clip.
-- Aucune publication.
-- Aucune conversation.
-- Aucune notification.
-- Aucun résultat.
-- Aucune transaction.
-
-Ne pas créer des dizaines de variantes redondantes. Une illustration doit correspondre à un contexte précis et pouvoir être réutilisée intelligemment.
-
-### 5.4. Qualité des images
-
-Pour chaque image :
-
-- Choisir un format adapté à son usage.
-- Respecter les proportions.
-- Éviter les dimensions inutilement élevées.
-- Préférer WebP ou AVIF lorsque cela est pertinent.
-- Préserver une qualité visuelle suffisante.
-- Éviter les arrière-plans non désirés.
-- Éviter les images floues, pixelisées ou déformées.
-- Respecter les contraintes de transparence lorsque nécessaire.
-
-Ne pas remplacer une image de marque par une simple capture ou une image générique.
-
-Respecter les droits d'utilisation des ressources provenant de tiers.
-
----
-
-## 6. Phase 5 — Construire une bibliothèque SVG complète
-
-C'est un point majeur de cette correction.
+Il faut réutiliser autant que possible la logique déjà implémentée dans `top-middle.tsx`.
 
-Il faut créer un véritable ensemble d'icônes et d'illustrations SVG personnalisées pour Games Trafics.
+Évite d'implémenter deux systèmes de détection du scroll différents pour obtenir le même résultat.
 
-### 6.1. Audit préalable
+Le comportement doit rester fluide, responsive et compatible avec les autres éléments du App Shell.
 
-Avant de créer des SVG :
-
-- Identifier la bibliothèque d'icônes déjà installée.
-- Identifier les icônes déjà utilisées dans les composants.
-- Repérer les icônes manquantes.
-- Repérer les SVG existants.
-- Éviter les doublons avec les icônes de bibliothèque.
-
-Les icônes fonctionnelles génériques peuvent continuer à utiliser la bibliothèque existante si elle répond correctement au besoin.
-
-Les SVG personnalisés doivent couvrir en priorité les besoins propres à Games Trafics.
-
-### 6.2. Catégories d'icônes à examiner
-
-Créer les icônes nécessaires selon les fonctionnalités réellement présentes :
-
-**Identité et navigation**
-- Logo et symbole Games Trafics.
-- Éléments de navigation propres à la marque.
-- Icônes de sections personnalisées.
-
-**Gaming**
-- Jeux.
-- Manette.
-- Contrôleur.
-- Consoles.
-- Compétitions.
-- Récompenses.
-- Trophées.
-- Classements.
-- Équipes.
+# PHASE 4 — REFONTE DU FLOATING ACTION BUTTON EN DOCK
 
-**Marketplace**
-- Produits.
-- Boutiques.
-- Vendeurs.
-- Achats.
-- Ventes.
-- Catalogue.
-
-**Wallet**
-- Portefeuille.
-- Dépôt.
-- Retrait.
-- Paiement.
-- Transactions.
-- Solde.
-
-**Communauté**
-- Clips.
-- Publications.
-- Discussions.
-- Groupes.
-- Réactions.
-- Partage.
+Nous voulons transformer le comportement de :
 
-**Statuts**
-- VIP.
-- Vérifié.
-- En attente.
-- Réussi.
-- Échoué.
-- Annulé.
-- En cours.
-
-Cette liste est indicative : vérifier chaque besoin dans le code avant de produire les fichiers.
-
-### 6.3. Règles de qualité SVG
-
-Tous les SVG doivent :
-
-- Être valides.
-- Être propres et optimisés.
-- Utiliser `viewBox`.
-- Être redimensionnables.
-- Ne pas dépendre de dimensions fixes inutiles.
-- Utiliser des couleurs compatibles avec le contexte lorsque nécessaire.
-- Éviter les styles inline excessifs.
-- Être accessibles lorsque utilisés comme éléments informatifs.
-- Permettre une intégration simple dans React/Next.js.
+`@components/layout/FloatingActionButton.tsx`
 
-Privilégier `currentColor` pour les icônes monochromes afin de faciliter leur adaptation aux thèmes clair et sombre.
+en nous inspirant de :
 
-Éviter les SVG inutilement complexes et les énormes fichiers générés par des outils graphiques.
+- `@components/layout/floating-dock.tsx`
+- `@docks.md`
 
-Ne pas transformer toutes les icônes de la bibliothèque existante en fichiers SVG locaux sans raison.
+L'objectif est d'obtenir un véritable dock d'actions, avec une gestion intelligente du nombre d'éléments visibles et du défilement horizontal.
 
----
+## 4.1. Comportement responsive
 
-## 7. Phase 6 — Réorganiser et migrer toutes les ressources
+Le dock doit afficher un nombre maximal d'éléments selon la taille de l'écran :
 
-Une fois l'architecture définie et les ressources manquantes créées, déplacer les fichiers vers les emplacements appropriés.
+| Écran | Nombre maximal d'éléments visibles |
+|---|---:|
+| Mobile et écrans inférieurs à `md` | 4 |
+| À partir de `md` et avant `lg` | 4 |
+| À partir de `lg` | 6 |
 
-Attention : un déplacement de fichier peut casser de nombreux composants.
+Si le nombre d'éléments dépasse cette limite :
 
-Effectuer une recherche globale dans le projet pour retrouver toutes les références aux ressources concernées :
+- Les éléments supplémentaires doivent être accessibles par défilement horizontal.
+- Le scroll doit être fluide.
+- Il faut éviter les barres de défilement visuellement gênantes.
+- Les éléments doivent conserver leur taille et leur espacement.
+- Le dock doit rester utilisable au tactile et à la souris.
+- Les éléments ne doivent pas être coupés ou partiellement masqués de manière involontaire.
 
-- Chemins `/images/...`.
-- Chemins `/icons/...`.
-- Chemins `/svg/...`.
-- Imports statiques.
-- Imports dynamiques.
-- `next/image`.
-- Balises `img`.
-- Backgrounds CSS.
-- Variables de configuration.
-- Manifestes PWA.
-- Métadonnées.
-- Pages de partage.
-- Composants d'upload.
-- Composants de visualisation.
-- Données statiques et configurations.
+Attention : les limites de 4 et 6 (si ca depasse on peut scroll horizontal (defilement horizontal)) concernent les éléments d'action du dock, pas le bouton Floating Action Button.
 
-Mettre à jour toutes les références après les déplacements.
+## 4.2. Le Floating Action Button doit appartenir au dock
 
-Ne pas laisser de chemins cassés, de références vers les anciens dossiers ou de duplications temporaires.
+C'est un point essentiel.
 
-### Centralisation des ressources
+Le bouton Floating Action Button ne doit plus être un élément indépendant et détaché du dock.
 
-Si cela apporte une réelle valeur au projet, créer un point central de référencement des ressources.
+Il doit être intégré visuellement et structurellement au dock, comme un élément d'action supplémentaire.
 
-Par exemple :
+Cependant, son comportement doit être particulier :
 
-```text
-src/
-  config/
-    assets.ts
-```
+- Il doit être positionné en absolu à droite du conteneur parent du dock.
+- Il doit rester visible et ne doit pas défiler horizontalement avec les autres éléments.
+- Il doit être visuellement cohérent avec les autres éléments du dock.
+- Il doit conserver son icône `+` et son comportement d'action.
+- Il doit être considéré comme un élément du dock dans la composition visuelle, sans être comptabilisé dans les 4 ou 6 éléments scrollables.
 
-Ce fichier pourra centraliser les chemins des ressources réutilisées dans plusieurs endroits :
+En pratique, le dock doit comporter :
 
-```ts
-export const ASSETS = {
-  brand: {
-    logo: "/images/brand/games-trafics-logo.svg",
-    mark: "/images/brand/games-trafics-mark.svg",
-  },
-  placeholders: {
-    imageUpload: "/images/placeholders/image-upload.webp",
-    videoUpload: "/images/placeholders/video-upload.webp",
-  },
-};
-```
+1. Une zone d'éléments scrollables horizontalement.
+2. Une zone réservée au bouton Floating Action Button, positionnée à droite.
 
-Adapter cet exemple à l'architecture existante.
+Le bouton doit rester dans le même conteneur visuel que le dock, avec un positionnement absolu ou une solution équivalente adaptée à l'architecture existante.
 
-Ne pas centraliser artificiellement toutes les ressources si cela rend le code plus complexe.
+Il ne doit pas être positionné indépendamment dans le viewport.
 
----
+La zone scrollable doit réserver suffisamment d'espace à droite pour que ses derniers éléments ne passent jamais sous le bouton `+`.
 
-## 8. Phase 7 — Nettoyage approfondi
+## 4.3. Réutilisation des éléments existants
 
-Après la migration, effectuer un nettoyage de tous les dossiers et fichiers publics.
+Avant de modifier les composants, analyse la structure actuelle de `floating-dock.tsx`, `FloatingActionButton.tsx` et les règles de `docks.md`.
 
-Identifier :
+Conserve les comportements utiles déjà existants :
 
-- Les doublons exacts.
-- Les images quasi identiques.
-- Les anciennes variantes inutilisées.
-- Les fichiers temporaires.
-- Les fichiers de test.
-- Les ressources orphelines.
-- Les dossiers vides inutiles.
-- Les anciennes structures remplacées.
-- Les fichiers qui ne servent plus à aucune fonctionnalité.
+- Les animations.
+- Les interactions.
+- Les états actifs.
+- Les tooltips.
+- Les variantes responsive.
+- Les comportements spécifiques aux différents docks.
 
-Avant toute suppression :
+Ne supprime pas des fonctionnalités existantes sans justification.
 
-1. Vérifier les références dans tout le projet.
-2. Vérifier les références indirectes.
-3. Vérifier les usages dynamiques.
-4. Vérifier les références dans les configurations.
-5. Vérifier les éventuelles références externes ou publiques.
-
-Ne pas supprimer un fichier uniquement parce qu'une recherche textuelle simple ne trouve pas son chemin.
-
-En cas de doute, conserver le fichier et le signaler dans le rapport final.
-
-Ne jamais supprimer les ressources nécessaires au fonctionnement de Next.js, de la PWA, des métadonnées ou d'autres dépendances.
-
----
-
-## 9. Phase 8 — Réajustement de toute l'application
-
-Le travail ne s'arrête pas à `public/`.
-
-Examiner les composants qui utilisent les ressources afin de garantir une intégration homogène.
-
-Vérifier particulièrement :
-
-- Les composants d'upload.
-- Les avatars et profils.
-- Les cartes produits.
-- Les cartes boutiques.
-- Les cartes tournois.
-- Les cartes matchs.
-- Les clips.
-- Les publications.
-- Les conversations.
-- Les notifications.
-- Les pages de dashboard.
-- Les états vides.
-- Les loaders.
-- Les pages d'erreur.
-- Les métadonnées et favicons.
-- Les écrans mobiles et desktop.
-
-Corriger les ressources manquantes, les mauvais ratios, les images déformées, les arrière-plans inadaptés et les incohérences visuelles.
-
-Utiliser correctement les mécanismes de chargement d'images de Next.js.
-
-Vérifier également les règles de configuration des images distantes : ne pas introduire de domaines arbitraires ou de configuration inutile.
-
-Les ressources doivent être réellement intégrées et utilisées là où elles sont nécessaires.
-
----
-
-## 10. Phase 9 — Optimisation des médias
-
-Examiner les performances de chargement.
-
-### Images
-- Éviter les images trop lourdes.
-- Utiliser les formats adaptés.
-- Réduire les dimensions excessives.
-- Préserver la qualité.
-- Utiliser le lazy loading lorsque pertinent.
-- Prioriser uniquement les images réellement critiques.
-
-### SVG
-- Nettoyer les métadonnées inutiles.
-- Réduire la complexité.
-- Préserver la qualité vectorielle.
-- Éviter les répétitions inutiles.
-
-### Vidéos
-- Éviter les vidéos volumineuses dans les pages qui n'en ont pas besoin.
-- Utiliser des formats adaptés au navigateur.
-- Prévoir des posters lorsque nécessaire.
-- Vérifier les attributs de lecture et de chargement.
-- Éviter le chargement automatique des vidéos lourdes sans justification.
-
-Ne pas dégrader la qualité visuelle dans le seul but de réduire la taille des fichiers.
-
----
-
-## 11. Phase 10 — Vérifications et critères de validation
-
-À la fin, effectuer une vérification complète.
-
-### Vérifications techniques
-- Aucune référence locale cassée.
-- Aucun import invalide.
-- Aucun chemin obsolète.
-- Aucun fichier essentiel supprimé.
-- Aucun SVG invalide.
-- Aucune erreur de build liée aux ressources.
-- Aucun problème de métadonnées ou favicon.
-- Aucun problème de chargement d'image.
-- Aucun problème de compilation TypeScript.
-
-### Vérifications visuelles
-- Mode clair.
-- Mode sombre.
-- Mobile.
-- Tablette.
-- Desktop.
-- Pages publiques.
-- Pages authentifiées.
-- Pages d'administration.
-- États vides.
-- Uploads.
-- Médias.
-
-### Vérifications de qualité
-- Nommage cohérent.
-- Arborescence logique.
-- Absence de doublons inutiles.
-- Ressources bien catégorisées.
-- SVG personnalisés cohérents.
-- Images alignées avec l'identité de Games Trafics.
-
-Exécuter les commandes de vérification déjà prévues dans le projet : lint, typecheck, tests et build, selon les scripts disponibles.
-
-Ne pas contourner les erreurs en désactivant les contrôles ou en masquant les avertissements.
-
----
-
-## 12. Rapport final obligatoire
-
-À la fin, fournir un rapport précis qui présente :
-
-### A. Audit initial
-- Nombre total de ressources trouvées.
-- Nombre d'images.
-- Nombre de SVG.
-- Nombre d'icônes.
-- Nombre de vidéos.
-- Nombre d'autres fichiers.
-- Ressources historiques conservées.
-- Ressources produites par les agents.
-- Ressources manquantes identifiées.
-
-### B. Travail réalisé
-- Ressources réutilisées.
-- Ressources créées.
-- Ressources optimisées.
-- Ressources déplacées.
-- Ressources supprimées.
-- Dossiers supprimés.
-- Dossiers créés.
-- Composants et pages mis à jour.
-
-### C. Architecture finale
-Présenter l'arborescence finale complète de `public/`, avec une brève description des catégories.
-
-### D. Intégration
-Présenter les principales références et composants modifiés, ainsi que les éventuels points nécessitant une intervention complémentaire.
-
-### E. Vérifications
-Indiquer les résultats réels du lint, du typecheck, des tests et du build.
-
-Ne jamais annoncer qu'une vérification a réussi si elle n'a pas été exécutée.
-
-### F. Ressources restantes
-Signaler les ressources conservées volontairement parce que leur suppression n'était pas suffisamment sûre.
-
----
-
-## 13. Consignes impératives
-
-1. Analyser avant de modifier.
-2. Examiner récursivement tous les dossiers publics et leurs sous-dossiers.
-3. Comparer les ressources historiques avec celles produites par les agents.
-4. Identifier les besoins à partir des fonctionnalités réelles.
-5. Ne pas recréer inutilement les ressources existantes.
-6. Compléter les ressources réellement manquantes.
-7. Respecter strictement l'identité visuelle Games Trafics.
-8. Construire une bibliothèque SVG cohérente et utile.
-9. Réorganiser toutes les ressources par catégorie.
-10. Mettre à jour toutes les références dans l'ensemble du projet.
-11. Nettoyer les anciens dossiers uniquement après vérification.
-12. Ne pas supprimer les ressources essentielles ou potentiellement utilisées dynamiquement.
-13. Ne pas introduire de dépendances inutiles.
-14. Ne pas modifier les fonctionnalités métier sans nécessité.
-15. Ne pas laisser de migration incomplète.
-16. Ne pas se contenter de créer des fichiers : les intégrer réellement dans l'application.
-17. Ne pas déclarer le travail terminé sans vérifications techniques.
-
-**Résultat attendu :** Games Trafics doit disposer d'un environnement public entièrement audité, complété, optimisé, organisé et cohérent. Chaque ressource doit avoir une catégorie, un nom explicite, une raison d'exister et une utilisation claire. L'ensemble doit pouvoir évoluer facilement sans accumuler des fichiers désorganisés, des doublons ou des ressources inutilisées.
-
-Commence par l'audit complet du dépôt et de son historique disponible, puis réalise la correction de bout en bout. Ne t'arrête pas à un simple rapport d'analyse : exécute effectivement les modifications nécessaires.
+Le résultat doit être un composant propre, réutilisable et cohérent avec le design system de Games Trafics.
+
+# PHASE 5 — REFONTE DE LA PAGE EDITION DETAIL
+
+Une fois les phases précédentes correctement terminées, passe à la page :
+
+`@app/tournaments/[tournamentId]/editions/[editionId]`
+
+Cette page doit être réajustée pour profiter du nouveau système de pilotage du App Shell.
+
+## 5.1. Refonte du comportement des Tabs
+
+Actuellement, les tabs de la page utilisent un comportement sticky.
+
+Nous voulons remplacer ce comportement par un système similaire à celui de :
+
+- `@components/layout/top-middle.tsx`
+- Header Dashboard après sa refonte.
+
+### Comportement attendu
+
+Lorsque l'utilisateur descend dans la page :
+
+- Les tabs suivent leur position naturelle.
+- Lorsqu'ils dépassent leur position initiale, ils ne doivent pas rester immédiatement sticky.
+
+Lorsque l'utilisateur commence à remonter après avoir dépassé leur position initiale :
+
+- Les tabs doivent réapparaître en position fixe.
+- Ils doivent rester visibles pendant la remontée.
+- Leur position doit être calculée dynamiquement.
+- Ils doivent disparaître ou retrouver leur position normale lorsque l'utilisateur revient au-dessus de leur seuil initial.
+
+Le comportement doit être identique dans son principe à celui de `top-middle.tsx`, et non une simple utilisation de `position: sticky`.
+
+## 5.2. Priorité et coordination avec Top Middle
+
+C'est un point particulièrement important.
+
+Les tabs doivent être positionnés immédiatement sous le Top Middle lorsque celui-ci est visible et fixé.
+
+Le Top Middle conserve toujours la priorité de positionnement et de superposition.
+
+Les tabs ne doivent jamais :
+
+- Passer au-dessus du Top Middle.
+- Recouvrir le Top Middle.
+- Se retrouver avec un espace excessif entre les deux.
+- Provoquer un décalage brutal du contenu.
+- Entrer en conflit avec le Header Dashboard.
+
+Il faut donc mettre en place une coordination entre les hauteurs et les positions des éléments fixes.
+
+Si le Top Middle est masqué par la configuration de la page ou par une action d'un composant, les tabs doivent automatiquement adapter leur position.
+
+N'utilise pas des valeurs fixes arbitraires en pixels si la hauteur réelle des éléments peut être mesurée ou communiquée par le App Shell.
+
+Privilégie une gestion centralisée des offsets, des hauteurs et des priorités de positionnement.
+
+## 5.3. Intégration au App Shell Store
+
+Les tabs doivent pouvoir communiquer avec le App Shell via `app-shell-store.ts` si cela est nécessaire pour leur comportement.
+
+La page Edition Detail doit pouvoir :
+
+- Signaler la présence de ses tabs.
+- Déclarer leurs besoins de positionnement.
+- Communiquer les informations nécessaires à la coordination avec le Top Middle.
+- Adapter leur comportement si le Top Middle est masqué.
+- Nettoyer les informations transmises lorsqu'elle est démontée.
+
+Évite cependant de transformer le store en système de gestion de chaque détail visuel.
+
+Les composants doivent rester autonomes pour leur logique locale, tandis que le store centralise uniquement les informations nécessaires à la coordination globale.
+
+# PHASE 6 — SECTION AUTRES ÉDITIONS EN CAROUSEL
+
+Sur la page Edition Detail, la section « Autres éditions » doit être transformée en carousel.
+
+Il faut revoir sa présentation pour obtenir une section plus moderne et mieux intégrée à l'environnement gaming de Games Trafics.
+
+Attentes :
+
+- Présentation sous forme de cartes.
+- Défilement horizontal fluide.
+- Navigation tactile sur mobile.
+- Navigation à la souris sur desktop.
+- Espacement cohérent entre les cartes.
+- Gestion responsive des dimensions.
+- États hover et focus soignés.
+- Indication visuelle discrète de la possibilité de défiler lorsqu'il y a plusieurs éditions.
+- Gestion correcte lorsqu'il n'y a aucune autre édition.
+
+Le carousel doit conserver toutes les informations pertinentes actuellement affichées sur les autres éditions.
+
+Ne supprime aucune donnée métier utile.
+
+Réutilise un composant carousel déjà présent dans le projet s'il est adapté. Sinon, crée une implémentation cohérente avec le design system existant.
+
+# PHASE 7 — RESPONSIVE, DESIGN ET QUALITÉ
+
+Toutes les modifications doivent respecter l'identité visuelle actuelle de Games Trafics.
+
+Nous voulons une interface :
+
+- Moderne et premium.
+- Orientée gaming.
+- Fluide et cohérente.
+- Adaptée au mobile et au desktop.
+- Sans chevauchements.
+- Sans espaces inutiles.
+- Sans animations excessives.
+- Sans comportements imprévisibles au scroll.
+
+Vérifie particulièrement :
+
+- Les petits écrans mobiles.
+- Les écrans intermédiaires.
+- Les écrans desktop.
+- Les transitions entre les breakpoints.
+- Les changements de route.
+- Les pages avec ou sans Top Middle.
+- Les pages avec ou sans Header Dashboard.
+- Les pages avec ou sans Floating Dock.
+- Les pages comportant plusieurs éléments fixes simultanément.
+
+Les éléments fixes doivent tenir compte de leurs hauteurs réelles et de leurs priorités respectives.
+
+Il faut également vérifier que les comportements tactiles ne sont pas perturbés par les zones scrollables horizontales du dock et du carousel.
+
+# PHASE 8 — TESTS ET VALIDATION
+
+Après les modifications, effectue une vérification complète.
+
+### Architecture
+
+- Vérifier que `route-config` reste fonctionnel.
+- Vérifier que `app-shell-store` ne provoque pas de conflits d'état.
+- Vérifier que les composants enfants peuvent piloter le App Shell.
+- Vérifier le nettoyage des états lors des changements de route.
+- Vérifier qu'aucune configuration temporaire ne persiste accidentellement.
+
+### Scroll et positionnement
+
+- Tester le Header Dashboard.
+- Tester le Top Middle.
+- Tester les tabs de Edition Detail.
+- Vérifier les priorités de superposition.
+- Vérifier les offsets dynamiques.
+- Vérifier les changements de visibilité du Top Middle.
+
+### Dock
+
+- Tester les limites de 4 et 6 éléments.
+- Tester le scroll horizontal.
+- Vérifier que le bouton `+` reste fixe à droite du dock.
+- Vérifier que le dernier élément scrollable reste accessible.
+- Tester les interactions tactiles et desktop.
+
+### Edition Detail
+
+- Vérifier le comportement complet des tabs.
+- Vérifier la section Autres éditions.
+- Vérifier les autres sections de la page pour éviter les régressions.
+- Vérifier la navigation entre éditions.
+
+### Qualité du code
+
+Exécute les vérifications disponibles dans le projet :
+
+- ESLint.
+- TypeScript.
+- Tests automatisés pertinents.
+- Build de production.
+
+Corrige les erreurs introduites par les modifications.
+
+Ne masque pas les erreurs avec des `any`, des `@ts-ignore`, des désactivations ESLint injustifiées ou des contournements temporaires.
+
+# CONSIGNES IMPORTANTES
+
+1. Travaille à partir du code réellement présent dans le dépôt Git.
+2. Ne suppose pas que les fichiers, composants ou API décrits dans ce prompt sont identiques à leur ancienne version.
+3. Analyse les dépendances avant de modifier une architecture existante.
+4. Réutilise les composants et utilitaires déjà disponibles.
+5. Ne crée pas plusieurs systèmes concurrents de détection du scroll.
+6. Ne transforme pas `app-shell-store` en un store géant contenant toute la logique de présentation.
+7. Préserve les comportements existants qui ne sont pas concernés par cette refonte.
+8. Évite les modifications inutiles des pages ou fonctionnalités non concernées.
+9. Ne supprime aucun composant ou fichier sans avoir vérifié toutes ses références.
+10. N'ajoute pas de dépendance externe si une solution propre existe déjà dans le projet.
+11. Ne te limite pas à corriger visuellement les composants : le comportement et l'architecture doivent être réellement fonctionnels.
+12. Ne considère pas une phase comme terminée simplement parce que le code compile.
+
+# LIVRABLE FINAL
+
+À la fin, fournis un compte rendu clair comprenant :
+
+1. L'état initial de l'architecture après audit.
+2. Les problèmes identifiés.
+3. Les modifications réalisées.
+4. Les fichiers créés, modifiés ou supprimés.
+5. Le fonctionnement final du système de pilotage App Shell.
+6. Le fonctionnement du Header Dashboard et des tabs au scroll.
+7. Le fonctionnement final du Floating Dock et du bouton `+`.
+8. Les améliorations apportées à la section Autres éditions.
+9. Les tests exécutés et leurs résultats.
+10. Les éventuels problèmes restants ou points nécessitant une décision.
+
+**Résultat attendu :** un système de layout cohérent, centralisé, pilotable par les pages et les composants enfants, avec des comportements de scroll harmonisés, un Floating Dock responsive et une page Edition Detail parfaitement intégrée à cette nouvelle architecture.

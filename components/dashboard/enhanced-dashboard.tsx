@@ -17,10 +17,11 @@ import { Bell, Sparkles, Menu, LayoutDashboard } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { useTheme } from "next-themes"
-import { motion } from "framer-motion"
+import { motion, useScroll, useMotionValueEvent } from "framer-motion"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useScreenSize } from "@/hooks/use-screen"
 import { ThemeToggle } from "../layout/ThemeToggle"
+import { useAppShellStickyOffset } from "@/stores/app-shell-store"
 
 // Mobile sheet close context — allows SidebarItem to close the mobile Sheet when clicked
 const MobileSheetContext = createContext<(() => void) | null>(null);
@@ -46,15 +47,39 @@ export function EnhancedDashboard({
 }: EnhancedDashboardProps) {
   const { screenSize } = useScreenSize()
   const [isMobileOpen, setIsMobileOpen] = React.useState(false)
-
   const isMobile = screenSize.width < mobileBreakpoint
+
+  const { scrollY } = useScroll()
+  const stickyOffset = useAppShellStickyOffset()
+  const [isMobileHeaderVisible, setIsMobileHeaderVisible] = React.useState(true)
+  const [mobileLastScrollY, setMobileLastScrollY] = React.useState(0)
+  const [isMobileScrolled, setIsMobileScrolled] = React.useState(false)
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    if (latest > mobileLastScrollY && latest > 100) {
+      setIsMobileHeaderVisible(false)
+    } else {
+      setIsMobileHeaderVisible(true)
+    }
+    setIsMobileScrolled(latest > 10)
+    setMobileLastScrollY(latest)
+  })
 
   // Version mobile avec Sheet
   if (isMobile) {
     return (
       <div className={cn("flex min-h-screen w-full flex-col ", className)}>
         {/* Header mobile avec bouton menu */}
-        <header className="flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+        <motion.header
+          initial={{ y: 0 }}
+          animate={{ y: isMobileHeaderVisible ? 0 : -70 }}
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          style={{ top: stickyOffset }}
+          className={cn(
+            "sticky z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4",
+            isMobileScrolled && "shadow-sm"
+          )}
+        >
           <div className="flex items-center gap-2">
             <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
               <SheetTitle className='hidden'>title</SheetTitle>
@@ -74,7 +99,7 @@ export function EnhancedDashboard({
             </Typography>
           </div>
           <ThemeToggle />
-        </header>
+        </motion.header>
 
         {/* Contenu mobile */}
         <main className="flex-1 p-3">
@@ -576,6 +601,7 @@ interface DashboardHeaderProps {
   notificationCount?: number
   children?: React.ReactNode
   togglerComponent?: boolean;
+  hideOnScroll?: boolean;
 }
 
 export function DashboardHeader({
@@ -587,13 +613,51 @@ export function DashboardHeader({
   onNotificationButtonClick,
   notificationCount,
   togglerComponent,
+  hideOnScroll = true,
   children
 }: DashboardHeaderProps) {
+  const [isVisible, setIsVisible] = React.useState(true);
+  const [lastScrollY, setLastScrollY] = React.useState(0);
+  const [isScrolled, setIsScrolled] = React.useState(false);
+  const { scrollY } = useScroll();
+  const stickyOffset = useAppShellStickyOffset();
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    if (hideOnScroll && latest > lastScrollY && latest > 100) {
+      setIsVisible(false);
+    } else {
+      setIsVisible(true);
+    }
+
+    if (latest > 10) {
+      setIsScrolled(true);
+    } else {
+      setIsScrolled(false);
+    }
+
+    setLastScrollY(latest);
+  });
+
   return (
-    <header className={cn(
-      "flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4",
-      className
-    )}>
+    <motion.header
+      initial={{ y: 0 }}
+      animate={{
+        y: isVisible ? 0 : -80,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 500,
+        damping: 30,
+      }}
+      style={{
+        top: stickyOffset,
+      }}
+      className={cn(
+        "sticky z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 transition-colors",
+        isScrolled && "shadow-sm",
+        className
+      )}
+    >
       <div className="flex items-center gap-4">
         {showSidebarTrigger && <SidebarTrigger className="h-8 w-8" />}
         <div>
@@ -624,7 +688,7 @@ export function DashboardHeader({
         )}
         {togglerComponent && <ThemeToggle />}
       </div>
-    </header>
+    </motion.header>
   )
 }
 

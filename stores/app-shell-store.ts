@@ -49,6 +49,11 @@ export interface AppShellFloatingState {
   safeMargins: { top: number; right: number; bottom: number; left: number };
 }
 
+export interface AppShellFooterState {
+  enabled: boolean;
+  visible: boolean;
+}
+
 export interface AppShellSidebarsState {
   left: { enabled: boolean; open: boolean };
   right: { enabled: boolean; open: boolean };
@@ -65,26 +70,56 @@ export interface AppShellViewportState {
   height: number;
 }
 
+export type OverridableKey = "topMiddle" | "breadcrumbs" | "floating" | "footer";
+
+export interface AppShellOverride {
+  key: OverridableKey;
+  value: Partial<
+    | AppShellTopMiddleState
+    | AppShellBreadcrumbsState
+    | AppShellFloatingState
+    | AppShellFooterState
+  >;
+  componentId: string;
+}
+
 export interface AppShellState {
   route: AppShellRouteState;
   topMiddle: AppShellTopMiddleState;
   breadcrumbs: AppShellBreadcrumbsState;
   floating: AppShellFloatingState;
+  footer: AppShellFooterState;
   sidebars: AppShellSidebarsState;
   scroll: AppShellScrollState;
   viewport: AppShellViewportState;
+  overrides: AppShellOverride[];
 
   // Actions
-  syncRoute: (route: ResolvedRoute, user: { isAuthenticated: boolean; isAdmin: boolean; isVip: boolean; userId?: string }) => void;
+  syncRoute: (
+    route: ResolvedRoute,
+    user: { isAuthenticated: boolean; isAdmin: boolean; isVip: boolean; userId?: string }
+  ) => void;
   resetForNoneLayout: () => void;
   setTopMiddle: (patch: Partial<AppShellTopMiddleState>) => void;
   setBreadcrumbs: (patch: Partial<AppShellBreadcrumbsState>) => void;
   setFloating: (patch: Partial<AppShellFloatingState>) => void;
+  setFooter: (patch: Partial<AppShellFooterState>) => void;
   setSidebars: (patch: Partial<AppShellSidebarsState>) => void;
   setScroll: (patch: Partial<AppShellScrollState>) => void;
   setViewport: (patch: Partial<AppShellViewportState>) => void;
   setLeftOpen: (open: boolean) => void;
   setRightOpen: (open: boolean) => void;
+  requestOverride: (
+    key: OverridableKey,
+    value: Partial<
+      | AppShellTopMiddleState
+      | AppShellBreadcrumbsState
+      | AppShellFloatingState
+      | AppShellFooterState
+    >,
+    componentId: string
+  ) => void;
+  clearOverride: (componentId: string) => void;
 }
 
 const defaultRoute: AppShellRouteState = {
@@ -134,6 +169,11 @@ const defaultFloating: AppShellFloatingState = {
   safeMargins: { top: 0, right: 0, bottom: 0, left: 0 },
 };
 
+const defaultFooter: AppShellFooterState = {
+  enabled: false,
+  visible: false,
+};
+
 const defaultSidebars: AppShellSidebarsState = {
   left: { enabled: false, open: false },
   right: { enabled: false, open: false },
@@ -155,9 +195,11 @@ export const useAppShellStore = create<AppShellState>((set) => ({
   topMiddle: defaultTopMiddle,
   breadcrumbs: defaultBreadcrumbs,
   floating: defaultFloating,
+  footer: defaultFooter,
   sidebars: defaultSidebars,
   scroll: defaultScroll,
   viewport: defaultViewport,
+  overrides: [],
 
   syncRoute: (route, user) =>
     set(() => {
@@ -201,7 +243,12 @@ export const useAppShellStore = create<AppShellState>((set) => ({
           dockCount: !isNone ? route.floatingDock.links.length : 0,
           dockVisible: !isNone && route.floatingDock.enabled,
         },
+        footer: {
+          enabled: !isNone && Boolean(route.footer?.enabled),
+          visible: !isNone && Boolean(route.footer?.enabled),
+        },
         scroll: defaultScroll,
+        overrides: [],
       };
     }),
 
@@ -212,7 +259,9 @@ export const useAppShellStore = create<AppShellState>((set) => ({
       breadcrumbs: { ...defaultBreadcrumbs, enabled: false, visible: false },
       sidebars: defaultSidebars,
       floating: defaultFloating,
+      footer: defaultFooter,
       scroll: defaultScroll,
+      overrides: [],
     })),
 
   setTopMiddle: (patch) =>
@@ -223,6 +272,9 @@ export const useAppShellStore = create<AppShellState>((set) => ({
 
   setFloating: (patch) =>
     set((state) => ({ floating: { ...state.floating, ...patch } })),
+
+  setFooter: (patch) =>
+    set((state) => ({ footer: { ...state.footer, ...patch } })),
 
   setSidebars: (patch) =>
     set((state) => ({ sidebars: { ...state.sidebars, ...patch } })),
@@ -242,16 +294,81 @@ export const useAppShellStore = create<AppShellState>((set) => ({
     set((state) => ({
       sidebars: { ...state.sidebars, right: { ...state.sidebars.right, open } },
     })),
+
+  requestOverride: (key, value, componentId) =>
+    set((state) => {
+      const remaining = state.overrides.filter(
+        (o) => !(o.componentId === componentId && o.key === key)
+      );
+      return {
+        overrides: [...remaining, { key, value, componentId }],
+      };
+    }),
+
+  clearOverride: (componentId) =>
+    set((state) => ({
+      overrides: state.overrides.filter((o) => o.componentId !== componentId),
+    })),
 }));
+
+export function getEffectiveTopMiddle(state: AppShellState): AppShellTopMiddleState {
+  const overrides = state.overrides.filter((o) => o.key === "topMiddle");
+  return overrides.reduce<AppShellTopMiddleState>(
+    (acc, curr) => ({ ...acc, ...(curr.value as Partial<AppShellTopMiddleState>) }),
+    state.topMiddle
+  );
+}
+
+export function useEffectiveTopMiddle(): AppShellTopMiddleState {
+  return useAppShellStore(getEffectiveTopMiddle);
+}
+
+export function getEffectiveBreadcrumbs(state: AppShellState): AppShellBreadcrumbsState {
+  const overrides = state.overrides.filter((o) => o.key === "breadcrumbs");
+  return overrides.reduce<AppShellBreadcrumbsState>(
+    (acc, curr) => ({ ...acc, ...(curr.value as Partial<AppShellBreadcrumbsState>) }),
+    state.breadcrumbs
+  );
+}
+
+export function useEffectiveBreadcrumbs(): AppShellBreadcrumbsState {
+  return useAppShellStore(getEffectiveBreadcrumbs);
+}
+
+export function getEffectiveFloating(state: AppShellState): AppShellFloatingState {
+  const overrides = state.overrides.filter((o) => o.key === "floating");
+  return overrides.reduce<AppShellFloatingState>(
+    (acc, curr) => ({ ...acc, ...(curr.value as Partial<AppShellFloatingState>) }),
+    state.floating
+  );
+}
+
+export function useEffectiveFloating(): AppShellFloatingState {
+  return useAppShellStore(getEffectiveFloating);
+}
+
+export function getEffectiveFooter(state: AppShellState): AppShellFooterState {
+  const overrides = state.overrides.filter((o) => o.key === "footer");
+  return overrides.reduce<AppShellFooterState>(
+    (acc, curr) => ({ ...acc, ...(curr.value as Partial<AppShellFooterState>) }),
+    state.footer
+  );
+}
+
+export function useEffectiveFooter(): AppShellFooterState {
+  return useAppShellStore(getEffectiveFooter);
+}
 
 export function getAppShellStickyOffset(state: AppShellState): number {
   if (state.route.layout === "none") return 0;
   let offset = 0;
-  if (state.topMiddle.enabled && state.topMiddle.visible) {
-    offset += state.topMiddle.height;
+  const tm = getEffectiveTopMiddle(state);
+  const bc = getEffectiveBreadcrumbs(state);
+  if (tm.enabled && tm.visible) {
+    offset += tm.height;
   }
-  if (state.breadcrumbs.enabled && state.breadcrumbs.visible) {
-    offset += state.breadcrumbs.height;
+  if (bc.enabled && bc.visible) {
+    offset += bc.height;
   }
   return offset;
 }
@@ -263,15 +380,24 @@ export function useAppShellStickyOffset(): number {
 export function useAppShell() {
   const state = useAppShellStore();
   const stickyOffset = getAppShellStickyOffset(state);
+  const effectiveTopMiddle = getEffectiveTopMiddle(state);
+  const effectiveBreadcrumbs = getEffectiveBreadcrumbs(state);
+  const effectiveFloating = getEffectiveFloating(state);
+  const effectiveFooter = getEffectiveFooter(state);
+
   return {
     route: state.route,
     layout: state.route.layout,
-    topMiddle: state.topMiddle,
-    breadcrumbs: state.breadcrumbs,
-    floating: state.floating,
+    topMiddle: effectiveTopMiddle,
+    breadcrumbs: effectiveBreadcrumbs,
+    floating: effectiveFloating,
+    footer: effectiveFooter,
     sidebars: state.sidebars,
     scroll: state.scroll,
     viewport: state.viewport,
+    overrides: state.overrides,
+    requestOverride: state.requestOverride,
+    clearOverride: state.clearOverride,
     stickyOffset,
   };
 }

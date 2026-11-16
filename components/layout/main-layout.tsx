@@ -15,7 +15,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { QrTransaction } from "@/components/pages/transactions/qr-transaction";
 import OnTapPopup from "../auth/on-tap-popup";
 import { useNetworkStatus } from "@/hooks/network-status";
-import { useAppShellStore } from "@/stores/app-shell-store";
+import { useAppShellStore, useAppShellStickyOffset } from "@/stores/app-shell-store";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -66,10 +66,23 @@ export function MainLayout({
     useAppShellStore.getState().setRightOpen(rightOpen);
   }, [rightOpen]);
 
-  const topPadding =
-    topMiddle && !shouldExcludeContainer && breadcrumbs
-      ? "pt-20"
-      : "";
+  const stickyOffset = useAppShellStickyOffset();
+  const footerOverride = useAppShellStore((state) =>
+    state.overrides.find((o) => o.key === "footer")
+  );
+  const isFooterVisible =
+    footerOverride && typeof footerOverride.value.visible === "boolean"
+      ? footerOverride.value.visible
+      : footer;
+
+  const dynamicTopPadding =
+    topMiddle && !shouldExcludeContainer
+      ? stickyOffset > 0
+        ? stickyOffset
+        : breadcrumbs
+        ? 80
+        : 64
+      : 0;
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);
   const closeRight = useCallback(() => setRightOpen(false), []);
@@ -125,7 +138,12 @@ export function MainLayout({
 
       {/* MAIN CONTENT */}
 
-      <main className={cn("min-h-screen", topPadding)}>
+      <main
+        className="min-h-screen"
+        style={{
+          paddingTop: dynamicTopPadding > 0 ? `${dynamicTopPadding}px` : undefined,
+        }}
+      >
         <Suspense
           fallback={
             <div className="flex min-h-[60vh] items-center justify-center">
@@ -152,7 +170,7 @@ export function MainLayout({
           </div>
         </Suspense>
 
-        {footer && !shouldExcludeContainer && <Footer />}
+        {isFooterVisible && !shouldExcludeContainer && <Footer />}
       </main>
 
 

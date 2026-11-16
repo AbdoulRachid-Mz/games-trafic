@@ -1,30 +1,45 @@
+<p align="center">
+  <img src="public/icons/gt-primary.png" alt="Games-Trafics Logo" width="240" height="240" />
+</p>
+
 # 🎮 Games-Trafics
 
 > *"Joue, échange, domine — L'infini du gaming commence ici."*
 
-**Games-Trafics** est une plateforme web moderne dédiée à l'écosystème du gaming compétitif et communautaire. Elle combine la gestion avancée de tournois e-sport, une marketplace de jeux et services, un système de streaming de clips vidéo et un portefeuille financier sécurisé intégré.
+**Games-Trafics** est une plateforme web moderne et premium dédiée à l'écosystème du gaming compétitif et communautaire. Elle combine la gestion avancée de tournois e-sport, une marketplace de jeux et services, un système de streaming de clips vidéo, un portefeuille financier sécurisé intégré, ainsi qu'un système de layout réactif et adaptatif (App Shell pilotable dynamiquement, dock responsive, scroll-reveal et carousels).
 
 ---
 
 ## 🚀 Fonctionnalités Principales
 
-- **Compétition & Tournois** : Création de tournois, gestion des éditions, arbres de tournois (brackets simples/doubles éliminations, groupes, rondes suisses), suivi en temps réel des matchs et classements.
-- **Portefeuille Numérique & Transactions** : Portefeuille sécurisé, rechargement, transferts P2P, génération et scan de QR codes, sécurisation des opérations par code PIN chiffré AES-256-GCM.
-- **Marketplace Gaming** : Boutiques officielles et marchands partenaires, vente d'articles gaming, gestion de commandes et paiements.
-- **Communauté & Game Clips** : Partage de clips de gameplay, flux interactifs, système d'interactions et messagerie instantanée.
-- **Administration & Modération** : Console d'administration centralisée, gestion des rôles, modération des utilisateurs et des contenus.
+- **Compétition & Tournois** :
+  - Création de tournois et gestion complète des éditions.
+  - Page de détails d'édition avec en-tête hero e-sport, tabs à défilement scroll-reveal synchronisés avec le App Shell (sans décalage de contenu).
+  - Moteur dynamique de brackets de playoffs (simples/doubles éliminations, groupes, rondes suisses).
+  - Page dédiée de révélation de structure 3D e-sport (`/reveal`) avec déclencheur unique par utilisateur (`localStorage`).
+  - Carousels fluides d'éditions associées (« Autres éditions de ce tournoi » et « Éditions similaires »).
+  - Suivi en temps réel des matchs, MVPs, classements et calendrier officiel.
+- **Portefeuille Numérique & Transactions** : Portefeuille sécurisé, rechargement, transferts P2P, génération et scan de QR codes dynamiques, sécurisation des opérations par code PIN chiffré AES-256-GCM.
+- **Marketplace Gaming** : Boutiques officielles et marchands partenaires, vente d'articles gaming, gestion de commandes et paiements instantanés.
+- **Communauté & Game Clips** : Partage de clips de gameplay, flux interactifs, système d'interactions, chat temps réel et messagerie instantanée.
+- **App Shell & Expérience Utilisateur** :
+  - Pilotage centralisé et dynamique du layout (`stores/app-shell-store.ts`) avec support des surcharges temporaires par composant (`requestOverride` / `clearOverride`).
+  - Header Dashboard et Top Middle avec masquage au défilement descendant et réapparition fluide au défilement montant (scroll-reveal via Framer Motion).
+  - Floating Action Button responsive intégré directement au Dock (4 éléments max sur mobile/tablette, 6 max sur desktop, défilement horizontal fluide et bouton d'action `+` fixe à droite).
+- **Administration & Modération** : Console d'administration centralisée, gestion des rôles, modération des utilisateurs, audits et monitoring financier.
 
 ---
 
 ## 🛠️ Stack Technique
 
-- **Framework** : [Next.js 16.4.3](https://nextjs.org/) (App Router, Turbopack, Partial Prefetching)
-- **Langage** : [TypeScript](https://www.typescriptlang.org/) (Mode strict)
+- **Framework Web** : [Next.js 16.4.3](https://nextjs.org/) (App Router, Turbopack, Partial Prefetching)
+- **Langage** : [TypeScript](https://www.typescriptlang.org/) (Mode strict, typage intégral sans régression)
 - **Base de Données & ORM** : PostgreSQL managé avec [Drizzle ORM](https://orm.drizzle.team/)
-- **Authentification** : [Better-Auth](https://www.better-auth.com/) avec cookies sécurisés et support Passkey
-- **Style & Composants** : [Tailwind CSS](https://tailwindcss.com/), Framer Motion, Radix UI, Lucide Icons
+- **Authentification & Sessions** : [Better-Auth](https://www.better-auth.com/) avec cookies HTTP-Only sécurisés et support Passkey
+- **Gestion d'État UI** : [Zustand](https://github.com/pmndrs/zustand) (`app-shell-store.ts` avec gestion des offsets réels et priorités de superposition)
+- **Style & Animation** : [Tailwind CSS](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/), Radix UI, Lucide Icons
 - **Sécurité** : Chiffrement AES-256-GCM (`lib/encryption.ts`), protection anti-Open Redirect (`lib/routes/safe-redirect.ts`), proxy de contrôle de route (`proxy.ts`)
-- **Tests Automatisés** : [Vitest](https://vitest.dev/) (35 tests unitaires et d'intégration)
+- **Tests Automatisés** : [Vitest](https://vitest.dev/) (270 tests unitaires et d'intégration validés, 29 suites de tests)
 
 ---
 
@@ -32,7 +47,7 @@
 
 Pour explorer en détail chaque composant du projet, consultez la documentation dédiée :
 
-- 🏛️ **[ARCHITECTURE.md](./ARCHITECTURE.md)** : Cartographie globale, schémas Mermaid d'architecture, sécurité, sessions et performances.
+- 🏛️ **[ARCHITECTURE.md](./ARCHITECTURE.md)** : Cartographie globale, schémas Mermaid d'architecture, App Shell, sécurité, sessions et performances.
 - 📱 **[app/README.md](./app/README.md)** : Structure des pages Next.js, groupes de routes, hiérarchie des layouts et navigation.
 - 🌐 **[app/api/README.md](./app/api/README.md)** : Spécifications des Route Handlers REST, contrats d'entrée/sortie et flux.
 - ⚡ **[actions/README.md](./actions/README.md)** : Server Actions, mutations métier, tournois, inscriptions et finances.
@@ -75,14 +90,14 @@ L'application est accessible sur [http://localhost:3000](http://localhost:3000).
 ## 🧪 Tests et Vérifications Qualité
 
 ```bash
-# Exécuter les tests unitaires et de sécurité
+# Exécuter les 270 tests unitaires et de sécurité
 bun run test
 
 # Vérification du typage TypeScript
 bunx tsc --noEmit
 
 # Vérification du linter
-bunx eslint
+bun run lint
 ```
 
 ---
@@ -92,3 +107,4 @@ bunx eslint
 1. **Aucun secret exposé** : Les clés privées et secrets de signature restent strictement réservés à l'environnement serveur.
 2. **Protection CSRF & Open Redirect** : Validation rigoureuse des redirections et des en-têtes d'origine.
 3. **Sécurité des Portefeuilles** : Toutes les transactions requièrent la validation cryptographique du code PIN.
+4. **App Shell Invariants** : Nettoyage systématique des surcharges de layout lors des transitions de route.

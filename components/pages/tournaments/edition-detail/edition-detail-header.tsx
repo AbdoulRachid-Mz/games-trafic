@@ -30,7 +30,7 @@ import {
 import Image from "next/image";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import Link from "next/link";
 import { Tournament, TournamentEditionWithRelations } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
@@ -131,27 +131,50 @@ export function EditionDetailHeader({
 
   const stickyTop = useAppShellStickyOffset();
 
-  // ─── Compact sticky header detection ─────────────────────────────────────
-  // Quand la carte principale de l'édition a défilé et que les onglets atteignent
-  // le bas du shell, les onglets deviennent sticky et affichent la barre compacte.
+  // ─── Scroll-reveal & App Shell Coordination ─────────────────────────────
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [isCompact, setIsCompact] = useState(false);
+  const [isPastInitial, setIsPastInitial] = useState(false);
+  const [isRevealedOnScrollUp, setIsRevealedOnScrollUp] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [initialThreshold, setInitialThreshold] = useState(0);
+  const { scrollY } = useScroll();
 
+  // Mesure du seuil initial des onglets dans le document
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsCompact(!entry.isIntersecting && entry.boundingClientRect.top < stickyTop + 20);
-      },
-      {
-        threshold: 0,
-        rootMargin: `-${Math.max(0, stickyTop)}px 0px 0px 0px`,
+    const updateThreshold = () => {
+      if (sentinelRef.current) {
+        const rect = sentinelRef.current.getBoundingClientRect();
+        setInitialThreshold(window.scrollY + rect.top);
       }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [stickyTop]);
+    };
+    updateThreshold();
+    window.addEventListener("resize", updateThreshold);
+    return () => window.removeEventListener("resize", updateThreshold);
+  }, []);
+
+  // Détection du scroll pour masquer en descente et révéler en remontée
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    const threshold = initialThreshold > 0 ? initialThreshold - stickyTop : 300;
+    const isPast = latest > threshold;
+    setIsPastInitial(isPast);
+
+    if (!isPast) {
+      // Position naturelle au-dessus du seuil : visible dans le flux
+      setIsRevealedOnScrollUp(true);
+      setIsCompact(false);
+    } else {
+      setIsCompact(true);
+      if (latest < lastScrollY) {
+        // Remontée : faire réapparaître les tabs fixés
+        setIsRevealedOnScrollUp(true);
+      } else if (latest > lastScrollY + 5) {
+        // Descente : masquer les tabs fixés
+        setIsRevealedOnScrollUp(false);
+      }
+    }
+    setLastScrollY(latest);
+  });
 
   // ─── Derived values ───────────────────────────────────────────────────────
   const currentParticipants = edition.registrations?.length || edition.currentParticipants || 0;
@@ -567,8 +590,20 @@ export function EditionDetailHeader({
       {/* Sentinelle sticky liée à la position réelle des onglets dans la page */}
       <div ref={sentinelRef} className="w-full h-px pointer-events-none" />
 
-      {/* 3. COMPETITION TABS NAVIGATION BAR — sticky avec compact header */}
-      <div className="sticky z-30 transition-[top] duration-150" style={{ top: stickyTop }}>
+      {/* 3. COMPETITION TABS NAVIGATION BAR — Scroll-reveal coordonné avec TopMiddle */}
+      <motion.div
+        className="sticky z-30 transition-[top] duration-150"
+        style={{ top: stickyTop }}
+        initial={{ y: 0 }}
+        animate={{
+          y: isPastInitial ? (isRevealedOnScrollUp ? 0 : -140) : 0,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 450,
+          damping: 30,
+        }}
+      >
         {/* ── Compact edition info bar (visible seulement quand le hero est scrollé) */}
         <AnimatePresence>
           {isCompact && (
@@ -665,7 +700,7 @@ export function EditionDetailHeader({
             </nav>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       <EditionQrDialog
         open={showQrDialog}
