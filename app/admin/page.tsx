@@ -86,6 +86,7 @@ import { StatsCarousel } from "@/components/shared/stats-carousel";
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const { screenSize } = useScreenSize();
   const [orderStats, setOrderStats] = useState<any>(null);
@@ -107,6 +108,7 @@ export default function AdminOverviewPage() {
 
 
   const loadStats = async () => {
+    setError(false);
     try {
       const [global, orders, products, requests] = await Promise.all([
         getGlobalStats(),
@@ -123,6 +125,7 @@ export default function AdminOverviewPage() {
       loadDetailedStats();
     } catch (error) {
       console.error("Error loading stats:", error);
+      setError(true);
     } finally {
       setIsLoading(false);
     }
@@ -153,12 +156,31 @@ export default function AdminOverviewPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-4 md:p-6">
         <Skeleton className="h-12 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(8)].map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-4 md:p-6 min-h-[60vh]">
+        <div role="alert" className="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-destructive/30 bg-card p-8 text-center shadow-lg">
+          <AlertCircle className="h-10 w-10 text-destructive" aria-hidden="true" />
+          <Typography variant="h2" weight="bold">
+            Impossible de charger le tableau de bord
+          </Typography>
+          <Typography variant="body-sm" theme="muted">
+            Vérifiez votre connexion puis réessayez.
+          </Typography>
+          <Button onClick={loadStats} className="gap-2 mt-2">
+            Réessayer
+          </Button>
         </div>
       </div>
     );
@@ -233,6 +255,7 @@ export default function AdminOverviewPage() {
                 <Button
                   variant={dropdownTabs.some((t) => t.value === activeTab) ? "default" : "outline"}
                   size="icon"
+                  aria-label="Plus d'onglets du tableau de bord"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -371,10 +394,10 @@ export default function AdminOverviewPage() {
                     value: s.count
                   })) || []}
                   config={{
-                    active: { label: "Actif", color: "hsl(var(--chart-1))" },
-                    inactive: { label: "Inactif", color: "hsl(var(--chart-2))" },
-                    draft: { label: "Brouillon", color: "hsl(var(--chart-3))" },
-                    sold: { label: "Vendu", color: "hsl(var(--chart-4))" },
+                    active: { label: "Actif", color: "var(--chart-1)" },
+                    inactive: { label: "Inactif", color: "var(--chart-2)" },
+                    draft: { label: "Brouillon", color: "var(--chart-3)" },
+                    sold: { label: "Vendu", color: "var(--chart-4)" },
                   }}
                 />
               </CardContent>
@@ -499,9 +522,9 @@ export default function AdminOverviewPage() {
                     { name: "Mobile", value: 25 },
                   ]}
                   config={{
-                    PC: { label: "PC", color: "hsl(var(--chart-1))" },
-                    Console: { label: "Console", color: "hsl(var(--chart-2))" },
-                    Mobile: { label: "Mobile", color: "hsl(var(--chart-3))" },
+                    PC: { label: "PC", color: "var(--chart-1)" },
+                    Console: { label: "Console", color: "var(--chart-2)" },
+                    Mobile: { label: "Mobile", color: "var(--chart-3)" },
                   }}
                 />
               </CardContent>
@@ -648,10 +671,10 @@ export default function AdminOverviewPage() {
                   { name: "Other", value: 10 },
                 ]}
                 config={{
-                  sponsor: { label: "Sponsor", color: "hsl(var(--chart-1))" },
-                  media: { label: "Media", color: "hsl(var(--chart-2))" },
-                  tech: { label: "Tech", color: "hsl(var(--chart-3))" },
-                  other: { label: "Other", color: "hsl(var(--chart-4))" },
+                  sponsor: { label: "Sponsor", color: "var(--chart-1)" },
+                  media: { label: "Media", color: "var(--chart-2)" },
+                  tech: { label: "Tech", color: "var(--chart-3)" },
+                  other: { label: "Other", color: "var(--chart-4)" },
                 }}
               />
             </CardContent>
@@ -714,7 +737,7 @@ export default function AdminOverviewPage() {
                 ]}
                 dataKey="vues"
                 label="Vues hebdomadaires"
-                color="hsl(var(--chart-4))"
+                color="var(--chart-4)"
               />
             </CardContent>
           </Card>
@@ -855,10 +878,10 @@ export default function AdminOverviewPage() {
                   { name: "Legendary", value: 10 },
                 ]}
                 config={{
-                  common: { label: "Commun", color: "hsl(var(--chart-1))" },
-                  rare: { label: "Rare", color: "hsl(var(--chart-2))" },
-                  epic: { label: "Épique", color: "hsl(var(--chart-3))" },
-                  legendary: { label: "Légendaire", color: "hsl(var(--chart-4))" },
+                  common: { label: "Commun", color: "var(--chart-1)" },
+                  rare: { label: "Rare", color: "var(--chart-2)" },
+                  epic: { label: "Épique", color: "var(--chart-3)" },
+                  legendary: { label: "Légendaire", color: "var(--chart-4)" },
                 }}
               />
             </CardContent>
@@ -945,9 +968,9 @@ export default function AdminOverviewPage() {
                   { name: "Rejected", value: 10 },
                 ]}
                 config={{
-                  pending: { label: "En attente", color: "hsl(var(--chart-1))" },
-                  resolved: { label: "Résolu", color: "hsl(var(--chart-2))" },
-                  rejected: { label: "Rejeté", color: "hsl(var(--chart-3))" },
+                  pending: { label: "En attente", color: "var(--chart-1)" },
+                  resolved: { label: "Résolu", color: "var(--chart-2)" },
+                  rejected: { label: "Rejeté", color: "var(--chart-3)" },
                 }}
               />
             </CardContent>
@@ -976,9 +999,9 @@ export default function AdminOverviewPage() {
                   { name: "Alert", value: 15 },
                 ]}
                 config={{
-                  system: { label: "Système", color: "hsl(var(--chart-1))" },
-                  order: { label: "Commande", color: "hsl(var(--chart-2))" },
-                  alert: { label: "Alerte", color: "hsl(var(--chart-3))" },
+                  system: { label: "Système", color: "var(--chart-1)" },
+                  order: { label: "Commande", color: "var(--chart-2)" },
+                  alert: { label: "Alerte", color: "var(--chart-3)" },
                 }}
               />
             </CardContent>
@@ -1013,9 +1036,9 @@ export default function AdminOverviewPage() {
                   { name: "Bookmarks", value: 15 },
                 ]}
                 config={{
-                  likes: { label: "Likes", color: "hsl(var(--chart-1))" },
-                  follows: { label: "Follows", color: "hsl(var(--chart-2))" },
-                  bookmarks: { label: "Favoris", color: "hsl(var(--chart-3))" },
+                  likes: { label: "Likes", color: "var(--chart-1)" },
+                  follows: { label: "Follows", color: "var(--chart-2)" },
+                  bookmarks: { label: "Favoris", color: "var(--chart-3)" },
                 }}
               />
             </CardContent>
@@ -1048,7 +1071,7 @@ export default function AdminOverviewPage() {
                 ]}
                 dataKey="messages"
                 label="Total messages"
-                color="hsl(var(--chart-2))"
+                color="var(--chart-2)"
               />
             </CardContent>
           </Card>
@@ -1076,9 +1099,9 @@ export default function AdminOverviewPage() {
                   { name: "Denied", value: 10 },
                 ]}
                 config={{
-                  pending: { label: "En attente", color: "hsl(var(--chart-1))" },
-                  processed: { label: "Traitée", color: "hsl(var(--chart-2))" },
-                  denied: { label: "Refusée", color: "hsl(var(--chart-3))" },
+                  pending: { label: "En attente", color: "var(--chart-1)" },
+                  processed: { label: "Traitée", color: "var(--chart-2)" },
+                  denied: { label: "Refusée", color: "var(--chart-3)" },
                 }}
               />
             </CardContent>
@@ -1117,7 +1140,7 @@ export default function AdminOverviewPage() {
                 ]}
                 dataKey="shops"
                 label="Nouvelles boutiques"
-                color="hsl(var(--chart-5))"
+                color="var(--chart-5)"
               />
             </CardContent>
           </Card>

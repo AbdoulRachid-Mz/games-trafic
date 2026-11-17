@@ -6,13 +6,14 @@ import { GameItemCard } from "./game-item-card";
 import { GameItemWithRelations } from "@/database/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Package, RefreshCw, Layers } from "lucide-react";
+import { Package, RefreshCw, Layers, AlertCircle } from "lucide-react";
 import { Typography } from "@/components/ui/typography";
-import { useRouter } from "next/navigation";
 
 interface GamesGridProps {
   items: GameItemWithRelations[];
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   isFetchingNextPage: boolean;
   hasNextPage: boolean | undefined;
   onLoadMore: () => void;
@@ -22,13 +23,13 @@ interface GamesGridProps {
 export function GamesGrid({
   items,
   isLoading,
+  isError = false,
+  onRetry,
   isFetchingNextPage,
   hasNextPage,
   onLoadMore,
   emptyMessage,
 }: GamesGridProps) {
-  const router = useRouter();
-
   if (isLoading && items.length === 0) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
@@ -49,9 +50,34 @@ export function GamesGrid({
     );
   }
 
+  if (isError) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-col items-center justify-center py-20 md:py-24 px-6 text-center rounded-2xl bg-muted/20 border border-destructive/30 animate-in fade-in duration-300"
+      >
+        <div className="p-6 rounded-full bg-destructive/10 mb-6">
+          <AlertCircle className="h-10 w-10 text-destructive" />
+        </div>
+        <Typography variant="h3" className="mb-3 font-bold tracking-tight">
+          Impossible de charger les items
+        </Typography>
+        <Typography variant="body-base" theme="muted" className="max-w-sm mx-auto leading-relaxed mb-6">
+          Une erreur est survenue lors de la récupération des items. Vérifiez votre connexion puis réessayez.
+        </Typography>
+        {onRetry && (
+          <Button variant="outline" onClick={onRetry} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 md:py-32 px-6 text-center rounded-[2.5rem] bg-muted/20 border-2 border-dashed border-border/50 animate-in fade-in zoom-in duration-500">
+      <div className="flex flex-col items-center justify-center py-24 md:py-32 px-6 text-center rounded-[2.5rem] bg-muted/20 border-2 border-dashed border-border/50 animate-in fade-in duration-300">
         <div className="p-8 rounded-full bg-background shadow-xl mb-8 relative">
           <Package className="h-16 w-16 text-muted-foreground/20" />
           <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary animate-ping opacity-20" />
@@ -66,10 +92,6 @@ export function GamesGrid({
       </div>
     );
   }
-
-  const handleViewGame = (gameId: string) => {
-      router.push(`/games/${gameId}`);
-    };
 
   return (
     <div className="space-y-16">

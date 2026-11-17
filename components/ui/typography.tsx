@@ -226,7 +226,7 @@ const TextLoupe = ({
 export function Typography({
   variant = "body-base",
   children,
-  component = "div",
+  component,
   theme = "black",
   weight = "regular",
   className,

@@ -419,11 +419,11 @@ export function TournamentCard({
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleMainAction}
       >
-        <div className="flex gap-4 p-4">
-          <div className="w-40 sm:w-64 flex-shrink-0">
+        <div className="flex gap-3 p-4 sm:gap-4">
+          <div className="w-28 sm:w-64 flex-shrink-0">
             {renderImage()}
           </div>
-          <CardContent className="p-0 flex-1">
+          <CardContent className="p-0 flex-1 min-w-0">
             {renderContent()}
           </CardContent>
         </div>

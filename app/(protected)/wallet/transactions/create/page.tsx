@@ -51,23 +51,18 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function CreateTransactionPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
   return (
     <Suspense fallback={<TransactionSkeleton />}>
-      <CreateTransactionContent searchParams={searchParams} router={router} />
+      <CreateTransactionContent />
     </Suspense>
   );
 }
 
-function CreateTransactionContent({
-  searchParams,
-  router,
-}: {
-  searchParams: URLSearchParams;
-  router: any;
-}) {
+function CreateTransactionContent() {
+  // Ces hooks doivent vivre sous le <Suspense> ci-dessus pour ne pas forcer
+  // un rendu côté client de toute la page.
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuthContext();
   const { data: completeData, refresh: refreshProfile } = useUserProfile({
     enabled: true,

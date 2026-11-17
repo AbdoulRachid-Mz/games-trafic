@@ -18,6 +18,7 @@ export function useGameClips(filters: GameClipFilters = {}) {
     fetchNextPage,
     hasNextPage,
     isLoading,
+    isError,
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery<
@@ -48,7 +49,7 @@ export function useGameClips(filters: GameClipFilters = {}) {
   const clips = (() => {
     const raw = data?.pages.flatMap((page) => page.data) || [];
     const seen = new Set<string>();
-    return raw.filter((c: any) => {
+    return raw.filter((c: GameClipCard) => {
       if (!c?.id) return true;
       if (seen.has(c.id)) return false;
       seen.add(c.id);
@@ -109,6 +110,7 @@ export function useGameClips(filters: GameClipFilters = {}) {
   return {
     clips,
     loading: isLoading,
+    error: isError,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,

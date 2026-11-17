@@ -1762,3 +1762,24 @@ Le problème n'est pas l'absence de fonctionnalités, mais **la coexistence de p
 - un ancien audit qui décrit une application refondue qui n'existe qu'en partie.
 
 La priorité n'est donc pas d'ajouter des écrans, mais de **réduire les chemins concurrents**, de **fermer les surfaces non authentifiées**, de **rendre la comptabilité cohérente de bout en bout**, et de **terminer les flux amorcés** (inscription payante, renouvellement VIP, upload réel, mise à jour PWA). C'est à ce prix que l'application passera d'un prototype avancé à une plateforme exploitable en production.
+
+---
+
+## 19. MISE À JOUR UI/UX (2026-11-17)
+
+Cette section corrige les affirmations obsolètes de la section 17.E (`111/111 tests`) : l'état vérifié au 2026-11-17 est **29 fichiers / 270 tests Vitest réussis**, `tsc --noEmit` à 0 erreur, lint à 0 erreur (4 381 avertissements préexistants), et un build qui compile et génère 200 pages avec succès au retry (le premier passage a été interrompu en fin de processus par le nudge de sécurité Next.js 16.4.3).
+
+- Un toolkit UI/UX durable a été mis en place : skill maison canonique `.agents/skills/games-trafics-ui-ux/SKILL.md` (reproduit dans `~/.agents/skills` et `~/.claude/skills`) et quatre skills vérifiés installés globalement (frontend-design, web-design-guidelines, accessibility, browser-qa).
+- Six lots de correction (A–F) ont été appliqués : fondations typographie/ARIA, App Shell et stacking, cards/tokens/responsive, données réelles et états d'erreur, déduplication partielle, puis static shell/instant navigation. Détail complet dans `UI-UX-AUDIT.md`.
+- Le blocage de rendu en développement (« Could not validate that a segment … has instant navigation », DOM vide) a été traité **structurellement** (suppression de `useSearchParams()` dans les providers racines, rendu inconditionnel des children, `viewport` exporté, boundaries `<Suspense>`), sans recourir à `export const instant = false`.
+- Validation navigateur réelle effectuée sur la marketplace : 8 largeurs (320→1920) × 2 thèmes sans débordement horizontal, console `error` vide, interactions (filtres, recherche, bascule de vue, état vide, thème, clavier) confirmées. Les contrôles de contraste chiffrés, Lighthouse, les parcours authentifiés et le build de production restent non certifiés ; voir `UI-UX-AUDIT.md` § « Limites ».
+
+## 20. PÉRIMÈTRE 2 UI/UX — TRANSACTIONS, GAMES, ADMIN, TOURNOIS (2026-11-17)
+
+Second passage d'audit et de correction, même référentiel `games-trafics-ui-ux`, sur les routes wallet/historique transactions, games & game-clips, admin et tournois/éditions (calendrier, dashboard, matches, members, phases). Tableau P1/P2 exhaustif et détail des correctifs dans `UI-UX-AUDIT.md` § « Périmètre 2 ».
+
+- **Faux contrôles éliminés** : la carte « Filtrage Temporel » de l'historique wallet est devenue un vrai `DateRangePicker` ; le « Signaler un litige » à base de `prompt()` est devenu un `Dialog` branché sur la Server Action `reportMatchDispute` (statut `DISPUTED` + raison persistés, autorisation participant/admin, `revalidatePath` via `tournamentEditions` car `matches` n'a pas de `tournamentId`) ; les filtres de la page admin Signaux sont réellement câblés (`ResponsiveFilters`, filtre statut serveur, recherche client).
+- **États d'erreur distincts + « Réessayer »** generalisés : wallet (liste, détail, historique), games (`GamesGrid`), game-clips, admin (dashboard, signaux), tournois (members, calendrier). Les erreurs réseau ne sont plus confondues avec des listes vides.
+- **Accessibilité** : `h1`–`h3` rétablis, `aria-label` sur les actions icône, `htmlFor`/`id` et noms accessibles sur les inputs de score, `<div onClick>` → `<Link>`/`<button>`, `aria-pressed` sur les bascules de vue, dialogue de litige clavier-compatible.
+- **Responsive / thème** : vues cartes mobiles pour les tableaux, `min-w-[720px]` + `overflow-x-auto`, score `grid-cols-1 sm:grid-cols-7`, `p-4 md:p-6|8`, suppression des doubles offsets sticky, `hsl(var(--chart-N))` → `var(--chart-N)`, fonds durs → tokens OKLCH et variantes `dark:`.
+- **Vérifications** : `tsc --noEmit` ✅ ; lint ✅ 0 erreur / 4 355 avertissements préexistants (aucun ajouté) ; `vitest run tests/unit` ✅ 29 fichiers / 270 tests ; build ⚠️ compilation + TypeScript OK mais prerender interrompu par une déconnexion DB externe (`Connection terminated unexpectedly`), sans rapport avec les correctifs UI. Les routes protégées nécessitent une session authentifiée pour une certification visuelle ; aucune capture ni donnée fictive créée.

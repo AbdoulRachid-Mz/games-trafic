@@ -10,14 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import Link from "next/link";
 import {
-  Swords,
-  Calendar,
   Clock, ArrowRight,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  User as UserIcon,
   AlertCircle, FolderTree,
   ListTree,
   Grid3X3, Zap,
@@ -25,136 +22,41 @@ import {
   Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
-import Image from "next/image";
 import { MatchesDashboardFilters } from "@/components/pages/tournaments/edition-detail/matches-dashboard-filters";
 import { ExportMatchesButton } from "@/components/pages/tournaments/edition-detail/export-matches-button";
+import { MatchCard as SharedMatchCard } from "@/components/cards/match-card";
 import { useQuery } from "@tanstack/react-query";
 import { getTournamentPhases, getEditionDetailTree } from "@/actions/tournaments";
 import { getMatchesWithParticipants } from "@/actions/phases";
 import { useSearchParams, useRouter, usePathname, useParams } from "next/navigation";
 
-function StatusBadge({ status }: { status: string | null | undefined }) {
-  const s = status || "PENDING";
-  const config: Record<string, { label: string; className: string }> = {
-    COMPLETED: { label: "Terminé", className: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
-    IN_PROGRESS: { label: "En cours", className: "bg-blue-500/10 text-blue-600 border-blue-200" },
-    PENDING_REVIEW: { label: "À valider", className: "bg-amber-500/10 text-amber-600 border-amber-200" },
-    DISPUTED: { label: "Litige", className: "bg-destructive/10 text-destructive border-destructive/20" },
-    AWAITING_ADMIN_CONFIRMATION: { label: "Validation admin", className: "bg-purple-500/10 text-purple-600 border-purple-200" },
-    PENDING: { label: "En attente", className: "bg-muted text-muted-foreground border-border" },
-  };
-  const { label, className } = config[s] || config.PENDING;
+/**
+ * Vue liste du dashboard : on réutilise la MatchCard partagée (surface,
+ * badges de statut, accessibilité clavier) et on conserve l'action « Gérer »
+ * vers la fiche du match. Plus de seconde implémentation de card à maintenir.
+ */
+function MatchCard({
+  match,
+  tournamentId,
+  editionId,
+  viewMode = "list",
+}: {
+  match: any;
+  tournamentId: string;
+  editionId: string;
+  viewMode?: "grid" | "list" | "compact";
+}) {
+  const router = useRouter();
+  const href = `/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`;
+
   return (
-    <Badge variant="outline" className={cn("text-[10px] uppercase font-bold", className)}>
-      {label}
-    </Badge>
-  );
-}
-
-function ParticipantAvatar({ participant }: { participant: any }) {
-  const name = participant?.member?.displayName || participant?.member?.user?.fullName || "?";
-  const image = participant?.member?.avatar || participant?.member?.user?.profileImage || participant?.member?.user?.image;
-  
-  return (
-    <div className="h-10 w-10 shrink-0 relative rounded-full bg-muted border-2 border-background shadow-sm flex items-center justify-center overflow-hidden">
-      {image ? (
-        <Image src={image} fill className="object-cover" alt={name} />
-      ) : (
-        <UserIcon className="h-5 w-5 text-muted-foreground/50" />
-      )}
-    </div>
-  );
-}
-
-function MatchCard({ match, tournamentId, editionId }: { match: any; tournamentId: string; editionId: string }) {
-  return (
-    <Card className="group hover:border-primary/40 transition-all">
-      <CardContent className="p-0">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center">
-          {/* Left: Info */}
-          <div className="p-4 flex-1 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 border-b md:border-b-0 md:border-r border-border/50">
-            <div className="w-24 shrink-0">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">
-                {match.phase?.name || "Match"}
-              </div>
-              <div className="text-sm font-bold flex items-center gap-1.5">
-                <Swords className="h-3.5 w-3.5 text-primary" />
-                #{match.matchNumber}
-              </div>
-              {match.group?.name && (
-                <div className="text-[9px] text-muted-foreground mt-1 truncate">
-                  {match.group.name}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <Calendar className="h-3 w-3" />
-                {match.scheduledTime ? format(new Date(match.scheduledTime), "d MMMM yyyy", { locale: fr }) : "Non planifié"}
-              </div>
-              <div className="flex items-center gap-2 text-xs font-medium">
-                <Clock className="h-3 w-3" />
-                {match.scheduledTime ? format(new Date(match.scheduledTime), "HH:mm") : "--:--"}
-              </div>
-            </div>
-
-            <div className="ml-auto sm:ml-0">
-              <StatusBadge status={match.status} />
-            </div>
-          </div>
-
-          {/* Middle: Participants & Score */}
-          <div className="p-4 md:p-6 flex-[2] bg-muted/5 group-hover:bg-primary/5 transition-colors">
-            <div className="flex items-center justify-between gap-4 max-w-xl mx-auto">
-              {/* P1 */}
-              <div className="flex-1 flex flex-col items-center sm:flex-row sm:items-center gap-3 text-center sm:text-left min-w-0">
-                <ParticipantAvatar participant={match.participant1} />
-                <div className="truncate w-full">
-                  <div className="text-sm font-bold truncate">
-                    {match.participant1?.member?.displayName || match.participant1?.member?.user?.fullName || "À déterminer"}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground truncate uppercase">
-                    {match.participant1?.member?.team?.name || "Joueur Solo"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Score */}
-              <div className="shrink-0 flex items-center gap-3 px-4 py-2 bg-background rounded-lg border shadow-sm font-black text-lg min-w-20 justify-center">
-                <span className={cn(match.score1 > match.score2 && "text-primary")}>{match.score1 ?? "-"}</span>
-                <span className="text-muted-foreground/30 text-xs">VS</span>
-                <span className={cn(match.score2 > match.score1 && "text-primary")}>{match.score2 ?? "-"}</span>
-              </div>
-
-              {/* P2 */}
-              <div className="flex-1 flex flex-col-reverse items-center sm:flex-row sm:items-center gap-3 text-center sm:text-right min-w-0">
-                <div className="truncate w-full">
-                  <div className="text-sm font-bold truncate">
-                    {match.participant2?.member?.displayName || match.participant2?.member?.user?.fullName || "À déterminer"}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground truncate uppercase">
-                    {match.participant2?.member?.team?.name || "Joueur Solo"}
-                  </div>
-                </div>
-                <ParticipantAvatar participant={match.participant2} />
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Actions */}
-          <div className="p-4 flex shrink-0 items-center justify-center border-t md:border-t-0 md:border-l border-border/50">
-            <Button variant="outline" size="sm" className="h-9 gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all" asChild>
-              <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
-                Gérer <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <SharedMatchCard
+      item={match}
+      match={match}
+      viewMode={viewMode}
+      onView={() => router.push(href)}
+      aria-label={`Gérer le match #${match.matchNumber ?? ""}`}
+    />
   );
 }
 
@@ -580,45 +482,13 @@ export default function MatchesDashboardPage({
             </div>
           ) : (
             matches.map((match: any) => (
-              <Card key={match.id} className="group hover:border-primary/40 transition-all overflow-hidden">
-                <div className="bg-muted/30 p-3 border-b flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[9px]">
-                      {match.phase?.name || "Match"}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">#{match.matchNumber}</span>
-                  </div>
-                  <StatusBadge status={match.status} />
-                </div>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 text-center">
-                      <ParticipantAvatar participant={match.participant1} />
-                      <div className="text-xs font-medium mt-1 truncate">
-                        {match.participant1?.member?.displayName?.slice(0, 12) || "TBD"}
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-1 px-2 py-1 bg-muted rounded-lg font-bold text-sm">
-                      <span>{match.score1 ?? "-"}</span>
-                      <span className="text-muted-foreground">-</span>
-                      <span>{match.score2 ?? "-"}</span>
-                    </div>
-                    <div className="flex-1 text-center">
-                      <ParticipantAvatar participant={match.participant2} />
-                      <div className="text-xs font-medium mt-1 truncate">
-                        {match.participant2?.member?.displayName?.slice(0, 12) || "TBD"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t">
-                    <Button size="sm" variant="outline" className="w-full h-8 text-xs gap-1" asChild>
-                      <Link href={`/tournaments/${tournamentId}/editions/${editionId}/matches/${match.id}`}>
-                        Gérer <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <MatchCard
+                key={match.id}
+                match={match}
+                tournamentId={tournamentId}
+                editionId={editionId}
+                viewMode="grid"
+              />
             ))
           )}
         </div>

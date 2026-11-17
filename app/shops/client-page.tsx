@@ -75,6 +75,8 @@ export function ShopsContent() {
   const {
     data,
     isLoading,
+    isError,
+    error,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
@@ -323,8 +325,24 @@ export function ShopsContent() {
               )}
             </div>
 
+            {/* Erreur réseau : distincte d'une liste vide (PROMPT §10.5). */}
+            {isError && (
+              <Card className="p-8 text-center">
+                <Store className="h-12 w-12 mx-auto mb-4 text-destructive" />
+                <Typography variant="h4" weight="semibold" className="mb-2">
+                  Impossible de charger les boutiques
+                </Typography>
+                <Typography variant="body-base" theme="muted" className="mb-6">
+                  {error instanceof Error
+                    ? error.message
+                    : "Une erreur est survenue. Veuillez réessayer."}
+                </Typography>
+                <Button onClick={() => refetch()}>Réessayer</Button>
+              </Card>
+            )}
+
             {/* Grille de boutiques avec chargement infini */}
-            <ShopsGrid
+            {!isError && <ShopsGrid
               shops={allShops}
               viewMode={viewMode}
               isLoading={isLoading}
@@ -352,7 +370,7 @@ export function ShopsContent() {
                   </div>
                 ) : null
               }
-            />
+            />}
 
             {/* CTA Création boutique */}
             {user && allShops.length > 0 && (

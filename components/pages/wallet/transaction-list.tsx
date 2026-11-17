@@ -262,16 +262,77 @@ export function TransactionList({
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" aria-label="Exporter les transactions">
                 <Download className="h-4 w-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* Table des transactions */}
-        <div className="rounded-md border">
-          <Table>
+        {/* Vue cartes mobile — mêmes données, informations essentielles */}
+        <div className="md:hidden space-y-3">
+          {filteredTransactions.map((transaction) => (
+            <div
+              key={transaction.id}
+              className="flex items-center justify-between gap-3 p-3 rounded-xl bg-card/30 border border-border/50"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={cn(
+                    "p-2.5 rounded-xl shrink-0",
+                    transaction.type === "DEPOSIT" ||
+                      transaction.type === "PURCHASE"
+                      ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                      : "bg-red-500/10 text-red-600 dark:text-red-400"
+                  )}
+                >
+                  {getTypeIcon(transaction.type)}
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-sm font-bold truncate text-foreground">
+                    {transaction.description || "Transaction"}
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {format(new Date(transaction.createdAt), "dd MMM, HH:mm", {
+                      locale: fr,
+                    })}
+                  </span>
+                  {getStatusBadge(transaction.status)}
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 text-sm font-bold",
+                  transaction.type === "DEPOSIT" ||
+                    transaction.type === "PURCHASE"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                )}
+              >
+                {transaction.type === "DEPOSIT" || transaction.type === "PURCHASE"
+                  ? "+"
+                  : "-"}
+                {parseFloat(transaction.amount).toLocaleString("fr-FR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                GTC
+              </span>
+            </div>
+          ))}
+          {filteredTransactions.length === 0 && (
+            <div className="text-center py-10 border border-dashed border-border/50 rounded-xl bg-card/20">
+              <Receipt className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+              <p className="text-sm text-muted-foreground font-medium">
+                Aucune transaction trouvée
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Table des transactions — scrollable, colonnes secondaires masquées sous sm */}
+        <div className="hidden md:block rounded-md border overflow-x-auto">
+          <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Type</TableHead>
@@ -355,7 +416,11 @@ export function TransactionList({
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Actions pour la transaction ${transaction.id}`}
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>

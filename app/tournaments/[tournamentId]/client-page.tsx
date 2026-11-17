@@ -1181,6 +1181,8 @@ export function TournamentPageContent({
                             memberViewMode === "grid" ? "default" : "outline"
                           }
                           size="icon"
+                          aria-label="Affichage en grille"
+                          aria-pressed={memberViewMode === "grid"}
                           onClick={() => setMemberViewMode("grid")}
                         >
                           <Grid className="h-4 w-4" />
@@ -1190,6 +1192,8 @@ export function TournamentPageContent({
                             memberViewMode === "list" ? "default" : "outline"
                           }
                           size="icon"
+                          aria-label="Affichage en liste"
+                          aria-pressed={memberViewMode === "list"}
                           onClick={() => setMemberViewMode("list")}
                         >
                           <List className="h-4 w-4" />

@@ -145,6 +145,18 @@ export function GameCard({
     ? itemTypeConfig[gameItem.type as ItemType] || itemTypeConfig.DEFAULT 
     : itemTypeConfig.DEFAULT;
 
+  // Classes statiques : Tailwind v4 ne détecte pas `bg-${var}-500`.
+  const buyButtonColorClasses: Record<string, string> = {
+    "text-amber-500": "bg-amber-500 hover:bg-amber-600 text-amber-950 shadow-amber-500/25",
+    "text-fuchsia-500": "bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-fuchsia-500/25",
+    "text-emerald-500": "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25",
+    "text-blue-500": "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25",
+    "text-primary": "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/25",
+  };
+  const buyButtonClasses =
+    buyButtonColorClasses[currentConfig.textColor] ??
+    buyButtonColorClasses["text-primary"];
+
   const handleView = () => {
     if (onView) {
       onView(activeItem);
@@ -456,8 +468,7 @@ export function GameCard({
                     onClick={handleBuy}
                     className={cn(
                       "h-8 gap-1.5 font-bold shadow-lg transition-all",
-                      `bg-${currentConfig.textColor.split('-')[1]}-500 hover:bg-${currentConfig.textColor.split('-')[1]}-600 text-white`,
-                      isHovered && `shadow-${currentConfig.textColor.split('-')[1]}-500/25`
+                      buyButtonClasses
                     )}
                   >
                     <ShoppingBag className="w-3.5 h-3.5" />

@@ -84,9 +84,9 @@ export function QrScanner({
         setIsScanning(true);
         setIsLoading(false);
         onStart?.();
-      } catch (err: any) {
+      } catch (err) {
         console.error("QR Scanner Error:", err);
-        const errorMsg = err.message ?? "Erreur caméra";
+        const errorMsg = err instanceof Error ? err.message : "Erreur caméra";
         setError(errorMsg);
         onError?.(errorMsg);
         setIsLoading(false);
@@ -166,7 +166,7 @@ export function QrScanner({
               "absolute left-[15%] right-[15%] h-0.5 shadow-lg",
               scanSuccess 
                 ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.8)]" 
-                : "bg-primary shadow-[0_0_15px_hsl(var(--primary)/0.8)]"
+                : "bg-primary shadow-[0_0_15px_var(--primary)]"
             )}
           />
 

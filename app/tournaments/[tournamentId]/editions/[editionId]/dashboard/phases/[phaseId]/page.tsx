@@ -22,15 +22,16 @@ interface PageProps {
   }>;
 }
 
+// Couleurs utilitaires de catégorie (statut), rendues compatibles clair/sombre.
 const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  ELIMINATION: { label: "Élimination directe", color: "text-red-700", bgColor: "bg-red-100 border-red-200" },
-  DOUBLE_ELIMINATION: { label: "Double élimination", color: "text-orange-700", bgColor: "bg-orange-100 border-orange-200" },
-  ROUND_ROBIN: { label: "Round Robin", color: "text-blue-700", bgColor: "bg-blue-100 border-blue-200" },
-  GROUP_STAGE: { label: "Phase de groupes", color: "text-green-700", bgColor: "bg-green-100 border-green-200" },
-  SWISS: { label: "Suisse", color: "text-purple-700", bgColor: "bg-purple-100 border-purple-200" },
-  KNOCKOUT: { label: "K.O.", color: "text-pink-700", bgColor: "bg-pink-100 border-pink-200" },
-  CUSTOM: { label: "Personnalisé", color: "text-gray-700", bgColor: "bg-gray-100 border-gray-200" },
-  GROUP_ELIMINATION: { label: "Groupes + Élimination", color: "text-teal-700", bgColor: "bg-teal-100 border-teal-200" },
+  ELIMINATION: { label: "Élimination directe", color: "text-red-700 dark:text-red-300", bgColor: "bg-red-500/10 border-red-500/20" },
+  DOUBLE_ELIMINATION: { label: "Double élimination", color: "text-orange-700 dark:text-orange-300", bgColor: "bg-orange-500/10 border-orange-500/20" },
+  ROUND_ROBIN: { label: "Round Robin", color: "text-blue-700 dark:text-blue-300", bgColor: "bg-blue-500/10 border-blue-500/20" },
+  GROUP_STAGE: { label: "Phase de groupes", color: "text-green-700 dark:text-green-300", bgColor: "bg-green-500/10 border-green-500/20" },
+  SWISS: { label: "Suisse", color: "text-purple-700 dark:text-purple-300", bgColor: "bg-purple-500/10 border-purple-500/20" },
+  KNOCKOUT: { label: "K.O.", color: "text-pink-700 dark:text-pink-300", bgColor: "bg-pink-500/10 border-pink-500/20" },
+  CUSTOM: { label: "Personnalisé", color: "text-gray-700 dark:text-gray-300", bgColor: "bg-gray-500/10 border-gray-500/20" },
+  GROUP_ELIMINATION: { label: "Groupes + Élimination", color: "text-teal-700 dark:text-teal-300", bgColor: "bg-teal-500/10 border-teal-500/20" },
 };
 
 export default async function PhaseDetailPage({ params }: PageProps) {

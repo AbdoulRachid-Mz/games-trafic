@@ -28,6 +28,7 @@ import {
   GamepadIcon,
   Star,
   ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -44,6 +45,7 @@ export default function TransactionDetailPage() {
     null,
   );
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -51,11 +53,14 @@ export default function TransactionDetailPage() {
   }, [params.id]);
 
   const loadTransaction = async () => {
+    setLoading(true);
+    setError(false);
     try {
       const data = await getTransactionById(params.id as string);
       setTransaction(data);
     } catch (error) {
       console.error("Error loading transaction:", error);
+      setError(true);
       toast.error("Erreur lors du chargement de la transaction");
     } finally {
       setLoading(false);
@@ -134,11 +139,15 @@ export default function TransactionDetailPage() {
     }
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success("Copié !");
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Copié !");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Impossible de copier. Réessayez.");
+    }
   };
 
   const handleDownloadReceipt = () => {
@@ -192,10 +201,29 @@ export default function TransactionDetailPage() {
     return <TransactionDetailSkeleton />;
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-12 max-w-4xl text-center">
+        <div role="alert" className="flex flex-col items-center gap-3">
+          <AlertCircle className="h-12 w-12 text-destructive" aria-hidden="true" />
+          <Typography variant="h1" weight="bold">
+            Impossible de charger la transaction
+          </Typography>
+          <Typography variant="body-sm" theme="muted">
+            Vérifiez votre connexion puis réessayez.
+          </Typography>
+          <Button onClick={loadTransaction} className="gap-2 mt-4">
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!transaction) {
     return (
       <div className="container mx-auto px-4 py-12 max-w-4xl text-center">
-        <Typography variant="h2" weight="bold">
+        <Typography variant="h1" weight="bold">
           Transaction non trouvée
         </Typography>
         <Button onClick={() => router.back()} className="mt-4">
@@ -270,7 +298,7 @@ export default function TransactionDetailPage() {
                   <TypeIcon className={`h-6 w-6 ${typeConfig.color}`} />
                 </div>
                 <div>
-                  <Typography variant="h3" weight="bold">
+                  <Typography variant="h1" weight="bold">
                     {typeConfig.label}
                   </Typography>
                   <Typography variant="caption1" theme="muted">
@@ -295,9 +323,9 @@ export default function TransactionDetailPage() {
                   Montant
                 </Typography>
                 <Typography
-                  variant="h1"
+                  variant="h2"
                   weight="extrabold"
-                  className={`${isCredit ? "text-green-500" : "text-red-500"}`}
+                  className={`${isCredit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                 >
                   {isCredit ? "+" : "-"}
                   {amountNum.toLocaleString("fr-FR", {
@@ -339,6 +367,7 @@ export default function TransactionDetailPage() {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
+                        aria-label="Copier la référence de la transaction"
                         onClick={() =>
                           handleCopy(`TX-${transaction.id.slice(-8)}`)
                         }
@@ -373,7 +402,7 @@ export default function TransactionDetailPage() {
                     >
                       Solde après transaction
                     </Typography>
-                    <Typography variant="h4" weight="bold" className="mt-1">
+                    <Typography variant="h3" weight="bold" className="mt-1">
                       {parseFloat(transaction.balanceAfter).toLocaleString(
                         "fr-FR",
                         { minimumFractionDigits: 2 },
@@ -408,7 +437,7 @@ export default function TransactionDetailPage() {
                 <>
                   <Separator className="my-6" />
                   <div>
-                    <Typography variant="h5" weight="bold" className="mb-4">
+                    <Typography variant="h2" weight="bold" className="mb-4">
                       Détails de l'élément
                     </Typography>
                     <div className="bg-muted/20 rounded-xl p-4 space-y-3">
@@ -468,7 +497,7 @@ export default function TransactionDetailPage() {
                   <>
                     <Separator className="my-6" />
                     <div>
-                      <Typography variant="h5" weight="bold" className="mb-4">
+                      <Typography variant="h2" weight="bold" className="mb-4">
                         Détails de paiement
                       </Typography>
                       <div className="bg-muted/20 rounded-xl p-4 space-y-3">

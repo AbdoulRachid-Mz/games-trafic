@@ -11,6 +11,7 @@ import { Filter, Grid3x3, List, X, SlidersHorizontal } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
+import { useAppShellStickyOffset } from "@/stores/app-shell-store";
 
 export function MarketplaceContent() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function MarketplaceContent() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [totalProducts, setTotalProducts] = useState<number | null>(null);
   const { isSmallScreen, isMediumScreen } = useScreenSize();
+  const stickyOffset = useAppShellStickyOffset();
 
   const handleSearch = useCallback(
     (value: string) => {
@@ -65,7 +67,7 @@ export function MarketplaceContent() {
           {/* Filters sidebar - Desktop : masquée SOUS lg (zone 640–1023px
               couverte par le drawer, pas un empilement de la sidebar) */}
           <aside className="hidden lg:block lg:w-1/4">
-              <div className="sticky top-24 space-y-4">
+              <div className="sticky space-y-4" style={{ top: stickyOffset }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <SlidersHorizontal className="h-5 w-5 text-primary" />
@@ -74,6 +76,7 @@ export function MarketplaceContent() {
                   <div className="flex gap-2">
                     <Button
                       variant={viewMode === "grid" ? "default" : "outline"}
+                      aria-pressed={viewMode === "grid"}
                       size="icon"
                       onClick={() => setViewMode("grid")}
                       className="h-8 w-8"
@@ -83,6 +86,7 @@ export function MarketplaceContent() {
                     </Button>
                     <Button
                       variant={viewMode === "list" ? "default" : "outline"}
+                      aria-pressed={viewMode === "list"}
                       size="icon"
                       onClick={() => setViewMode("list")}
                       className="h-8 w-8"
@@ -120,6 +124,7 @@ export function MarketplaceContent() {
                   <div className="flex gap-1">
                     <Button
                       variant={viewMode === "grid" ? "default" : "outline"}
+                      aria-pressed={viewMode === "grid"}
                       size="sm"
                       onClick={() => setViewMode("grid")}
                       className="h-8 px-3"
@@ -129,6 +134,7 @@ export function MarketplaceContent() {
                     </Button>
                     <Button
                       variant={viewMode === "list" ? "default" : "outline"}
+                      aria-pressed={viewMode === "list"}
                       size="sm"
                       onClick={() => setViewMode("list")}
                       className="h-8 px-3"
@@ -151,6 +157,7 @@ export function MarketplaceContent() {
                 <div className="flex gap-2">
                   <Button
                     variant={viewMode === "grid" ? "default" : "outline"}
+                      aria-pressed={viewMode === "grid"}
                     size="icon"
                     onClick={() => setViewMode("grid")}
                     className="h-8 w-8 sm:hidden"
@@ -160,6 +167,7 @@ export function MarketplaceContent() {
                   </Button>
                   <Button
                     variant={viewMode === "list" ? "default" : "outline"}
+                      aria-pressed={viewMode === "list"}
                     size="icon"
                     onClick={() => setViewMode("list")}
                     className="h-8 w-8 sm:hidden"
@@ -184,7 +192,6 @@ export function MarketplaceContent() {
                       <SlidersHorizontal className="h-5 w-5" />
                       Filtres Gaming
                       </Typography>
-                      <Button></Button>
                     </SheetTitle>
                     <Button
                       variant="ghost"

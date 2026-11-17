@@ -33,6 +33,7 @@ import {
   submitMatchResult,
   adminConfirmMatchResult,
   updateMatchResult,
+  reportMatchDispute,
 } from "@/actions/tournaments";
 import { useAuthContext } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,15 @@ import { Typography } from "@/components/ui/typography";
 import { deleteMatch } from "@/actions/phases";
 import { AdvancedUpload } from "@/components/ui/advanced-upload";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { MatchSuccessDialog } from "@/components/pages/tournaments/matches/match-success-dialog";
 
@@ -70,6 +80,9 @@ export function MatchControlClient({
     proofUrl: match.proofUrl || "",
     disputeReason: match.disputeReason || ""
   });
+
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeText, setDisputeText] = useState("");
 
   const [showCelebration, setShowCelebration] = useState(false);
   const [shouldShowConfetti, setShouldShowConfetti] = useState(false);
@@ -188,6 +201,24 @@ export function MatchControlClient({
         router.refresh();
       } catch (error: any) {
         toast.error(error.message || "Erreur lors de la confirmation");
+      }
+    });
+  };
+
+  const onReportDispute = () => {
+    if (disputeText.trim().length < 5) {
+      toast.error("Veuillez décrire le litige (5 caractères minimum).");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await reportMatchDispute(match.id, disputeText);
+        toast.success("Litige signalé. L'organisateur en est informé.");
+        setDisputeOpen(false);
+        setDisputeText("");
+        router.refresh();
+      } catch (error: any) {
+        toast.error(error.message || "Erreur lors du signalement du litige");
       }
     });
   };
@@ -320,7 +351,7 @@ export function MatchControlClient({
           {/* Score inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center justify-center py-4 px-2">
             <div className="space-y-3 text-center">
-              <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider block">
+              <Label htmlFor="score1" className="text-xs uppercase font-bold text-muted-foreground tracking-wider block">
                 {match.participant1?.member?.displayName || "Participant 1"}
                 {isParticipant1 && !isMatchCompleted && (
                   <Badge variant="outline" className="ml-2 text-[8px]">Vous</Badge>
@@ -331,6 +362,7 @@ export function MatchControlClient({
                   type="button"
                   variant="destructive"
                   size="icon"
+                  aria-label={`Retirer un point à ${match.participant1?.member?.displayName || "Participant 1"}`}
                   className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full flex-shrink-0"
                   disabled={!canEditScore || formData.score1 <= 0}
                   onClick={() => handleScoreChange("score1", formData.score1 - 1)}
@@ -338,10 +370,12 @@ export function MatchControlClient({
                   <Minus className="h-5 w-5" />
                 </Button>
                 <Input
+                  id="score1"
                   type="number"
                   min={0}
                   value={formData.score1}
                   disabled={!canEditScore}
+                  aria-label={`Score de ${match.participant1?.member?.displayName || "Participant 1"}`}
                   onChange={(e) => handleScoreChange("score1", e.target.value)}
                   className={cn(
                     "h-20 max-md:h-12 text-4xl max-md:text-2xl font-black text-center bg-background border-2 shadow-sm w-24 max-md:w-16",
@@ -352,6 +386,7 @@ export function MatchControlClient({
                   type="button"
                   variant="default"
                   size="icon"
+                  aria-label={`Ajouter un point à ${match.participant1?.member?.displayName || "Participant 1"}`}
                   className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full text-primary bg-primary/10  flex-shrink-0"
                   disabled={!canEditScore}
                   onClick={() => handleScoreChange("score1", formData.score1 + 1)}
@@ -362,7 +397,7 @@ export function MatchControlClient({
             </div>
             
             <div className="space-y-3 text-center">
-              <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider block">
+              <Label htmlFor="score2" className="text-xs uppercase font-bold text-muted-foreground tracking-wider block">
                 {match.participant2?.member?.displayName || "Participant 2"}
                 {isParticipant2 && !isMatchCompleted && (
                   <Badge variant="outline" className="ml-2 text-[8px]">Vous</Badge>
@@ -373,6 +408,7 @@ export function MatchControlClient({
                   type="button"
                   variant="destructive"
                   size="icon"
+                  aria-label={`Retirer un point à ${match.participant2?.member?.displayName || "Participant 2"}`}
                   className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full flex-shrink-0"
                   disabled={!canEditScore || formData.score2 <= 0}
                   onClick={() => handleScoreChange("score2", formData.score2 - 1)}
@@ -380,10 +416,12 @@ export function MatchControlClient({
                   <Minus className="h-5 w-5" />
                 </Button>
                 <Input
+                  id="score2"
                   type="number"
                   value={formData.score2}
                   min={0}
                   disabled={!canEditScore}
+                  aria-label={`Score de ${match.participant2?.member?.displayName || "Participant 2"}`}
                   onChange={(e) => handleScoreChange("score2", e.target.value)}
                   className={cn(
                     "h-20 max-md:h-14 text-4xl max-md:text-2xl font-black text-center bg-background border-2 shadow-sm w-24 max-md:w-16",
@@ -394,6 +432,7 @@ export function MatchControlClient({
                   type="button"
                   variant="default"
                   size="icon"
+                  aria-label={`Ajouter un point à ${match.participant2?.member?.displayName || "Participant 2"}`}
                   className="h-12 w-12 max-md:w-8 max-md:h-8 rounded-full text-primary bg-primary/10 flex-shrink-0"
                   disabled={!canEditScore}
                   onClick={() => handleScoreChange("score2", formData.score2 + 1)}
@@ -482,20 +521,59 @@ export function MatchControlClient({
                 </Button>
               </ConfirmationDialog>
 
-              {/* Bouton litige */}
-              <Button
-                variant="outline"
-                className="flex-1 min-w-[150px] h-11 gap-2 border-red-500/30 text-red-600 hover:bg-red-50 text-sm font-medium"
-                onClick={() => {
-                  const reason = prompt("Raison du litige:");
-                  if (reason) {
-                    // Appel API pour signaler un litige
-                    toast.info(`Litige signalé: ${reason}`);
-                  }
-                }}
-              >
-                <AlertTriangle className="h-4 w-4" /> Signaler un litige
-              </Button>
+              {/* Bouton litige — formulaire accessible et persistance réelle */}
+              <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={isPending || isMatchDisputed}
+                    className="flex-1 min-w-[150px] h-11 gap-2 border-red-500/30 text-red-600 hover:bg-red-50 text-sm font-medium"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    {isMatchDisputed ? "Litige signalé" : "Signaler un litige"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[calc(100vw-2rem)]">
+                  <DialogHeader>
+                    <DialogTitle>Signaler un litige</DialogTitle>
+                    <DialogDescription>
+                      Décrivez le problème rencontré lors de ce match. L'organisateur
+                      du tournoi pourra examiner votre demande.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <Label htmlFor="dispute-reason">Raison du litige</Label>
+                    <Textarea
+                      id="dispute-reason"
+                      value={disputeText}
+                      onChange={(e) => setDisputeText(e.target.value)}
+                      placeholder="Ex. : le score saisi ne correspond pas au résultat réel…"
+                      rows={4}
+                      maxLength={500}
+                    />
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDisputeOpen(false)}
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={onReportDispute}
+                      disabled={isPending || disputeText.trim().length < 5}
+                    >
+                      {isPending ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4" />
+                      )}
+                      Envoyer le signalement
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
             {/* Danger zone */}
@@ -517,6 +595,7 @@ export function MatchControlClient({
                   disabled={isPending}
                   variant="ghost"
                   size="sm"
+                  aria-label="Supprimer définitivement le match"
                   className="h-9 w-9 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />

@@ -321,13 +321,6 @@ export function MarketplaceFilters() {
                       ? "bg-primary/10 border-primary"
                       : "hover:bg-muted/50"
                   )}
-                  onClick={() =>
-                    toggleSelection(
-                      feature.value,
-                      selectedFeatures,
-                      setSelectedFeatures,
-                    )
-                  }
                 >
                   <Checkbox
                     id={`feature-${feature.value}`}

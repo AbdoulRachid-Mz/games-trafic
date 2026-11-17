@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { roboto, montserrat } from "./fonts";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -26,7 +26,13 @@ export const metadata: Metadata = {
   icons: {
     icon: "/icons/gt-primary.png",
   },
-  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
+};
+
+// Next.js 16 exige un export `viewport` séparé. Le zoom est autorisé :
+// `user-scalable=no` / `maximum-scale=1` sont des échecs WCAG 1.4.4.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

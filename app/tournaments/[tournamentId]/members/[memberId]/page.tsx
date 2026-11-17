@@ -520,17 +520,6 @@ export default function MemberDetailPage() {
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="default"
-                        className="mt-4 md:mt-0 rounded-full"
-                        asChild
-                      >
-                        <Link
-                          href={`/tournaments/${tournamentId}/teams/${member.teamId}`}
-                        >
-                          Page d'équipe
-                        </Link>
-                      </Button>
                     </div>
                   ) : (
                     <div className="text-center py-6">

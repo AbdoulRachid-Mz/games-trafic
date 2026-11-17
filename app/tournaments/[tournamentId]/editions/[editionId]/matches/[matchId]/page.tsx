@@ -264,9 +264,9 @@ export default async function MatchDetailPage({
           {/* Main Versus Card */}
           <Card className="overflow-hidden border-none shadow-2xl bg-gradient-to-br from-card to-muted/30">
             <CardContent className="p-0">
-              <div className="grid grid-cols-7 items-stretch min-h-[280px]">
+              <div className="grid grid-cols-1 sm:grid-cols-7 items-stretch min-h-[280px]">
                 {/* Participant 1 */}
-                <div className="col-span-3 p-6 flex flex-col items-center justify-center text-center gap-4">
+                <div className="col-span-1 sm:col-span-3 p-6 flex flex-col items-center justify-center text-center gap-4">
                   <ParticipantLargeAvatar
                     participant={match.participant1}
                     isWinner={
@@ -292,14 +292,14 @@ export default async function MatchDetailPage({
                 </div>
 
                 {/* Versus / Score */}
-                <div className="col-span-1 flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm border-x border-border/20">
-                  <div className="text-[10px] font-black text-muted-foreground uppercase mb-4 tracking-[0.2em]">
+                <div className="col-span-1 sm:col-span-1 flex flex-row sm:flex-col items-center justify-center gap-4 sm:gap-0 bg-background/50 backdrop-blur-sm border-y sm:border-y-0 sm:border-x border-border/20 py-4 sm:py-0">
+                  <div className="text-[10px] font-black text-muted-foreground uppercase sm:mb-4 tracking-[0.2em]">
                     VS
                   </div>
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-row sm:flex-col items-center gap-2">
                     <span
                       className={cn(
-                        "text-5xl font-black tabular-nums tracking-tighter",
+                        "text-3xl sm:text-5xl font-black tabular-nums tracking-tighter",
                         match.score1 > match.score2 && "text-primary",
                       )}
                     >
@@ -308,7 +308,7 @@ export default async function MatchDetailPage({
                     <div className="h-[2px] w-8 bg-border" />
                     <span
                       className={cn(
-                        "text-5xl font-black tabular-nums tracking-tighter",
+                        "text-3xl sm:text-5xl font-black tabular-nums tracking-tighter",
                         match.score2 > match.score1 && "text-primary",
                       )}
                     >
@@ -318,7 +318,7 @@ export default async function MatchDetailPage({
                 </div>
 
                 {/* Participant 2 */}
-                <div className="col-span-3 p-6 flex flex-col items-center justify-center text-center gap-4">
+                <div className="col-span-1 sm:col-span-3 p-6 flex flex-col items-center justify-center text-center gap-4">
                   <ParticipantLargeAvatar
                     participant={match.participant2}
                     isWinner={

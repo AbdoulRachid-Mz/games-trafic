@@ -629,7 +629,7 @@ export function StandingsTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 bg-background/50 backdrop-blur-sm">
-              {sortedGroupRows.slice(0, isExtraSmall ? 50 : 100).map((row, idx) => {
+              {sortedGroupRows.map((row, idx) => {
                 const { name, image } = getParticipantInfo(row.registrationId, row);
                 return (
                   <tr

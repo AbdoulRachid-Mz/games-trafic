@@ -15,7 +15,9 @@ import {
   Crown,
   Gamepad2,
   Grid,
-  List as ListIcon
+  List as ListIcon,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -38,6 +40,7 @@ interface MembersListProps {
 
 export function MembersList({ tournamentId, isOrganizer }: MembersListProps) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [data, setData] = useState<PaginationResponse<TournamentMember> | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("ALL");
@@ -47,6 +50,7 @@ export function MembersList({ tournamentId, isOrganizer }: MembersListProps) {
 
   const fetchMembers = async () => {
     setLoading(true);
+    setError(false);
     try {
       const filters: any = { tournamentId };
       if (roleFilter !== "ALL") {
@@ -65,6 +69,7 @@ export function MembersList({ tournamentId, isOrganizer }: MembersListProps) {
       setData(res);
     } catch (error) {
       console.error("Error fetching members:", error);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -109,6 +114,8 @@ export function MembersList({ tournamentId, isOrganizer }: MembersListProps) {
                 variant={viewMode === "grid" ? "secondary" : "ghost"} 
                 size="sm" 
                 className="h-8 w-8 p-0"
+                aria-label="Affichage en grille"
+                aria-pressed={viewMode === "grid"}
                 onClick={() => setViewMode("grid")}
             >
               <Grid className="h-4 w-4" />
@@ -117,6 +124,8 @@ export function MembersList({ tournamentId, isOrganizer }: MembersListProps) {
                 variant={viewMode === "list" ? "secondary" : "ghost"} 
                 size="sm" 
                 className="h-8 w-8 p-0"
+                aria-label="Affichage en liste"
+                aria-pressed={viewMode === "list"}
                 onClick={() => setViewMode("list")}
             >
               <ListIcon className="h-4 w-4" />
@@ -161,6 +170,18 @@ export function MembersList({ tournamentId, isOrganizer }: MembersListProps) {
           {[...Array(8)].map((_, i) => (
             <Skeleton key={i} className={cn("rounded-2xl", viewMode === "grid" ? "h-[280px]" : "h-20")} />
           ))}
+        </div>
+      ) : error ? (
+        <div role="alert" className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-3xl bg-card/50">
+          <AlertCircle className="h-12 w-12 text-destructive mb-4" aria-hidden="true" />
+          <Typography variant="h4" weight="bold">Impossible de charger les membres</Typography>
+          <Typography variant="body-base" theme="muted" className="max-w-xs mt-2">
+            Vérifiez votre connexion puis réessayez.
+          </Typography>
+          <Button variant="outline" className="mt-6 gap-2" onClick={fetchMembers}>
+            <RefreshCw className="h-4 w-4" />
+            Réessayer
+          </Button>
         </div>
       ) : filteredMembers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-3xl bg-card/50">

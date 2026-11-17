@@ -3,6 +3,7 @@
 
 import React, { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -25,9 +26,11 @@ import { useGameClips } from "@/hooks/use-game-clips";
 import { AdvancedMultiUpload } from "@/components/ui/advanced-multi-upload";
 import { AdvancedVideoUpload } from "@/components/ui/advanced-video-upload";
 import { GameVideoController } from "@/components/pages/game-clips/game-video-controller";
+import { useAppShellStickyOffset } from "@/stores/app-shell-store";
 
 export default function GameClipCreatePage() {
   const router = useRouter();
+  const stickyOffset = useAppShellStickyOffset();
 
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
@@ -109,24 +112,24 @@ export default function GameClipCreatePage() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
         <div
-          className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse"
+          className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary/20 rounded-full blur-3xl animate-pulse"
           style={{ animationDelay: "1s" }}
         />
       </div>
 
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-2xl border-b border-border">
+      {/* Header — offset unique depuis l'App Shell (pas de top-0 codé en dur) */}
+      <div className="sticky z-30 bg-background/80 backdrop-blur-2xl border-b border-border" style={{ top: stickyOffset }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => router.back()}
-              className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-muted hover:bg-muted/80 transition-all duration-300"
+              className="group gap-2"
             >
-              <ArrowLeft className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">
-                Retour
-              </span>
-            </button>
+              <ArrowLeft className="h-4 w-4" />
+              Retour
+            </Button>
 
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
@@ -166,7 +169,7 @@ export default function GameClipCreatePage() {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Left Column - Preview */}
           <div className="order-2 lg:order-1">
-            <div className="sticky top-24">
+            <div className="sticky" style={{ top: stickyOffset }}>
               {/* Preview Card */}
               <div className="bg-card backdrop-blur-xl rounded-2xl border border-border overflow-hidden shadow-2xl">
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -178,8 +181,8 @@ export default function GameClipCreatePage() {
                   </div>
                   {hasContent && (
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                      <CheckCircle className="h-3 w-3 text-green-400" />
-                      <span className="text-[10px] font-medium text-green-400 uppercase">
+                      <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+                      <span className="text-[10px] font-medium text-green-600 dark:text-green-400 uppercase">
                         Prêt
                       </span>
                     </div>
@@ -194,8 +197,17 @@ export default function GameClipCreatePage() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="w-full h-full relative cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={isPlaying ? "Mettre la vidéo en pause" : "Lire la vidéo"}
+                        className="w-full h-full relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                         onClick={togglePlay}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            togglePlay();
+                          }
+                        }}
                       >
                         <video
                           ref={videoRef}
@@ -228,11 +240,12 @@ export default function GameClipCreatePage() {
                         exit={{ opacity: 0, scale: 0.95 }}
                         className="relative w-full h-full"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <Image
                           src={imageUrls[0]}
-                          alt="Preview"
-                          className="w-full h-full object-contain"
+                          alt="Aperçu de l'image du clip"
+                          fill
+                          sizes="(max-width: 1024px) 100vw, 50vw"
+                          className="object-contain"
                         />
                         {imageUrls.length > 1 && (
                           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs">
@@ -311,8 +324,11 @@ export default function GameClipCreatePage() {
             </div>
 
             {/* Media Type Toggle */}
-            <div className="flex gap-2 p-1 bg-muted rounded-xl border border-border">
+            <div role="tablist" aria-label="Type de média du clip" className="flex gap-2 p-1 bg-muted rounded-xl border border-border">
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "video"}
                 onClick={() => setActiveTab("video")}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-300",
@@ -325,6 +341,9 @@ export default function GameClipCreatePage() {
                 <span className="text-sm font-medium">Vidéo</span>
               </button>
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "images"}
                 onClick={() => setActiveTab("images")}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all duration-300",
@@ -396,7 +415,7 @@ export default function GameClipCreatePage() {
             {/* Visibility Info */}
             <div className="flex items-center gap-3 p-4 rounded-xl bg-card border border-border shadow-sm">
               <div className="p-2 rounded-lg bg-green-500/10">
-                <Users className="h-4 w-4 text-green-500" />
+                <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">

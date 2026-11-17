@@ -70,7 +70,7 @@ export default function Footer() {
               </div>
             </ActiveLink>
 
-            <p className="text-sm text-white/80 leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               L&apos;infrastructure gaming complète pour connecter, compétiter et
               monétiser votre passion. Rejoignez l&apos;élite du gaming francophone.
             </p>
@@ -85,7 +85,7 @@ export default function Footer() {
                     href={item.href}
                     isShort
                     icon={<Icon className="w-5 h-5" />}
-                    className="h-10 w-10 flex items-center justify-center rounded-lg bg-primary text-white border border-border/50 hover:bg-secondary hover:border-primary/50 hover:text-primary transition-all"
+                    className="h-10 w-10 flex items-center justify-center rounded-lg bg-primary text-primary-foreground border border-border/50 hover:bg-primary/90 hover:border-primary/50 transition-all"
                     tooltipContent={item.label}
                     withTooltip
                   />
@@ -97,7 +97,7 @@ export default function Footer() {
           {/* Sections */}
           {footerLinks.map((section, idx) => (
             <div key={idx}>
-              <h3 className="font-bold mb-6 uppercase tracking-wider text-xs text-white">
+              <h3 className="font-bold mb-6 uppercase tracking-wider text-xs text-foreground">
                 {section.title}
               </h3>
 
@@ -106,7 +106,7 @@ export default function Footer() {
                   <li key={lIdx}>
                     <ActiveLink
                       href={link.href}
-                      className="text-sm text-white/80 hover:text-white transition-colors flex items-center gap-1 group"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 group"
                       activeClassName="text-primary font-semibold"
                     >
                       <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />

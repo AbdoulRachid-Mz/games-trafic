@@ -14,7 +14,6 @@ import type { UserRoles, ResolvedRoute } from "@/types/routes";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { useAppShellStore } from "@/stores/app-shell-store";
-import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { PulseLoading } from "../loading-ui/pulse-loader";
 
@@ -102,7 +101,6 @@ function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const {
     user,
@@ -137,7 +135,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Gestion de la première visite (non-bloquante pour le premier rendu des composants)
   useEffect(() => {
     const isWelcomePath = pathname === "/welcome";
-    const ignore = canSkipWelcome(searchParams);
+    // Lecture client de l'URL : useSearchParams() ferait suspendre tout le
+    // layout racine et viderait le static shell en Cache Components.
+    const ignore = canSkipWelcome(
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null,
+    );
 
     if (ignore) {
       setWelcomeChecked(true);
@@ -154,7 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } else {
       setWelcomeChecked(true);
     }
-  }, [pathname, router, searchParams]);
+  }, [pathname, router]);
 
   // Calcul réactif des rôles
   const userRoles: UserRoles = useMemo(

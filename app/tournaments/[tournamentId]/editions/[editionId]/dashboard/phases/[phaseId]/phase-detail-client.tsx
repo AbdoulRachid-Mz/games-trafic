@@ -57,17 +57,6 @@ interface PhaseDetailClientProps {
   registrations?: any[];
 }
 
-const phaseTypeConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  ELIMINATION: { label: "Élimination directe", color: "text-red-700", bgColor: "bg-red-100 border-red-200" },
-  DOUBLE_ELIMINATION: { label: "Double élimination", color: "text-orange-700", bgColor: "bg-orange-100 border-orange-200" },
-  ROUND_ROBIN: { label: "Round Robin", color: "text-blue-700", bgColor: "bg-blue-100 border-blue-200" },
-  GROUP_STAGE: { label: "Phase de groupes", color: "text-green-700", bgColor: "bg-green-100 border-green-200" },
-  SWISS: { label: "Suisse", color: "text-purple-700", bgColor: "bg-purple-100 border-purple-200" },
-  KNOCKOUT: { label: "K.O.", color: "text-pink-700", bgColor: "bg-pink-100 border-pink-200" },
-  CUSTOM: { label: "Personnalisé", color: "text-gray-700", bgColor: "bg-gray-100 border-gray-200" },
-  GROUP_ELIMINATION: { label: "Groupes + Élimination", color: "text-teal-700", bgColor: "bg-teal-100 border-teal-200" },
-};
-
 export function PhaseDetailClient({ 
   tournamentId, 
   editionId, 
@@ -270,14 +259,14 @@ export function PhaseDetailClient({
                    <AlertDialogFooter>
                       <AlertDialogCancel>Annuler</AlertDialogCancel>
                       <AlertDialogAction asChild>
-                        <Link href={`./phases/${phaseId}/organize`}>Continuer quand même</Link>
+                        <Link href={`./organize`}>Continuer quand même</Link>
                       </AlertDialogAction>
                    </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             ) : (
               <Button variant="outline" asChild size="sm">
-                <Link href={`./phases/${phaseId}/organize`}>
+                <Link href={`./organize`}>
                     <RefreshCcw className="h-4 w-4 mr-2" />
                     Organiser Phase
                 </Link>
@@ -414,7 +403,7 @@ export function PhaseDetailClient({
              id: "organise",
              label: "Générer Structure",
              icon: RefreshCcw,
-             href: `./phases/${phaseId}/organize`,
+             href: `./organize`,
              separatorBefore: true,
              ...(isAutoMode ? {
                overlayType: "dialog",
@@ -428,7 +417,7 @@ export function PhaseDetailClient({
                      Il est préférable de laisser l'Assistant gérer ou de basculer en mode Manuel.
                    </p>
                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => router.push(`./phases/${phaseId}/organize`)}>Continuer quand même</Button>
+                      <Button variant="outline" onClick={() => router.push(`./organize`)}>Continuer quand même</Button>
                    </div>
                  </div>
                )

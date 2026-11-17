@@ -45,6 +45,7 @@ import {
   organizeEditionStructure,
   generateMatchesAction,
   getStructurePreviewAction,
+  randomizeOrderAction,
 } from "@/actions/phases";
 import { Badge } from "@/components/ui/badge";
 import { Typography } from "@/components/ui/typography";
@@ -53,6 +54,7 @@ import { MatchGenerationDialog } from "./match-generation-dialog";
 import { DrawRevealDialog } from "./draw-reveal-dialog";
 import { drawPhaseGroupsAction, type DrawParticipantsResult } from "@/actions/phases";
 import { cn } from "@/lib/utils";
+import { useAppShellStickyOffset } from "@/stores/app-shell-store";
 import {
   Collapsible,
   CollapsibleContent,
@@ -135,6 +137,7 @@ export function PhaseOrganizeClient({
   editionConfig,
 }: PhaseOrganizeClientProps) {
   const router = useRouter();
+  const stickyOffset = useAppShellStickyOffset();
   const [isPending, startTransition] = useTransition();
 
   const isAutoMode = editionConfig.competitionMode === "AUTO";
@@ -467,13 +470,16 @@ export function PhaseOrganizeClient({
     );
   };
 
-  const handleDistributeParticipants = () => {
+  const handleDistributeParticipants = async () => {
     const availableParticipants = sourceParticipants.map((p) => p.id);
-    const shuffled = [...availableParticipants];
+    let shuffled = [...availableParticipants];
     if (seedingMethod === "RANDOM") {
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      try {
+        // Tirage serveur : l'aperçu ne décide jamais de l'ordre aléatoire.
+        shuffled = await randomizeOrderAction(editionId, availableParticipants);
+      } catch (error: any) {
+        toast.error(error.message || "Impossible d'effectuer le tirage.");
+        return;
       }
     }
 
@@ -628,7 +634,7 @@ export function PhaseOrganizeClient({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Colonne gauche: Configuration */}
         <div className="space-y-6 lg:col-span-1">
-          <Card className="border-primary/10 shadow-lg sticky top-24">
+          <Card className="border-primary/10 shadow-lg sticky" style={{ top: stickyOffset }}>
             <CardHeader className="bg-primary/5 pb-4">
               <CardTitle className="text-base font-bold flex items-center gap-2">
                 <Settings2 className="h-5 w-5 text-primary" /> Configuration

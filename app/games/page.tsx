@@ -10,7 +10,7 @@ import { GamesGrid } from "@/components/pages/games/games-grid";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Filter, X, Gamepad2, Package, LayoutGrid, Info } from "lucide-react";
+import { Filter, X, Gamepad2, Package } from "lucide-react";
 import { useScreenSize } from "@/hooks/use-screen";
 import {
   Sheet,
@@ -19,7 +19,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Loader2 } from "lucide-react";
+import { useAppShellStickyOffset } from "@/stores/app-shell-store";
 
 function GamesContent() {
   const {
@@ -31,10 +31,11 @@ function GamesContent() {
     hasActiveFilters,
   } = useGamesFilters();
   const { isSmallScreen } = useScreenSize();
+  const stickyOffset = useAppShellStickyOffset();
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   // Hook pour le chargement infini des items
-  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } =
+  const { data, isLoading, isError, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
     useGameItems({
       filters: {
         ...filters,
@@ -53,6 +54,11 @@ function GamesContent() {
 
   const allItems = data?.pages.flatMap((page) => page.data) || [];
   const totalItems = data?.pages[0]?.pagination.total || 0;
+  const activeFilterCount =
+    (filters.gameId ? 1 : 0) +
+    (filters.type ? 1 : 0) +
+    (filters.availability ? 1 : 0) +
+    (searchQuery ? 1 : 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -64,7 +70,7 @@ function GamesContent() {
           {/* Sidebar - Desktop only */}
           {!isSmallScreen && (
             <div className="lg:col-span-1">
-              <div className="sticky top-20">
+              <div className="sticky" style={{ top: stickyOffset }}>
                 <GamesFilterSidebar
                   filters={filters}
                   updateFilter={updateFilter}
@@ -84,7 +90,7 @@ function GamesContent() {
                   <Package className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <Typography variant="h4" className="text-lg font-bold leading-none mb-1">Items Disponibles</Typography>
+                  <Typography variant="h2" className="text-lg font-bold leading-none mb-1">Items Disponibles</Typography>
                   <p className="text-xs text-muted-foreground font-medium">
                     {totalItems} résultats trouvés
                   </p>
@@ -107,9 +113,10 @@ function GamesContent() {
                         Filtres
                         {hasActiveFilters && (
                           <Badge
+                            aria-label={`${activeFilterCount} filtre(s) actif(s)`}
                             className="ml-1 px-1.5 h-5 min-w-[20px] rounded-full"
                           >
-                            !
+                            {activeFilterCount}
                           </Badge>
                         )}
                       </Button>
@@ -141,10 +148,7 @@ function GamesContent() {
 
                 <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
                   <span>Trier:</span>
-                  <Badge
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-secondary/80 transition-colors"
-                  >
+                  <Badge variant="secondary">
                     Popularité
                   </Badge>
                 </div>
@@ -162,35 +166,47 @@ function GamesContent() {
                   >
                     <Gamepad2 className="h-3 w-3" />
                     Jeu sélectionné
-                    <X
-                      className="h-3 w-3 cursor-pointer hover:text-foreground"
+                    <button
+                      type="button"
+                      aria-label="Retirer le filtre jeu sélectionné"
                       onClick={() => updateFilter("gameId", "all")}
-                    />
+                      className="rounded-full p-0.5 transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </Badge>
                 )}
                 {filters.type && (
                   <Badge
                     variant="secondary"
-                    className="gap-1.5 pl-2 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                    className="gap-1.5 pl-2 py-1 bg-primary/10 text-primary border-primary/20"
                   >
                     <Package className="h-3 w-3" />
                     {filters.type}
-                    <X
-                      className="h-3 w-3 cursor-pointer hover:text-foreground"
+                    <button
+                      type="button"
+                      aria-label={`Retirer le filtre ${filters.type}`}
                       onClick={() => updateFilter("type", "all")}
-                    />
+                      className="rounded-full p-0.5 transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </Badge>
                 )}
                 {searchQuery && (
                   <Badge
                     variant="secondary"
-                    className="gap-1.5 pl-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                    className="gap-1.5 pl-2 py-1 bg-primary/10 text-primary border-primary/20"
                   >
                     "{searchQuery}"
-                    <X
-                      className="h-3 w-3 cursor-pointer hover:text-foreground"
+                    <button
+                      type="button"
+                      aria-label="Effacer la recherche"
                       onClick={() => setSearchQuery("")}
-                    />
+                      className="rounded-full p-0.5 transition-colors hover:bg-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </Badge>
                 )}
                 <Button
@@ -206,8 +222,10 @@ function GamesContent() {
 
             {/* Grid with Infinite Scroll */}
             <GamesGrid
-              items={allItems as any}
+              items={allItems}
               isLoading={isLoading}
+              isError={isError}
+              onRetry={() => refetch()}
               isFetchingNextPage={isFetchingNextPage}
               hasNextPage={hasNextPage}
               onLoadMore={fetchNextPage}

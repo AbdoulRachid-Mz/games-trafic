@@ -249,6 +249,15 @@ export function MatchCard({
           className,
         )}
         onClick={handleView}
+        role={onView ? "button" : undefined}
+        tabIndex={onView ? 0 : undefined}
+        aria-label={onView ? `Voir le match ${p1Name} contre ${p2Name}` : undefined}
+        onKeyDown={(event) => {
+          if (onView && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            onView(match);
+          }
+        }}
       >
         <div className={cn("absolute inset-0 bg-gradient-to-r opacity-50", statusStyle.bg)} />
         <div className="p-3 relative z-10">
@@ -355,18 +364,34 @@ export function MatchCard({
     else if (onViewP2) onViewP2();
     else if (onView) onView(match);
   };
-  
+
+  // Une zone cliquable doit être atteignable et activable au clavier.
+  const activationProps = isCliquable
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        "aria-label": `Voir le match ${p1Name} contre ${p2Name}`,
+        onKeyDown: (event: React.KeyboardEvent) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleMainAction();
+          }
+        },
+      }
+    : {};
+
   return (
     <motion.div 
       whileHover={isCliquable ? { scale: 0.995, y: -2 } : {}}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border bg-card/80 backdrop-blur-xl transition-all duration-300",
+        "group relative overflow-hidden rounded-xl border bg-card/80 backdrop-blur-xl transition-all duration-300",
         statusStyle.border,
         statusStyle.glow,
         isCompactView ? "p-3" : "p-4 sm:p-5",
         isCliquable && "cursor-pointer",
         className
       )}
+      {...activationProps}
       onClick={handleMainAction}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -441,7 +466,13 @@ export function MatchCard({
                 </span>
               )}
             </div>
-            <div className="relative group/avatar" onClick={(e) => { e.stopPropagation(); if (onViewP1) onViewP1(); }}>
+            <button
+              type="button"
+              className="relative group/avatar cursor-pointer disabled:cursor-default"
+              aria-label={`Voir le profil de ${p1Name}`}
+              disabled={!onViewP1}
+              onClick={(e) => { e.stopPropagation(); onViewP1?.(); }}
+            >
               <div className={cn(
                 "relative overflow-hidden border-2 transition-all duration-300",
                 "bg-muted shadow-xl",
@@ -458,7 +489,7 @@ export function MatchCard({
                   )}
                 </div>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Score / VS Center */}
@@ -492,7 +523,13 @@ export function MatchCard({
             "flex flex-1 items-center gap-3",
             isListView ? "justify-end" : "justify-center sm:justify-start flex-row-reverse sm:flex-row"
           )}>
-            <div className="relative group/avatar" onClick={(e) => { e.stopPropagation(); if (onViewP2) onViewP2(); }}>
+            <button
+              type="button"
+              className="relative group/avatar cursor-pointer disabled:cursor-default"
+              aria-label={`Voir le profil de ${p2Name}`}
+              disabled={!onViewP2}
+              onClick={(e) => { e.stopPropagation(); onViewP2?.(); }}
+            >
               <div className={cn(
                 "relative overflow-hidden border-2 transition-all duration-300",
                 "bg-muted shadow-xl",
@@ -509,7 +546,7 @@ export function MatchCard({
                   )}
                 </div>
               </div>
-            </div>
+            </button>
             <div className={cn("flex flex-col gap-1", isListView ? "items-end" : "items-center sm:items-start")}>
               <span className={cn(
                 "font-black italic tracking-tight text-foreground transition-colors group-hover:text-primary",

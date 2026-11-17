@@ -343,9 +343,15 @@
   animation: gradient 3s ease infinite;
 }
 
-/* Smooth transitions */
-* {
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+/* Les transitions sont définies par composant : une règle globale `*` doublait
+   les transitions des cards/boutons/tabs et ajoutait de la latence au hover. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Styles pour les transactions */

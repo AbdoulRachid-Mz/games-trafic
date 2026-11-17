@@ -22,6 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useAppShellStickyOffset } from "@/stores/app-shell-store"
 import { PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
@@ -161,6 +162,8 @@ function Sidebar({
   collapsible?: "offExamples" | "icon" | "none"
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  // La sidebar commence sous le header fixe de l'App Shell (mesuré, jamais codé en dur).
+  const stickyOffset = useAppShellStickyOffset()
 
   if (collapsible === "none") {
     return (
@@ -226,7 +229,7 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed z-40 hidden w-(--sidebar-width) transition-[left,right,top,height,width] duration-200 ease-linear md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offExamples]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offExamples]:right-[calc(var(--sidebar-width)*-1)]",
@@ -236,6 +239,13 @@ function Sidebar({
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
           className
         )}
+        style={
+          {
+            top: stickyOffset,
+            height: `calc(100dvh - ${stickyOffset}px)`,
+            ...props.style,
+          } as React.CSSProperties
+        }
         {...props}
       >
         <div

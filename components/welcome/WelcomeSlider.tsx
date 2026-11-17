@@ -235,6 +235,7 @@ export function WelcomeSlider() {
                     src={slide.image}
                     alt={slide.title}
                     fill
+                    sizes="80px"
                     className="object-cover"
                   />
 
@@ -297,6 +298,7 @@ export function WelcomeSlider() {
                   src={welcomeSlides[currentSlide].image}
                   alt={welcomeSlides[currentSlide].title}
                   fill
+                  sizes="128px"
                   className="object-cover"
                   priority
                 />

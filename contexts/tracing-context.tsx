@@ -1,10 +1,10 @@
 // contexts/tracing-context.tsx
 "use client";
 
-import React, { createContext, useContext, ReactNode, useEffect, useState, Suspense } from "react";
+import React, { createContext, useContext, ReactNode, useEffect, Suspense } from "react";
 import { useTracing } from "@/hooks/use-tracing";
 import { TracingContextValue } from "@/types/tracing";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const TracingContext = createContext<TracingContextValue | undefined>(
   undefined
@@ -25,8 +25,6 @@ function TracingProviderInner({ children, options }: TracingProviderProps) {
   const tracing = useTracing();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [canRender, setCanRender] = useState(false);
 
   // Initial configuration based on options
   useEffect(() => {
@@ -56,21 +54,21 @@ function TracingProviderInner({ children, options }: TracingProviderProps) {
   }, [options, tracing.updateConfig]);
 
   useEffect(() => {
-    const ignore = searchParams?.get("ignore_visite") === "true";
+    // Les paramètres d'URL sont lus côté client uniquement : éviter
+    // useSearchParams() ici, qui suspend tout l'arbre côté serveur et vide
+    // le static shell (Cache Components / instant navigation).
+    const ignore =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("ignore_visite") === "true";
     const shouldRedirect = (options?.redirectFirstTimeUsers ?? tracing.config.redirectFirstTimeUsers) === true;
     const redirectPath = tracing.config.redirectPath || "/welcome";
     const isWelcome = pathname === redirectPath;
-    if (ignore || !shouldRedirect) {
-      setCanRender(true);
-      return;
-    }
+    if (ignore || !shouldRedirect) return;
     const hasVisited = typeof window !== "undefined" ? localStorage.getItem("gt_welcome_visited") : null;
     if (!hasVisited && !isWelcome && (tracing.config.checkRedirectConditions ?? true)) {
       router.replace(redirectPath);
-      return;
     }
-    setCanRender(true);
-  }, [searchParams, pathname, router, options?.redirectFirstTimeUsers, tracing.config.redirectFirstTimeUsers, tracing.config.redirectPath, tracing.config.checkRedirectConditions]);
+  }, [pathname, router, options?.redirectFirstTimeUsers, tracing.config.redirectFirstTimeUsers, tracing.config.redirectPath, tracing.config.checkRedirectConditions]);
 
   useEffect(() => {
     const disabled = typeof window !== "undefined" && localStorage.getItem("gt_explanations_disabled") === "true";
@@ -81,7 +79,7 @@ function TracingProviderInner({ children, options }: TracingProviderProps) {
 
   return (
     <TracingContext.Provider value={tracing}>
-      {canRender ? children : null}
+      {children}
     </TracingContext.Provider>
   );
 }

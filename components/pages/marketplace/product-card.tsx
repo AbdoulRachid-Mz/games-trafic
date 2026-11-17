@@ -99,9 +99,8 @@ export function ProductCard({
   const { data: messageCount } = useUnreadMessageCount(user?.id || "", !!user?.id);
 
   const likes = counts?.LIKE || 0;
-  // Note: messageCount est global, mais pour la démo on peut simuler un compteur par produit si on avait l'info
-  // Ici on va utiliser une valeur mockée si messageCount n'est pas ce qu'on attend pour un produit spécifique
-  const messages = Math.floor(Math.random() * 5); // Mock réactif pour la démo si pas lié au produit direct
+  // Donnée réelle (globale) : plus de Math.random() — évite le mismatch d'hydratation.
+  const messages = messageCount ?? 0;
 
   const images =
     product.images || (product.featuredImage ? [product.featuredImage] : []);

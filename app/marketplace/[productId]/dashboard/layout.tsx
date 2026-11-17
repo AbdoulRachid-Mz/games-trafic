@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import { Typography } from "@/components/ui/typography";
+import { useAppShellStickyOffset } from "@/stores/app-shell-store";
 
 export default function ProductDashboardLayout({
   children,
@@ -13,11 +14,15 @@ export default function ProductDashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const stickyOffset = useAppShellStickyOffset();
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Dashboard Header Shell */}
-      <header className="border-b bg-card/50 backdrop-blur-md sticky top-0 z-50">
+      {/* Dashboard Header Shell — se colle sous le header global de l'App Shell */}
+      <header
+        className="border-b bg-card/50 backdrop-blur-md sticky z-30"
+        style={{ top: stickyOffset }}
+      >
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button

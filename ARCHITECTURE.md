@@ -197,3 +197,14 @@ sequenceDiagram
 2. **Navigation fluide sans blocage** : L'AppShell évalue les routes publiques sans bloquer leur affichage sur des requêtes privées.
 3. **Contrôles d'accès serveurs stricts** : Toutes les mutations financières et d'inscriptions vérifient cryptographiquement les identités et permissions sans se fier aux paramètres client.
 4. **Chiffrement AES-256-GCM** : Codes PIN et identifiants sensibles sécurisés avec clé 256 bits et vecteurs d'initialisation aléatoires.
+
+---
+
+## 9. Invariants UI/UX et static shell (Cache Components)
+
+- **Référence obligatoire** : le skill `.agents/skills/games-trafics-ui-ux/SKILL.md` (copié dans `~/.agents/skills` et `~/.claude/skills`) est la source canonique avant toute intervention d'interface. Identité violet + or (OKLCH) ; le vert reste réservé aux statuts utilitaires.
+- **Une seule autorité d'offset sticky** : `useAppShellStickyOffset()` (`stores/app-shell-store.ts`). Aucun `top-16`/`top-20` codé en dur dans les zones ciblées. `resolveRoute()` reste la source de vérité du routage.
+- **Tirages** : le serveur décide et persiste via Web Crypto (`actions/phases/draw.ts`) ; le client ne visualise que la structure persistée (`randomizeOrderAction`, `draw-reveal-dialog`). Aucun `sort(() => Math.random() - 0.5)` client.
+- **Static shell non vide** : avec `cacheComponents: true` et `partialPrefetching: true`, un `useSearchParams()` dans un provider/layout racine suspend tout l'arbre et vide le shell. Les lectures d'URL des providers racines se font donc côté client (`window.location.search`) ; les pages qui suspendent encore (marketplace, sign-up, welcome) sont enveloppées dans un `<Suspense>` à fallback statique. Aucun `export const instant = false` n'a été ajouté pour masquer le problème.
+- **Accessibilité de base** : `viewport` exporté séparément de `metadata` (zoom autorisé, WCAG 1.4.4), vrais `h1`–`h6` via `typography`, `aria-label` sur les actions de cards, `aria-pressed` sur les bascules de vue, `prefers-reduced-motion` dans `globals.css`.
+- **Validation** : voir `UI-UX-AUDIT.md` (8 largeurs × 2 thèmes, interactions réelles, état des avertissements résiduels).

@@ -17,6 +17,10 @@ import OnTapPopup from "../auth/on-tap-popup";
 import { useNetworkStatus } from "@/hooks/network-status";
 import { useAppShellStore, useAppShellStickyOffset } from "@/stores/app-shell-store";
 
+// Hauteur de la barre `h-16` rendue par TopMiddle, utilisée uniquement avant
+// la première mesure du ResizeObserver. Toute valeur mesurée prend le dessus.
+const TOP_MIDDLE_FALLBACK_HEIGHT = 64;
+
 interface MainLayoutProps {
   children: React.ReactNode;
   breadcrumbs?: boolean;
@@ -79,9 +83,7 @@ export function MainLayout({
     topMiddle && !shouldExcludeContainer
       ? stickyOffset > 0
         ? stickyOffset
-        : breadcrumbs
-        ? 80
-        : 64
+        : TOP_MIDDLE_FALLBACK_HEIGHT
       : 0;
 
   const closeLeft = useCallback(() => setLeftOpen(false), []);

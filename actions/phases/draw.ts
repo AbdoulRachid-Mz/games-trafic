@@ -27,7 +27,11 @@ import {
   bracketNodes,
   matches,
 } from "@/database/schema";
-import { assertOrganizerOrAdminByPhase, getPhaseQualifiedRegistrationIds } from "./helpers";
+import {
+  assertOrganizerOrAdminByEdition,
+  assertOrganizerOrAdminByPhase,
+  getPhaseQualifiedRegistrationIds,
+} from "./helpers";
 import {
   buildLeagueCalendar,
 } from "@/lib/tournaments/match.generator";
@@ -72,10 +76,25 @@ export interface DrawNodesResult {
 function fisherYates<T>(input: T[]): T[] {
   const arr = [...input];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const random = new Uint32Array(1);
+    crypto.getRandomValues(random);
+    const j = random[0] % (i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+/**
+ * Tirage utilitaire pour les aperçus d'organisation : l'ordre aléatoire est
+ * décidé côté serveur et vérifié contre les permissions de l'édition.
+ * Le frontend ne fait que visualiser l'ordre renvoyé avant persistance.
+ */
+export async function randomizeOrderAction(
+  editionId: string,
+  ids: string[],
+): Promise<string[]> {
+  await assertOrganizerOrAdminByEdition(editionId);
+  return fisherYates(ids.filter(Boolean));
 }
 
 function displayNameFromUser(reg: any): string {

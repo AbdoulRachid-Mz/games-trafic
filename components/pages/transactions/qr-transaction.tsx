@@ -37,7 +37,7 @@ export function QrTransaction() {
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <div className="text-center">
-        <Typography variant="h3" weight="bold">
+        <Typography variant="h2" weight="bold">
           Scanner un QR
         </Typography>
         <Typography variant="body-base" theme="muted">
@@ -53,11 +53,23 @@ export function QrTransaction() {
               Placez le QR dans le cadre
             </Typography>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="h-10 rounded-xl" onClick={() => setScanningEnabled(false)}>
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() => setScanningEnabled(false)}
+              disabled={!scanningEnabled}
+              aria-label="Arrêter le scanner"
+            >
               Arrêter
             </Button>
-            <Button variant="secondary" className="h-10 rounded-xl" onClick={() => setScanningEnabled(true)}>
+            <Button
+              variant="secondary"
+              className="h-10 rounded-xl"
+              onClick={() => setScanningEnabled(true)}
+              disabled={scanningEnabled}
+              aria-label="Relancer le scanner"
+            >
               Relancer
             </Button>
           </div>

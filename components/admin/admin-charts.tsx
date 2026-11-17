@@ -72,7 +72,7 @@ export function UsersGrowthChart({
 const revenueConfig: ChartConfig = {
   revenue: {
     label: "Revenus (GTC)",
-    color: "hsl(var(--chart-1))",
+    color: "var(--chart-1)",
   },
 };
 
@@ -112,7 +112,7 @@ export function RevenueChart({
 const newUsersConfig: ChartConfig = {
   newUsers: {
     label: "Nouveaux utilisateurs",
-    color: "hsl(var(--chart-2))",
+    color: "var(--chart-2)",
   },
 };
 
@@ -157,19 +157,19 @@ const salesCategoryConfig: ChartConfig = {
   },
   Gaming: {
     label: "Gaming",
-    color: "hsl(var(--chart-1))",
+    color: "var(--chart-1)",
   },
   eSports: {
     label: "eSports",
-    color: "hsl(var(--chart-2))",
+    color: "var(--chart-2)",
   },
   Digital: {
     label: "Digital",
-    color: "hsl(var(--chart-3))",
+    color: "var(--chart-3)",
   },
   Collection: {
     label: "Collection",
-    color: "hsl(var(--chart-4))",
+    color: "var(--chart-4)",
   },
 };
 
@@ -260,11 +260,11 @@ export function TopShopsChart({
 const financeConfig: ChartConfig = {
   revenue: {
     label: "Revenus (GTC)",
-    color: "hsl(var(--chart-1))",
+    color: "var(--chart-1)",
   },
   expenses: {
     label: "Dépenses (GTC)",
-    color: "hsl(var(--chart-2))",
+    color: "var(--chart-2)",
   },
 };
 
@@ -314,7 +314,7 @@ export function FinanceEvolutionChart({
 const tournamentConfig: ChartConfig = {
   tournaments: {
     label: "Tournois",
-    color: "hsl(var(--chart-3))",
+    color: "var(--chart-3)",
   },
 };
 

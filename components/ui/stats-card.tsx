@@ -126,21 +126,22 @@ export function StatsCard({
   const adjustedSize = getAdjustedSize();
 
   const getBackgroundStyles = () => {
+    // Dégradés sombres de la charte (violet → or) : le texte blanc reste lisible.
     const gradientMap = {
-      "gradient-1": "bg-gradient-1",
-      "gradient-2": "bg-gradient-2",
-      "gradient-3": "bg-gradient-3",
-      "gradient-4": "bg-gradient-4",
-      "gradient-5": "bg-gradient-5",
-      "gradient-6": "bg-gradient-6",
+      "gradient-1": "bg-gradient-to-br from-violet-950 via-primary to-violet-700",
+      "gradient-2": "bg-gradient-to-br from-indigo-950 via-violet-800 to-primary",
+      "gradient-3": "bg-gradient-to-br from-purple-950 via-purple-800 to-fuchsia-700",
+      "gradient-4": "bg-gradient-to-br from-slate-950 via-violet-900 to-primary",
+      "gradient-5": "bg-gradient-to-br from-violet-950 via-primary to-amber-800",
+      "gradient-6": "bg-gradient-to-br from-primary via-violet-700 to-amber-800",
     };
 
     const baseGradients = {
       default:
         "from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800",
-      primary: "from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
+      primary: "from-violet-50 to-violet-100 dark:from-violet-950 dark:to-violet-900",
       secondary:
-        "from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900",
+        "from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900",
       success:
         "from-green-50 to-green-100 dark:from-green-950 dark:to-green-900",
       warning:
@@ -175,8 +176,8 @@ export function StatsCard({
       case "neon":
         const neonColors = {
           default: "shadow-slate-500/25 border-slate-300",
-          primary: "shadow-blue-500/25 border-blue-300",
-          secondary: "shadow-purple-500/25 border-purple-300",
+          primary: "shadow-primary/25 border-primary/40",
+          secondary: "shadow-amber-500/25 border-amber-400/50",
           success: "shadow-green-500/25 border-green-300",
           warning: "shadow-yellow-500/25 border-yellow-300",
           danger: "shadow-red-500/25 border-red-300",
@@ -195,13 +196,14 @@ export function StatsCard({
   };
 
   const getIconBackgroundStyles = () => {
+    // Surface neutre translucide : contraste garanti quel que soit le dégradé de la card.
     const gradientMap = {
-      "gradient-1": "bg-gradient-1",
-      "gradient-2": "bg-gradient-2",
-      "gradient-3": "bg-gradient-3",
-      "gradient-4": "bg-gradient-4",
-      "gradient-5": "bg-gradient-5",
-      "gradient-6": "bg-gradient-6",
+      "gradient-1": "bg-card/20 text-white backdrop-blur-sm border border-white/20",
+      "gradient-2": "bg-card/20 text-white backdrop-blur-sm border border-white/20",
+      "gradient-3": "bg-card/20 text-white backdrop-blur-sm border border-white/20",
+      "gradient-4": "bg-card/20 text-white backdrop-blur-sm border border-white/20",
+      "gradient-5": "bg-card/20 text-white backdrop-blur-sm border border-white/20",
+      "gradient-6": "bg-card/20 text-white backdrop-blur-sm border border-white/20",
     };
 
     switch (bgIcon) {
@@ -256,9 +258,9 @@ export function StatsCard({
       case "default":
         return "text-primary";
       case "primary":
-        return "text-blue-500";
+        return "text-primary";
       case "secondary":
-        return "text-purple-500";
+        return "text-amber-600 dark:text-amber-400";
       case "success":
         return "text-green-500";
       case "warning":

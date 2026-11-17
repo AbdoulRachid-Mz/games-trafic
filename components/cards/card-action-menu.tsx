@@ -63,6 +63,8 @@ export function CardActionMenu({
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-full bg-primary/20 text-primary"
+            aria-label={`Actions pour ${entityName || "cet élément"}`}
+            title={`Actions pour ${entityName || "cet élément"}`}
             onClick={(e) => e.stopPropagation()}
           >
             <MoreHorizontal className="h-4 w-4" />

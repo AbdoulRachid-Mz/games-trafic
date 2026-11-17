@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   AlertCircle,
   CalendarDays,
-  ShieldAlert,
   ArrowRight,
   Swords,
   Search,
@@ -40,12 +39,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
-import { updateMatchResult } from "@/actions/tournaments";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import Image from "next/image";
+import Link from "next/link";
 
 interface EditionCalendarTimelineProps {
   editionId: string;
@@ -74,7 +70,7 @@ export function EditionCalendarTimeline({
   const groups = groupsRes?.data || [];
 
   // Fetch matches
-  const { data: matchesRes, isLoading } = useMatchList({
+  const { data: matchesRes, isLoading, isError, refetch } = useMatchList({
     filters: { 
       editionId,
       phaseId: selectedPhaseId !== "all" ? selectedPhaseId : undefined,
@@ -343,6 +339,16 @@ export function EditionCalendarTimeline({
                   <div key={i} className="h-24 bg-card/40 border border-white/5 rounded-2xl" />
                 ))}
               </div>
+            ) : isError ? (
+              <Card className="border-dashed border-destructive/30 bg-card/30">
+                <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-4">
+                  <AlertCircle className="w-10 h-10 text-destructive" aria-hidden="true" />
+                  <span className="text-sm">Impossible de charger les rencontres.</span>
+                  <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+                    Réessayer
+                  </Button>
+                </CardContent>
+              </Card>
             ) : todayMatches.length === 0 ? (
               <Card className="border-dashed border-white/10 bg-card/30">
                 <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-4">
@@ -379,27 +385,10 @@ export function EditionCalendarTimeline({
   );
 }
 
-function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
+function MatchTimelineCard({ match, currentUserId }: any) {
   const isMyMatch =
     match.participant1?.member?.userId === currentUserId ||
     match.participant2?.member?.userId === currentUserId;
-
-  const router = useRouter();
-  const canAdminValidate = isAdmin && match.status !== "COMPLETED";
-
-  const handleAdminValidate = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const s1 = match.score1 ?? 0;
-      const s2 = match.score2 ?? 0;
-      const winnerId = s1 > s2 ? match.participant1RegistrationId : (s2 > s1 ? match.participant2RegistrationId : null);
-      
-      await updateMatchResult(match.id, s1, s2, winnerId || "", currentUserId || "");
-      toast.success("Match validé par l'administrateur");
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la validation");
-    }
-  };
 
   const p1Name = match.participant1?.member?.displayName || match.participant1?.member?.user?.username || "TBD";
   const p2Name = match.participant2?.member?.displayName || match.participant2?.member?.user?.username || "TBD";
@@ -408,8 +397,9 @@ function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
   const isCompleted = match.status === "COMPLETED";
 
   return (
-    <div
-      onClick={() => router.push(`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`)}
+    <Link
+      href={`/tournaments/${match.tournamentId}/editions/${match.editionId}/matches/${match.id}`}
+      aria-label={`Voir les détails du match ${p1Name} contre ${p2Name}`}
       className={cn(
         "group relative overflow-hidden bg-card/80 backdrop-blur-xl border border-white/10 hover:border-primary/50 rounded-2xl p-4 transition-all duration-300 hover:shadow-[0_0_20px_rgba(var(--primary),0.15)] cursor-pointer flex flex-col justify-between gap-3",
         isMyMatch && "border-primary/40 bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.1)]",
@@ -521,6 +511,6 @@ function MatchTimelineCard({ match, currentUserId, isAdmin }: any) {
           <ArrowRight className="w-3.5 h-3.5" />
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

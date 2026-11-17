@@ -726,6 +726,75 @@ export async function updateMatchResult(
 }
 
 /**
+ * Signale un litige sur un match. Seul un participant ou un administrateur
+ * peut contester ; la raison est persistée et le statut passe en DISPUTED.
+ */
+export async function reportMatchDispute(
+  matchId: string,
+  reason: string,
+): Promise<Match> {
+  const trimmed = reason.trim();
+  if (trimmed.length < 5) {
+    throw new Error("Veuillez décrire le litige (5 caractères minimum).");
+  }
+
+  const currentUser = await getCurrentUser();
+  if (!currentUser) throw new Error("Non authentifié");
+
+  const [match] = await db
+    .select()
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+
+  if (!match) throw new Error("Match introuvable");
+  if (match.status === "COMPLETED") {
+    throw new Error("Un match terminé ne peut plus être contesté.");
+  }
+
+  const isAdmin =
+    currentUser.role === "admin" || (currentUser as any).isAdmin === true;
+  const isParticipant =
+    (!!match.participant1RegistrationId &&
+      (await isUserRegistered(
+        currentUser.id,
+        match.participant1RegistrationId,
+      ))) ||
+    (!!match.participant2RegistrationId &&
+      (await isUserRegistered(
+        currentUser.id,
+        match.participant2RegistrationId,
+      )));
+
+  if (!isAdmin && !isParticipant) {
+    throw new Error("Vous n'êtes pas autorisé à contester ce match.");
+  }
+
+  const [updated] = await db
+    .update(matches)
+    .set({
+      disputed: true,
+      disputeReason: trimmed,
+      status: "DISPUTED",
+      updatedAt: new Date(),
+    })
+    .where(eq(matches.id, matchId))
+    .returning();
+
+  const edition = await db.query.tournamentEditions.findFirst({
+    where: eq(tournamentEditions.id, match.editionId),
+    columns: { tournamentId: true },
+  });
+  if (edition) {
+    revalidatePath(
+      `/tournaments/${edition.tournamentId}/editions/${match.editionId}/matches/${matchId}`,
+    );
+  }
+
+  return updated;
+}
+
+/**
  * Liste les matches avec filtres
  */
 export async function createEditionResult(

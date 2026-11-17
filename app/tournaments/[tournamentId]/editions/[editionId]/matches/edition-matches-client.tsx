@@ -219,13 +219,16 @@ function PublicMatchCard({
               )}
             </div>
           </div>
-          <div
+          <button
+            type="button"
+            aria-label={`Voir le profil de ${match.participant1?.member?.displayName || match.participant1?.member?.user?.username || "TBD"}`}
             className={cn(
-              "text-xs md:text-sm truncate transition-colors",
+              "w-full text-xs md:text-sm truncate transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded",
               isP1Winner ? "font-black text-foreground" : "font-medium text-foreground/80",
             )}
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               if (match.participant1?.member?.id) {
                 router.push(`/tournaments/${match.tournamentId}/members/${match.participant1.member.id}`);
               }
@@ -234,7 +237,7 @@ function PublicMatchCard({
             {match.participant1?.member?.displayName ||
               match.participant1?.member?.user?.username ||
               "TBD"}
-          </div>
+          </button>
           {match.participant1?.member?.team?.name && (
             <div className="text-[10px] text-muted-foreground truncate font-medium">
               {match.participant1.member.team.name}
@@ -272,13 +275,16 @@ function PublicMatchCard({
               )}
             </div>
           </div>
-          <div
+          <button
+            type="button"
+            aria-label={`Voir le profil de ${match.participant2?.member?.displayName || match.participant2?.member?.user?.username || "TBD"}`}
             className={cn(
-              "text-xs md:text-sm truncate transition-colors",
+              "w-full text-xs md:text-sm truncate transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded",
               isP2Winner ? "font-black text-foreground" : "font-medium text-foreground/80",
             )}
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               if (match.participant2?.member?.id) {
                 router.push(`/tournaments/${match.tournamentId}/members/${match.participant2.member.id}`);
               }
@@ -287,7 +293,7 @@ function PublicMatchCard({
             {match.participant2?.member?.displayName ||
               match.participant2?.member?.user?.username ||
               "TBD"}
-          </div>
+          </button>
           {match.participant2?.member?.team?.name && (
             <div className="text-[10px] text-muted-foreground truncate font-medium">
               {match.participant2.member.team.name}
@@ -347,7 +353,11 @@ function BracketNodeSection({
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="mb-4">
         <CollapsibleTrigger asChild>
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+          <button
+            type="button"
+            aria-label={`${isOpen ? "Replier" : "Déplier"} ${nodeName}`}
+            className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <Zap className="h-4 w-4 text-primary" />
@@ -370,7 +380,7 @@ function BracketNodeSection({
                 <ChevronDown className="h-4 w-4" />
               )}
             </div>
-          </div>
+          </button>
         </CollapsibleTrigger>
 
         <CollapsibleContent>
@@ -635,6 +645,8 @@ export function EditionMatchesClient({
 
   const phases = phasesRes?.data || [];
   const rawMatches = matchesRes?.data || [];
+  const totalMatches = matchesRes?.pagination?.total ?? rawMatches.length;
+  const isTruncated = totalMatches > rawMatches.length;
 
   // Priorisation : mettre les matchs du user en premier dans la liste
   const prioritizedMatches = useMemo(() => {
@@ -856,6 +868,8 @@ export function EditionMatchesClient({
             <Button
               variant={viewMode === "tree" ? "secondary" : "ghost"}
               size="sm"
+              aria-label="Vue structure"
+              aria-pressed={viewMode === "tree"}
               onClick={() => setViewMode("tree")}
               className="h-8 gap-1.5 font-bold text-xs rounded-lg"
             >
@@ -865,6 +879,8 @@ export function EditionMatchesClient({
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
               size="sm"
+              aria-label="Vue liste"
+              aria-pressed={viewMode === "list"}
               onClick={() => setViewMode("list")}
               className="h-8 gap-1.5 font-bold text-xs rounded-lg"
             >
@@ -1160,6 +1176,12 @@ export function EditionMatchesClient({
               </span>
             </div>
           </div>
+          {isTruncated && (
+            <p className="mt-3 text-xs text-amber-600 dark:text-amber-400" role="status">
+              Affichage de {rawMatches.length} matchs sur {totalMatches}. Affinez les
+              filtres pour voir les rencontres restantes.
+            </p>
+          )}
         </div>
       )}
     </div>

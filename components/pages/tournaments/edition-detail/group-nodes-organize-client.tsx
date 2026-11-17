@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { bulkCreateBracketNodes, deleteBracketNode, generateMatchesAction, getStructurePreviewAction, drawGroupMatchesAction, type DrawNodesResult } from "@/actions/phases";
+import { bulkCreateBracketNodes, deleteBracketNode, generateMatchesAction, getStructurePreviewAction, drawGroupMatchesAction, randomizeOrderAction, type DrawNodesResult } from "@/actions/phases";
 import { buildLeagueCalendar } from "@/lib/tournaments/match.generator";
 import { DrawRevealDialog } from "./draw-reveal-dialog";
 import { Dices } from "lucide-react";
@@ -39,6 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useAppShellStickyOffset } from "@/stores/app-shell-store";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -109,6 +110,7 @@ export function GroupNodesOrganizeClient({
   editionConfig,
 }: GroupNodesOrganizeClientProps) {
   const router = useRouter();
+  const stickyOffset = useAppShellStickyOffset();
   const [isPending, startTransition] = useTransition();
   const isAutoMode = editionConfig.competitionMode === "AUTO";
   const manualMode = !isAutoMode;
@@ -190,19 +192,22 @@ export function GroupNodesOrganizeClient({
     return groupParticipants.filter(gp => !assignedIds.has(gp.registrationId));
   };
 
-  const handleAutoGenerateNodes = () => {
+  const handleAutoGenerateNodes = async () => {
     const participantIds = groupParticipants.map(p => p.registrationId).filter(Boolean);
-    const shuffled = [...participantIds];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    let shuffled: string[];
+    try {
+      // Le tirage est décidé côté serveur (permissions + aléa), jamais ici.
+      shuffled = await randomizeOrderAction(editionId, participantIds);
+    } catch (error: any) {
+      toast.error(error.message || "Impossible d'effectuer le tirage.");
+      return;
     }
 
     const newDrafts: DraftNode[] = [];
     
     if (nodeType === "ROUND_ROBIN") {
       // 🆕 Refonte RR : 1 nœud = 1 confrontation (2 participants).
-      // Circle Method sur un ordre mélangé (tirage Fisher-Yates local) ;
+      // Circle Method sur l'ordre tiré côté serveur ;
       // les journées au-dessus de la structure "allers-retours" sont numérotées
       // en continu et le retour inverse les confrontations.
       // Groupe = UNE journée : si le groupe est une journée (modèle refondu),
@@ -296,12 +301,14 @@ export function GroupNodesOrganizeClient({
     toast.success(`${newDrafts.length} nœud(s) généré(s)`);
   };
 
-  const handleDistributeParticipants = () => {
+  const handleDistributeParticipants = async () => {
     const availableParticipants = getAvailableParticipants().map(p => p.registrationId);
-    const shuffled = [...availableParticipants];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    let shuffled: string[];
+    try {
+      shuffled = await randomizeOrderAction(editionId, availableParticipants);
+    } catch (error: any) {
+      toast.error(error.message || "Impossible d'effectuer la distribution.");
+      return;
     }
 
     setDraftNodes(prev => prev.map((node, idx) => {
@@ -512,7 +519,7 @@ export function GroupNodesOrganizeClient({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Colonne gauche: Configuration */}
         <div className="lg:col-span-1 space-y-6">
-          <Card className="border-primary/10 shadow-lg sticky top-24">
+          <Card className="border-primary/10 shadow-lg sticky" style={{ top: stickyOffset }}>
             <CardHeader className="bg-primary/5 pb-4">
               <CardTitle className="text-base font-bold flex items-center gap-2">
                 <Settings2 className="h-5 w-5 text-primary" /> Configuration

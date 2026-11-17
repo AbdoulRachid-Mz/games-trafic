@@ -18,9 +18,9 @@ export default async function WalletQrTransactionPage() {
   }
 
   return (
-    <div className="mx-auto px-4">
+    <div className="mx-auto px-4 py-6">
       <div className="text-center mb-6">
-        <Typography variant="h2" weight="bold" className="font-black italic uppercase tracking-tighter">
+        <Typography variant="h1" weight="bold" className="font-black italic uppercase tracking-tighter">
           Scanner un QR
         </Typography>
         <Typography variant="body-sm" theme="muted">

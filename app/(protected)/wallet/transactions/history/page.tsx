@@ -18,7 +18,8 @@ import {
   Clock,
   ArrowUpRight,
   ArrowDownLeft,
-  Activity
+  Activity,
+  AlertCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { TransactionList } from "@/components/pages/wallet/transaction-list";
@@ -26,6 +27,7 @@ import { getWalletTransactions } from "@/actions/wallets";
 import { type WalletTransaction } from "@/database/schema";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { getWalletLedgerStats } from "@/actions/wallets";
 
 export default function TransactionHistoryPage() {
@@ -34,6 +36,11 @@ export default function TransactionHistoryPage() {
   const { data: completeData } = useUserProfile();
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({
+    from: null,
+    to: null,
+  });
   const [ledgerTotals, setLedgerTotals] = useState<{ income: number; expense: number }>({ income: 0, expense: 0 });
 
   const wallet = completeData?.wallet;
@@ -48,6 +55,7 @@ export default function TransactionHistoryPage() {
     try {
       if (!wallet?.id) return;
       setIsLoading(true);
+      setError(false);
 
       const transactionsData = await getWalletTransactions({
         filters: { walletId: wallet.id },
@@ -60,11 +68,23 @@ export default function TransactionHistoryPage() {
       setLedgerTotals({ income: stats.income, expense: stats.expense });
     } catch (error) {
       console.error("Error loading history:", error);
+      setError(true);
       toast.error("Erreur lors du chargement de l'historique");
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Filtre temporel réel appliqué à la liste affichée (données existantes).
+  const dateFilteredTransactions = transactions.filter((t) => {
+    if (!t.createdAt) return true;
+    const created = new Date(t.createdAt).getTime();
+    const from = dateRange.from;
+    const to = dateRange.to;
+    if (from && created < from.getTime()) return false;
+    if (to && created > to.getTime()) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -117,7 +137,7 @@ export default function TransactionHistoryPage() {
                 </CardDescription>
               </div>
               <Badge variant="outline" className="px-3">
-                {transactions.length} opérations
+                {dateFilteredTransactions.length} opérations
               </Badge>
             </CardHeader>
             <CardContent>
@@ -127,17 +147,37 @@ export default function TransactionHistoryPage() {
                     <Skeleton key={i} className="h-20 w-full rounded-xl" />
                   ))}
                 </div>
-              ) : transactions.length > 0 ? (
+              ) : error ? (
+                <div role="alert" className="flex flex-col items-center gap-3 py-16 text-center">
+                  <AlertCircle className="h-12 w-12 text-destructive" aria-hidden="true" />
+                  <Typography variant="h4">Impossible de charger l'historique</Typography>
+                  <Typography variant="body-sm" theme="muted">
+                    Vérifiez votre connexion puis réessayez.
+                  </Typography>
+                  <Button onClick={loadHistory} className="gap-2 mt-2">
+                    <Activity className="h-4 w-4" />
+                    Réessayer
+                  </Button>
+                </div>
+              ) : dateFilteredTransactions.length > 0 ? (
                 <TransactionList
-                  transactions={transactions}
+                  transactions={dateFilteredTransactions}
                   walletId={wallet?.id || ""}
                   showFilters
                 />
               ) : (
-                <div className="text-center py-20 grayscale opacity-50">
-                  <History className="h-20 w-20 mx-auto mb-4" />
-                  <Typography variant="h4">Aucune activité</Typography>
-                  <Typography variant="body-sm">C'est bien calme par ici...</Typography>
+                <div className="text-center py-20 opacity-70">
+                  <History className="h-20 w-20 mx-auto mb-4 text-muted-foreground" />
+                  <Typography variant="h4">
+                    {dateRange.from || dateRange.to
+                      ? "Aucune transaction sur cette période"
+                      : "Aucune activité"}
+                  </Typography>
+                  <Typography variant="body-sm" theme="muted">
+                    {dateRange.from || dateRange.to
+                      ? "Élargissez la période sélectionnée."
+                      : "C'est bien calme par ici..."}
+                  </Typography>
                 </div>
               )}
             </CardContent>
@@ -200,13 +240,18 @@ export default function TransactionHistoryPage() {
                 Filtrage Temporel
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Typography variant="body-sm" theme="muted" className="text-center py-4 italic">
-                Options de filtrage avancées bientôt disponibles
-              </Typography>
-              <Button variant="secondary" className="w-full mt-2" disabled>
-                Sélectionner une date
-              </Button>
+            <CardContent className="space-y-3">
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
+              {(dateRange.from || dateRange.to) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setDateRange({ from: null, to: null })}
+                >
+                  Réinitialiser la période
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

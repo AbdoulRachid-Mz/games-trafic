@@ -7,7 +7,8 @@ import { StatsCard } from "@/components/pages/dashboard/stats-card";
 import { QuickActions } from "@/components/pages/dashboard/quick-actions";
 import { ActivityFeed } from "@/components/pages/dashboard/activity-feed";
 import { useAuthContext } from "@/contexts/auth-context";
-import { Store, ShoppingBag, Trophy, CreditCard } from "lucide-react";
+import { Store, ShoppingBag, Trophy, CreditCard, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getUserStats } from "@/actions/user-stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const { user } = useAuthContext();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { isMobile } = useScreenSize();
 
   useEffect(() => {
@@ -34,9 +36,17 @@ export default function DashboardPage() {
       });
       if (result.success) {
         setStats(result.data);
+        setError(null);
+      } else {
+        setError(result.error || "Impossible de charger vos statistiques.");
       }
     } catch (error) {
       console.error("Error loading stats:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de charger vos statistiques.",
+      );
     } finally {
       setLoading(false);
     }
@@ -70,13 +80,36 @@ export default function DashboardPage() {
         </Typography>
       </motion.div>
 
+      {/* Erreur de chargement : distincte d'un dashboard vide. */}
+      {error && (
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <AlertCircle className="h-10 w-10 text-destructive" />
+          <Typography variant="h4" weight="semibold">
+            Statistiques indisponibles
+          </Typography>
+          <Typography variant="body-base" theme="muted">
+            {error}
+          </Typography>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              loadStats();
+            }}
+          >
+            Réessayer
+          </Button>
+        </div>
+      )}
+
       {/* Stats Section with Carousel */}
-      <StatsCarousel mode={isMobile ? "carousel" : "auto"}>
+      {!error && <StatsCarousel mode={isMobile ? "carousel" : "auto"}>
         <StatsCard
           title="Boutiques"
           value={stats?.overview.total_shops ?? 0}
           icon={Store}
-          changeLabel={`${stats?.shops.total_products ?? 0} produits`}
+          changeLabel={`${stats?.shops?.total_products ?? 0} produits`}
           delay={0}
         />
 
@@ -84,7 +117,7 @@ export default function DashboardPage() {
           title="Produits"
           value={stats?.overview.total_products ?? 0}
           icon={ShoppingBag}
-          changeLabel={`${stats?.products.sold ?? 0} vendus`}
+          changeLabel={`${stats?.products?.sold ?? 0} vendus`}
           delay={0.1}
         />
 
@@ -92,18 +125,18 @@ export default function DashboardPage() {
           title="Tournois"
           value={stats?.overview.total_tournaments ?? 0}
           icon={Trophy}
-          changeLabel={`${stats?.tournaments.total_participants ?? 0} participants`}
+          changeLabel={`${stats?.tournaments?.total_participants ?? 0} participants`}
           delay={0.2}
         />
 
         <StatsCard
           title="Solde"
-          value={`${stats?.wallet.balance?.toFixed(2) ?? "0.00"} GTC`}
+          value={`${stats?.wallet?.balance?.toFixed(2) ?? "0.00"} GTC`}
           icon={CreditCard}
-          changeLabel={`${stats?.overview.total_transactions ?? 0} transactions`}
+          changeLabel={`${stats?.overview?.total_transactions ?? 0} transactions`}
           delay={0.3}
         />
-      </StatsCarousel>
+      </StatsCarousel>}
 
       {/* Quick Actions */}
       <motion.div

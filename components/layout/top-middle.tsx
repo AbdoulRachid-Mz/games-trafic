@@ -92,7 +92,8 @@ const TopMiddle = ({
       });
       store.setBreadcrumbs({
         enabled: !!breadcrumbItems && breadcrumbItems.length > 0,
-        visible: !!breadcrumbItems && breadcrumbItems.length > 0,
+        // Les breadcrumbs font partie du header fixe : ils disparaissent avec lui.
+        visible: isVisible && !!breadcrumbItems && breadcrumbItems.length > 0,
         height: cr ? cr.height : 0,
         top: cr ? cr.top : 0,
         bottom: cr ? cr.bottom : 0,

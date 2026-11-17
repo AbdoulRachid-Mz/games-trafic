@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ const signupSchema = z
     path: ["confirmPassword"],
   });
 
-export default function SignUpPage() {
+function SignUpPageContent() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -560,5 +560,28 @@ export default function SignUpPage() {
         </p>
       </motion.div>
     </div>
+  );
+}
+
+function SignUpFallback() {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center bg-background p-4"
+      aria-busy="true"
+    >
+      <div className="h-[520px] w-full max-w-md animate-pulse rounded-xl border border-border/50 bg-card/40" />
+    </div>
+  );
+}
+
+/**
+ * Le formulaire lit la redirect via useSearchParams() : le boundary fournit un
+ * static shell non vide pendant la validation Cache Components.
+ */
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<SignUpFallback />}>
+      <SignUpPageContent />
+    </Suspense>
   );
 }

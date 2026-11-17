@@ -190,7 +190,7 @@ export function ProductCard({
       {/* Badges */}
       <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 items-center">
         {product.isFeatured && (
-          <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-xs">
+          <Badge className="bg-secondary text-secondary-foreground border-0 text-xs">
             <Star className="w-3 h-3 mr-1" />
             Vedette
           </Badge>

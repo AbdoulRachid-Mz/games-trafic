@@ -23,17 +23,10 @@ import {
   Plus,
   RefreshCw,
   Wallet,
-  ShoppingCart,
-  Trophy,
-  Palette,
-  Star,
-  GamepadIcon,
-  CreditCard
+  CreditCard,
+  AlertCircle,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useUserProfile } from "@/hooks/use-profile";
 import { getWalletLedgerStats } from "@/actions/wallets";
@@ -41,7 +34,6 @@ import { getWalletTransactions as getWalletTransactionsAction } from "@/actions/
 import type { WalletTransaction } from "@/database/schema";
 import { useScreenSize } from "@/hooks/use-screen";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import router from "next/router";
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -49,6 +41,7 @@ export default function TransactionsPage() {
   const { data: completeData } = useUserProfile(!!user?.id);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [drawerDisplay, isDrawerDisplay] = useState(false);
   const { matchesBreakpoint } = useScreenSize()
   const isMobile = !matchesBreakpoint('md')
@@ -85,6 +78,7 @@ export default function TransactionsPage() {
 
   const loadTransactions = async () => {
     setLoading(true);
+    setError(false);
     try {
       if (!wallet?.id) return;
       const types = filters.type !== "all" ? [filters.type] : undefined;
@@ -112,6 +106,7 @@ export default function TransactionsPage() {
       setTransactions(list);
     } catch (error) {
       console.error("Error loading transactions:", error);
+      setError(true);
       toast.error("Erreur lors du chargement des transactions");
     } finally {
       setLoading(false);
@@ -142,56 +137,6 @@ export default function TransactionsPage() {
   // filtered transactions pending
   const filteredPendingTransactions = transactions.filter((t: any) => t.status === "PENDING");
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "THEME_PURCHASE": return Palette;
-      case "VIP_SUBSCRIPTION": return Star;
-      case "ORDER_PURCHASE": return ShoppingCart;
-      case "TOURNAMENT_PARTICIPATION": return Trophy;
-      case "GAME_ITEM_PURCHASE": return GamepadIcon;
-      case "DEPOSIT": return Wallet;
-      case "WITHDRAWAL": return CreditCard;
-      case "TRANSFER": return ArrowUpRight;
-      default: return Wallet;
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "DEPOSIT": return "text-green-600";
-      case "TRANSFER": return "text-blue-600";
-      case "WITHDRAWAL": return "text-amber-600";
-      default: return "text-purple-600";
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "THEME_PURCHASE": return "Achat thème";
-      case "VIP_SUBSCRIPTION": return "Abonnement VIP";
-      case "ORDER_PURCHASE": return "Achat produit";
-      case "TOURNAMENT_PARTICIPATION": return "Participation";
-      case "GAME_ITEM_PURCHASE": return "Item jeu";
-      case "DEPOSIT": return "Dépôt";
-      case "WITHDRAWAL": return "Retrait";
-      case "TRANSFER": return "Transfert";
-      default: return type;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return <Badge variant="default" className="gap-1"><div className="h-1.5 w-1.5 rounded-full bg-current" /> Complétée</Badge>;
-      case "PENDING":
-        return <Badge variant="destructive" className="gap-1"><div className="h-1.5 w-1.5 rounded-full bg-current" /> En attente</Badge>;
-      case "FAILED":
-        return <Badge variant="destructive" className="gap-1"><div className="h-1.5 w-1.5 rounded-full bg-current" /> Échouée</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   const handleExport = () => {
     // Logique d'export CSV
     toast.info("Export en cours de développement");
@@ -221,19 +166,20 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       {/* En-tête */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-        <div>
-          <Typography variant="h3" weight="bold">
+        <div className="min-w-0">
+          <Typography variant="h1" weight="bold">
             Mes Transactions
           </Typography>
           <Typography variant="body-base" theme="muted" className="mt-1">
             Gérez et suivez toutes vos transactions financières
           </Typography>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push("/wallet/transactions/create?type=TRANSFER")}
+            aria-label="Transférer"
             className="gap-2 items-center flex justify-center"
           >
             <ArrowUpRight className="h-4 w-4" />
@@ -243,6 +189,7 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={() => router.push("/wallet/transactions/create?type=WITHDRAWAL")}
+            aria-label="Retrait"
             className="gap-2 items-center flex justify-center"
           >
             <CreditCard className="h-4 w-4" />
@@ -252,6 +199,7 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={() => router.push("/wallet/transactions/create?type=DEPOSIT")}
+            aria-label="Dépôt"
             className="gap-2 items-center flex justify-center"
           >
             <ArrowDownLeft className="h-4 w-4" />
@@ -261,10 +209,11 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={handleExport}
+            aria-label="Exporter les transactions"
             className="gap-2 items-center flex justify-center"
           >
             <Download className="h-4 w-4" />
-            <span className="">
+            <span className="hidden md:inline-block">
               Exporter
             </span>
           </Button>
@@ -272,6 +221,7 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={loadTransactions}
+            aria-label="Actualiser les transactions"
             className="gap-2 items-center flex justify-center"
           >
             <RefreshCw className="h-4 w-4" />
@@ -281,6 +231,7 @@ export default function TransactionsPage() {
           </Button>
           <Button
             onClick={() => router.push("/wallet/transactions/create")}
+            aria-label="Nouvelle transaction"
             className="gap-2 items-center flex justify-center"
           >
             <Plus className="h-4 w-4" />
@@ -525,7 +476,29 @@ export default function TransactionsPage() {
         </Card>
       )}
 
+      {/* État d'erreur — distinct de « aucune transaction » */}
+      {error && !loading && (
+        <Card className="p-4">
+          <CardContent className="p-2">
+            <div role="alert" className="flex flex-col items-center gap-3 py-10 text-center">
+              <AlertCircle className="h-10 w-10 text-destructive" aria-hidden="true" />
+              <Typography variant="body-lg" weight="semibold">
+                Impossible de charger les transactions
+              </Typography>
+              <Typography variant="body-sm" theme="muted">
+                Vérifiez votre connexion puis réessayez.
+              </Typography>
+              <Button onClick={loadTransactions} className="gap-2 mt-2">
+                <RefreshCw className="h-4 w-4" />
+                Réessayer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Liste des transactions */}
+      {!error && (
       <Card className="p-4">
         <CardContent className="p-2">
           <Tabs defaultValue="all" className="space-y-3">
@@ -682,6 +655,7 @@ export default function TransactionsPage() {
           </Tabs>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
