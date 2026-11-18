@@ -83,7 +83,7 @@ export function EditionPhasesView({
 
   if (phases.length === 0) {
     return (
-      <Card className="border-dashed py-16">
+      <Card className="border-dashed py-16 max-md:py-10">
         <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground">
           <GitBranch className="h-16 w-16 mb-6 opacity-20" />
           <Typography variant="h5" weight="bold" className="mb-2">
@@ -104,7 +104,7 @@ export function EditionPhasesView({
   const currentPhase = sortedPhases.find((p) => p.id === activePhaseId);
 
   return (
-    <div className="space-y-8 mt-6">
+    <div className="space-y-8 mt-6 max-md:mt-4">
       {/* Phase Progression Schema */}
       <div className="relative">
         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-muted to-transparent -translate-y-1/2 hidden md:block" />
@@ -279,25 +279,25 @@ function PhaseSchemaView({
     phase.phaseType === "ELIMINATION" || phase.phaseType === "KNOCKOUT";
 
   return (
-    <Card className="border-none shadow-xl bg-gradient-to-br from-card to-background overflow-hidden">
-      <CardHeader className="bg-muted/30 border-b py-4 px-6">
+    <Card className="border-none p-2 shadow-xl bg-gradient-to-br from-card to-background overflow-hidden">
+      <CardHeader className="bg-muted/30 border-b py-4 px-6 max-md:px-4 max-md:py-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
               {isElimination ? (
-                <Trophy className="h-6 w-6" />
+                <Trophy className="h-6 w-6 max-md:h-4 max-md:w-4" />
               ) : (
-                <LayoutGrid className="h-6 w-6" />
+                <LayoutGrid className="h-6 w-6 max-md:h-4 max-md:w-4" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <CardTitle className="text-xl font-black">
+                <CardTitle className="text-xl max-md:text-md font-black">
                   {phase.name}
                 </CardTitle>
                 <Badge
                   variant="secondary"
-                  className="text-[9px] uppercase font-bold tracking-tighter"
+                  className="text-[9px] max-md:text-[7px] uppercase font-bold tracking-tighter"
                 >
                   {phase.phaseType === "ELIMINATION"
                     ? "ÉLIMINATION DIRECTE"
@@ -340,7 +340,7 @@ function PhaseSchemaView({
         </div>
       </CardHeader>
 
-      <CardContent className="p-6">
+      <CardContent className="p-4">
         <div className="space-y-6">
           {/* Légende */}
           <div className="flex flex-wrap gap-4 text-[10px] text-muted-foreground border-b pb-3">

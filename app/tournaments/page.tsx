@@ -6,10 +6,19 @@ import { Suspense } from "react";
 export const metadata = {
   title: "Tournois | Games-Trafics",
   description: "Participez aux meilleurs tournois et compétitions e-sport.",
+  keywords: "tournois, compétitions, jeux vidéo, jeux en ligne, e-sport, editions, games-trafics",
+  icons: {
+    icon: "/icons/tournament-240.png",
+    shortcut: "/icons/tournament-128.png",
+  },
 };
 
 export default async function TournamentsPage() {
   const response = await getTournamentEditions({
+    filters: {
+      isActive: true,
+      isDeleted: false
+    },
     pagination: { page: 1, limit: 100 },
   });
 

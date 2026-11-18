@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { MemberCard } from "@/components/cards/member-card";
 import { useEditionManager } from "@/hooks/use-edition-manager";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EditionParticipantsListProps {
   participants: any[];
@@ -33,8 +34,9 @@ export function EditionParticipantsList({
   editionId,
 }: EditionParticipantsListProps) {
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const { exportParticipants } = useEditionManager(editionId);
+  const { isMobile } = useScreenSize();
 
   const filtered = participants.filter((reg) => {
     const member = reg.member;
@@ -103,8 +105,8 @@ export function EditionParticipantsList({
                 <div className="flex items-center">
                   <Download className="h-4 w-4 mr-2" />
                   <SelectValue
-                    placeholder="Exporter"
-                    className="hidden md:inline"
+                    placeholder={isMobile ? "Ex" : "Exporter"}
+                    className="hidden md:inline text-white"
                   />
                 </div>
               </SelectTrigger>

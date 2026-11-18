@@ -34,13 +34,13 @@ export function EditionRulesTab({
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10" />
         <div className="flex items-center gap-3 mb-4">
           <div className="p-3 rounded-2xl bg-primary/10 text-primary border border-primary/20">
-            <Scale className="h-6 w-6" />
+            <Scale className="h-6 w-6 max-md:h-5 max-md:w-5" />
           </div>
           <div>
-            <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter">
+            <h3 className="text-md md:text-2xl lg:text-lg font-black italic tracking-tighter">
               Règlement Officiel de la Compétition
             </h3>
-            <p className="text-sm text-muted-foreground font-medium">
+            <p className="text-xs md:text-md text-muted-foreground font-medium">
               Normes d&apos;arbitrage, charte de fair-play et conditions de participation
             </p>
           </div>
@@ -51,12 +51,12 @@ export function EditionRulesTab({
         {/* Section 1 : Format & Paramètres */}
         <div className="bg-card/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-2 text-primary">
-            <Shield className="h-5 w-5" />
-            <h4 className="font-black uppercase tracking-wider text-sm italic">
+            <Shield className="h-5 w-5 max-md:h-4 max-md:w-4" />
+            <h4 className="font-black uppercase tracking-wider text-xs md:text-sm italic">
               1. Format & Paramètres de Jeu
             </h4>
           </div>
-          <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <div className="space-y-3 text-xs md:text-sm text-muted-foreground leading-relaxed">
             <p>
               • <strong>Jeu officiel :</strong> {tournament.game}
             </p>
@@ -75,12 +75,12 @@ export function EditionRulesTab({
         {/* Section 2 : Check-in & Ponctualité */}
         <div className="bg-card/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-2 text-blue-400">
-            <Clock className="h-5 w-5" />
-            <h4 className="font-black uppercase tracking-wider text-sm italic">
+            <Clock className="h-5 w-5 max-md:h-4 max-md:w-4" />
+            <h4 className="font-black uppercase tracking-wider text-xs md:text-sm italic">  
               2. Check-in & Délais de présence
             </h4>
           </div>
-          <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <div className="space-y-3 text-xs md:text-sm text-muted-foreground leading-relaxed">
             <p>
               • <strong>Validation du check-in :</strong> Tout participant doit valider son check-in 15 à 30 minutes avant le début de l&apos;édition.
             </p>
@@ -93,12 +93,12 @@ export function EditionRulesTab({
         {/* Section 3 : Déconnexions & Problèmes techniques */}
         <div className="bg-card/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-2 text-amber-400">
-            <WifiOff className="h-5 w-5" />
-            <h4 className="font-black uppercase tracking-wider text-sm italic">
+            <WifiOff className="h-5 w-5 max-md:h-4 max-md:w-4" />
+            <h4 className="font-black uppercase tracking-wider text-xs md:text-sm italic">
               3. Déconnexions & Pannes réseau
             </h4>
           </div>
-          <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <div className="space-y-3 text-xs md:text-sm text-muted-foreground leading-relaxed">
             <p>
               • En cas de déconnexion dans les 60 premières secondes du match sans qu&apos;un point n&apos;ait été marqué, la manche est relancée.
             </p>
@@ -114,12 +114,12 @@ export function EditionRulesTab({
         {/* Section 4 : Dotations & Récompenses */}
         <div className="bg-card/50 backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-2 text-yellow-400">
-            <Award className="h-5 w-5" />
-            <h4 className="font-black uppercase tracking-wider text-sm italic">
+            <Award className="h-5 w-5 max-md:h-4 max-md:w-4" />
+            <h4 className="font-black uppercase tracking-wider text-xs md:text-sm italic">
               4. Dotations & Paiement des Prix
             </h4>
           </div>
-          <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <div className="space-y-3 text-xs md:text-sm text-muted-foreground leading-relaxed">
             <p>
               • Les gains sont crédités directement sur le portefeuille du vainqueur ou de l&apos;équipe à la clôture officielle du tournoi.
             </p>
@@ -139,7 +139,7 @@ export function EditionRulesTab({
               Directives spécifiques de l&apos;organisateur
             </h4>
           </div>
-          <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm whitespace-pre-line bg-background/50 p-4 rounded-xl border border-white/5">
+          <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs md:text-sm whitespace-pre-line bg-background/50 p-4 rounded-xl border border-white/5">
             {edition.editionRules}
           </div>
         </div>

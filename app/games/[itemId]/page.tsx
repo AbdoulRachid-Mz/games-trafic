@@ -4,11 +4,24 @@ import { getGameItemById } from "@/actions/games";
 import { GameItemDetail } from "@/components/pages/games/game-item-detail";
 import { notFound } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { Metadata } from "next";
 import { GameItemWithRelations } from "@/database/schema";
 
 interface GameItemPageProps {
   params: Promise<{ itemId: string }>;
 }
+
+// metadata
+export const metadata: Metadata = {
+  title: "Jeu | Games-Trafics",
+  description: "Détails du jeu sur Games-Trafics.",
+  keywords: "jeu, jeux vidéo, jeux en ligne, e-sport, games-trafics",
+  robots: "index, follow",
+  icons: {
+    icon: "/icons/icon-192.png",
+    shortcut: "/icons/icon-128.png",
+  },
+};
 
 async function GameItemContent({ itemId }: { itemId: string }) {
   const item = await getGameItemById(itemId);

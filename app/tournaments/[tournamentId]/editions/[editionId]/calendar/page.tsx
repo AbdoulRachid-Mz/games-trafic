@@ -20,6 +20,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: "Consultez le programme officiel des matchs par date, phase et groupe.",
     keywords: "matchs, calendrier, programme, esport, tournoi",
     robots: "index, follow",
+    icons: {
+      icon: "/icons/tournament-240.png",
+      shortcut: "/icons/tournament-128.png",
+    },
   };
 }
 

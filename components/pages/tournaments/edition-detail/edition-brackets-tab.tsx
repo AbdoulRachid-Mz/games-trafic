@@ -165,17 +165,17 @@ export function EditionBracketsTab({
       {/* Header du Bracket : Sélecteur de phase & Outils */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 md:p-6 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20">
-            <GitBranch className="h-6 w-6" />
+          <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+            <GitBranch className="h-6 max:md:h-4 max:md:w-4 w-6" />
           </div>
           <div>
-            <h3 className="text-xl md:text-2xl font-black italic tracking-tighter flex items-center gap-2">
+            <h3 className="text-sm md:text-xl lg:text-2xl font-black italic tracking-tighter flex items-center gap-2">
               Arbre des Play-offs
               <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] uppercase font-black tracking-wider">
                 Tournoi
               </Badge>
             </h3>
-            <p className="text-xs md:text-sm text-muted-foreground font-medium">
+            <p className="text-sm md:text-base text-muted-foreground font-medium">
               Structure à élimination directe et progression des équipes
             </p>
           </div>

@@ -26,10 +26,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${product.name} | GT-V2 Marketplace`,
     description: product.description?.slice(0, 160) || "Détails du produit",
     openGraph: {
-      title: `${product.name} | GT-V2`,
+      title: `${product.name} | GT-Marketplace`,
       description: product.description?.slice(0, 160) || "Détails du produit",
       images: product.images && product.images.length > 0 ? [product.images[0]] : [],
     },
+    icons: {
+      icon: "/icons/marketplace-240.png",
+      shortcut: "/icons/marketplace-128.png",
+    },
+    keywords:"Compte, Produit, Marketplace, gaming, games-trafics",
+    robots: "index, follow",
   };
 }
 

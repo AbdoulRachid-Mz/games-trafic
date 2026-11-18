@@ -411,7 +411,7 @@ export function AdvancedUserCard({
         </motion.div>
 
         {/* Indicateurs rapides */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
           <motion.div
             whileHover={{ scale: 1.05 }}
             className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4"
@@ -479,7 +479,7 @@ export function AdvancedUserCard({
               Excellent
             </Typography>
           </motion.div>
-        </div>
+        </div> */}
       </div>
 
       {/* Drawer QR Code */}

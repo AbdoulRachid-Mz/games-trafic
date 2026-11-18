@@ -8,6 +8,7 @@ import { Loader2, Camera, CameraOff, RefreshCw } from "lucide-react";
 import { Typography } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface QrScannerProps {
   onScan: (data: string) => void;
@@ -35,6 +36,7 @@ export function QrScanner({
   const [isScanning, setIsScanning] = useState(false);
   const [laserActive, setLaserActive] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const {isMediumScreen: isMobile} = useScreenSize()
 
   useEffect(() => {
     scanCallbackRef.current = onScan;
@@ -195,7 +197,7 @@ export function QrScanner({
                 ? "bg-green-500/20 border-green-500/30"
                 : "bg-primary/20 border-primary/30"
             )}>
-              <Typography variant="caption1" className={cn(
+              <Typography variant={isMobile ? "caption4" : "caption1"} className={cn(
                 "font-bold tracking-widest uppercase",
                 scanSuccess ? "text-green-500" : "text-primary"
               )}>

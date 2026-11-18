@@ -9,6 +9,7 @@ import { getEditionBestPlayersStats } from "@/actions/editions";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { motion } from "framer-motion";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EditionBestParticipantsTabProps {
   editionId: string;
@@ -19,6 +20,7 @@ export function EditionBestParticipantsTab({
 }: EditionBestParticipantsTabProps) {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { isMobile } = useScreenSize();
 
   useEffect(() => {
     setLoading(true);
@@ -146,7 +148,7 @@ export function EditionBestParticipantsTab({
   return (
     <div className="space-y-12 py-6">
       <div className="text-center space-y-2">
-        <Typography variant="h2" weight="bold" className="italic uppercase tracking-tighter flex items-center justify-center gap-3">
+        <Typography variant={!isMobile ? "h2" : "h3"} weight="bold" className="italic uppercase tracking-tighter flex items-center justify-center gap-3">
           <Star className="h-8 w-8 text-yellow-500 fill-yellow-500" />
           Hall of Fame
           <Star className="h-8 w-8 text-yellow-500 fill-yellow-500" />
@@ -154,18 +156,18 @@ export function EditionBestParticipantsTab({
         <Typography variant="body-base" theme="muted">Les gladiateurs les plus performants de cette arène.</Typography>
       </div>
 
-      <Tabs defaultValue="attack" className="w-full">
-        <div className="flex justify-center mb-10">
-          <TabsList className="bg-muted/50 p-1.5 h-14 rounded-full border border-border/50">
-            <TabsTrigger value="attack" className="rounded-full px-8 gap-3 data-[state=active]:bg-background data-[state=active]:shadow-xl data-[state=active]:text-primary transition-all font-bold">
+      <Tabs defaultValue="attack" className="w-[95%]">
+        <div className="flex justify-center max-w-full overflow-hidden mb-10">
+          <TabsList className="bg-muted/50 w-full mx-auto p-2 h-14 rounded-full border border-border/50">
+            <TabsTrigger value="attack" className="rounded-full h-8 px-5 max-md:px-2 gap-2 data-[state=active]:bg-background data-[state=active]:shadow-xl data-[state=active]:text-primary transition-all font-bold">
               <Swords className="h-4 w-4" />
               Attaque
             </TabsTrigger>
-            <TabsTrigger value="defense" className="rounded-full px-8 gap-3 data-[state=active]:bg-background data-[state=active]:shadow-xl data-[state=active]:text-blue-500 transition-all font-bold">
+            <TabsTrigger value="defense" className="rounded-full h-8 px-5 max-md:px-2 gap-2 data-[state=active]:bg-background data-[state=active]:shadow-xl data-[state=active]:text-blue-500 transition-all font-bold">
               <Shield className="h-4 w-4" />
               Défense
             </TabsTrigger>
-            <TabsTrigger value="winrate" className="rounded-full px-8 gap-3 data-[state=active]:bg-background data-[state=active]:shadow-xl data-[state=active]:text-emerald-500 transition-all font-bold">
+            <TabsTrigger value="winrate" className="rounded-full h-8 px-5 max-md:px-2 gap-2 data-[state=active]:bg-background data-[state=active]:shadow-xl data-[state=active]:text-emerald-500 transition-all font-bold">
               <TrendingUp className="h-4 w-4" />
               Victoires
             </TabsTrigger>

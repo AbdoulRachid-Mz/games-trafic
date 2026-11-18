@@ -246,7 +246,7 @@ export function PhaseCard({
     return (
       <Card
         className={cn(
-          "group relative cursor-pointer overflow-hidden transition-all hover:border-primary/50",
+          "group relative cursor-pointer py-0 overflow-hidden transition-all hover:border-primary/50",
           isPending && "opacity-70",
           className,
         )}
@@ -317,7 +317,7 @@ export function PhaseCard({
               </div>
             </div>
           </div>
-          <div
+          {/* <div
             className="flex items-center justify-end gap-2 border-t bg-muted/5 p-4 md:border-l md:border-t-0"
             onClick={(event) => event.stopPropagation()}
           >
@@ -325,7 +325,7 @@ export function PhaseCard({
               <a href={detailUrl}>Gérer</a>
             </Button>
             {menu}
-          </div>
+          </div> */}
         </CardContent>
       </Card>
     );
@@ -376,7 +376,7 @@ export function PhaseCard({
         </div>
       </CardContent>
 
-      <div
+      {/* <div
         className="flex gap-2 p-4 pt-0"
         onClick={(event) => event.stopPropagation()}
       >
@@ -390,7 +390,7 @@ export function PhaseCard({
             <Settings2 className="h-3.5 w-3.5" /> Gérer
           </a>
         </Button>
-      </div>
+      </div> */}
     </Card>
   );
 }

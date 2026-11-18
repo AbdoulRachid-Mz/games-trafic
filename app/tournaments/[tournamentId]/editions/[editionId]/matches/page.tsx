@@ -20,6 +20,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `Matchs & Résultats - ${edition?.name || `Édition #${edition?.editionNumber}`} | Games-Trafics`,
     description: `Consultez le calendrier, les scores et les résultats en direct des matchs de l'édition.`,
+    keywords: "tournoi, édition, esport, gaming, matchs, bracket, classement",
+    robots: "index, follow",
+    icons: {
+      icon: "/icons/tournament-240.png",
+      shortcut: "/icons/tournament-128.png",
+    },
   };
 }
 

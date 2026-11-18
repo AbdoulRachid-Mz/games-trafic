@@ -16,7 +16,14 @@ import {
   isCurrencyLikeGameItem,
   type TransactionPricingMode,
 } from "@/types/transaction-types";
-import { ArrowLeft, ArrowRight, Wallet, Info, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Wallet,
+  Info,
+  AlertTriangle,
+} from "lucide-react";
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs";
 
 interface TransactionAmountInputProps {
   amount: number;
@@ -78,9 +85,50 @@ export function TransactionAmountInput({
   const feeAmount = fees.amount || 0;
   const debitedAmount = grossAmount;
   const receivedAmount = Math.max(0, grossAmount - feeAmount);
-  const [gameAccount, setGameAccount] = React.useState(metadata?.gameAccount || "");
-  const [gamePassword, setGamePassword] = React.useState(metadata?.encryptedPassword || "");
-  const [additionalInfo, setAdditionalInfo] = React.useState(metadata?.additionalInfo || "");
+  const [gameAccount, setGameAccount] = React.useState(
+    metadata?.gameAccount || "",
+  );
+  const [gamePassword, setGamePassword] = React.useState(
+    metadata?.encryptedPassword || "",
+  );
+  const [additionalInfo, setAdditionalInfo] = React.useState(
+    metadata?.additionalInfo || "",
+  );
+
+  const priceTabs = Array.from([
+    {
+      label: "0",
+      value: 0,
+    },
+    {
+      label: "+100",
+      value: 100,
+    },
+    {
+      label: "+500",
+      value: 500,
+    },
+    {
+      label: "+10000",
+      value: 100000,
+    },
+    {
+      label: "+20000",
+      value: 200000,
+    },
+    {
+      label: "+50000",
+      value: 50000,
+    },
+    {
+      label: "+70000",
+      value: 700000,
+    },
+    {
+      label: "+100000",
+      value: 1000000,
+    },
+  ]);
 
   React.useEffect(() => {
     if (!onMetadataChange || !isGameItem) return;
@@ -98,11 +146,12 @@ export function TransactionAmountInput({
     isDeposit ||
     (walletBalance !== undefined && fees.totalAmount <= walletBalance);
 
-  const MIN_AMOUNT = process.env.NEXT_PUBLIC_MIN_TRANSACTION_AMOUNT 
-    ? parseFloat(process.env.NEXT_PUBLIC_MIN_TRANSACTION_AMOUNT) 
+  const MIN_AMOUNT = process.env.NEXT_PUBLIC_MIN_TRANSACTION_AMOUNT
+    ? parseFloat(process.env.NEXT_PUBLIC_MIN_TRANSACTION_AMOUNT)
     : 100;
-  
-  const isMinAmountRestricted = (isTransfer || isWithdrawal) && amount > 0 && amount < MIN_AMOUNT;
+
+  const isMinAmountRestricted =
+    (isTransfer || isWithdrawal) && amount > 0 && amount < MIN_AMOUNT;
 
   // Validité du montant pour autoriser l'étape suivante, selon le mode :
   // - VARIABLE : montant strictement positif (les crédits/débits libres) ;
@@ -118,10 +167,14 @@ export function TransactionAmountInput({
         : amount > 0;
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8">
+    <div className="w-full max-w-2xl mx-auto space-y-4">
       <div className="text-center">
         <Typography variant="h3" weight="bold">
-          {requiresQuantity ? "Quelle quantité ?" : requiresAmountInput ? "Quel montant ?" : "Confirmer l'achat"}
+          {requiresQuantity
+            ? "Quelle quantité ?"
+            : requiresAmountInput
+              ? "Quel montant ?"
+              : "Confirmer l'achat"}
         </Typography>
         <Typography variant="body-base" theme="muted">
           {isDeposit
@@ -136,8 +189,12 @@ export function TransactionAmountInput({
         <CardContent className="p-8">
           {isVip && alreadyVip && (
             <div className="mb-6 p-4 rounded-xl border border-amber-300/40 bg-amber-200/15">
-              <Typography variant="body-base" className="font-bold text-amber-700">
-                Vous êtes déjà VIP. Veuillez attendre l’expiration pour renouveler.
+              <Typography
+                variant="body-base"
+                className="font-bold text-amber-700"
+              >
+                Vous êtes déjà VIP. Veuillez attendre l’expiration pour
+                renouveler.
               </Typography>
             </div>
           )}
@@ -146,7 +203,11 @@ export function TransactionAmountInput({
             <div className="space-y-4 mb-8">
               <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 flex items-center justify-between">
                 <div>
-                  <Typography variant="h5" weight="bold" className="text-primary">
+                  <Typography
+                    variant="h5"
+                    weight="bold"
+                    className="text-primary"
+                  >
                     {entity.name}
                   </Typography>
                   {entity.description && (
@@ -173,18 +234,20 @@ export function TransactionAmountInput({
               </div>
 
               {isUnavailable && (
-                <div className={cn(
-                  "p-4 rounded-xl border flex items-center gap-3",
-                  status === "RESERVE" 
-                    ? "bg-amber-500/10 border-amber-500/20 text-amber-700" 
-                    : "bg-rose-500/10 border-rose-500/20 text-rose-700"
-                )}>
+                <div
+                  className={cn(
+                    "p-4 rounded-xl border flex items-center gap-3",
+                    status === "RESERVE"
+                      ? "bg-amber-500/10 border-amber-500/20 text-amber-700"
+                      : "bg-rose-500/10 border-rose-500/20 text-rose-700",
+                  )}
+                >
                   <AlertTriangle className="w-5 h-5 shrink-0" />
                   <Typography variant="body-sm" weight="bold">
-                    {status === "RESERVE" 
-                      ? "Attention: Ce compte est déjà réservé par un autre utilisateur." 
-                      : status === "VENDU" 
-                        ? "Erreur: Ce compte a déjà été vendu." 
+                    {status === "RESERVE"
+                      ? "Attention: Ce compte est déjà réservé par un autre utilisateur."
+                      : status === "VENDU"
+                        ? "Erreur: Ce compte a déjà été vendu."
                         : `Attention: Ce compte n'est pas disponible (Statut: ${status})`}
                   </Typography>
                 </div>
@@ -193,9 +256,9 @@ export function TransactionAmountInput({
           )}
 
           {(requiresAmountInput || requiresQuantity) && (
-            <div className="space-y-8">
-              <div className="relative flex justify-center py-4">
-                <div className="relative">
+            <div className="space-y-4">
+              <div className="relative flex justify-center py-2">
+                <div className="flex flex-col relative border-3 w-full rounded-md border-primary space-y-2 py-2">
                   <Input
                     id="amount"
                     type="number"
@@ -215,16 +278,31 @@ export function TransactionAmountInput({
                         onChange(v);
                       }
                     }}
-                    className="text-3xl sm:text-4xl font-black h-16 sm:h-20 text-center border-none bg-transparent focus-visible:ring-0 shadow-none p-0 w-full min-w-[120px] max-w-full"
+                    className="text-xl sm:text-2xl lg:text-3xl font-black h-14 sm:h-16 text-center border-none bg-primary/20 focus-visible:ring-0 shadow-none p-0 w-[98%] mx-auto min-w-[60%] max-w-full"
                     min="0"
                     step={requiresQuantity ? "1" : "0.01"}
                     autoFocus
                   />
                   {!requiresQuantity && (
+                    <ResponsiveTabs
+                      tabs={priceTabs.map((tab) => ({
+                        ...tab,
+                        value: tab.value.toString(),
+                      }))}
+                      // showNavButtons={true}
+                      swipeable={true}
+                      onValueChange={(value) => onChange(parseFloat(value))}
+                      desktopCount={8}
+                      tabletCount={5}
+                      mobileCount={4}
+                      className="max-w-[98%] mx-auto"
+                    />
+                  )}
+                  {/* {!requiresQuantity && (
                     <span className="absolute top-1/2 -right-10 sm:-right-12 -translate-y-1/2 text-xl sm:text-2xl font-bold text-muted-foreground">
                       GTC
                     </span>
-                  )}
+                  )} */}
                 </div>
               </div>
 
@@ -236,7 +314,8 @@ export function TransactionAmountInput({
                 <div className="flex items-center gap-2 justify-center text-red-500 bg-red-500/10 p-3 rounded-lg border border-red-500/20">
                   <AlertTriangle className="w-5 h-5" />
                   <Typography variant="body-sm" weight="bold">
-                    Le montant minimum pour cette transaction est de {MIN_AMOUNT} GTC
+                    Le montant minimum pour cette transaction est de{" "}
+                    {MIN_AMOUNT} GTC
                   </Typography>
                 </div>
               )}
@@ -245,8 +324,8 @@ export function TransactionAmountInput({
                 <div className="flex items-center gap-2 justify-center text-amber-600 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
                   <AlertTriangle className="w-5 h-5" />
                   <Typography variant="body-sm" weight="bold">
-                    Cet article n&apos;a pas de prix unitaire défini — transaction
-                    impossible.
+                    Cet article n&apos;a pas de prix unitaire défini —
+                    transaction impossible.
                   </Typography>
                 </div>
               )}
@@ -259,9 +338,7 @@ export function TransactionAmountInput({
           <div className="space-y-3 bg-card/30 rounded-xl p-4 border border-border/50">
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">Montant brut</span>
-              <span className="font-bold">
-                {grossAmount.toFixed(2)} GTC
-              </span>
+              <span className="font-bold">{grossAmount.toFixed(2)} GTC</span>
             </div>
             {fees.percentage > 0 && (
               <div className="flex justify-between items-center text-sm text-orange-500">
@@ -324,14 +401,14 @@ export function TransactionAmountInput({
                 "mt-6 flex items-center justify-between p-3 rounded-lg border transition-all",
                 hasSufficientBalance
                   ? "bg-green-500/10 border-green-500/20"
-                  : "bg-red-500/10 border-red-500/20"
+                  : "bg-red-500/10 border-red-500/20",
               )}
             >
               <div className="flex items-center gap-2">
                 <Wallet
                   className={cn(
                     "w-4 h-4",
-                    hasSufficientBalance ? "text-green-500" : "text-red-500"
+                    hasSufficientBalance ? "text-green-500" : "text-red-500",
                   )}
                 />
                 <span
@@ -339,7 +416,7 @@ export function TransactionAmountInput({
                     "text-sm font-bold",
                     hasSufficientBalance
                       ? "text-green-700 dark:text-green-400"
-                      : "text-red-700 dark:text-red-400"
+                      : "text-red-700 dark:text-red-400",
                   )}
                 >
                   Solde disponible: {walletBalance?.toFixed(2) ?? "0.00"} GTC

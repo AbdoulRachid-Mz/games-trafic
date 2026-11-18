@@ -273,7 +273,7 @@ export function EditionCalendarTimeline({
             </Button>
 
             <div className="text-center">
-              <div className="text-xl md:text-2xl font-black italic tracking-tight capitalize text-foreground">
+              <div className="text-md md:text-2xl font-black italic tracking-tight capitalize text-foreground">
                 {format(currentDateObj, "EEEE d MMMM yyyy", { locale: fr })}
               </div>
               <div className="text-xs text-muted-foreground font-semibold mt-0.5">
@@ -305,7 +305,7 @@ export function EditionCalendarTimeline({
                     key={dateKey}
                     onClick={() => setCurrentDate(date)}
                     className={cn(
-                      "flex flex-col items-center px-4 py-2.5 rounded-2xl min-w-[85px] transition-all border shrink-0",
+                      "flex flex-col items-center px-4 max-md:p-2 py-2.5 rounded-2xl min-w-[85px] transition-all border shrink-0",
                       isSelected
                         ? "bg-primary text-primary-foreground border-primary shadow-[0_0_15px_rgba(var(--primary),0.35)] scale-105"
                         : isToday
@@ -316,7 +316,7 @@ export function EditionCalendarTimeline({
                     <span className="text-[11px] font-black uppercase tracking-wider">
                       {format(date, "EEE", { locale: fr })}
                     </span>
-                    <span className="text-lg font-black">{format(date, "d")}</span>
+                    <span className="text-md md:text-lg font-black">{format(date, "d")}</span>
                     <span className="text-[10px] font-bold opacity-80">
                       {matchCount} m.
                     </span>
@@ -328,7 +328,7 @@ export function EditionCalendarTimeline({
 
           {/* Matchs du jour */}
           <div className="space-y-4">
-            <h3 className="font-black italic text-lg tracking-tight flex items-center gap-2">
+            <h3 className="font-black italic text-md md:text-lg tracking-tight flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               Rencontres du {format(currentDateObj, "dd MMMM yyyy", { locale: fr })}
             </h3>

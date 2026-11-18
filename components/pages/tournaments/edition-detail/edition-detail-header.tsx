@@ -423,7 +423,7 @@ export function EditionDetailHeader({
                 <Button
                   size="lg"
                   onClick={onJoinClick}
-                  className="flex-1 sm:flex-initial font-black uppercase tracking-wider text-sm px-7 py-6 italic shadow-[0_0_20px_rgba(var(--primary),0.35)] hover:shadow-[0_0_30px_rgba(var(--primary),0.55)] transition-all hover:scale-105"
+                  className="flex-1 sm:flex-initial font-black uppercase tracking-wider text-sm px-7 max-md:px-3 max-md:py-3 py-6 italic shadow-[0_0_20px_rgba(var(--primary),0.35)] hover:shadow-[0_0_30px_rgba(var(--primary),0.55)] transition-all hover:scale-105"
                 >
                   <Zap className="w-4 h-4 mr-2 fill-current" />
                   S&apos;inscrire

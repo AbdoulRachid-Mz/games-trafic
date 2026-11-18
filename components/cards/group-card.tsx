@@ -90,10 +90,10 @@ export function GroupCard({
   if (isCompact) {
     return (
       <Card 
-        className={cn("hover:border-primary/50 transition-all cursor-pointer group relative overflow-hidden", className)}
+        className={cn("hover:border-primary/50 py-0 transition-all cursor-pointer group relative overflow-hidden", className)}
         onClick={handleMainAction}
       >
-        <CardContent className="p-3 flex items-center justify-between gap-3">
+        <CardContent className="p-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-xs text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
               G{group.order + 1}
@@ -167,7 +167,7 @@ export function GroupCard({
               </div>
             </div>
           </div>
-          <div 
+          {/* <div 
             className="flex items-center gap-2 p-4 border-t md:border-t-0 md:border-l bg-muted/5 justify-end"
             onClick={(e) => e.stopPropagation()}
           >
@@ -190,7 +190,7 @@ export function GroupCard({
                 extraActions={extraActions}
               />
             )}
-          </div>
+          </div> */}
         </CardContent>
       </Card>
     );
@@ -268,7 +268,7 @@ export function GroupCard({
         </div>
       </CardContent>
       
-      <div 
+      {/* <div 
         className="p-4 pt-0 flex gap-2"
         onClick={(e) => e.stopPropagation()}
       >
@@ -282,7 +282,7 @@ export function GroupCard({
             <ArrowRight className="h-3.5 w-3.5" /> Détails
           </Link>
         </Button>
-      </div>
+      </div> */}
     </Card>
   );
 }

@@ -29,6 +29,11 @@ export async function generateMetadata({
     title: `Révélation de la Structure • ${edition?.name || "Édition"} | Games-Trafics`,
     description: "Cérémonie officielle de révélation de la structure, des phases et des matchs de l'édition.",
     robots: "noindex, nofollow",
+    keywords: "tournoi, édition, esport, gaming, matchs, bracket, classement",
+    icons: {
+      icon: "/icons/tournament-240.png",
+      shortcut: "/icons/tournament-128.png",
+    },
   };
 }
 

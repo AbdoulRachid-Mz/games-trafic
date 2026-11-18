@@ -71,6 +71,7 @@ import Image from "next/image";
 import { StatsCarousel } from "@/components/shared/stats-carousel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EditionMatchesClientProps {
   editionId: string;
@@ -570,7 +571,7 @@ function PhaseSection({
             {/* Matchs directs de la phase */}
             {directMatches.length > 0 && (
               <div className="space-y-4">
-                <div className="text-sm font-medium text-muted-foreground">
+                <div className="text-xs md:text-sm font-medium text-muted-foreground">
                   Matchs de la phase
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -608,6 +609,7 @@ export function EditionMatchesClient({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showOnlyMyMatches, setShowOnlyMyMatches] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isMobile } = useScreenSize();
 
   const handleSearchChange = (val: string) => {
     setSearchTerm(val);
@@ -777,13 +779,13 @@ export function EditionMatchesClient({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary shadow-lg shadow-primary/5">
-            <Swords className="h-6 w-6" />
+            <Swords className="h-6 w-6 max-md:h-4 max-md:w-4" />
           </div>
           <div>
             <Typography
-              variant="h2"
+              variant={!isMobile ? "h2" : "h4"}
               weight="bold"
-              className="font-black italic uppercase tracking-tighter text-2xl md:text-3xl text-foreground"
+              className="font-black italic uppercase tracking-tighter text-xl md:text-2xl lg:text-3xl text-foreground"
             >
               Matchs & Affrontements
             </Typography>
@@ -809,9 +811,12 @@ export function EditionMatchesClient({
                   setSearchTerm("");
                   setDebouncedSearch("");
                 }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:text-destructive text-muted-foreground"
+                className={cn(
+                  "absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:text-destructive text-muted-foreground",
+                  isMobile ? "h-3.5 w-3.5" : "h-4 w-4",
+                )}
               >
-                <X className="h-3.5 w-3.5" />
+                <X className={cn("h-3.5 w-3.5", isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
               </button>
             )}
           </div>

@@ -14,6 +14,8 @@ import { Trophy, Sparkles, Layers, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useScreenSize } from "@/hooks/use-screen";
+
 
 interface EditionRelatedCarouselProps {
   tournamentId: string;
@@ -32,6 +34,7 @@ export function EditionRelatedCarousel({
 }: EditionRelatedCarouselProps) {
   const hasOtherEditions = otherEditions.length > 0;
   const hasSimilarEditions = similarEditions.length > 0;
+  const { isMobile } = useScreenSize();
 
   if (!hasOtherEditions && !hasSimilarEditions) {
     return null;
@@ -48,15 +51,19 @@ export function EditionRelatedCarousel({
                 <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-xl md:text-2xl font-black italic tracking-tight flex items-center gap-2">
+                <h4 className="text-sm md:text-xl lg:text-2xl font-black italic tracking-tight flex items-center gap-2">
                   Autres Éditions de ce Tournoi
                   <Badge variant="outline" className="text-[10px] font-black border-primary/30 text-primary">
                     {otherEditions.length}
                   </Badge>
-                </h3>
-                <p className="text-xs md:text-sm text-muted-foreground font-medium">
-                  Consultez les éditions précédentes et à venir de cette même compétition
-                </p>
+                </h4>
+                {
+                  !isMobile && (
+                    <p className="text-xs md:text-sm text-muted-foreground font-medium">
+                    Consultez les éditions précédentes et à venir de cette même compétition
+                    </p>
+                  )
+                }
               </div>
             </div>
 
@@ -110,15 +117,21 @@ export function EditionRelatedCarousel({
                 <Sparkles className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <h3 className="text-xl md:text-2xl font-black italic tracking-tight flex items-center gap-2">
+                <h4 className="text-sm md:text-xl lg:text-2xl font-black italic tracking-tight flex items-center gap-2">
                   Éditions Similaires & Recommandées
+                  {!isMobile && (
                   <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] font-black">
                     Découverte
                   </Badge>
-                </h3>
-                <p className="text-xs md:text-sm text-muted-foreground font-medium">
-                  D&apos;autres compétitions esport qui pourraient vous intéresser
-                </p>
+                  )}
+                </h4>
+                {
+                  !isMobile && (
+                    <p className="text-xs md:text-sm text-muted-foreground font-medium">
+                    D&apos;autres compétitions esport qui pourraient vous intéresser
+                    </p>
+                  )
+                }
               </div>
             </div>
 

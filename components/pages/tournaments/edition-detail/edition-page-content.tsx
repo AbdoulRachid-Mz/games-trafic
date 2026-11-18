@@ -204,7 +204,7 @@ export function EditionPageContent({
                 <Zap className="w-3.5 h-3.5 fill-primary" />
                 Inscriptions Ouvertes
               </div>
-              <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter mb-2">
+              <h3 className="text-xl md:text-2xl lg:text-3xl font-black italic tracking-tighter mb-2">
                 Participez à la compétition
               </h3>
               <p className="text-muted-foreground text-sm md:text-base font-medium">
@@ -214,9 +214,9 @@ export function EditionPageContent({
             </div>
             <div className="relative z-10 w-full md:w-auto">
               <Button
-                size="lg"
+                size={isMobile ? "sm" : "lg"}
                 onClick={handleJoinClick}
-                className="w-full md:w-auto px-10 py-6 text-base font-black uppercase tracking-wider italic shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] transition-all hover:scale-105"
+                className="w-full md:w-auto px-10 py-6 text-base max-md:text-xs font-black uppercase tracking-wider italic shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] transition-all hover:scale-105"
                 disabled={joinMutation.isPending}
               >
                 {joinMutation.isPending ? "Inscription en cours..." : "Rejoindre l'édition"}
@@ -229,26 +229,20 @@ export function EditionPageContent({
         <div className="min-w-0">
           {/* TAB: VUE D'ENSEMBLE (OVERVIEW) */}
           {activeTab === "overview" && (
-            <div className="space-y-6 md:space-y-8">
+            <div className="space-y-6 max-md:space-y-4">
               {/* Carte Principale de Présentation */}
-              <div className="bg-card/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+              <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-primary/5 rounded-full blur-[120px] -z-10" />
 
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-black italic tracking-tighter flex items-center gap-3">
+                  <h3 className="text-md md:text-2xl font-black italic tracking-tighter flex items-center gap-3">
                     <Info className="h-6 w-6 text-primary" />
                     À propos de la Compétition
                   </h3>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" asChild className="gap-2 border-primary/30 bg-primary/10 text-primary hover:bg-primary/20">
-                      <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/reveal`}>
-                        <Zap className="w-3.5 h-3.5" />
-                        Révélation 3D
-                      </Link>
-                    </Button>
                     <Button variant="outline" size="sm" asChild className="gap-2 border-white/10">
                       <Link href={`/tournaments/${tournament.id}`}>
-                        Tournoi Principal
+                      {!isMobile && ("Tournoi Principal")}
                         <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </Button>
@@ -260,7 +254,7 @@ export function EditionPageContent({
                     {edition.name || `Édition #${edition.editionNumber} de ${tournament.name}`}
                   </p>
                   {edition.description && (
-                    <div className="mt-4 p-5 rounded-2xl bg-background/50 border border-white/5 text-sm md:text-base leading-relaxed">
+                    <div className="mt-4 p-4 max-md:p-2 rounded-2xl bg-background/50 border border-white/5 text-sm md:text-base leading-relaxed">
                       {edition.description}
                     </div>
                   )}
@@ -270,7 +264,7 @@ export function EditionPageContent({
                 <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-background/50 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Jeu Officiel</span>
-                    <span className="font-black text-base md:text-lg">{tournament.game}</span>
+                    <span className="font-black text-sm md:text-lg">{tournament.game}</span>
                   </div>
                   <div className="bg-background/50 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Format</span>
@@ -282,13 +276,13 @@ export function EditionPageContent({
                   </div>
                   <div className="bg-background/50 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lieu / Mode</span>
-                    <span className="font-black text-base md:text-lg">
+                    <span className="font-black text-sm md:text-lg">
                       {edition.locationType === "ONLINE" ? "En Ligne" : "Présentiel"}
                     </span>
                   </div>
                   <div className="bg-background/50 border border-white/5 rounded-2xl p-4 flex flex-col gap-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Capacité</span>
-                    <span className="font-black text-base md:text-lg text-primary">
+                    <span className="font-black text-sm md:text-lg text-primary">
                       {edition.maxParticipants || 32} Joueurs
                     </span>
                   </div>
@@ -304,17 +298,17 @@ export function EditionPageContent({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="p-4 rounded-2xl bg-gradient-to-br from-yellow-500/15 to-yellow-600/5 border border-yellow-500/30">
                         <div className="text-xs uppercase font-black tracking-wider text-yellow-400">1ère Place 🥇</div>
-                        <div className="text-2xl font-black mt-1 text-foreground">50% du Prize Pool</div>
+                        <div className="text-xl font-black mt-1 text-foreground">50% du Prize Pool</div>
                         <div className="text-xs text-muted-foreground mt-1">Trophée + Titre de Champion</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-400/15 to-slate-500/5 border border-slate-400/30">
                         <div className="text-xs uppercase font-black tracking-wider text-slate-300">2ème Place 🥈</div>
-                        <div className="text-2xl font-black mt-1 text-foreground">30% du Prize Pool</div>
+                        <div className="text-xl font-black mt-1 text-foreground">30% du Prize Pool</div>
                         <div className="text-xs text-muted-foreground mt-1">Médaille d&apos;Argent</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-700/15 to-amber-800/5 border border-amber-700/30">
                         <div className="text-xs uppercase font-black tracking-wider text-amber-500">3ème Place 🥉</div>
-                        <div className="text-2xl font-black mt-1 text-foreground">20% du Prize Pool</div>
+                        <div className="text-xl font-black mt-1 text-foreground">20% du Prize Pool</div>
                         <div className="text-xs text-muted-foreground mt-1">Médaille de Bronze</div>
                       </div>
                     </div>
@@ -336,7 +330,7 @@ export function EditionPageContent({
 
           {/* TAB: PHASES & POULES */}
           {activeTab === "phases" && (
-            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-3 md:p-6 shadow-xl">
+            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl">
               <EditionPhasesView
                 phases={phases}
                 editionId={edition.id}
@@ -350,7 +344,7 @@ export function EditionPageContent({
 
           {/* TAB: MATCHS */}
           {activeTab === "matches" && (
-            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-3 md:p-6 shadow-xl">
+            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl">
               <EditionMatchesTab
                 editionId={edition.id}
                 tournamentId={edition.tournamentId}
@@ -364,7 +358,7 @@ export function EditionPageContent({
 
           {/* TAB: CLASSEMENT (STANDINGS) */}
           {activeTab === "standings" && (
-            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-3 md:p-6 shadow-xl">
+            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl">
               <EditionStandingsTab
                 editionId={edition.id}
                 activePhaseId={activePhaseId}
@@ -376,7 +370,7 @@ export function EditionPageContent({
 
           {/* TAB: PARTICIPANTS */}
           {activeTab === "participants" && (
-            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-3 md:p-6 shadow-xl">
+            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl">
               <EditionParticipantsList
                 participants={edition.registrations || []}
                 editionId={edition.id}
@@ -386,10 +380,10 @@ export function EditionPageContent({
 
           {/* TAB: CALENDRIER */}
           {activeTab === "calendar" && (
-            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-4 md:p-6 shadow-xl space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl space-y-6">
+              <div className="flex sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
                 <div>
-                  <h3 className="text-2xl font-black italic tracking-tighter flex items-center gap-2">
+                  <h3 className="text-md md:text-xl lg:text-2xl font-black italic tracking-tighter flex items-center gap-2">
                     <Calendar className="w-6 h-6 text-primary" />
                     Programme & Calendrier
                   </h3>
@@ -399,8 +393,8 @@ export function EditionPageContent({
                 </div>
                 <Button variant="outline" size="sm" asChild className="gap-2 border-white/10">
                   <Link href={`/tournaments/${tournament.id}/editions/${edition.id}/calendar`}>
-                    Ouvrir la page calendrier
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    {!isMobile && "Ouvrir la page calendrier"}
+                    <ArrowRight className="w-4 h-4 md:w-6 md:h-6" />
                   </Link>
                 </Button>
               </div>
@@ -411,7 +405,7 @@ export function EditionPageContent({
 
           {/* TAB: STATS & MVPS */}
           {activeTab === "stats" && (
-            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-3 md:p-6 shadow-xl">
+            <div className="bg-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-2 md:p-4 shadow-xl">
               <EditionBestParticipantsTab editionId={edition.id} />
             </div>
           )}

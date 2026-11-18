@@ -45,6 +45,12 @@ import { MatchControlClient } from "./match-control-client";
 
 export const metadata: Metadata = {
   title: "Détail du match | Games-Trafics",
+  keywords: "tournoi, édition, esport, gaming, matchs, bracket, classement",
+  robots: "index, follow",
+  icons: {
+    icon: "/icons/tournament-240.png",
+    shortcut: "/icons/tournament-128.png",
+  },
 };
 
 interface PageProps {

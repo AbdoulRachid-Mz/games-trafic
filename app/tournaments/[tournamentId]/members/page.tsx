@@ -11,6 +11,12 @@ import { getCurrentUser } from "@/lib/auth/session";
 export const metadata: Metadata = {
   title: "Membres du tournoi | Games-Trafic",
   description: "Liste complète des membres et organisateurs du tournoi.",
+  keywords: "tournoi, membres, organisateurs, games-trafics",
+  robots: "index, follow",
+  icons: {
+    icon: "/icons/tournament-240.png",
+    shortcut: "/icons/tournament-128.png",
+  },
 };
 
 export default async function TournamentMembersPage({

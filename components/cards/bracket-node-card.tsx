@@ -159,7 +159,7 @@ export function BracketNodeCard({
               </div>
             </div>
           </div>
-          <div 
+          {/* <div 
             className="flex items-center gap-2 p-4 border-t md:border-t-0 md:border-l bg-muted/5 justify-end"
             onClick={(e) => e.stopPropagation()}
           >
@@ -182,7 +182,7 @@ export function BracketNodeCard({
                 extraActions={extraActions}
               />
             )}
-          </div>
+          </div> */}
         </CardContent>
       </Card>
     );
@@ -249,7 +249,7 @@ export function BracketNodeCard({
         </div>
       </CardContent>
       
-      <div 
+      {/* <div 
         className="p-4 pt-0 flex gap-2"
         onClick={(e) => e.stopPropagation()}
       >
@@ -263,7 +263,7 @@ export function BracketNodeCard({
             Voir Détails
           </Link>
         </Button>
-      </div>
+      </div> */}
     </Card>
   );
 }

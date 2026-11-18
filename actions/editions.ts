@@ -1032,6 +1032,8 @@ export async function getRelatedEditions(
       .where(
         and(
           eq(tournamentEditions.tournamentId, tournamentId),
+          eq(tournamentEditions.isActive, true),
+          eq(tournamentEditions.isDeleted, false),
           ne(tournamentEditions.id, currentEditionId)
         )
       )
@@ -1042,13 +1044,15 @@ export async function getRelatedEditions(
     let similarEditions: TournamentEdition[] = [];
 
     if (game) {
-      // Trouver les tournois du même jeu
+      // Trouver les tournois du même jeu actifs
       const matchingTournaments = await db
         .select({ id: tournaments.id })
         .from(tournaments)
         .where(
           and(
             eq(tournaments.game, game),
+            eq(tournaments.isActive, true),
+            eq(tournaments.isDeleted, false),
             ne(tournaments.id, tournamentId)
           )
         )
@@ -1063,6 +1067,8 @@ export async function getRelatedEditions(
           .where(
             and(
               inArray(tournamentEditions.tournamentId, matchingIds),
+              eq(tournamentEditions.isActive, true),
+              eq(tournamentEditions.isDeleted, false),
               ne(tournamentEditions.status, "CANCELLED")
             )
           )
@@ -1078,6 +1084,8 @@ export async function getRelatedEditions(
         .from(tournamentEditions)
         .where(
           and(
+            eq(tournamentEditions.isActive, true),
+            eq(tournamentEditions.isDeleted, false),
             ne(tournamentEditions.tournamentId, tournamentId),
             ne(tournamentEditions.status, "CANCELLED")
           )

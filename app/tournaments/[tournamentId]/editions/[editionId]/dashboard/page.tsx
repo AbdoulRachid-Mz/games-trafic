@@ -42,6 +42,12 @@ interface PageProps {
 
 export const metadata: Metadata = {
   title: "Dashboard Édition - Vue d'ensemble",
+  keywords: "tournoi, édition, esport, gaming, matchs, bracket, classement",
+  robots: "index, follow",
+  icons: {
+    icon: "/icons/tournament-240.png",
+    shortcut: "/icons/tournament-128.png",
+  },
 };
 
 interface EditionConfig {

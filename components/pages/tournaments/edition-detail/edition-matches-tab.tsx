@@ -57,6 +57,7 @@ import { useUserRegistration } from "@/hooks/use-editions";
 import { MatchCard } from "@/components/cards/match-card";
 import { useRouter } from "next/navigation";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface EditionMatchesTabProps {
   editionId: string;
@@ -84,6 +85,7 @@ export function EditionMatchesTab({
   const [allMatchesPage, setAllMatchesPage] = useState(1);
   const [myMatchesPage, setMyMatchesPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const {isMobile} = useScreenSize()
   // viewmode
   const [matchViewMode, setMatchViewMode] = useState<"list" | "grid" | "compact">("list");
   const router = useRouter();
@@ -278,7 +280,7 @@ export function EditionMatchesTab({
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
       {/* Premium Header/Stats Section */}
       <div className="relative overflow-hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 p-6 md:p-8">
         <div className="absolute -top-24 -right-24 h-64 w-64 bg-primary/10 blur-[100px]" />
@@ -287,30 +289,31 @@ export function EditionMatchesTab({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <Typography
-              variant="h3"
+              variant={!isMobile ? "h3" : "h5"}
               weight="bold"
               className="italic uppercase tracking-tighter flex items-center gap-3"
             >
               <Swords className="h-8 w-8 text-primary" />
               Arène des Combats
             </Typography>
-            <Typography variant="body-sm" theme="muted" className="max-w-md">
+            <Typography variant={!isMobile ? "body-sm" : "caption1"} theme="muted" className="max-w-md">
               Suivez l'intensité de chaque affrontement en temps réel. Les
               statistiques et résultats sont mis à jour officiellement.
             </Typography>
           </div>
 
-          <div className="flex flex-wrap gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
             {matchStats.map((s, i) => (
               <div
                 key={i}
-                className="flex flex-col items-center px-6 py-3 rounded-2xl bg-background/50 border border-white/5 backdrop-blur-sm min-w-[100px]"
+                className="flex flex-col items-center flex-1 px-4 py-2 rounded-2xl bg-background/50 border border-white/5 backdrop-blur-sm min-w-[100px]"
               >
                 <div className={cn("mb-1", s.color)}>{s.icon}</div>
                 <div className="text-xl font-black italic">{s.value}</div>
+                {!isMobile && (
                 <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
                   {s.label}
-                </div>
+                </div>)}
               </div>
             ))}
           </div>
@@ -367,7 +370,7 @@ export function EditionMatchesTab({
           )}
         </div>
 
-        <div className="flex items-center gap-2 p-1">
+        <div className="flex items-center gap-2 p-1 overflow-x-auto scroller-hide">
           {/* Toggle "Mes matchs seulement" — visible uniquement si l'user est connecté */}
           {currentUserId && (
             <Button
@@ -381,7 +384,7 @@ export function EditionMatchesTab({
               onClick={() => setShowOnlyMyMatches((v) => !v)}
             >
               <Star className={cn("h-3.5 w-3.5", showOnlyMyMatches && "fill-white")} />
-              Mes matchs
+              {!isMobile && "Mes matchs"}
               {myMatchesCountInPage > 0 && (
                 <span className={cn(
                   "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black",
@@ -402,7 +405,7 @@ export function EditionMatchesTab({
           >
             <SelectTrigger className="h-10 w-[150px] max-md:w-[100px] max-sm:w-[80px] border-none bg-muted/50 font-bold text-[11px] uppercase tracking-wider rounded-xl">
               <Filter className="h-3 w-3 mr-2 text-primary" />
-              <SelectValue placeholder="État" />
+              {!isMobile && <SelectValue placeholder="État" />}
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tous les états</SelectItem>
@@ -426,14 +429,14 @@ export function EditionMatchesTab({
                   <Download className="h-4 w-4 text-primary" />
                 )}
                 <span className="text-[11px] font-black uppercase tracking-wider">
-                  Export
+                  {!isMobile && "Export"}
                 </span>
                 <ChevronDown className="h-4 w-4 text-primary" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl p-2 w-48">
               <DropdownMenuLabel className="text-[10px] uppercase font-black text-muted-foreground">
-                Format d'export
+                {!isMobile && "Format d'export"}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -472,7 +475,7 @@ export function EditionMatchesTab({
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="16" y1="9" x2="8" y2="9"/></svg>
                   </span>
                 )}
-                <span className="text-[11px] font-black uppercase tracking-wider">Vue</span>
+                {!isMobile && <span className="text-[11px] font-black uppercase tracking-wider">Vue</span>}
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>

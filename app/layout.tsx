@@ -16,7 +16,7 @@ import { ExplanationManager } from "@/components/onboarding/explanation-manager"
 export const metadata: Metadata = {
   title: {
     default: "Games-Trafics — Joue, échange, domine",
-    template: "%s | Games-Trafics",
+    template: "GT | Games-Trafics",
   },
   description:
     "Games-Trafics — Joue, échange, domine. La plateforme tout-en-un de tournois esport, marketplace de comptes & produits gaming et communauté.",
@@ -24,8 +24,10 @@ export const metadata: Metadata = {
     getAppUrlEnv(),
   ),
   icons: {
-    icon: "/icons/gt-primary.png",
+    icon: "/icons/icon-192.png",
+    shortcut: "/icons/icon-128.png",
   },
+  keywords: "tournois esport, marketplace comptes produits, communauté",
 };
 
 // Next.js 16 exige un export `viewport` séparé. Le zoom est autorisé :

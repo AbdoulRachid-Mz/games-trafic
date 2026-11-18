@@ -7,7 +7,7 @@ import { GameTraficsLoader } from "@/components/pages/game-clips/game-trafics-lo
 
 // generate metadata
 export const metadata = {
-  title: "Clips de Jeu",
+  title: "Clips de Jeu | Games-Trafics",
   description: "Regardez et partagez des clips de vos jeux préférés",
   keywords: ["clips de jeu", "jeux", "partage", "regarder"],
   robots: {
@@ -32,6 +32,10 @@ export const metadata = {
     images: [
       "https://gt-v3.vercel.app/api/og?title=Clips%20de%20Jeu",
     ],
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    shortcut: "/icons/icon-128.png",
   },
 };
 

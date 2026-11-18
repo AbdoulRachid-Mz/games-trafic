@@ -4,13 +4,18 @@ import { MarketplaceContent } from "@/components/pages/marketplace/marketplace-c
 import { getAppUrlEnv } from "@/utils/app-url";
 
 export const metadata: Metadata = {
-  title: "Marketplace Gaming | GT-V2 - Trouve ton compte parfait",
+  title: "Marketplace Gaming | Games-Trafics - Trouve ton compte parfait",
   metadataBase: new URL(getAppUrlEnv()),
+  keywords: "marketplace gaming, comptes jeux premium, achat jeux, jeux vidéo, jeux en ligne",
   description: "Marketplace de comptes de jeu premium. Trouve des comptes vérifiés pour tous tes jeux préférés. Achat sécurisé, livraison instantanée.",
   openGraph: {
-    title: "Marketplace Gaming | GT-V2",
+    title: "Marketplace Gaming | Games-Trafics",
     description: "L'ultime marketplace pour les gamers. Des milliers de comptes disponibles.",
-    images: ["/og-marketplace.jpg"],
+    images: ["/icons/marketplace-240.png"],
+  },
+  icons: {
+    icon: "/icons/marketplace-240.png",
+    shortcut: "/icons/marketplace-128.png",
   },
 };
 
