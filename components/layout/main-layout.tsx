@@ -16,6 +16,7 @@ import { QrTransaction } from "@/components/pages/transactions/qr-transaction";
 import OnTapPopup from "../auth/on-tap-popup";
 import { useNetworkStatus } from "@/hooks/network-status";
 import { useAppShellStore, useAppShellStickyOffset } from "@/stores/app-shell-store";
+import Loader from "@/components/loading/loader";
 
 // Hauteur de la barre `h-16` rendue par TopMiddle, utilisée uniquement avant
 // la première mesure du ResizeObserver. Toute valeur mesurée prend le dessus.
@@ -149,7 +150,7 @@ export function MainLayout({
         <Suspense
           fallback={
             <div className="flex min-h-[60vh] items-center justify-center">
-              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+              <Loader title="Chargement de la page..." size="md" />
             </div>
           }
         >

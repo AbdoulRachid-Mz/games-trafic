@@ -443,7 +443,7 @@ export const DEFAULT_ROUTE_ACCESS: RouteAccessConfig = {
     "/offers",
     "/shops/create",
     "/tournaments/create",
-    "/products/create"
+    "/marketplace/create"
   ],
   admin: [
     "/admin",

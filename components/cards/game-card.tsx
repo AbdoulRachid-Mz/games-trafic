@@ -68,6 +68,8 @@ export function GameCard({
   showActions = true,
   showBuyButton = true,
   showLikeButton = true,
+  extraActions: extraActionsNode,
+
   className,
 }: GameCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -264,6 +266,8 @@ export function GameCard({
         {/* Menu d'actions (overlay absolu en haut à droite) */}
         {!isList && hasActions && (
           <div className="absolute top-2 right-2 z-30" onClick={(e) => e.stopPropagation()}>
+            <>
+            {extraActionsNode}
             <CardActionMenu
               onEdit={onEdit ? () => onEdit(activeItem) : undefined}
               onView={onView ? () => onView(activeItem) : undefined}
@@ -271,6 +275,7 @@ export function GameCard({
               entityName={isGameItem ? `l'item ${activeItem.name}` : `le jeu ${activeItem.name}`}
               extraActions={extraActions}
             />
+            </>
           </div>
         )}
       </div>
@@ -305,6 +310,8 @@ export function GameCard({
               )}
               {hasActions && (
                 <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-10">
+                  <>
+                  {extraActionsNode}
                   <CardActionMenu
                     onEdit={onEdit ? () => onEdit(activeItem) : undefined}
                     onView={onView ? () => onView(activeItem) : undefined}
@@ -312,6 +319,7 @@ export function GameCard({
                     entityName={isGameItem ? `l'item ${activeItem.name}` : `le jeu ${activeItem.name}`}
                     extraActions={extraActions}
                   />
+                  </>
                 </div>
               )}
             </div>
@@ -355,6 +363,8 @@ export function GameCard({
           
           {isList && hasActions && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative z-10">
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(activeItem) : undefined}
                 onView={onView ? () => onView(activeItem) : undefined}
@@ -362,6 +372,7 @@ export function GameCard({
                 entityName={isGameItem ? `l'item ${activeItem.name}` : `le jeu ${activeItem.name}`}
                 extraActions={extraActions}
               />
+              </>
             </div>
           )}
         </div>

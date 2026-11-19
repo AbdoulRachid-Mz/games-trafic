@@ -40,6 +40,8 @@ export function GroupCard({
   onManageGroup,
   tournamentId,
   editionId,
+  extraActions: extraActionsNode,
+
   className,
 }: GroupCardProps) {
   const isGrid = viewMode === "grid";
@@ -112,6 +114,8 @@ export function GroupCard({
           </div>
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {hasActions && (
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(group) : undefined}
                 onView={onView ? () => onView(group) : undefined}
@@ -119,6 +123,7 @@ export function GroupCard({
                 entityName={`le groupe ${group.name}`}
                 extraActions={extraActions}
               />
+              </>
             )}
             <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
@@ -228,6 +233,8 @@ export function GroupCard({
               </div>
             )}
             {hasActions && (
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(group) : undefined}
                 onView={onView ? () => onView(group) : undefined}
@@ -235,6 +242,7 @@ export function GroupCard({
                 entityName={`le groupe ${group.name}`}
                 extraActions={extraActions}
               />
+              </>
             )}
           </div>
         </div>

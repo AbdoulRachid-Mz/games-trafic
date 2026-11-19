@@ -26,6 +26,7 @@ import { useSearchParams } from "next/navigation";
 import { getEditionMatchesDocument } from "@/actions/documents";
 import { downloadDocument } from "@/lib/documents/engine";
 import type { DocumentFormat } from "@/lib/documents/types";
+import { useScreenSize } from "@/hooks/use-screen";
 
 /**
  * Export des matchs d'une édition.
@@ -51,7 +52,8 @@ export function ExportMatchesButton({
 }: ExportMatchesButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const searchParams = useSearchParams();
-
+  const {isMobile, isMediumScreen} = useScreenSize();
+  
   const resolvedPhaseId = phaseId || searchParams.get("phaseId") || undefined;
   const resolvedGroupId = groupId || searchParams.get("groupId") || undefined;
   const resolvedBracketNodeId =
@@ -161,7 +163,7 @@ export function ExportMatchesButton({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger className="flex-1" asChild>
         <Button
           variant="outline"
           size="sm"
@@ -173,7 +175,7 @@ export function ExportMatchesButton({
           ) : (
             <Download className="h-4 w-4" />
           )}
-          Exporter {isExporting ? "..." : getScopeLabel()}
+          Exporter {isExporting ? "..." : (!isMobile && getScopeLabel())}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

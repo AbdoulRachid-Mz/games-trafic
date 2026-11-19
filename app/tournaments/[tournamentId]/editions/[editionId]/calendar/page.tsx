@@ -53,11 +53,11 @@ export default async function EditionCalendarPage({ params }: PageProps) {
       <div className="bg-gradient-to-r from-card via-card/80 to-card/50 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Badge className="bg-primary/20 text-primary border-primary/30 uppercase font-black tracking-wider text-[10px]">
+            <Badge className="bg-primary/20 text-primary border-primary/30 uppercase font-black tracking-wider text-[10px] max-md:text-[9px]">
               Programme Officiel
             </Badge>
             {tournament?.game && (
-              <Badge variant="outline" className="border-white/10 gap-1 text-xs">
+              <Badge variant="outline" className="border-white/10 gap-1 text-xs max-md:text-[9px]">
                 <Gamepad2 className="w-3 h-3 text-primary" />
                 {tournament.game}
               </Badge>

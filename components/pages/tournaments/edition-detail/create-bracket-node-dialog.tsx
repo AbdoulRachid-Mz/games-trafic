@@ -37,6 +37,8 @@ interface CreateBracketNodeDialogProps {
   groupOrder?: number;
   maxNodes?: number;
   currentNodesCount?: number;
+  open?: boolean;
+  onOpen?: (open: boolean) => void;
   inheritedConfig?: {
     nodeType?: "ROUND_ROBIN" | "ELIMINATION" | "SWISS";
     matchFormat?: "BEST_OF_1" | "BEST_OF_3" | "BEST_OF_5";
@@ -53,10 +55,14 @@ export function CreateBracketNodeDialog({
   groupOrder = 0,
   maxNodes = 20,
   currentNodesCount = 0,
+  open = false,
+  onOpen,
   inheritedConfig,
   asFormOnly = false,
 }: CreateBracketNodeDialogProps) {
-  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    onOpen?.(open);
+  }, [open, onOpen]);
   const [loading, setLoading] = useState(false);
   const [nodeType, setNodeType] = useState<"ROUND_ROBIN" | "ELIMINATION" | "SWISS">(
     inheritedConfig?.nodeType || (phaseType === "ROUND_ROBIN" ? "ROUND_ROBIN" : "ELIMINATION")
@@ -111,7 +117,7 @@ export function CreateBracketNodeDialog({
       } as any);
 
       toast.success(`Nœud "${nodeCode}" créé avec succès`);
-      if (!asFormOnly) setOpen(false);
+      if (!asFormOnly) onOpen?.(false);
       router.refresh();
     } catch (error: any) {
       toast.error(error.message || "Erreur lors de la création");
@@ -233,11 +239,11 @@ export function CreateBracketNodeDialog({
         </select>
       </div>
 
-      <DialogFooter className="pt-4">
+      <DialogFooter className=" pt-4">
         <Button
           type="button"
           variant="outline"
-          onClick={() => setOpen(false)}
+          onClick={() => onOpen?.(false)}
           disabled={loading}
         >
           Annuler
@@ -253,7 +259,7 @@ export function CreateBracketNodeDialog({
   if (asFormOnly) return formContent;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpen}>
       <DialogTrigger asChild>
         <Button
           size="sm"

@@ -35,6 +35,7 @@ import { isMatchdayGroup } from "@/lib/tournaments/config";
 import { GroupCard } from "@/components/cards/group-card";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface PhaseDetailClientProps {
   tournamentId: string;
@@ -75,6 +76,7 @@ export function PhaseDetailClient({
   const isAutoMode = editionConfig.competitionMode === "AUTO";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { isMobile } = useScreenSize();
 
   // RR refondu (« groupes = journées ») : la structure est générée par le
   // moteur championnat — les actions de groupage manuel ne s'appliquent pas.
@@ -129,7 +131,7 @@ export function PhaseDetailClient({
                   {isAutoMode ? (
                     <Badge className="bg-blue-600/10 text-blue-600 border-blue-600/20 shadow-sm text-xs px-3 py-0.5 flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      Mode Auto (Assistant)
+                      Mode Auto
                     </Badge>
                   ) : (
                     <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 shadow-sm text-xs px-3 py-0.5">
@@ -158,11 +160,15 @@ export function PhaseDetailClient({
                 </div>
               </div>
 
-              <div className="flex items-center flex-wrap gap-2">
+                            <div className="flex items-center flex-wrap gap-2">
                 {isAutoMode && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 border-amber-500/30 text-amber-600 hover:bg-amber-500/5 text-[10px] font-black uppercase tracking-wider">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-amber-500/30 text-amber-600 hover:bg-amber-500/5 text-[10px] font-black uppercase tracking-wider"
+                      >
                         Passer en manuel
                       </Button>
                     </AlertDialogTrigger>
@@ -173,24 +179,21 @@ export function PhaseDetailClient({
                         </AlertDialogTitle>
                         <AlertDialogDescription className="space-y-3">
                           <p>
-                            En basculant en mode **Manuel**, vous prenez le contrôle total de la structure de l'édition.
+                            En basculant en mode Manuel, vous prenez le contrôle total de la structure de l&apos;édition.
                           </p>
-                          <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20 text-amber-700 text-xs space-y-2">
-                             <p className="font-bold">Risques identifiés :</p>
-                             <ul className="list-disc pl-4 space-y-1">
-                               <li>L'Assistant (Wizard) ne pourra plus générer ou réorganiser automatiquement les phases.</li>
-                               <li>Les calculs automatiques de qualification pourraient être perturbés si la structure change.</li>
-                               <li>**Cette action est irréversible** pour cette édition.</li>
-                             </ul>
+                          <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 space-y-2">
+                            <p className="font-bold">Risques identifiés :</p>
+                            <ul className="list-disc space-y-1 pl-4">
+                              <li>L&apos;assistant ne pourra plus générer ou réorganiser automatiquement les phases.</li>
+                              <li>Les calculs automatiques de qualification pourraient être perturbés si la structure change.</li>
+                              <li>Cette action est irréversible pour cette édition.</li>
+                            </ul>
                           </div>
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={handleSwitchToManual}
-                          className="bg-amber-600 hover:bg-amber-700"
-                        >
+                        <AlertDialogAction onClick={handleSwitchToManual} className="bg-amber-600 hover:bg-amber-700">
                           Confirmer la bascule
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -200,10 +203,12 @@ export function PhaseDetailClient({
 
                 <PhaseDetailActions
                   phaseId={phaseId}
+                  phaseName={phase?.name || "Phase"}
                   isActive={phase.isActive ?? false}
                   isCompleted={phase.isCompleted ?? false}
                   phaseType={phase.phaseType as string | undefined}
                   editionType={editionConfig.competitionType}
+                  basePath={basePath}
                 />
               </div>
             </div>

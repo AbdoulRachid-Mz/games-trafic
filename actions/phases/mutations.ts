@@ -197,7 +197,8 @@ export async function updateTournamentPhase(
 }
 
 /**
- * Supprime une phase de tournoi (soft delete)
+ * Supprime une phase de tournoi (soft delete) en cascade sur ses enfants.
+ * Les soft-deletes étant explicites, les cascades FK ne s'appliquent pas.
  * SEC-07 FIX: Organizer or admin only
  */
 
@@ -207,25 +208,131 @@ export async function deleteTournamentPhase(
   try {
     await assertOrganizerOrAdminByPhase(id);
 
-    const result = await db
-      .update(tournamentPhases)
-      .set({
-        isDeleted: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(tournamentPhases.id, id))
-      .returning();
+    const result = await db.transaction(async (tx) => {
+      const [phase] = await tx
+        .select()
+        .from(tournamentPhases)
+        .where(eq(tournamentPhases.id, id))
+        .limit(1);
 
-    if (result.length === 0) {
-      throw new Error("Tournament phase not found");
-    }
-    return result[0];
+      if (!phase) {
+        throw new Error("Tournament phase not found");
+      }
+
+      const now = new Date();
+
+      // Groupes de la phase → participants de ces groupes
+      const groups = await tx
+        .select({ id: phaseGroups.id })
+        .from(phaseGroups)
+        .where(eq(phaseGroups.phaseId, id));
+      const groupIds = groups.map((g) => g.id);
+
+      if (groupIds.length > 0) {
+        await tx
+          .update(phaseGroupParticipants)
+          .set({ isDeleted: true, updatedAt: now })
+          .where(inArray(phaseGroupParticipants.groupId, groupIds));
+      }
+
+      await tx
+        .update(phaseGroups)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(phaseGroups.phaseId, id));
+
+      // Nœuds de bracket et matchs rattachés à la phase
+      await tx
+        .update(bracketNodes)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(bracketNodes.phaseId, id));
+
+      await tx
+        .update(matches)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(matches.phaseId, id));
+
+      const [deletedPhase] = await tx
+        .update(tournamentPhases)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(tournamentPhases.id, id))
+        .returning();
+
+      if (!deletedPhase) {
+        throw new Error("Tournament phase not found");
+      }
+
+      if (phase.editionId) {
+        revalidatePath(`/tournaments`);
+        revalidatePath(`/tournaments/dashboard`);
+      }
+
+      return deletedPhase;
+    });
+
+    return result;
   } catch (error) {
     console.error("Error deleting tournament phase:", error);
     if (error instanceof Error) {
       throw error;
     }
     throw new Error("Failed to delete tournament phase");
+  }
+}
+
+/**
+ * Supprime un groupe de phase en cascade (participants, matchs, nœuds liés).
+ */
+
+export async function deletePhaseGroupCascade(id: string): Promise<PhaseGroup> {
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [group] = await tx
+        .select()
+        .from(phaseGroups)
+        .where(eq(phaseGroups.id, id))
+        .limit(1);
+
+      if (!group) {
+        throw new Error("Phase group not found");
+      }
+
+      const now = new Date();
+
+      await tx
+        .update(phaseGroupParticipants)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(phaseGroupParticipants.groupId, id));
+
+      await tx
+        .update(bracketNodes)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(bracketNodes.groupId, id));
+
+      await tx
+        .update(matches)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(matches.groupId, id));
+
+      const [deletedGroup] = await tx
+        .update(phaseGroups)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(phaseGroups.id, id))
+        .returning();
+
+      if (!deletedGroup) {
+        throw new Error("Phase group not found");
+      }
+
+      return deletedGroup;
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error deleting phase group cascade:", error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Failed to delete phase group");
   }
 }
 
@@ -622,21 +729,44 @@ export async function updateBracketNode(
  * Supprime un nœud de bracket (soft delete)
  */
 
+/**
+ * Supprime un nœud de bracket (soft delete) en cascade sur ses matchs.
+ */
+
 export async function deleteBracketNode(id: string): Promise<BracketNode> {
   try {
-    const result = await db
-      .update(bracketNodes)
-      .set({
-        isDeleted: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(bracketNodes.id, id))
-      .returning();
+    const result = await db.transaction(async (tx) => {
+      const [node] = await tx
+        .select()
+        .from(bracketNodes)
+        .where(eq(bracketNodes.id, id))
+        .limit(1);
 
-    if (result.length === 0) {
-      throw new Error("Bracket node not found");
-    }
-    return result[0];
+      if (!node) {
+        throw new Error("Bracket node not found");
+      }
+
+      const now = new Date();
+
+      await tx
+        .update(matches)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(matches.bracketNodeId, id));
+
+      const [deletedNode] = await tx
+        .update(bracketNodes)
+        .set({ isDeleted: true, updatedAt: now })
+        .where(eq(bracketNodes.id, id))
+        .returning();
+
+      if (!deletedNode) {
+        throw new Error("Bracket node not found");
+      }
+
+      return deletedNode;
+    });
+
+    return result;
   } catch (error) {
     console.error("Error deleting bracket node:", error);
     if (error instanceof Error) {
@@ -645,7 +775,6 @@ export async function deleteBracketNode(id: string): Promise<BracketNode> {
     throw new Error("Failed to delete bracket node");
   }
 }
-
 /**
  * Crée un nouveau match
  */

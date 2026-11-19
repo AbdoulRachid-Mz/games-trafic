@@ -31,6 +31,8 @@ export function BracketNodeCard({
   onOrganize,
   tournamentId,
   editionId,
+  extraActions: extraActionsNode,
+
   className,
 }: BracketNodeCardProps) {
   const isGrid = viewMode === "grid";
@@ -111,6 +113,8 @@ export function BracketNodeCard({
           </div>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             {hasActions && (
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(node) : undefined}
                 onView={onView ? () => onView(node) : undefined}
@@ -118,6 +122,7 @@ export function BracketNodeCard({
                 entityName={`le bracket ${node.nodeCode}`}
                 extraActions={extraActions}
               />
+              </>
             )}
             <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
@@ -208,6 +213,8 @@ export function BracketNodeCard({
               {node.nodeCode || "#"}
             </div>
             {hasActions && (
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(node) : undefined}
                 onView={onView ? () => onView(node) : undefined}
@@ -215,6 +222,7 @@ export function BracketNodeCard({
                 entityName={`le bracket ${node.nodeCode}`}
                 extraActions={extraActions}
               />
+              </>
             )}
           </div>
         </div>

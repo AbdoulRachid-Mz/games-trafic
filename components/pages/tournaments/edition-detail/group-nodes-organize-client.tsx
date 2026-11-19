@@ -829,14 +829,37 @@ export function GroupNodesOrganizeClient({
                                     Gérer
                                   </Link>
                                 </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => handleDeleteExistingNode(node.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      disabled={isPending}
+                                      aria-label={`Supprimer le nœud ${node.nodeCode || ""}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Supprimer le nœud</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Cette action supprimera en cascade le nœud « {(node.metadata as any)?.name || node.nodeCode || "sélectionné"} » ainsi que tous les matchs qui lui sont associés. Cette suppression est irréversible.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel disabled={isPending}>Annuler</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteExistingNode(node.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        disabled={isPending}
+                                      >
+                                        Supprimer en cascade
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
                             </div>
                           </div>

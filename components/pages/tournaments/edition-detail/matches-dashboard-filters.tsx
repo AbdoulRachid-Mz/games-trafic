@@ -127,9 +127,9 @@ export function MatchesDashboardFilters({
   return (
     <div className="space-y-3">
       {/* Main filter row — responsive: stacks on mobile, horizontal on desktop */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
+      <div className="flex flex-wrap items-stretch sm:items-center gap-3">
         {/* Search */}
-        <div className="flex-1 min-w-[200px] relative">
+        <div className="flex-1 min-w-[200px] max-md:min-w-[150px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm focus:ring-1 focus:ring-primary outline-none"

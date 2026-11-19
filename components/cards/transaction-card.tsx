@@ -60,6 +60,8 @@ export function TransactionCard({
   onDownloadReceipt,
   onShare,
   currentUserId,
+  extraActions: extraActionsNode,
+
   className,
 }: TransactionCardProps) {
   const isIncome =
@@ -175,6 +177,8 @@ export function TransactionCard({
                   className="flex-shrink-0"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <>
+                  {extraActionsNode}
                   <CardActionMenu
                     onEdit={onEdit ? () => onEdit(item) : undefined}
                     onView={onView ? () => onView(item) : undefined}
@@ -182,6 +186,7 @@ export function TransactionCard({
                     entityName={`la transaction ${item.id.slice(0, 8)}`}
                     extraActions={extraActions}
                   />
+                  </>
                 </div>
               )}
             </div>
@@ -217,6 +222,8 @@ export function TransactionCard({
                      </Typography>
                    )}
                 </div>
+               <>
+               {extraActionsNode}
                <CardActionMenu
                  onEdit={onEdit ? () => onEdit(item) : undefined}
                  onView={onView ? () => onView(item) : undefined}
@@ -224,6 +231,7 @@ export function TransactionCard({
                  entityName={`la transaction ${item.id.slice(0, 8)}`}
                  extraActions={extraActions}
                />
+               </>
              </div>
           )}
         </div>

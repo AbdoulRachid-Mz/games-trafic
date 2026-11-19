@@ -80,6 +80,8 @@ export function TournamentCard({
   showActions = true,
   showFollowButton = true,
   showLikeButton = false,
+  extraActions: extraActionsNode,
+
   className,
 }: TournamentCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -191,6 +193,8 @@ export function TournamentCard({
 
         {!isList && hasActions && (
           <div onClick={(e) => e.stopPropagation()} className="z-20">
+            <>
+            {extraActionsNode}
             <CardActionMenu
               onEdit={onEdit ? () => onEdit(tournament) : undefined}
               onView={onView ? () => onView(tournament) : undefined}
@@ -198,6 +202,7 @@ export function TournamentCard({
               entityName={`le tournoi ${tournament.name}`}
               extraActions={extraActions}
             />
+            </>
           </div>
         )}
       </div>
@@ -236,6 +241,8 @@ export function TournamentCard({
           </div>
           {isCompact && hasActions && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(tournament) : undefined}
                 onView={onView ? () => onView(tournament) : undefined}
@@ -243,6 +250,7 @@ export function TournamentCard({
                 entityName={`le tournoi ${tournament.name}`}
                 extraActions={extraActions}
               />
+              </>
             </div>
           )}
         </div>
@@ -279,6 +287,8 @@ export function TournamentCard({
 
           {isList && hasActions && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(tournament) : undefined}
                 onView={onView ? () => onView(tournament) : undefined}
@@ -286,6 +296,7 @@ export function TournamentCard({
                 entityName={`le tournoi ${tournament.name}`}
                 extraActions={extraActions}
               />
+              </>
             </div>
           )}
         </div>

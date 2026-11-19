@@ -73,6 +73,8 @@ export function ProductCard({
   showLikeButton = true,
   showBookmarkButton = true,
   showBuyButton = true,
+  extraActions: extraActionsNode,
+
   className,
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -209,6 +211,8 @@ export function ProductCard({
       {/* Action Menu (overlay absolute in top-right) */}
       {isGrid && hasActions && (
         <div className="absolute top-3 right-3 z-20" onClick={(e) => e.stopPropagation()}>
+          <>
+          {extraActionsNode}
           <CardActionMenu
             onEdit={onEdit ? () => onEdit(product) : undefined}
             onView={onView ? () => onView(product) : undefined}
@@ -216,6 +220,7 @@ export function ProductCard({
             entityName={`le produit ${product.name}`}
             extraActions={extraActions}
           />
+          </>
         </div>
       )}
 
@@ -269,6 +274,8 @@ export function ProductCard({
               </Typography>
               {isCompact && hasActions && (
                 <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                  <>
+                  {extraActionsNode}
                   <CardActionMenu
                     onEdit={onEdit ? () => onEdit(product) : undefined}
                     onView={onView ? () => onView(product) : undefined}
@@ -276,6 +283,7 @@ export function ProductCard({
                     entityName={`le produit ${product.name}`}
                     extraActions={extraActions}
                   />
+                  </>
                 </div>
               )}
             </div>
@@ -339,6 +347,8 @@ export function ProductCard({
 
           {isList && hasActions && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(product) : undefined}
                 onView={onView ? () => onView(product) : undefined}
@@ -346,6 +356,7 @@ export function ProductCard({
                 entityName={`le produit ${product.name}`}
                 extraActions={extraActions}
               />
+              </>
             </div>
           )}
         </div>

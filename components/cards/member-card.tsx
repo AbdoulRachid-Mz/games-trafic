@@ -53,6 +53,8 @@ export function MemberCard({
   onToggleCoOrganizer,
   userDisplay = "member",
   showDetail,
+  extraActions: extraActionsNode,
+
   className,
 }: MemberCardProps) {
   const { isMobile, isTablet } = useScreenSize();
@@ -278,6 +280,8 @@ export function MemberCard({
 
           {/* Dropdown menu centralisé */}
           {hasActions && (
+            <>
+            {extraActionsNode}
             <CardActionMenu
               onEdit={onEdit ? () => onEdit(member) : undefined}
               onView={onView ? () => onView(member) : undefined}
@@ -285,6 +289,7 @@ export function MemberCard({
               entityName={`le membre ${member.displayName || user?.username}`}
               extraActions={extraActions}
             />
+            </>
           )}
         </div>
       </div>
@@ -310,6 +315,8 @@ export function MemberCard({
       {/* Actions en absolute top-right */}
       {hasActions && (
         <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+          <>
+          {extraActionsNode}
           <CardActionMenu
             onEdit={onEdit ? () => onEdit(member) : undefined}
             onView={onView ? () => onView(member) : undefined}
@@ -317,6 +324,7 @@ export function MemberCard({
             entityName={`le membre ${member.displayName || user?.username}`}
             extraActions={extraActions}
           />
+          </>
         </div>
       )}
 

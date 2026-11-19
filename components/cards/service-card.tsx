@@ -21,6 +21,7 @@ export interface ServiceCardProps extends BaseCardProps<ServiceCardType> {
 
 export function ServiceCard({ 
     item: service, 
+    extraActions: extraActionsNode,
     className, 
     viewMode = "grid", 
     status: _status,
@@ -136,6 +137,8 @@ export function ServiceCard({
                                 </Badge>
                             )}
                             {hasActions && (
+                                <>
+                                {extraActionsNode}
                                 <CardActionMenu
                                     onEdit={onEdit ? () => onEdit(service) : undefined}
                                     onView={onView ? () => onView(service) : undefined}
@@ -143,6 +146,7 @@ export function ServiceCard({
                                     entityName={`le service ${service.title}`}
                                     extraActions={extraActions}
                                 />
+                                </>
                             )}
                         </div>
                     </div>

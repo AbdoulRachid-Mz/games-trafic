@@ -776,7 +776,7 @@ export default function CreateShopPage() {
           {
             label: "Ajouter des produits",
             onClick: () =>
-              router.push(`/shops/${createdShopId}/products/create`),
+              router.push(`/marketplace/create`),
             variant: "outline",
           },
         ]}
@@ -808,3 +808,4 @@ export default function CreateShopPage() {
     </div>
   );
 }
+

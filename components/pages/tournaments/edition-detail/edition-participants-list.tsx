@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
   Search,
@@ -27,12 +28,15 @@ import { useScreenSize } from "@/hooks/use-screen";
 interface EditionParticipantsListProps {
   participants: any[];
   editionId: string;
+  tournamentId: string;
 }
 
 export function EditionParticipantsList({
   participants,
   editionId,
+  tournamentId,
 }: EditionParticipantsListProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const { exportParticipants } = useEditionManager(editionId);
@@ -150,7 +154,16 @@ export function EditionParticipantsList({
           }
         >
           {filtered.map((reg) => (
-            <MemberCard key={reg.id} item={reg.member} viewMode={viewMode} />
+            <MemberCard
+              key={reg.id}
+              item={reg.member}
+              viewMode={viewMode}
+              onView={(member) =>
+                router.push(
+                  `/tournaments/${tournamentId}/members/${member.id}`,
+                )
+              }
+            />
           ))}
         </div>
       )}

@@ -68,6 +68,7 @@ import { useRouter } from "next/navigation";
 import { updateTournamentEditionModeAction } from "@/actions/editions";
 import { organizeNextPhaseAction } from "@/actions/phases";
 import { AlertTriangle } from "lucide-react";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface BracketNode {
   id: string;
@@ -116,7 +117,10 @@ export function GroupDetailClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isAutoMode = editionConfig.competitionMode === "AUTO";
-
+  const [open, setOpen] = useState(false);
+  const {isMobile} = useScreenSize();
+  
+  
   const handleSwitchToManual = () => {
     startTransition(async () => {
       try {
@@ -174,7 +178,7 @@ export function GroupDetailClient({
               )}
               {group?.isLocked && (
                 <Badge className="bg-amber-100 text-amber-900 border-amber-200 text-xs gap-1 py-0.5">
-                  <Lock className="h-3 w-3" /> Verrouillé
+                  <Lock className="h-3 w-3" aria-label="Verrouillé" /> {isMobile ? "" : "Verrouillé"}
                 </Badge>
               )}
 
@@ -771,13 +775,13 @@ export function GroupDetailClient({
                 Structure du Bracket
               </Typography>
               {isAutoMode ? (
-                <AlertDialog>
+                <AlertDialog open={open} onOpenChange={setOpen}>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" size="sm">
                       <PlusCircle className="h-4 w-4 mr-2" /> Nouveau Nœud
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent className="overflow-y-auto max-h-[80vh]">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="flex items-center gap-2">
                         <AlertTriangle className="h-5 w-5 text-amber-500" />{" "}
@@ -790,13 +794,15 @@ export function GroupDetailClient({
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      {/* <AlertDialogCancel>Annuler</AlertDialogCancel> */}
                       <AlertDialogAction asChild>
                         <CreateBracketNodeDialog
                           phaseId={group?.phaseId || ""}
                           groupId={groupId}
                           groupOrder={group?.order || 0}
-                          asFormOnly
+                          asFormOnly={true}
+                          open={open}
+                          onOpen={setOpen}
                         />
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -864,7 +870,7 @@ export function GroupDetailClient({
                         value={String(roundNum)}
                         className="space-y-4"
                       >
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                           {roundsMap[roundNum].map((node) => {
                             const nodeParticipants =
                               (node.metadata as any)?.participants || [];
@@ -900,7 +906,7 @@ export function GroupDetailClient({
                                     revalidatePath={basePath}
                                   />
                                 </div>
-                                <div className="p-4 flex-1">
+                                <div className="p-4 flex-1 gap-4">
                                   {nodeMatch ? (
                                     <MatchCard
                                       item={nodeMatch}

@@ -88,7 +88,7 @@ export function useFabActions() {
         label: "Vendre produit",
         icon: <Package className="h-5 w-5" />,
         type: "link",
-        url: "/products/create",
+        url: "/marketplace/create",
         requiresAuth: true,
       },
       {

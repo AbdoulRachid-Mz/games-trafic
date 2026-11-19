@@ -1,25 +1,18 @@
-// app/(main)/shops/[id]/products/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   Package,
   Plus,
   Search,
   Filter,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Eye,
-  ShoppingBag,
-  TrendingUp,
-  Star,
-  Copy,
   AlertCircle,
+  CheckCircle2,
+  Lock,
+  ExternalLink,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
@@ -33,43 +26,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import Image from "next/image";
-import { getProductsByShopId, deleteProduct, updateProductStatus } from "@/actions/products";
-import { AdvancedUpload } from "@/components/ui/advanced-upload";
+import { getProductsByShopId, deleteProduct } from "@/actions/products";
+import { getOrdersByShopId } from "@/actions/orders";
 import { ProductDialog } from "@/components/pages/shops/products/product-dialog";
 import { ProductCard } from "@/components/cards/product-card";
 
-const statusColors = {
-  "NON_VENDU": "bg-gray-500",
-  "RESERVE": "bg-blue-500",
-  "EN_ECHANGE": "bg-purple-500",
-  "LIVRE": "bg-green-500",
-  "VENDU": "bg-emerald-500",
-  "ANNULER": "bg-red-500",
-};
-
-const statusLabels = {
-  "NON_VENDU": "En stock",
-  "RESERVE": "Réservé",
-  "EN_ECHANGE": "En échange",
-  "LIVRE": "Livré",
-  "VENDU": "Vendu",
-  "ANNULER": "Annulé",
+const statusLabels: Record<string, string> = {
+  NON_VENDU: "En stock",
+  RESERVE: "Réservé",
+  EN_ECHANGE: "En échange",
+  LIVRE: "Livré",
+  VENDU: "Vendu",
+  ANNULER: "Annulé",
 };
 
 export default function ShopProductsPage() {
   const params = useParams();
   const router = useRouter();
+  const shopId = params.shopId as string;
   const [products, setProducts] = useState<any[]>([]);
+  const [completedProductIds, setCompletedProductIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -78,15 +56,11 @@ export default function ShopProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  useEffect(() => {
-    loadProducts();
-  }, [activeTab, statusFilter, categoryFilter]);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
       const filters: any = {
-        shopId: params.shopId as string,
+        shopId,
         isDeleted: false,
       };
 
@@ -98,23 +72,37 @@ export default function ShopProductsPage() {
         filters.name = search;
       }
 
-      const result = await getProductsByShopId(params.shopId as string, {
-        filters,
-        pagination: { page: 1, limit: 50 },
-        options: {
-          sortBy: "createdAt",
-          sortOrder: "desc",
-        },
-      });
+      const [result, completedOrdersRes] = await Promise.all([
+        getProductsByShopId(shopId, {
+          filters,
+          pagination: { page: 1, limit: 50 },
+          options: {
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          },
+        }),
+        getOrdersByShopId(shopId, { status: "COMPLETED", limit: 200 }),
+      ]);
 
-      setProducts(result.data);
+      const completedIds = new Set<string>(
+        (completedOrdersRes?.data || [])
+          .map((o: any) => o.productId)
+          .filter(Boolean)
+      );
+
+      setCompletedProductIds(completedIds);
+      setProducts(result.data || []);
     } catch (error) {
       console.error("Erreur chargement produits:", error);
       toast.error("Erreur lors du chargement des produits");
     } finally {
       setLoading(false);
     }
-  };
+  }, [shopId, search, statusFilter]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts, activeTab, categoryFilter]);
 
   const handleDelete = async (productId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) {
@@ -131,30 +119,23 @@ export default function ShopProductsPage() {
     }
   };
 
-  const handleStatusChange = async (productId: string, newStatus: string) => {
-    try {
-      await updateProductStatus(productId, newStatus as any);
-      toast.success("Statut mis à jour");
-      loadProducts();
-    } catch (error) {
-      console.error("Erreur mise à jour:", error);
-      toast.error("Erreur lors de la mise à jour");
-    }
-  };
+  const enrichedProducts = useMemo(
+    () =>
+      products.map((p) => {
+        const hasCompletedOrder = completedProductIds.has(p.id);
+        const isSold = p.status === "VENDU";
+        const isPaid = hasCompletedOrder; // commande complétée (paiement validé) + statut vendu pris en compte
+        const isLocked = isSold || isPaid;
+        return { ...p, _sales: { isSold, isPaid, isLocked, hasCompletedOrder } };
+      }),
+    [products, completedProductIds]
+  );
 
-  const handleDuplicate = (product: any) => {
-    setSelectedProduct({
-      ...product,
-      name: `${product.name} (Copie)`,
-      id: undefined,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const filteredProducts = products.filter(product => {
-    if (activeTab === "active") return product.isActive;
+  const filteredProducts = enrichedProducts.filter((product) => {
+    if (activeTab === "active") return product.isActive && !product._sales.isLocked;
     if (activeTab === "inactive") return !product.isActive;
     if (activeTab === "featured") return product.isFeatured;
+    if (activeTab === "sold") return product._sales.isLocked;
     return true;
   });
 
@@ -164,7 +145,6 @@ export default function ShopProductsPage() {
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <Typography variant="h2" weight="bold" className="mb-1">
@@ -174,17 +154,13 @@ export default function ShopProductsPage() {
             Gérez vos produits et votre inventaire ({products.length} produits)
           </Typography>
         </div>
-        
-        <Button 
-          onClick={() => router.push(`/shops/${params.shopId}/dashboard/products/create`)}
-          className="gap-2"
-        >
+
+        <Button onClick={() => router.push(`/marketplace/create?shopId=${shopId}`)} className="gap-2">
           <Plus className="h-4 w-4" />
           Ajouter un produit
         </Button>
       </div>
 
-      {/* Filtres */}
       <Card>
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -199,7 +175,7 @@ export default function ShopProductsPage() {
                 />
               </div>
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Statut" />
@@ -207,48 +183,49 @@ export default function ShopProductsPage() {
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
                 {Object.entries(statusLabels).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            
+
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Catégorie" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes les catégories</SelectItem>
-                <SelectItem value="gaming">🎮 Gaming</SelectItem>
-                <SelectItem value="accounts">👤 Comptes</SelectItem>
-                <SelectItem value="items">🛡️ Items</SelectItem>
-                <SelectItem value="services">⚡ Services</SelectItem>
+                <SelectItem value="gaming">Gaming</SelectItem>
+                <SelectItem value="accounts">Comptes</SelectItem>
+                <SelectItem value="items">Items</SelectItem>
+                <SelectItem value="services">Services</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Onglets et actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-          <TabsList>
+          <TabsList className="flex flex-wrap h-auto">
             <TabsTrigger value="all">Tous</TabsTrigger>
             <TabsTrigger value="active">Actifs</TabsTrigger>
             <TabsTrigger value="inactive">Inactifs</TabsTrigger>
             <TabsTrigger value="featured">En vedette</TabsTrigger>
+            <TabsTrigger value="sold">Vendus / Payés</TabsTrigger>
           </TabsList>
         </Tabs>
-        
+
         <div className="flex items-center gap-2">
-          <ShopExportButton shopId={params.shopId as string} kind="products" />
-          <Button variant="outline" size="sm" className="gap-2">
+          <ShopExportButton shopId={shopId} kind="products" />
+          <Button variant="outline" size="sm" className="gap-2" onClick={loadProducts}>
             <Filter className="h-4 w-4" />
-            Plus de filtres
+            Actualiser
           </Button>
         </div>
       </div>
 
-      {/* Liste des produits */}
       {filteredProducts.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
@@ -261,13 +238,7 @@ export default function ShopProductsPage() {
                 ? "Essayez de modifier vos filtres de recherche"
                 : "Commencez par ajouter votre premier produit"}
             </Typography>
-            <Button 
-              onClick={() => {
-                setSelectedProduct(null);
-                setIsDialogOpen(true);
-              }}
-              className="gap-2"
-            >
+            <Button onClick={() => router.push(`/marketplace/create?shopId=${shopId}`)} className="gap-2">
               <Plus className="h-4 w-4" />
               Ajouter un produit
             </Button>
@@ -276,30 +247,73 @@ export default function ShopProductsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.map((product) => {
+            const locked = product._sales?.isLocked;
+            const sold = product._sales?.isSold || product.status === "VENDU";
+            const paid = product._sales?.isPaid;
             return (
-              <ProductCard
-                key={product.id}
-                item={product}
-                viewMode="grid"
-                onView={() => router.push(`/products/${product.id}`)}
-                onEdit={() => {
-                  setSelectedProduct(product);
-                  setIsDialogOpen(true);
-                }}
-                onDelete={() => handleDelete(product.id)}
-                // extraActions={extraActions}
-                showLikeButton={false}
-                showBookmarkButton={false}
-                showBuyButton={false}
-              />
+              <div key={product.id} className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {paid && (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Payé
+                    </Badge>
+                  )}
+                  {sold && (
+                    <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 gap-1">
+                      <AlertCircle className="h-3 w-3" /> Vendu
+                    </Badge>
+                  )}
+                  {locked && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Lock className="h-3 w-3" /> Verrouillé
+                    </Badge>
+                  )}
+                </div>
+                <ProductCard
+                  item={product}
+                  viewMode="grid"
+                  onView={() => router.push(`/marketplace/${product.id}`)}
+                  onEdit={() => {
+                    if (locked) {
+                      toast.info("Produit vendu/payé: modifications limitées. Ouvrez les paramètres pour consulter les détails.");
+                      router.push(`/marketplace/${product.id}/dashboard/settings`);
+                      return;
+                    }
+                    setSelectedProduct(product);
+                    setIsDialogOpen(true);
+                  }}
+                  onDelete={
+                    locked
+                      ? undefined
+                      : () => handleDelete(product.id)
+                  }
+                  showLikeButton={false}
+                  showBookmarkButton={false}
+                  showBuyButton={false}
+                  extraActions={
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      title="Paramètres du produit"
+                      aria-label="Paramètres du produit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/marketplace/${product.id}/dashboard/settings`);
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+              </div>
             );
           })}
         </div>
       )}
 
-      {/* Dialog produit */}
       <ProductDialog
-        shopId={params.shopId as string}
+        shopId={shopId}
         product={selectedProduct}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
@@ -320,14 +334,11 @@ function ProductsSkeleton() {
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-10 w-40" />
       </div>
-      
       <Skeleton className="h-20 w-full" />
-      
       <div className="flex justify-between">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-10 w-40" />
       </div>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (
           <Skeleton key={i} className="h-96 rounded-xl" />

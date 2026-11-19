@@ -994,18 +994,42 @@ function ExistingMatchCard({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                disabled={isPending}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={isPending}
+                    aria-label="Supprimer le match"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Supprimer le match</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action supprimera uniquement le match entre{" "}
+                      {getName(match.participant1RegistrationId)} et{" "}
+                      {getName(match.participant2RegistrationId)}. Les participants, le nœud de bracket
+                      et les autres données associées ne seront pas supprimés en cascade. Cette action est
+                      irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isPending}>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={onDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={isPending}
+                    >
+                      Supprimer
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               {isExpanded ? (
                 <ChevronUp className="h-4 w-4" />
               ) : (

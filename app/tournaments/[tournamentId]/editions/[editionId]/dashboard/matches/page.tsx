@@ -318,11 +318,11 @@ export default function MatchesDashboardPage({
         
         <div className="flex items-center gap-2">
           {/* View Toggle */}
-          <div className="flex bg-muted/50 p-1.5 rounded-xl border border-primary/10 shadow-inner">
+          <div className="flex flex-1 bg-muted/50 p-1.5 rounded-xl border border-primary/10 shadow-inner">
             <Button 
               variant={view === "list" ? "secondary" : "ghost"} 
               size="sm" 
-              className={cn("h-8 px-4 rounded-lg text-xs font-bold gap-2", view === "list" && "shadow-sm border")}
+              className={cn("h-6 px-3 rounded-lg text-xs font-bold gap-2", view === "list" && "shadow-sm border")}
               onClick={() => updateParams({ view: "list" })}
             >
               <ListTree className="h-3.5 w-3.5" />
@@ -331,7 +331,7 @@ export default function MatchesDashboardPage({
             <Button 
               variant={view === "tree" ? "secondary" : "ghost"} 
               size="sm" 
-              className={cn("h-8 px-4 rounded-lg text-xs font-bold gap-2", view === "tree" && "shadow-sm border")}
+              className={cn("h-6 px-3 rounded-lg text-xs font-bold gap-2", view === "tree" && "shadow-sm border")}
               onClick={() => updateParams({ view: "tree" })}
             >
               <FolderTree className="h-3.5 w-3.5" />
@@ -340,7 +340,7 @@ export default function MatchesDashboardPage({
             <Button 
               variant={view === "grid" ? "secondary" : "ghost"} 
               size="sm" 
-              className={cn("h-8 px-4 rounded-lg text-xs font-bold gap-2", view === "grid" && "shadow-sm border")}
+              className={cn("h-6 px-3 rounded-lg text-xs font-bold gap-2", view === "grid" && "shadow-sm border")}
               onClick={() => updateParams({ view: "grid" })}
             >
               <Grid3X3 className="h-3.5 w-3.5" />
@@ -363,7 +363,7 @@ export default function MatchesDashboardPage({
               size="sm"
               onClick={() => updateParams({ phaseId: null, groupId: null, bracketNodeId: null })}
               className={cn(
-                "flex-shrink-0 h-9 px-5 rounded-full",
+                "flex-shrink-0 h-9 max-md:h-7 max-md:px-3 rounded-full",
                 !phaseId && "shadow-lg shadow-primary/20"
               )}
             >
@@ -376,7 +376,7 @@ export default function MatchesDashboardPage({
                 size="sm"
                 onClick={() => updateParams({ phaseId: phase.id, groupId: null, bracketNodeId: null })}
                 className={cn(
-                  "flex-shrink-0 h-9 px-5 rounded-full transition-all",
+                  "flex-shrink-0 h-9 px-5 max-md:h-7 max-md:px-3 rounded-full transition-all",
                   phaseId === phase.id && "shadow-lg shadow-primary/20 scale-105"
                 )}
               >
@@ -393,7 +393,7 @@ export default function MatchesDashboardPage({
                 variant={!groupId ? "default" : "ghost"}
                 size="xs"
                 onClick={() => updateParams({ groupId: null, bracketNodeId: null })}
-                className="flex-shrink-0 h-7 px-3 rounded-full text-[10px] uppercase tracking-wider font-black"
+                className="flex-shrink-0 h-9 max-md:h-7 max-md:px-3 rounded-full text-[10px] uppercase tracking-wider font-black"
               >
                 Tous les groupes
               </Button>
@@ -403,7 +403,7 @@ export default function MatchesDashboardPage({
                   variant={groupId === group.id ? "default" : "ghost"}
                   size="xs"
                   onClick={() => updateParams({ groupId: group.id, bracketNodeId: null })}
-                  className="flex-shrink-0 h-7 px-3 rounded-full text-[10px] uppercase tracking-wider font-black"
+                  className="flex-shrink-0 h-9 max-md:h-7 max-md:px-3 rounded-full text-[10px] uppercase tracking-wider font-black"
                 >
                   {group.name}
                 </Button>
@@ -474,7 +474,7 @@ export default function MatchesDashboardPage({
           </CardContent>
         </Card>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {matches.length === 0 ? (
             <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/20">
               <AlertCircle className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
@@ -487,7 +487,7 @@ export default function MatchesDashboardPage({
                 match={match}
                 tournamentId={tournamentId}
                 editionId={editionId}
-                viewMode="grid"
+                viewMode="compact"
               />
             ))
           )}

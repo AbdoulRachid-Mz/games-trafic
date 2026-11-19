@@ -48,8 +48,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,11 +69,9 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { useAuthContext } from "@/contexts/auth-context";
 import { useScreenSize } from "@/hooks/use-screen";
 import { cn } from "@/lib/utils";
-// import { ShopCard } from "@/components/pages/shops/shop-card";
-import { CommentsSection } from "@/components/comments/comments-section";
 import { ShopCard } from "@/components/cards/shop-card";
 import { ProductCard } from "@/components/cards/product-card";
-import { ProductWithRelations } from "@/database/schema";
+import type { ProductWithRelations } from "@/database/schema";
 
 export function ShopPageContent() {
   const params = useParams();
@@ -155,6 +154,30 @@ export function ShopPageContent() {
     },
   ];
 
+  const handleShareShop = async () => {
+    if (typeof window === "undefined") return;
+    const shareUrl = window.location.href;
+    const shareData = {
+      title: shop?.name || "Boutique Games Trafics",
+      text: shop?.description || `Découvrez la boutique ${shop?.name || ""} sur Games Trafics`,
+      url: shareUrl,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Lien de la boutique copié");
+    } catch {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Lien de la boutique copié");
+      } catch {
+        toast.error("Impossible de partager la boutique");
+      }
+    }
+  };
   const handleProductClick = (productId: string) => {
     router.push(`/marketplace/${productId}`);
   };
@@ -330,9 +353,7 @@ export function ShopPageContent() {
                   <Button
                     variant="outline"
                     className="gap-2 max-md:flex-1"
-                    onClick={() =>
-                      router.push(`/shops/${shopId}/products/create`)
-                    }
+                    onClick={() => router.push("/marketplace/create")}
                   >
                     <Plus className="h-4 w-4" />
                     Ajouter produit
@@ -354,7 +375,7 @@ export function ShopPageContent() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/shops/${shopId}/dashabord/settings`)
+                          router.push(`/shops/${shopId}/dashboard/settings`)
                         }
                       >
                         <Settings className="h-4 w-4 mr-2" />
@@ -389,9 +410,7 @@ export function ShopPageContent() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => console.log("Share shop")}
-                      >
+                      <DropdownMenuItem onClick={handleShareShop}>
                         <Share2 className="h-4 w-4 mr-2" />
                         Partager
                       </DropdownMenuItem>
@@ -561,29 +580,31 @@ export function ShopPageContent() {
             {/* Navigation Tabs */}
             <Card className="mb-4 p-3">
               <CardContent className="p-2">
-                <Tabs
+                <ResponsiveTabs
+                  tabs={[
+                    {
+                      value: "products",
+                      label: "Produits",
+                      icon: <Package className="h-4 w-4" />,
+                    },
+                    {
+                      value: "about",
+                      label: "À propos",
+                      icon: <Store className="h-4 w-4" />,
+                    },
+                    {
+                      value: "similar",
+                      label: "Similaires",
+                      icon: <TrendingUp className="h-4 w-4" />,
+                    },
+                  ]}
                   value={activeTab}
                   onValueChange={setActiveTab}
+                  desktopCount={3}
+                  tabletCount={3}
+                  mobileCount={3}
                   className="w-full"
-                >
-                  <TabsList className="grid grid-cols-4">
-                    <TabsTrigger value="products" className="gap-2">
-                      <Package className="h-4 w-4" />
-                      Produits
-                    </TabsTrigger>
-                    <TabsTrigger value="about" className="gap-2">
-                      <Store className="h-4 w-4" />À propos
-                    </TabsTrigger>
-                    <TabsTrigger value="reviews" className="gap-2">
-                      <Star className="h-4 w-4" />
-                      Avis (128)
-                    </TabsTrigger>
-                    <TabsTrigger value="similar" className="gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      Similaires
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                />
               </CardContent>
             </Card>
 
@@ -645,9 +666,7 @@ export function ShopPageContent() {
                       {isOwner && (
                         <Button
                           className="gap-2"
-                          onClick={() =>
-                            router.push(`/shops/${shopId}/products/create`)
-                          }
+                          onClick={() => router.push("/marketplace/create")}
                         >
                           <Plus className="h-4 w-4" />
                           Ajouter
@@ -721,27 +740,6 @@ export function ShopPageContent() {
                     </div>
                   )}
                 </motion.div>
-              )}
-
-              {/* avis */}
-              {activeTab === "reviews" && (
-                <div className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Star className="h-5 w-5 text-yellow-500" />
-                        Avis des clients
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <CommentsSection
-                        entityId={shopId}
-                        entityType="SHOP"
-                        title={`Avis de la boutique ${shop.name}`}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
               )}
 
               {/* About Tab */}

@@ -57,6 +57,8 @@ export function MatchCard({
   isAdmin,
   onUpdate,
   showMinInfo = false,
+  extraActions: extraActionsNode,
+
   className,
 }: MatchCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -196,7 +198,7 @@ export function MatchCard({
   const getStatusBadge = () => {
     const label = matchStatusLabel(match.status);
     return (
-      <Badge className={cn("text-[9px] sm:text-[10px] px-1.5 py-0 sm:py-0.5 uppercase tracking-wider font-bold backdrop-blur-sm", statusStyle.badge)}>
+      <Badge className={cn("text-[8px] sm:text-[10px] px-1.5 py-0 sm:py-0.5 uppercase tracking-wider font-bold backdrop-blur-sm", statusStyle.badge)}>
         {match.status === "COMPLETED" && <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />}
         {match.status === "IN_PROGRESS" && <Swords className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1 animate-pulse" />}
         {label}
@@ -264,7 +266,7 @@ export function MatchCard({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5">
               <Clock className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[9px] font-bold tracking-wider uppercase text-muted-foreground">
+              <span className="text-[8px] font-bold tracking-wider uppercase text-muted-foreground">
                 {match.scheduledTime
                   ? format(new Date(match.scheduledTime), "dd MMM HH:mm", {
                       locale: fr,
@@ -275,6 +277,8 @@ export function MatchCard({
             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
               {getStatusBadge()}
               {hasActions && (
+                <>
+                {extraActionsNode}
                 <CardActionMenu
                   onEdit={onEdit ? () => onEdit(match) : undefined}
                   onView={onView ? () => onView(match) : undefined}
@@ -282,6 +286,7 @@ export function MatchCard({
                   entityName={`le match ${p1Name} vs ${p2Name}`}
                   extraActions={extraActions}
                 />
+                </>
               )}
             </div>
           </div>
@@ -299,7 +304,7 @@ export function MatchCard({
                   <div className="skew-x-[10deg] w-full h-full scale-[1.2]">
                     <AvatarImage src={p1Image} className="object-cover" />
                   </div>
-                  <AvatarFallback className="bg-muted text-[10px] skew-x-[10deg]">
+                  <AvatarFallback className="bg-muted text-[10px] max-md:text-[9px] skew-x-[10deg]">
                     {p1Name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -316,7 +321,7 @@ export function MatchCard({
               )}>
                 {match.status === "PENDING" ? "-" : (match.score1 ?? 0)}
               </span>
-              <span className="text-[9px] font-black text-muted-foreground/50 mx-0.5">VS</span>
+              <span className="text-[8px] font-black text-muted-foreground/50 mx-0.5 max-md:text-[7px]">VS</span>
               <span className={cn(
                 "font-black text-sm italic tabular-nums leading-none",
                 isCompleted && match.score2 > match.score1 ? "text-primary" : "text-foreground"
@@ -340,7 +345,7 @@ export function MatchCard({
                   <div className="skew-x-[10deg] w-full h-full scale-[1.2]">
                     <AvatarImage src={p2Image} className="object-cover" />
                   </div>
-                  <AvatarFallback className="bg-muted text-[10px] skew-x-[10deg]">
+                  <AvatarFallback className="bg-muted text-[10px] max-md:text-[9px] skew-x-[10deg]">
                     {p2Name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -408,7 +413,7 @@ export function MatchCard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 flex-wrap">
             {isParticipant && (
-              <Badge className="bg-primary text-primary-foreground text-[9px] font-black uppercase tracking-wider gap-1 px-2 py-0.5 shadow-md shadow-primary/20">
+              <Badge className="bg-primary text-primary-foreground text-[8px] max-md:text-[9px] font-black uppercase tracking-wider gap-1 px-2 py-0.5 shadow-md shadow-primary/20">
                 <Trophy className="h-2.5 w-2.5 fill-current" />
                 Votre combat
               </Badge>
@@ -420,12 +425,12 @@ export function MatchCard({
                 : "Non planifié"}
             </div>
             {match.phase?.name && (
-              <Badge variant="outline" className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest border-white/10 bg-background/30 backdrop-blur-sm">
+              <Badge variant="outline" className="text-[8px] sm:text-[10px] uppercase font-bold tracking-widest border-white/10 bg-background/30 backdrop-blur-sm">
                 {match.phase.name}
               </Badge>
             )}
             {match.round && (
-              <span className="font-black italic uppercase tracking-widest text-muted-foreground/50 text-[10px] sm:text-xs bg-muted/50 px-1.5 py-0.5 rounded">
+              <span className="font-black italic uppercase tracking-widest text-muted-foreground/50 text-[10px] max-md:text-xs bg-muted/50 px-1.5 py-0.5 rounded">
                 R{match.round}
               </span>
             )}
@@ -433,6 +438,8 @@ export function MatchCard({
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             {getStatusBadge()}
             {hasActions && (
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(match) : undefined}
                 onView={onView ? () => onView(match) : undefined}
@@ -440,6 +447,7 @@ export function MatchCard({
                 entityName={`le match ${p1Name} vs ${p2Name}`}
                 extraActions={extraActions}
               />
+              </>
             )}
           </div>
         </div>
@@ -461,7 +469,7 @@ export function MatchCard({
                 {p1Name}
               </span>
               {match.confirmedByParticipant1 && (
-                <span className="flex items-center text-[9px] sm:text-[10px] text-green-500 font-bold uppercase tracking-wider bg-green-500/10 px-1.5 py-0.5 rounded">
+                <span className="flex items-center text-[8px] sm:text-[10px] text-green-500 font-bold uppercase tracking-wider bg-green-500/10 px-1.5 py-0.5 rounded">
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Confirmé
                 </span>
               )}
@@ -483,7 +491,7 @@ export function MatchCard({
                   {p1Image ? (
                     <Image src={p1Image} alt={p1Name} fill className="object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center font-black text-muted-foreground/30 text-xl">
+                    <div className="w-full h-full flex items-center justify-center font-black text-muted-foreground/30 text-xl max-md:text-md">
                       {p1Name.charAt(0)}
                     </div>
                   )}
@@ -540,7 +548,7 @@ export function MatchCard({
                   {p2Image ? (
                     <Image src={p2Image} alt={p2Name} fill className="object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center font-black text-muted-foreground/30 text-xl">
+                    <div className="w-full h-full flex items-center justify-center font-black text-muted-foreground/30 text-xl max-md:text-md">
                       {p2Name.charAt(0)}
                     </div>
                   )}

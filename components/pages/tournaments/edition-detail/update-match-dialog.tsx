@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Swords } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { updateMatch } from "@/actions/phases";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -26,14 +26,25 @@ interface UpdateMatchDialogProps {
   };
   p1Name: string;
   p2Name: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+  triggerLabel?: string;
 }
 
 export function UpdateMatchDialog({
   match,
   p1Name,
   p2Name,
+  open,
+  onOpenChange,
+  showTrigger = true,
+  triggerLabel = "Modifier",
 }: UpdateMatchDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = typeof open === "boolean";
+  const dialogOpen = isControlled ? open : internalOpen;
+  const setDialogOpen = onOpenChange ?? setInternalOpen;
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -44,7 +55,9 @@ export function UpdateMatchDialog({
     const formData = new FormData(e.currentTarget);
     const score1 = formData.get("score1") ? Number(formData.get("score1")) : null;
     const score2 = formData.get("score2") ? Number(formData.get("score2")) : null;
-    const scheduledTime = formData.get("scheduledTime") ? new Date(formData.get("scheduledTime") as string) : undefined;
+    const scheduledTime = formData.get("scheduledTime")
+      ? new Date(formData.get("scheduledTime") as string)
+      : undefined;
 
     try {
       const hasScores = score1 !== null && score2 !== null;
@@ -52,11 +65,11 @@ export function UpdateMatchDialog({
         score1: score1 as any,
         score2: score2 as any,
         scheduledTime,
-        ...(hasScores && { status: "COMPLETED" })
+        ...(hasScores && { status: "COMPLETED" }),
       } as any);
 
       toast.success("Match mis à jour");
-      setOpen(false);
+      setDialogOpen(false);
       router.refresh();
     } catch (error: any) {
       toast.error(error.message || "Erreur lors de la mise à jour");
@@ -66,12 +79,14 @@ export function UpdateMatchDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 text-xs">
-          Modifier
-        </Button>
-      </DialogTrigger>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {showTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="h-7 text-xs">
+            {triggerLabel}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Modifier le match</DialogTitle>
@@ -79,11 +94,14 @@ export function UpdateMatchDialog({
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-xl border">
             <div className="flex-1 space-y-1.5">
-              <Label htmlFor="score1" className="text-[10px] uppercase font-bold text-muted-foreground truncate block">
+              <Label
+                htmlFor={`score1-${match.id}`}
+                className="text-[10px] uppercase font-bold text-muted-foreground truncate block"
+              >
                 {p1Name}
               </Label>
               <Input
-                id="score1"
+                id={`score1-${match.id}`}
                 name="score1"
                 type="number"
                 defaultValue={match.score1 ?? undefined}
@@ -93,11 +111,14 @@ export function UpdateMatchDialog({
             </div>
             <span className="text-xl font-black italic text-muted-foreground pt-5">VS</span>
             <div className="flex-1 space-y-1.5">
-              <Label htmlFor="score2" className="text-[10px] uppercase font-bold text-muted-foreground truncate block">
+              <Label
+                htmlFor={`score2-${match.id}`}
+                className="text-[10px] uppercase font-bold text-muted-foreground truncate block"
+              >
                 {p2Name}
               </Label>
               <Input
-                id="score2"
+                id={`score2-${match.id}`}
                 name="score2"
                 type="number"
                 defaultValue={match.score2 ?? undefined}
@@ -108,9 +129,9 @@ export function UpdateMatchDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="scheduledTime">Date & Heure</Label>
+            <Label htmlFor={`scheduledTime-${match.id}`}>Date & Heure</Label>
             <Input
-              id="scheduledTime"
+              id={`scheduledTime-${match.id}`}
               name="scheduledTime"
               type="datetime-local"
               defaultValue={
@@ -125,7 +146,7 @@ export function UpdateMatchDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => setDialogOpen(false)}
               disabled={loading}
             >
               Annuler

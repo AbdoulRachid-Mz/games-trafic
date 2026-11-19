@@ -95,40 +95,26 @@ export function TransactionAmountInput({
     metadata?.additionalInfo || "",
   );
 
-  const priceTabs = Array.from([
-    {
-      label: "0",
-      value: 0,
-    },
-    {
-      label: "+100",
-      value: 100,
-    },
-    {
-      label: "+500",
-      value: 500,
-    },
-    {
-      label: "+10000",
-      value: 100000,
-    },
-    {
-      label: "+20000",
-      value: 200000,
-    },
-    {
-      label: "+50000",
-      value: 50000,
-    },
-    {
-      label: "+70000",
-      value: 700000,
-    },
-    {
-      label: "+100000",
-      value: 1000000,
-    },
-  ]);
+  const quickAmounts = [0, 100, 500, 10000, 20000, 50000, 70000, 100000];
+  const priceTabs = quickAmounts.map((value) => ({
+    label: value === 0 ? "0" : `+${value.toLocaleString("fr-FR")}`,
+    value,
+  }));
+
+  // En mode quantité, un pas = le prix unitaire ; en montant libre, un pas = 100 GTC.
+  const stepAmount = requiresQuantity ? unitPrice : 100;
+
+  const handleIncrement = () => {
+    if (stepAmount <= 0) return;
+    if (requiresQuantity) setQty((current) => current + 1);
+    onChange(grossAmount + stepAmount);
+  };
+
+  const handleDecrement = () => {
+    if (stepAmount <= 0 || grossAmount <= 0) return;
+    if (requiresQuantity) setQty((current) => Math.max(0, current - 1));
+    onChange(Math.max(0, grossAmount - stepAmount));
+  };
 
   React.useEffect(() => {
     if (!onMetadataChange || !isGameItem) return;
@@ -258,7 +244,14 @@ export function TransactionAmountInput({
           {(requiresAmountInput || requiresQuantity) && (
             <div className="space-y-4">
               <div className="relative flex justify-center py-2">
-                <div className="flex flex-col relative border-3 w-full rounded-md border-primary space-y-2 py-2">
+                <div className="flex flex-col relative w-full rounded-md space-y-2 py-2">
+                  <div className="flex w-full items-center justify-center gap-2 md:gap-4">
+                  <Button
+                  type="button"
+                  onClick={handleDecrement}
+                  disabled={stepAmount <= 0 || grossAmount <= 0}
+                  aria-label="Diminuer le montant"
+                  className="size-10 shrink-0 cursor-pointer rounded-full border border-primary/30 bg-primary/30 text-xl font-bold text-primary backdrop-blur-sm disabled:opacity-40 md:size-12">-</Button>
                   <Input
                     id="amount"
                     type="number"
@@ -278,24 +271,33 @@ export function TransactionAmountInput({
                         onChange(v);
                       }
                     }}
-                    className="text-xl sm:text-2xl lg:text-3xl font-black h-14 sm:h-16 text-center border-none bg-primary/20 focus-visible:ring-0 shadow-none p-0 w-[98%] mx-auto min-w-[60%] max-w-full"
+                    className="h-14 min-w-0 flex-1 border-none bg-primary/30 p-0 text-center text-xl font-black shadow-none focus-visible:ring-0 sm:h-16 sm:text-2xl lg:text-3xl"
                     min="0"
                     step={requiresQuantity ? "1" : "0.01"}
+                    aria-label={requiresQuantity ? "Quantité" : "Montant en GTC"}
                     autoFocus
                   />
+                  <Button
+                  type="button"
+                  onClick={handleIncrement}
+                  disabled={stepAmount <= 0}
+                  aria-label="Augmenter le montant"
+                  className="size-10 shrink-0 cursor-pointer rounded-full border border-primary/30 bg-primary/30 text-xl font-bold text-primary backdrop-blur-sm disabled:opacity-40 md:size-12">+</Button>
+                  </div>
+                
                   {!requiresQuantity && (
                     <ResponsiveTabs
                       tabs={priceTabs.map((tab) => ({
                         ...tab,
                         value: tab.value.toString(),
                       }))}
-                      // showNavButtons={true}
-                      swipeable={true}
-                      onValueChange={(value) => onChange(parseFloat(value))}
-                      desktopCount={8}
-                      tabletCount={5}
+                      value={String(grossAmount)}
+                      swipeable
+                      onValueChange={(tabValue) => onChange(parseFloat(tabValue))}
+                      desktopCount={priceTabs.length}
+                      tabletCount={4}
                       mobileCount={4}
-                      className="max-w-[98%] mx-auto"
+                      className="mx-auto w-full"
                     />
                   )}
                   {/* {!requiresQuantity && (
@@ -305,10 +307,6 @@ export function TransactionAmountInput({
                   )} */}
                 </div>
               </div>
-
-              {/* Saisie manuelle uniquement : les raccourcis de type
-                  +1000/+100 (et tout équivalent) sont supprimés
-                  définitivement (PROMPT.md §11) — pas de substitut. */}
 
               {isMinAmountRestricted && (
                 <div className="flex items-center gap-2 justify-center text-red-500 bg-red-500/10 p-3 rounded-lg border border-red-500/20">

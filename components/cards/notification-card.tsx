@@ -84,6 +84,7 @@ export function NotificationCard({
     showMarkAsRead = true,
     showDeleteButton = true,
     onMarkAsRead,
+    extraActions: extraActionsNode,
     className,
 }: NotificationCardProps) {
     const [isHovered, setIsHovered] = useState(false);
@@ -254,6 +255,8 @@ export function NotificationCard({
                             <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
                         )}
                         {hasActions && (
+                            <>
+                            {extraActionsNode}
                             <CardActionMenu
                                 onEdit={onEdit ? () => onEdit(notification) : undefined}
                                 onView={onView ? () => onView(notification) : undefined}
@@ -261,6 +264,7 @@ export function NotificationCard({
                                 entityName={`la notification`}
                                 extraActions={extraActions}
                             />
+                            </>
                         )}
                     </div>
                 </div>
@@ -297,6 +301,8 @@ export function NotificationCard({
                             </Typography>
                         </div>
                         {hasActions && (
+                            <>
+                            {extraActionsNode}
                             <CardActionMenu
                                 onEdit={onEdit ? () => onEdit(notification) : undefined}
                                 onView={onView ? () => onView(notification) : undefined}
@@ -304,6 +310,7 @@ export function NotificationCard({
                                 entityName={`la notification`}
                                 extraActions={extraActions}
                             />
+                            </>
                         )}
                     </div>
                 </div>

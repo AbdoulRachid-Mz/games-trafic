@@ -1,34 +1,29 @@
 "use client";
 
 import React, { useState, useTransition, useMemo } from "react";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription,
-  CardFooter
+  CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Users, 
-  UserPlus, 
-  UserMinus, 
-  Search, 
-  Loader2, 
+import {
+  Users,
+  UserPlus,
+  UserMinus,
+  Search,
+  Loader2,
   CheckCircle2,
   Save,
   Undo2,
   MoveRight,
   MoveLeft,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -43,12 +38,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { 
-  bulkCreatePhaseGroupParticipants, 
-  bulkDeletePhaseGroupParticipants 
+import {
+  bulkCreatePhaseGroupParticipants,
+  bulkDeletePhaseGroupParticipants,
 } from "@/actions/phases";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useScreenSize } from "@/hooks/use-screen";
 
 interface GroupParticipantsManagementProps {
   groupId: string;
@@ -56,7 +52,10 @@ interface GroupParticipantsManagementProps {
   allEditionRegistrations: any[];
   groupParticipants: any[];
   maxParticipants?: number;
-  previousPhasesData?: Record<string, { name: string, registrationIds: string[] }>;
+  previousPhasesData?: Record<
+    string,
+    { name: string; registrationIds: string[] }
+  >;
   defaultSource?: string;
 }
 
@@ -73,55 +72,93 @@ export function GroupParticipantsManagement({
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSource, setFilterSource] = useState<string>(defaultSource);
-  const [confirmAction, setConfirmAction] = useState<{ type: 'add' | 'remove', id: string, name: string, regId?: string } | null>(null);
-  
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "add" | "remove";
+    id: string;
+    name: string;
+    regId?: string;
+  } | null>(null);
+  const { isMobile } = useScreenSize();
+
   // Draft State
   const [draftAddIds, setDraftAddIds] = useState<Set<string>>(new Set());
   const [draftRemoveIds, setDraftRemoveIds] = useState<Set<string>>(new Set());
 
   // Derived State
-  const currentGroupParticipantIds = useMemo(() => new Set(groupParticipants.map(p => p.registrationId)), [groupParticipants]);
-  
+  const currentGroupParticipantIds = useMemo(
+    () => new Set(groupParticipants.map((p) => p.registrationId)),
+    [groupParticipants],
+  );
+
   // Participants to show on the left (Available)
   const availableList = useMemo(() => {
     // 1. Get registrations based on filterSource
     let sourceRegs = allEditionRegistrations;
     if (filterSource.startsWith("PHASE_")) {
       const sourcePhaseId = filterSource.replace("PHASE_", "");
-      const qualifiedIds = previousPhasesData[sourcePhaseId]?.registrationIds || [];
-      sourceRegs = allEditionRegistrations.filter(r => qualifiedIds.includes(r.id));
+      const qualifiedIds =
+        previousPhasesData[sourcePhaseId]?.registrationIds || [];
+      sourceRegs = allEditionRegistrations.filter((r) =>
+        qualifiedIds.includes(r.id),
+      );
     }
 
     // 2. Filter out those already in the group or draft
-    return sourceRegs.filter(reg => {
+    return sourceRegs.filter((reg) => {
       const isCurrentlyInGroup = currentGroupParticipantIds.has(reg.id);
       const isDraftAdded = draftAddIds.has(reg.id);
-      const isDraftRemoved = groupParticipants.find(p => p.registrationId === reg.id && draftRemoveIds.has(p.id));
-      
+      const isDraftRemoved = groupParticipants.find(
+        (p) => p.registrationId === reg.id && draftRemoveIds.has(p.id),
+      );
+
       // Show if: (Not in group AND not draft added) OR (In group AND draft removed)
       if (isCurrentlyInGroup && !isDraftRemoved) return false;
       if (!isCurrentlyInGroup && isDraftAdded) return false;
 
-      const nameMatch = reg.member?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        reg.member?.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        reg.member?.team?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      const nameMatch =
+        reg.member?.displayName
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        reg.member?.user?.username
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        reg.member?.team?.name
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase());
       return nameMatch;
     });
-  }, [allEditionRegistrations, filterSource, previousPhasesData, currentGroupParticipantIds, draftAddIds, groupParticipants, draftRemoveIds, searchQuery]);
+  }, [
+    allEditionRegistrations,
+    filterSource,
+    previousPhasesData,
+    currentGroupParticipantIds,
+    draftAddIds,
+    groupParticipants,
+    draftRemoveIds,
+    searchQuery,
+  ]);
 
   // Participants to show on the right (Group)
   const groupList = useMemo(() => {
     // Start with current group participants minus draft removals
-    const base = groupParticipants.filter(p => !draftRemoveIds.has(p.id))
-      .map(p => {
-        const reg = allEditionRegistrations.find(r => r.id === p.registrationId);
+    const base = groupParticipants
+      .filter((p) => !draftRemoveIds.has(p.id))
+      .map((p) => {
+        const reg = allEditionRegistrations.find(
+          (r) => r.id === p.registrationId,
+        );
         return { ...p, reg, isDraft: false };
       });
-    
+
     // Add draft additions
-    const added = Array.from(draftAddIds).map(regId => {
-      const reg = allEditionRegistrations.find(r => r.id === regId);
-      return { id: `draft-${regId}`, registrationId: regId, reg, isDraft: true };
+    const added = Array.from(draftAddIds).map((regId) => {
+      const reg = allEditionRegistrations.find((r) => r.id === regId);
+      return {
+        id: `draft-${regId}`,
+        registrationId: regId,
+        reg,
+        isDraft: true,
+      };
     });
 
     return [...base, ...added];
@@ -133,31 +170,36 @@ export function GroupParticipantsManagement({
     else {
       // Check capacity
       if (maxParticipants > 0 && groupList.length >= maxParticipants) {
-        toast.error(`Capacité maximale atteinte (${maxParticipants} participants).`);
+        toast.error(
+          `Capacité maximale atteinte (${maxParticipants} participants).`,
+        );
         return;
       }
-      
+
       // If it was in draftRemoveIds (indirectly via registrationId), remove it from there
-      const p = groupParticipants.find(p => p.registrationId === regId && draftRemoveIds.has(p.id));
-      if (p) setDraftRemoveIds(prev => {
-        const n = new Set(prev);
-        n.delete(p.id);
-        return n;
-      });
+      const p = groupParticipants.find(
+        (p) => p.registrationId === regId && draftRemoveIds.has(p.id),
+      );
+      if (p)
+        setDraftRemoveIds((prev) => {
+          const n = new Set(prev);
+          n.delete(p.id);
+          return n;
+        });
       else next.add(regId);
     }
     setDraftAddIds(next);
   };
 
   const toggleRemove = (pId: string, regId: string) => {
-    if (pId.startsWith('draft-')) {
-      setDraftAddIds(prev => {
+    if (pId.startsWith("draft-")) {
+      setDraftAddIds((prev) => {
         const n = new Set(prev);
         n.delete(regId);
         return n;
       });
     } else {
-      setDraftRemoveIds(prev => {
+      setDraftRemoveIds((prev) => {
         const n = new Set(prev);
         if (n.has(pId)) n.delete(pId);
         else n.add(pId);
@@ -171,8 +213,10 @@ export function GroupParticipantsManagement({
   const handleSave = () => {
     // Final capacity check
     if (maxParticipants > 0 && groupList.length > maxParticipants) {
-        toast.error(`Capacité maximale dépassée (${groupList.length}/${maxParticipants}).`);
-        return;
+      toast.error(
+        `Capacité maximale dépassée (${groupList.length}/${maxParticipants}).`,
+      );
+      return;
     }
 
     startTransition(async () => {
@@ -185,10 +229,13 @@ export function GroupParticipantsManagement({
         // 2. Bulk Create
         if (draftAddIds.size > 0) {
           await bulkCreatePhaseGroupParticipants(
-            Array.from(draftAddIds).map(regId => ({
-              groupId,
-              registrationId: regId,
-            } as any))
+            Array.from(draftAddIds).map(
+              (regId) =>
+                ({
+                  groupId,
+                  registrationId: regId,
+                }) as any,
+            ),
           );
         }
 
@@ -206,45 +253,63 @@ export function GroupParticipantsManagement({
     <div className="space-y-6">
       {/* Control Bar */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-card p-4 rounded-xl border shadow-sm gap-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1 w-full max-w-2xl">
+        <div className="flex sm:flex-wrap items-stretch sm:items-center gap-4 flex-1 w-full max-w-2xl">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Filtrer les participants..." 
+            <Input
+              placeholder="Filtrer les participants..."
               className="pl-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold whitespace-nowrap text-muted-foreground uppercase tracking-widest">Source:</span>
+            <span className="text-xs font-bold whitespace-nowrap text-muted-foreground uppercase tracking-widest">
+              Source:
+            </span>
             <select
               value={filterSource}
               onChange={(e) => setFilterSource(e.target.value)}
-              className="h-10 px-3 py-1 rounded-md border bg-background text-sm min-w-[150px] font-medium"
+              className="h-10 px-3 py-1 rounded-md border bg-background text-sm min-w-[100px] font-medium"
             >
-              <option value="EDITION">Tous les participants</option>
-              {Object.entries(previousPhasesData).map(([id, data]) => (
-                <option key={id} value={`PHASE_${id}`}>
-                   Qualifiés: {data.name}
-                </option>
-              ))}
+                <option value="EDITION">Tous</option>
+                {Object.entries(previousPhasesData).map(([id, data]) => (
+                  <option key={id} value={`PHASE_${id}`}>
+                    Qualifiés: {data.name}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {hasChanges && (
-            <Button variant="ghost" size="sm" onClick={() => { setDraftAddIds(new Set()); setDraftRemoveIds(new Set()); }} className="text-muted-foreground font-bold">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDraftAddIds(new Set());
+                setDraftRemoveIds(new Set());
+              }}
+              className="text-muted-foreground font-bold"
+            >
               <Undo2 className="h-4 w-4 mr-2" /> Annuler
             </Button>
           )}
-          <Button 
-            disabled={!hasChanges || isPending} 
+          <Button
+            disabled={!hasChanges || isPending}
             onClick={handleSave}
-            className={cn("font-bold gap-2 shadow-lg transition-all", hasChanges ? "bg-primary shadow-primary/20" : "")}
+            className={cn(
+              "font-bold gap-2 shadow-lg transition-all",
+              hasChanges ? "bg-primary shadow-primary/20" : "",
+            )}
           >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-white" />}
-            Enregistrer les modifications ({draftAddIds.size + draftRemoveIds.size})
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 text-white" />
+            )}
+            Enregistrer {isMobile ? "" : "les modifications"} (
+            {draftAddIds.size + draftRemoveIds.size})
           </Button>
         </div>
       </div>
@@ -252,44 +317,79 @@ export function GroupParticipantsManagement({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Available List */}
         <Card className="border-none shadow-xl bg-muted/30">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                 <Users className="h-4 w-4 text-primary" /> Disponibles ({availableList.length})
-              </CardTitle>
-              {maxParticipants > 0 && (
-                <Badge variant={groupList.length >= maxParticipants ? "destructive" : "outline"} className="text-[10px]">
-                   Capacité: {groupList.length}/{maxParticipants}
-                </Badge>
-              )}
-            </div>
-            <CardDescription className="text-[10px]">Cliquez sur un participant pour l'ajouter au draft.</CardDescription>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Disponibles (
+              {availableList.length})
+            </CardTitle>
+            {maxParticipants > 0 && (
+              <Badge
+                variant={
+                  groupList.length >= maxParticipants
+                    ? "destructive"
+                    : "outline"
+                }
+                className="text-[10px]"
+              >
+                Capacité: {groupList.length}/{maxParticipants}
+              </Badge>
+            )}
+          </div>
+          <CardDescription className="text-[10px]">
+            Cliquez sur un participant pour l'ajouter au draft.
+          </CardDescription>
           <CardContent className="p-0 border-t bg-card/50">
             <div className="max-h-[500px] overflow-y-auto">
               <Table>
                 <TableBody>
                   {availableList.length === 0 ? (
                     <TableRow>
-                      <TableCell className="text-center py-20 text-muted-foreground text-xs italic">Aucun participant disponible</TableCell>
+                      <TableCell className="text-center py-20 text-muted-foreground text-xs italic">
+                        Aucun participant disponible
+                      </TableCell>
                     </TableRow>
                   ) : (
                     availableList.map((reg) => (
-                      <TableRow key={reg.id} className="hover:bg-primary/5 cursor-pointer group" onClick={() => setConfirmAction({ type: 'add', id: reg.id, name: reg.member?.displayName || reg.member?.user?.username || reg.member?.team?.name || "Participant" })}>
+                      <TableRow
+                        key={reg.id}
+                        className="hover:bg-primary/5 cursor-pointer group"
+                        onClick={() =>
+                          setConfirmAction({
+                            type: "add",
+                            id: reg.id,
+                            name:
+                              reg.member?.displayName ||
+                              reg.member?.user?.username ||
+                              reg.member?.team?.name ||
+                              "Participant",
+                          })
+                        }
+                      >
                         <TableCell className="py-3 pl-6">
-                           <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-                                <AvatarImage src={reg.member?.user?.profileImage || ""} />
-                                <AvatarFallback className="bg-primary/10 text-primary font-bold">{reg.member?.displayName?.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold leading-tight">{reg.member?.displayName || reg.member?.user?.username}</span>
-                                <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter mt-1">ID: {reg.id.slice(0,8)}</span>
-                              </div>
-                           </div>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                              <AvatarImage
+                                src={reg.member?.user?.profileImage || ""}
+                              />
+                              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                {reg.member?.displayName?.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold leading-tight">
+                                {reg.member?.displayName ||
+                                  reg.member?.user?.username}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter mt-1">
+                                ID: {reg.id.slice(0, 8)}
+                              </span>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-primary border border-primary/20">
-                              <MoveRight className="h-4 w-4" />
-                           </div>
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-primary border border-primary/20">
+                            <MoveRight className="h-4 w-4" />
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -304,9 +404,12 @@ export function GroupParticipantsManagement({
         <Card className="border-none shadow-xl">
           <CardHeader className="pb-4">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-               <CheckCircle2 className="h-4 w-4 text-green-500" /> Membres du Groupe ({groupList.length})
+              <CheckCircle2 className="h-4 w-4 text-green-500" /> Membres du
+              Groupe ({groupList.length})
             </CardTitle>
-            <CardDescription className="text-[10px]">Les nouveaux membres (draft) apparaissent en couleur.</CardDescription>
+            <CardDescription className="text-[10px]">
+              Les nouveaux membres (draft) apparaissent en couleur.
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-0 border-t">
             <div className="max-h-[500px] overflow-y-auto">
@@ -314,32 +417,78 @@ export function GroupParticipantsManagement({
                 <TableBody>
                   {groupList.length === 0 ? (
                     <TableRow>
-                      <TableCell className="text-center py-20 text-muted-foreground text-xs italic">Groupe vide</TableCell>
+                      <TableCell className="text-center py-20 text-muted-foreground text-xs italic">
+                        Groupe vide
+                      </TableCell>
                     </TableRow>
                   ) : (
                     groupList.map((p) => (
-                      <TableRow key={p.id} className={cn("hover:bg-destructive/5 cursor-pointer group", p.isDraft && "bg-emerald-50/50")} onClick={() => setConfirmAction({ type: 'remove', id: p.id, regId: p.registrationId, name: p.reg?.member?.displayName || p.reg?.member?.user?.username || p.reg?.member?.team?.name || "Participant" })}>
+                      <TableRow
+                        key={p.id}
+                        className={cn(
+                          "hover:bg-destructive/5 cursor-pointer group",
+                          p.isDraft && "bg-emerald-50/50",
+                        )}
+                        onClick={() =>
+                          setConfirmAction({
+                            type: "remove",
+                            id: p.id,
+                            regId: p.registrationId,
+                            name:
+                              p.reg?.member?.displayName ||
+                              p.reg?.member?.user?.username ||
+                              p.reg?.member?.team?.name ||
+                              "Participant",
+                          })
+                        }
+                      >
                         <TableCell className="py-3 pl-6">
-                           <div className="flex items-center gap-3">
-                              <Avatar className={cn("h-10 w-10 border-2 border-background shadow-sm", p.isDraft && "ring-2 ring-emerald-500 ring-offset-2")}>
-                                <AvatarImage src={p.reg?.member?.user?.profileImage || ""} />
-                                <AvatarFallback className="font-bold">{p.reg?.member?.displayName?.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-bold leading-tight">{p.reg?.member?.displayName || p.reg?.member?.user?.username}</span>
-                                  {p.isDraft && <Badge className="bg-emerald-500 text-[8px] h-3.5 px-1">NOUVEAU</Badge>}
-                                </div>
-                                <span className={cn("text-[10px] mt-1 font-mono tracking-tighter", p.isDraft ? "text-emerald-600 font-bold" : "text-muted-foreground")}>
-                                  {p.isDraft ? "À AJOUTER" : `Pts: ${p.points || 0} • Pos: ${p.position || "N/A"}`}
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              className={cn(
+                                "h-10 w-10 border-2 border-background shadow-sm",
+                                p.isDraft &&
+                                  "ring-2 ring-emerald-500 ring-offset-2",
+                              )}
+                            >
+                              <AvatarImage
+                                src={p.reg?.member?.user?.profileImage || ""}
+                              />
+                              <AvatarFallback className="font-bold">
+                                {p.reg?.member?.displayName?.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold leading-tight">
+                                  {p.reg?.member?.displayName ||
+                                    p.reg?.member?.user?.username}
                                 </span>
+                                {p.isDraft && (
+                                  <Badge className="bg-emerald-500 text-[8px] h-3.5 px-1">
+                                    NOUVEAU
+                                  </Badge>
+                                )}
                               </div>
-                           </div>
+                              <span
+                                className={cn(
+                                  "text-[10px] mt-1 font-mono tracking-tighter",
+                                  p.isDraft
+                                    ? "text-emerald-600 font-bold"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {p.isDraft
+                                  ? "À AJOUTER"
+                                  : `Pts: ${p.points || 0} • Pos: ${p.position || "N/A"}`}
+                              </span>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                           <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-destructive border border-destructive/20">
-                              <MoveLeft className="h-4 w-4" />
-                           </div>
+                          <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-destructive border border-destructive/20">
+                            <MoveLeft className="h-4 w-4" />
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -351,23 +500,35 @@ export function GroupParticipantsManagement({
         </Card>
       </div>
 
-      <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+      <AlertDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => !open && setConfirmAction(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmAction?.type === 'add' ? "Ajouter au groupe" : "Retirer du groupe"}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirmAction?.type === "add"
+                ? "Ajouter au groupe"
+                : "Retirer du groupe"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Voulez-vous vraiment {confirmAction?.type === 'add' ? "ajouter" : "retirer"} <strong>{confirmAction?.name}</strong> du groupe ?
+              Voulez-vous vraiment{" "}
+              {confirmAction?.type === "add" ? "ajouter" : "retirer"}{" "}
+              <strong>{confirmAction?.name}</strong> du groupe ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (confirmAction) {
-                if (confirmAction.type === 'add') toggleAdd(confirmAction.id);
-                else if (confirmAction.type === 'remove') toggleRemove(confirmAction.id, confirmAction.regId!);
-              }
-              setConfirmAction(null);
-            }}>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmAction) {
+                  if (confirmAction.type === "add") toggleAdd(confirmAction.id);
+                  else if (confirmAction.type === "remove")
+                    toggleRemove(confirmAction.id, confirmAction.regId!);
+                }
+                setConfirmAction(null);
+              }}
+            >
               Confirmer
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -28,6 +28,8 @@ export function TeamCard({
   onDelete,
   onViewReset,
   userDisplay = "member",
+  extraActions: extraActionsNode,
+
   className,
 }: TeamCardProps) {
   const memberCount = team.currentSquadSize || 0;
@@ -100,6 +102,8 @@ export function TeamCard({
             Créée le {team.createdAt ? new Date(team.createdAt).toLocaleDateString() : "N/A"}
           </span>
           {hasActions && (
+            <>
+            {extraActionsNode}
             <CardActionMenu
               onEdit={onEdit ? () => onEdit(team) : undefined}
               onView={onView ? () => onView(team) : undefined}
@@ -107,6 +111,7 @@ export function TeamCard({
               entityName={`l'équipe ${team.name}`}
               extraActions={extraActions}
             />
+            </>
           )}
         </div>
       </div>
@@ -141,6 +146,8 @@ export function TeamCard({
 
           {hasActions && (
             <div onClick={(e) => e.stopPropagation()}>
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(team) : undefined}
                 onView={onView ? () => onView(team) : undefined}
@@ -148,6 +155,7 @@ export function TeamCard({
                 entityName={`l'équipe ${team.name}`}
                 extraActions={extraActions}
               />
+              </>
             </div>
           )}
         </div>

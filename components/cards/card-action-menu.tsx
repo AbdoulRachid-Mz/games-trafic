@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,7 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, Check, X, Eye, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  X,
+  Eye,
+  Pencil,
+  Trash2,
+  MoreHorizontal,
+  type LucideIcon,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,13 +37,15 @@ export interface BaseCardProps<T> {
   onEdit?: (item: T) => void;
   onView?: (item: T) => void;
   onDelete?: (item: T) => void;
+  /** Contenu d'actions supplémentaire affiché dans l'en-tête de la carte. */
+  extraActions?: ReactNode;
   className?: string;
 }
 
 export interface extraActionsProps {
   id: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   onClick: () => void;
   className?: string;
 }

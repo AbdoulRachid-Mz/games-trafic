@@ -1,11 +1,21 @@
 // @/components/cards/phase-card.tsx
 "use client";
 
-import React, { useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Typography } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowDown,
   ArrowRight,
@@ -79,9 +89,11 @@ export function PhaseCard({
   isFirst = false,
   isLast = false,
   canManage = true,
+  extraActions: extraActionsNode,
   className,
 }: PhaseCardProps) {
   const [isPending, startTransition] = useTransition();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const router = useRouter();
 
   const isList = viewMode === "list";
@@ -152,9 +164,10 @@ export function PhaseCard({
       try {
         await deleteTournamentPhase(phase.id);
         toast.success("Phase supprimée");
+        setShowDeleteDialog(false);
         router.refresh();
-      } catch (error) {
-        toast.error("Erreur lors de la suppression");
+      } catch (error: any) {
+        toast.error(error?.message || "Erreur lors de la suppression");
       }
     });
   };
@@ -193,6 +206,20 @@ export function PhaseCard({
           icon: Settings2,
           onClick: handleView,
         },
+        ...(canManage
+          ? [
+              {
+                id: "delete-phase",
+                label: "Supprimer",
+                icon: Trash2,
+                onClick: () => {
+                  if (onDelete) onDelete(phase);
+                  else setShowDeleteDialog(true);
+                },
+                className: "text-destructive focus:text-destructive",
+              },
+            ]
+          : []),
       ]
     : [
         {
@@ -233,164 +260,198 @@ export function PhaseCard({
 
   const menu = (
     <div onClick={(event) => event.stopPropagation()}>
+      {extraActionsNode}
       <CardActionMenu
         onView={() => handleView()}
-        onDelete={canManage && !onDelete ? handleDelete : undefined}
         entityName={`la phase ${phase.name}`}
         extraActions={extraActions}
       />
     </div>
   );
 
+  const deleteDialog = (
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer la phase</AlertDialogTitle>
+          <AlertDialogDescription>
+            Êtes-vous sûr de vouloir supprimer la phase « {phase.name} » ? Cette action est
+            irréversible et supprimera en cascade tous les groupes, nœuds de bracket,
+            participants de groupe et matchs associés.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Annuler</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isPending ? "Suppression..." : "Supprimer"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (isCompact) {
     return (
-      <Card
-        className={cn(
-          "group relative cursor-pointer py-0 overflow-hidden transition-all hover:border-primary/50",
-          isPending && "opacity-70",
-          className,
-        )}
-        onClick={handleMainAction}
-      >
-        <CardContent className="flex items-center justify-between gap-3 p-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-bold text-xs text-primary transition-colors group-hover:bg-primary group-hover:text-white">
-              {phase.order}
+      <>
+        <Card
+          className={cn(
+            "group relative cursor-pointer py-0 overflow-hidden transition-all hover:border-primary/50",
+            isPending && "opacity-70",
+            className,
+          )}
+          onClick={handleMainAction}
+        >
+          <CardContent className="flex items-center justify-between gap-3 p-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 font-bold text-xs text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+                {phase.order}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold leading-none">
+                  {phase.name}
+                </p>
+                <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <GitBranch className="h-3 w-3" />
+                  {typeLabel}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold leading-none">
-                {phase.name}
-              </p>
-              <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-                <GitBranch className="h-3 w-3" />
-                {typeLabel}
-              </p>
+            <div className="flex shrink-0 items-center gap-1">
+              {menu}
+              <ArrowRight className="h-3 w-3 text-muted-foreground transition-colors group-hover:text-primary" />
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {menu}
-            <ArrowRight className="h-3 w-3 text-muted-foreground transition-colors group-hover:text-primary" />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        {deleteDialog}
+      </>
     );
   }
 
   if (isList) {
     return (
-      <Card
-        className={cn(
-          "group relative overflow-hidden transition-all hover:border-primary/50",
-          isPending && "opacity-70",
-          className,
-        )}
-      >
-        <CardContent className="flex flex-col justify-between p-0 md:flex-row md:items-center">
-          <div
-            onClick={handleMainAction}
-            className="flex flex-1 cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-muted/30"
-          >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-black text-primary">
-              {phase.order}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Typography
-                  variant="body-base"
-                  weight="bold"
-                  className="truncate"
-                >
-                  {phase.name}
-                </Typography>
-                {statusBadges}
+      <>
+        <Card
+          className={cn(
+            "group relative overflow-hidden transition-all hover:border-primary/50",
+            isPending && "opacity-70",
+            className,
+          )}
+        >
+          <CardContent className="flex flex-col justify-between p-0 md:flex-row md:items-center">
+            <div
+              onClick={handleMainAction}
+              className="flex flex-1 cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-muted/30"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-black text-primary">
+                {phase.order}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Settings2 className="h-3 w-3" /> Ordre {phase.order}
-                </span>
-                {phase.totalMatches != null && (
-                  <span>
-                    {phase.completedMatches ?? 0}/{phase.totalMatches} matchs
-                    terminés
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Typography
+                    variant="body-base"
+                    weight="bold"
+                    className="truncate"
+                  >
+                    {phase.name}
+                  </Typography>
+                  {statusBadges}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Settings2 className="h-3 w-3" /> Ordre {phase.order}
                   </span>
-                )}
+                  {phase.totalMatches != null && (
+                    <span>
+                      {phase.completedMatches ?? 0}/{phase.totalMatches} matchs
+                      terminés
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          {/* <div
-            className="flex items-center justify-end gap-2 border-t bg-muted/5 p-4 md:border-l md:border-t-0"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Button size="sm" variant="ghost" asChild>
-              <a href={detailUrl}>Gérer</a>
-            </Button>
-            {menu}
-          </div> */}
-        </CardContent>
-      </Card>
+            {/* <div
+              className="flex items-center justify-end gap-2 border-t bg-muted/5 p-4 md:border-l md:border-t-0"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Button size="sm" variant="ghost" asChild>
+                <a href={detailUrl}>Gérer</a>
+              </Button>
+              {menu}
+            </div> */}
+          </CardContent>
+        </Card>
+        {deleteDialog}
+      </>
     );
   }
 
   return (
-    <Card
-      className={cn(
-        "group relative flex flex-col overflow-hidden transition-all duration-200 hover:border-primary/50 hover:shadow-md",
-        isCliquable && "cursor-pointer active:scale-[0.99]",
-        isPending && "opacity-70",
-        className,
-      )}
-      onClick={handleMainAction}
-    >
-      <CardHeader className="border-b bg-muted/30 pb-2 transition-colors group-hover:bg-muted/50">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {statusBadges}
-            </div>
-            <CardTitle className="truncate text-lg font-bold tracking-tight">
-              {phase.name}
-            </CardTitle>
-          </div>
-          <div className="shrink-0">{menu}</div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="flex-1 space-y-3 pt-4">
-        <div className="flex items-center justify-between border-b border-border/50 py-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Settings2 className="h-4 w-4" />
-            <span>Ordre</span>
-          </div>
-          <span className="font-mono text-sm">#{phase.order}</span>
-        </div>
-        <div className="flex items-center justify-between py-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <GitBranch className="h-4 w-4" />
-            <span>Matchs</span>
-          </div>
-          <span className="font-bold">
-            {phase.totalMatches != null
-              ? `${phase.completedMatches ?? 0}/${phase.totalMatches}`
-              : "—"}
-          </span>
-        </div>
-      </CardContent>
-
-      {/* <div
-        className="flex gap-2 p-4 pt-0"
-        onClick={(event) => event.stopPropagation()}
+    <>
+      <Card
+        className={cn(
+          "group relative flex flex-col overflow-hidden transition-all duration-200 hover:border-primary/50 hover:shadow-md",
+          isCliquable && "cursor-pointer active:scale-[0.99]",
+          isPending && "opacity-70",
+          className,
+        )}
+        onClick={handleMainAction}
       >
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 gap-1.5 text-xs"
-          asChild
+        <CardHeader className="border-b bg-muted/30 pb-2 transition-colors group-hover:bg-muted/50">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {statusBadges}
+              </div>
+              <CardTitle className="truncate text-lg font-bold tracking-tight">
+                {phase.name}
+              </CardTitle>
+            </div>
+            <div className="shrink-0">{menu}</div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="flex-1 space-y-3 pt-4">
+          <div className="flex items-center justify-between border-b border-border/50 py-2 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Settings2 className="h-4 w-4" />
+              <span>Ordre</span>
+            </div>
+            <span className="font-mono text-sm">#{phase.order}</span>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <GitBranch className="h-4 w-4" />
+              <span>Matchs</span>
+            </div>
+            <span className="font-bold">
+              {phase.totalMatches != null
+                ? `${phase.completedMatches ?? 0}/${phase.totalMatches}`
+                : "—"}
+            </span>
+          </div>
+        </CardContent>
+
+        {/* <div
+          className="flex gap-2 p-4 pt-0"
+          onClick={(event) => event.stopPropagation()}
         >
-          <a href={detailUrl}>
-            <Settings2 className="h-3.5 w-3.5" /> Gérer
-          </a>
-        </Button>
-      </div> */}
-    </Card>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5 text-xs"
+            asChild
+          >
+            <a href={detailUrl}>
+              <Settings2 className="h-3.5 w-3.5" /> Gérer
+            </a>
+          </Button>
+        </div> */}
+      </Card>
+      {deleteDialog}
+    </>
   );
 }

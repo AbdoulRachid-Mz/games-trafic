@@ -29,6 +29,8 @@ export interface ResponsiveTab {
 interface ResponsiveTabsProps {
   tabs: ResponsiveTab[];
   defaultValue?: string;
+  /** Valeur contrôlée : permet de refléter une sélection issue d'un état parent. */
+  value?: string;
   onValueChange?: (value: string) => void;
   desktopCount?: number;
   tabletCount?: number;
@@ -44,6 +46,7 @@ interface ResponsiveTabsProps {
 export function ResponsiveTabs({
   tabs,
   defaultValue,
+  value,
   onValueChange,
   desktopCount = tabs.length,
   tabletCount = 3,
@@ -56,7 +59,8 @@ export function ResponsiveTabs({
   labelCharacters = 10,
 }: ResponsiveTabsProps) {
   const { screenSize, isMobile } = useScreenSize();
-  const [activeTab, setActiveTab] = useState(defaultValue || tabs[0]?.value);
+  const [internalTab, setInternalTab] = useState(defaultValue || tabs[0]?.value);
+  const activeTab = value ?? internalTab;
   const [scrollPosition, setScrollPosition] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -81,9 +85,9 @@ export function ResponsiveTabs({
     (tab) => tab.value === activeTab,
   );
 
-  const handleValueChange = (value: string) => {
-    setActiveTab(value);
-    onValueChange?.(value);
+  const handleValueChange = (nextValue: string) => {
+    setInternalTab(nextValue);
+    onValueChange?.(nextValue);
   };
 
   // Scroll horizontal pour les tabs

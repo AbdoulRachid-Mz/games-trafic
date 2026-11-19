@@ -44,15 +44,104 @@ import {
   Users,
   RefreshCw,
   Plus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { UpdateBracketNodeDialog } from "@/components/pages/tournaments/edition-detail/update-bracket-node-dialog";
 import { MarkCompleteDialog } from "@/components/pages/tournaments/edition-detail/mark-complete-dialog";
 import { CreateMatchDialog } from "@/components/pages/tournaments/edition-detail/create-match-dialog";
 import { UpdateMatchDialog } from "@/components/pages/tournaments/edition-detail/update-match-dialog";
-import { GenerateBracketMatchesButton } from "@/components/pages/tournaments/edition-detail/generate-bracket-matches-button";
 import { deleteMatch } from "@/actions/phases";
 import { toast } from "sonner";
 import { BracketNodeWithDetails } from "@/types/api";
+
+function BracketMatchActions({
+  match,
+  p1Name,
+  p2Name,
+  onDelete,
+}: {
+  match: Match;
+  p1Name: string;
+  p2Name: string;
+  onDelete: () => void | Promise<void>;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full bg-primary/10 text-primary"
+            aria-label={`Actions pour le match ${p1Name} contre ${p2Name}`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" /> Modifier le match
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => setDeleteOpen(true)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" /> Supprimer le match
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <UpdateMatchDialog
+        match={{
+          id: match.id,
+          score1: match.score1,
+          score2: match.score2,
+          scheduledTime: match.scheduledTime,
+        }}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        showTrigger={false}
+      />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le match</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera uniquement le match {p1Name} vs {p2Name}. Les données liées
+              au bracket ou aux participants ne seront pas supprimées en cascade. Cette action est
+              irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
 
 import { DynamicActionMenu, MenuItemAction } from "@/components/shared/dynamic-action-menu";
 import { generateBracketMatches } from "@/actions/phases";
@@ -514,47 +603,12 @@ export default function ClientBracketNodeDetailPage({
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 justify-end">
-                          <UpdateMatchDialog
-                            match={{
-                              id: m.id,
-                              score1: m.score1,
-                              score2: m.score2,
-                              scheduledTime: m.scheduledTime,
-                            }}
+                          <BracketMatchActions
+                            match={m}
                             p1Name={name1}
                             p2Name={name2}
+                            onDelete={() => handleDeleteMatch(m.id)}
                           />
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive text-xs h-7"
-                              >
-                                Supprimer
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Supprimer le match
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Cette action supprimera {name1} vs {name2} de
-                                  façon irréversible.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                <Button
-                                  onClick={() => handleDeleteMatch(m.id)}
-                                  variant="destructive"
-                                >
-                                  Supprimer
-                                </Button>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
                         </div>
                       </div>
                     );

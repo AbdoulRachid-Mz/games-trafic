@@ -35,6 +35,7 @@ export function PartnerCard({
   showBadge = true,
   showDescription = true,
   showContactInfo = true,
+  extraActions: extraActionsNode,
   className,
   variant = "default"
 }: PartnerCardProps) {
@@ -120,6 +121,8 @@ export function PartnerCard({
                 <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
               )}
               {hasActions && (
+                <>
+                {extraActionsNode}
                 <CardActionMenu
                   onEdit={onEdit ? () => onEdit(partner) : undefined}
                   onView={onView ? () => onView(partner) : undefined}
@@ -127,6 +130,7 @@ export function PartnerCard({
                   entityName={`le partenaire ${partner.name}`}
                   extraActions={extraActions}
                 />
+                </>
               )}
             </div>
           </div>

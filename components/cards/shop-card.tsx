@@ -66,6 +66,8 @@ export function ShopCard({
   showFollowButton = true,
   showLikeButton = false,
   showQuickActions = true,
+  extraActions: extraActionsNode,
+
   className,
 }: ShopCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -148,6 +150,8 @@ export function ShopCard({
           </div>
           {isCompact && hasActions && (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <>
+              {extraActionsNode}
               <CardActionMenu
                 onEdit={onEdit ? () => onEdit(shop) : undefined}
                 onView={onView ? () => onView(shop) : undefined}
@@ -155,6 +159,7 @@ export function ShopCard({
                 entityName={`la boutique ${shop.name}`}
                 extraActions={extraActions}
               />
+              </>
             </div>
           )}
         </div>
@@ -205,6 +210,8 @@ export function ShopCard({
               )}
               {isList && hasActions && (
                 <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                  <>
+                  {extraActionsNode}
                   <CardActionMenu
                     onEdit={onEdit ? () => onEdit(shop) : undefined}
                     onView={onView ? () => onView(shop) : undefined}
@@ -212,6 +219,7 @@ export function ShopCard({
                     entityName={`la boutique ${shop.name}`}
                     extraActions={extraActions}
                   />
+                  </>
                 </div>
               )}
             </div>
@@ -358,6 +366,8 @@ export function ShopCard({
       {/* Menu d'actions (overlay absolu en haut à droite pour grille) */}
       {isGrid && hasActions && (
         <div className="absolute top-3 right-3 z-20" onClick={(e) => e.stopPropagation()}>
+          <>
+          {extraActionsNode}
           <CardActionMenu
             onEdit={onEdit ? () => onEdit(shop) : undefined}
             onView={onView ? () => onView(shop) : undefined}
@@ -365,6 +375,7 @@ export function ShopCard({
             entityName={`la boutique ${shop.name}`}
             extraActions={extraActions}
           />
+          </>
         </div>
       )}
     </div>

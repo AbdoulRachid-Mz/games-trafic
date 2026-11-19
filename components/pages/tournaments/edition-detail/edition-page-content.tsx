@@ -374,6 +374,7 @@ export function EditionPageContent({
               <EditionParticipantsList
                 participants={edition.registrations || []}
                 editionId={edition.id}
+                tournamentId={tournament.id}
               />
             </div>
           )}

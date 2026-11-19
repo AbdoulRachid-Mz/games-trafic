@@ -224,8 +224,6 @@ export function MatchControlClient({
   };
 
   const onDeleteMatch = () => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce match ? Cette action est irréversible.")) return;
-
     startTransition(async () => {
       try {
         await deleteMatch(match.id);

@@ -40,6 +40,7 @@ import { useDeleteEdition } from "@/hooks/use-editions";
 import { cn } from "@/lib/utils";
 import { InteractionButton } from "@/components/shared/interaction-button";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
+import { Awards } from "@/components/shared/award";
 import {
   Sheet,
   SheetContent,
@@ -48,6 +49,21 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditionQrDialog } from "./edition-qr-dialog";
 import { toast } from "sonner";
 import {
@@ -104,7 +120,24 @@ export function EditionDetailHeader({
   const router = useRouter();
   const deleteMutation = useDeleteEdition();
   const [showQrDialog, setShowQrDialog] = useState(false);
+  const [showWinnerDialog, setShowWinnerDialog] = useState(false);
   const [showActions, setShowActions] = useState(false);
+
+  const editionName =
+    edition.name || `${tournament.name} #${edition.editionNumber}`;
+  const winnerMetadata = (edition.winnerMetadata ?? {}) as {
+    displayName?: string;
+    avatar?: string | null;
+    gameTag?: string | null;
+    clubName?: string | null;
+  };
+  const winnerName = winnerMetadata.displayName || "Vainqueur officiel";
+  const winnerInitials = winnerName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
   // Couverture résolue édition → tournoi → visuel de secours, avec repli si
   // l'URL distante est cassée (aucune image brisée affichée).
   const resolvedCover = resolveEditionCover(
@@ -272,25 +305,33 @@ export function EditionDetailHeader({
         </div>
 
         {/* Champion Spotlight si tournoi terminé */}
-        {edition.status === "COMPLETED" && Boolean(edition.winnerMetadata) && (
+        {edition.status === "COMPLETED" && (
           <div className="container mx-auto px-4 md:px-6 mb-4 z-20">
-            <div className="p-3.5 md:p-5 rounded-2xl bg-gradient-to-r from-yellow-500/15 via-amber-500/10 to-transparent border border-yellow-500/30 backdrop-blur-xl flex items-center justify-between shadow-[0_0_25px_rgba(234,179,8,0.1)]">
+            <div className="flex flex-col gap-3 rounded-2xl border border-secondary/40 bg-gradient-to-r from-secondary/20 via-secondary/10 to-transparent p-3.5 shadow-lg backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between md:p-5">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                <div className="rounded-xl border border-secondary/40 bg-secondary/20 p-2.5 text-secondary-foreground">
                   <Trophy className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Champion de l&apos;Édition
                   </div>
-                  <div className="text-base md:text-lg font-black italic tracking-tight text-foreground">
-                    {(edition.winnerMetadata as any).username || "Vainqueur Officiel"}
+                  <div className="text-base font-black italic tracking-tight text-foreground md:text-lg">
+                    {winnerName}
                   </div>
                 </div>
               </div>
-              <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/40 text-xs font-black uppercase">
-                Vainqueur
-              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full gap-2 border-secondary/50 bg-secondary/10 font-bold text-foreground hover:bg-secondary/20 sm:w-auto"
+                onClick={() => setShowWinnerDialog(true)}
+                aria-label="Voir le vainqueur de l'édition"
+              >
+                <Award className="h-4 w-4" />
+                Voir le vainqueur
+              </Button>
             </div>
           </div>
         )}
@@ -709,6 +750,100 @@ export function EditionDetailHeader({
         editionId={edition.id}
         editionLabel={edition.name || `Édition #${edition.editionNumber}`}
       />
+
+      {isMobile ? (
+        <Drawer open={showWinnerDialog} onOpenChange={setShowWinnerDialog}>
+          <DrawerContent className="border-border/60 bg-card">
+            <DrawerHeader className="text-left">
+              <DrawerTitle>Vainqueur de l&apos;édition</DrawerTitle>
+              <DrawerDescription>
+                Profil du champion officiel de cette édition.
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="space-y-4 px-4 pb-6">
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-secondary/30 bg-secondary/10 p-4 text-center">
+                <Awards
+                  variant="badge"
+                  level="gold"
+                  title="Champion"
+                  subtitle={editionName}
+                />
+                <Avatar className="h-20 w-20 border-2 border-secondary/40">
+                  <AvatarImage src={winnerMetadata.avatar ?? undefined} alt={winnerName} />
+                  <AvatarFallback>{winnerInitials || "GT"}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <p className="text-lg font-bold text-foreground">{winnerName}</p>
+                  {winnerMetadata.gameTag && (
+                    <p className="text-sm text-muted-foreground">@{winnerMetadata.gameTag}</p>
+                  )}
+                  {winnerMetadata.clubName && (
+                    <p className="text-sm text-muted-foreground">{winnerMetadata.clubName}</p>
+                  )}
+                </div>
+              </div>
+              {edition.winnerId ? (
+                <Button asChild className="w-full gap-2">
+                  <Link href={`/tournaments/${tournament.id}/members/${edition.winnerId}`}>
+                    Voir le profil membre
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">
+                  Profil membre indisponible.
+                </p>
+              )}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={showWinnerDialog} onOpenChange={setShowWinnerDialog}>
+          <DialogContent className="border-border/60 bg-card sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Vainqueur de l&apos;édition</DialogTitle>
+              <DialogDescription>
+                Profil du champion officiel de cette édition.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-secondary/30 bg-secondary/10 p-5 text-center">
+                <Awards
+                  variant="badge"
+                  level="gold"
+                  title="Champion"
+                  subtitle={editionName}
+                />
+                <Avatar className="h-20 w-20 border-2 border-secondary/40">
+                  <AvatarImage src={winnerMetadata.avatar ?? undefined} alt={winnerName} />
+                  <AvatarFallback>{winnerInitials || "GT"}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <p className="text-lg font-bold text-foreground">{winnerName}</p>
+                  {winnerMetadata.gameTag && (
+                    <p className="text-sm text-muted-foreground">@{winnerMetadata.gameTag}</p>
+                  )}
+                  {winnerMetadata.clubName && (
+                    <p className="text-sm text-muted-foreground">{winnerMetadata.clubName}</p>
+                  )}
+                </div>
+              </div>
+              {edition.winnerId ? (
+                <Button asChild className="w-full gap-2">
+                  <Link href={`/tournaments/${tournament.id}/members/${edition.winnerId}`}>
+                    Voir le profil membre
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">
+                  Profil membre indisponible.
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

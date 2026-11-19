@@ -11,89 +11,16 @@ import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 import { resolveRoute } from "@/lib/routes/resolver";
 import { canSkipWelcome } from "@/lib/routes/safe-redirect";
 import type { UserRoles, ResolvedRoute } from "@/types/routes";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { useUserProfile } from "@/hooks/use-profile";
 import { useAppShellStore } from "@/stores/app-shell-store";
-import Image from "next/image";
-import { PulseLoading } from "../loading-ui/pulse-loader";
+import Loader from "@/components/loading/loader";
 
-// Loading Screen Premium pour les transitions nécessitant un blocage
+// Écran de blocage partagé pour les transitions d'authentification.
 function LoadingScreen({ message = "Chargement..." }: { message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-      <div className="text-center space-y-8">
-        <div className="relative">
-          <motion.div
-            animate={{
-              rotate: 360,
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              rotate: { duration: 2, repeat: Infinity, ease: "linear" },
-              scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" },
-            }}
-            className="w-24 h-24 mx-auto mb-6 relative"
-          >
-            <div className="absolute inset-0 rounded-full border-4 border-primary/10"></div>
-            <div className="absolute inset-4 rounded-full border-4 border-primary border-t-transparent"></div>
-            <div className="absolute inset-8 rounded-full border-4 border-primary/30 border-b-transparent"></div>
-
-            {/* Logo in center */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-8 w-8 rounded-lg flex items-center justify-center">
-                <Image
-                  src="/icons/icon-72.png"
-                  alt="Logo"
-                  width={50}
-                  height={50}
-                />
-              </div>
-            </div>
-          </motion.div>
-        </div>
-        <div className="space-y-3">
-          <motion.h2
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent"
-          >
-            {message}
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-muted-foreground max-w-sm mx-auto"
-          >
-            Préparation de votre expérience gaming
-          </motion.p>
-        </div>
-
-        {/* Progress dots */}
-        <motion.div
-          className="flex items-center justify-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          {[0, 1, 2].map((i) => (
-            <motion.div
-              key={i}
-              className="h-2 w-2 rounded-full bg-primary/30"
-              animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.3, 1, 0.3],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                delay: i * 0.2,
-              }}
-            />
-          ))}
-        </motion.div>
-      </div>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Loader title={message} subtitle="Préparation de votre espace gaming" size="lg" />
     </div>
   );
 }
