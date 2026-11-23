@@ -1,4 +1,4 @@
-# Document 04 — Analyse Comparative et Matrice des Écarts (Gap Analysis)
+# Document 04 — Analyse Comparative et Matrice des Écarts (Gap Analysis) — Révisé
 
 Ce document compare point par point l'architecture actuelle de Games Trafics avec les standards de l'industrie représentés par **Toornament**, **Challonge**, **Start.gg** et **FACEIT**.
 
@@ -15,7 +15,8 @@ Ce document compare point par point l'architecture actuelle de Games Trafics ave
 | **Roster figé par édition** | ❌ **Non** (utilise `team_members` global) | ✅ **Oui** (`lineup` instancié par tournoi) | ❌ Non | ✅ **Oui** (Participants liés à l'Entrant) | ✅ **Oui** (Roster verrouillé par cup) |
 | **Rôles dans l'équipe (Coach/Sub)** | Partiel (`team_members.role`) | ✅ Oui (`player`, `substitute`, `coach`) | ❌ Non | ✅ Oui (`role`, `isCaptain`) | ✅ Oui (`captain`, `substitute`) |
 | **Participants Invités (Sans compte)** | ⚠️ Partiel (crée un faux `tournament_member`) | ✅ Oui (Participant indépendant de compte) | ✅ Oui (`name` texte libre) | ✅ Oui (Entrant sans compte utilisateur) | ❌ Non (Comptes Steam/FACEIT obligatoires) |
-| **Custom Fields par tournoi** | ❌ Non (champs figés dans schema) | ✅ Oui (`custom_fields: key-value`) | ⚠️ Limité (`misc`) | ✅ Oui (`customData`) | ⚠️ Limité |
+| **Distinction Équipe réelle vs Club de jeu** | ❌ **Non** (champ `clubName` confus) | ✅ Oui (Equipe vs In-game loadout) | ❌ Non | ✅ Oui (Entrant vs Character/Team) | ✅ Oui |
+| **Séparation Staff vs Compétiteurs** | ❌ **Non** (mélangés dans `tournament_members`) | ✅ Oui (Permissions distinctes) | ✅ Oui | ✅ Oui (Admin/Staff vs Entrant) | ✅ Oui (Roles séparés) |
 | **Check-in dynamique** | ✅ Oui (`checkedIn`, `checkedInAt`) | ✅ Oui (`checked_in`, dates) | ✅ Oui | ✅ Oui | ✅ Oui |
 
 ---
@@ -39,11 +40,12 @@ Ce document compare point par point l'architecture actuelle de Games Trafics ave
 
 | Fonctionnalité | Games Trafics Actuel | Toornament | Challonge | Start.gg | FACEIT |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **Nombre d'adversaires max** | ❌ **Rigide (2 participants)** | ✅ **Universel (2 ou N via `opponents`)** | ❌ Rigide (2 joueurs) | ✅ **Universel (2 ou N)** | ❌ Rigide (2 équipes) |
-| **Support Battle Royale / FFA** | ❌ **Impossible** | ✅ **Natif (`type: ffa`)** | ❌ Impossible | ✅ **Natif (`entrants` multiples)** | ❌ Non |
+| **Nombre d'adversaires max** | ❌ **Rigide (2 participants obligatoires)** | ✅ **Universel (2 ou N via `opponents`)** | ❌ Rigide (2 joueurs) | ✅ **Universel (2 ou N)** | ❌ Rigide (2 équipes) |
+| **Support Battle Royale / FFA direct** | ❌ **Impossible** | ✅ **Natif (`type: ffa`)** | ❌ Impossible | ✅ **Natif (`entrants` multiples)** | ❌ Non |
+| **Confrontations Collectives (Inter-Régions)** | ❌ **Impossible nativement** | ⚠️ Partiel | ❌ Non | ⚠️ Complexe | ⚠️ Non |
 | **Séries Best-of-X (BO1, BO3, BO5)** | ⚠️ Simulé (`matches.metadata.format`) | ✅ **Natif (Match -> Games)** | ⚠️ Par scores_csv | ✅ **Natif (Set -> Games)** | ✅ **Natif (Match -> Maps)** |
 | **Score par manche élémentaire** | ❌ Non (stocké dans `gameData: jsonb`) | ✅ Oui (`games.score`) | ⚠️ Chaîne `scores_csv` | ✅ Oui (`games.score`) | ✅ Oui (`maps.score`) |
-| **Statut de validation par partie** | Global au match | Par manche et par match | Global au match | Par manche et par set | Automatisé via serveur |
+| **Slots relationnels d'arbre (DAG)** | ❌ Non (placeholders textuels non typés) | ✅ Oui | ✅ Oui | ✅ Oui (Seeds & Slots) | ✅ Oui |
 | **Preuves (Screenshots, Vidéos)** | ✅ Oui (`screenshot`, `proofLinks`) | ⚠️ En pièce jointe | ✅ Oui (`attachments`) | ⚠️ Non natif | ✅ Démos serveur auto |
 
 ---
@@ -54,10 +56,11 @@ Ce document compare point par point l'architecture actuelle de Games Trafics ave
 |:---|:---:|:---:|:---:|:---:|:---:|
 | **Scoring Sport / Football (Victoire/Nul/Défaite)** | ✅ Oui (`scoring.ts`, 3/1/0) | ✅ Oui | ✅ Oui | ❌ (Orientation win/loss) | ❌ (Win/loss binaire) |
 | **Scoring Battle Royale (Points Place + Kills)** | ❌ **Non géré** | ✅ **Oui (`ranking_points` configurables)** | ❌ Non géré | ✅ **Oui** | ❌ Non géré |
-| **Départage Confrontation directe (Head-to-head)** | ✅ Oui (`standings.engine.ts`) | ✅ Oui | ✅ Oui | ✅ Oui | ❌ |
-| **Départage Différence de score (Goal diff)** | ✅ Oui | ✅ Oui | ✅ Oui | ✅ Oui | ❌ |
+| **Départage Confrontation directe (Head-to-head)** | ❌ **NON IMPLÉMENTÉ dans `rankParticipants()`** (ignoré par le code de tri réel) | ✅ Oui | ✅ Oui | ✅ Oui | ❌ |
+| **Départage Différence de score (Goal diff)** | ✅ Oui (`GOAL_DIFF`) | ✅ Oui | ✅ Oui | ✅ Oui | ❌ |
+| **Départage Buts marqués (Goals for)** | ✅ Oui (`GOALS_FOR`) | ✅ Oui | ✅ Oui | ✅ Oui | ❌ |
 | **Départage Buchholz / Sonneborn-Berger** | ❌ Non implémenté | ✅ Oui | ✅ Oui | ✅ Oui | ❌ |
-| **Chronométrage au centième / millième (Courses)** | ❌ Non (uniquement entiers de scores) | ✅ Oui (métadonnées temporelles) | ❌ Non | ⚠️ Limité | ❌ Non |
+| **Chronométrage au centième / millième (Courses)** | ❌ Non (uniquement entiers) | ✅ Oui (métadonnées temporelles) | ❌ Non | ⚠️ Limité | ❌ Non |
 
 ---
 
@@ -69,15 +72,17 @@ Ce document compare point par point l'architecture actuelle de Games Trafics ave
 ├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
 │ Matches FFA / BR        │ Schéma bloqué à 2 colonnes (participant1 / participant2)    │ BLOQUANT  │
 ├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
+│ Confrontations Collectives | Impossible de regrouper des sous-matchs sous 2 camps      │ BLOQUANT  │
+├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
 │ Découpage Match / Game  │ Pas de table 'games' : les manches n'existent pas en base   │ MAJEUR    │
 ├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
 │ Roster d'Équipe         │ Les équipes n'ont pas de roster figé par édition            │ MAJEUR    │
 ├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
+│ Départage HEAD_TO_HEAD  │ Ignoré dans l'implémentation réelle de `rankParticipants()` │ MAJEUR    │
+├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
 │ Surcharge PhaseGroup    │ Les journées de championnat polluent les tables de groupes  │ MODÉRÉ    │
 ├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
-│ Participants Invités    │ Crée un faux membre de tournoi global pour chaque invité    │ MODÉRÉ    │
-├─────────────────────────┼─────────────────────────────────────────────────────────────┼───────────┤
-│ Moteur de Scoring BR    │ Aucun calcul de points par palier de survie ni par kill     │ MAJEUR    │
+│ Slots de progression    │ Dépendances stockées en text / JSON opaque au lieu de FK    │ MAJEUR    │
 └─────────────────────────┴─────────────────────────────────────────────────────────────┴───────────┘
 ```
 
@@ -85,9 +90,6 @@ Ce document compare point par point l'architecture actuelle de Games Trafics ave
 
 ## 3. Matrice de Maturité Compétitive
 
-* **Niveau 1 — Basique (Challonge v1) :** Tournois duels 1v1 simples, bracket éliminatoire généré à la volée, scores manuels.  
-  * *Games Trafics dépasse déjà largement ce niveau (gestion financière, notifications, design 3D).*
-* **Niveau 2 — Intermédiaire Avancé (État actuel de Games Trafics) :** Tournois multi-phases (poules + élimination), matches aller-retour, calcul dynamique des classements, gestion des clubs et prize pool en monnaie virtuelle.
-* **Niveau 3 — Professionnel Esports (Toornament / Start.gg) :** Découpage Match / Games (BO3, BO5), entités Entrant et Opponent universelles (1v1, TvT, FFA Battle Royale), rosters instanciés, moteur de scoring enfichable par jeu.  
-  * *C'est le niveau cible de notre proposition d'architecture.*
-* **Niveau 4 — Intégré Serveurs de Jeu (FACEIT) :** Déploiement automatique de serveurs de jeu dédiés, bot de gestion de lobby dans le jeu, récupération des scores par API mémoire/démo.
+* **Niveau 1 — Basique (Challonge v1) :** Tournois duels 1v1 simples, bracket éliminatoire généré à la volée, scores manuels.
+* **Niveau 2 — Intermédiaire Avancé (État actuel de Games Trafics) :** Tournois multi-phases, matches aller-retour, calcul dynamique des classements, prize pool en GTC et arbres 3D.
+* **Niveau 3 — Professionnel Esports Universel (Cible Games Trafics V2) :** Découpage Rencontre / Sous-matchs / Manches, entités Entrant et Roster figé, oppositions universelles (Duels, FFA direct sans côtés artificiels, et Chocs Collectifs avec camps), slots relationnels DAG, et Rule Engine paramétrable sans déploiement de code.
