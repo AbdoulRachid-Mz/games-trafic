@@ -1,18 +1,21 @@
-# Document 05 — Proposition d'Architecture Cible Universelle (Spécification Définitive)
+# Document 05 — Proposition d'Architecture Cible Universelle (Spécification Définitive et Complète)
 
-Ce document constitue la référence formelle et définitive du modèle relationnel cible pour le système de compétition de Games Trafics. Il détaille l'ensemble des entités, leurs cardinalités, leurs contraintes d'intégrité et démontre concrètement le support des 6 formats compétitifs majeurs.
+Ce document constitue la référence formelle, exhaustive et validée de l'architecture cible du système de compétition de Games Trafics. Il définit l'ensemble des tables, colonnes, cardinalités, contraintes SQL, relations d'intégrité et démontre concrètement la prise en charge de l'ensemble des formats compétitifs.
 
 ---
 
-## 1. Vue d'Ensemble et Découplage Fondamental
+## 1. Principes Directeurs et Séparation des Responsabilités
 
-Le modèle cible repose sur une séparation intransigeante des responsabilités :
-1. **Identité Globale (`users`, `teams`, `team_members`) :** Les entités permanentes de la plateforme, strictement préservées lors de la purge.
-2. **Encadrement (`tournament_staff`) :** Les arbitres et organisateurs, dissociés des compétiteurs.
-3. **Entité Compétitive (`competition_entrants`, `entrant_roster_members`) :** L'unique entité inscrite à une édition, figée dans le temps, dissociée du club cosmétique sélectionné dans le jeu (`in_game_club`).
-4. **Structure Temporelle et Sportive (`competition_stages`, `competition_groups`, `competition_rounds`) :** Distinction stricte entre poules de classement et journées de calendrier.
-5. **Rencontres Universelles (`competition_encounters`, `encounter_sides`, `encounter_matches`, `match_slots`, `match_games`, `game_metrics`) :** Modèle relationnel polymorphe couvrant les duels, le FFA direct (sans côtés artificiels) et les confrontations collectives.
-6. **Moteur Déclaratif (`competition_rulesets`) :** Paramétrage intégral en base des barèmes, calculs et départages sans développement TypeScript par jeu.
+Le modèle relationnel garantit 6 séparations strictes :
+1. **Identité Globale (`users`, `teams`, `team_members`) :** Entités permanentes de la plateforme, intangibles et préservées lors de toute opération sur les tournois.
+2. **Encadrement Administratif (`tournament_staff`) :** Arbitres, organisateurs et casters, formellement dissociés des compétiteurs.
+3. **Entité Compétitive Unique (`competition_entrants`, `entrant_roster_members`) :** L'unique unité en compétition (Solo, Équipe, Invité), figée pour une édition donnée, indépendante du club cosmétique sélectionné dans le jeu (`in_game_club`).
+4. **Structure Temporelle et Sportive (`competition_stages`, `competition_groups`, `competition_rounds`) :** Découplage strict entre poules de classement et calendrier des journées.
+5. **Rencontres Polymorphes et Sécurisées (`competition_encounters`, `encounter_sides`, `encounter_side_entrants`, `encounter_matches`, `match_slots`, `match_games`, `game_metrics`) :**
+   * **Duels standards (1v1, TvT) :** 1 encounter $\rightarrow$ 1 match $\rightarrow$ 2 slots directs. Aucun camp (`encounter_sides`) superflu.
+   * **FFA direct (Courses, Battle Royale) :** 1 encounter $\rightarrow$ 1 match $\rightarrow$ N slots directs. **Zéro côté artificiel.**
+   * **Confrontations Collectives (Inter-Régions, Clan Wars) :** 1 encounter parent $\rightarrow$ 2 camps (`encounter_sides`) $\rightarrow$ N sous-matchs dont chaque slot est contraint par clé étrangère composite à appartenir à son camp.
+6. **Moteur Déclaratif Piloté par les Données (`competition_rulesets`, `ruleset_versions`) :** Règles de scoring, métriques, départages et qualifications configurables en base par phase sans développement de code.
 
 ---
 
@@ -28,198 +31,347 @@ erDiagram
     users ||--o| competition_entrants : "joueur solo (optionnel)"
     teams ||--o| competition_entrants : "club réel (optionnel)"
 
-    competition_entrants ||--o{ entrant_roster_members : "composition (roster)"
+    competition_entrants ||--o{ entrant_roster_members : "composition d'édition"
     users ||--o| entrant_roster_members : "joueur physique (optionnel)"
 
-    competition_entrants ||--o| registration_payments : "paiement lié"
+    competition_entrants ||--o{ registration_payments : "a des paiements"
     registration_payments ||--|| wallet_transactions : "traçabilité comptable"
 
     tournament_editions ||--o{ competition_stages : "découpé en étapes"
-    competition_stages ||--o{ competition_groups : "comprend des poules"
-    competition_stages ||--o{ competition_rounds : "planifie des rounds/journées"
+    competition_stages ||--o{ competition_groups : "poules de classement"
+    competition_stages ||--o{ competition_rounds : "journées calendaires"
 
-    tournament_editions ||--|| competition_rulesets : "applique un barème"
+    competition_rulesets ||--o{ ruleset_versions : "possède des versions"
+    competition_stages }o--|| ruleset_versions : "applique une version de règles"
 
     competition_stages ||--o{ competition_encounters : "rencontres"
     competition_groups ||--o{ competition_encounters : "rattaché à la poule (optionnel)"
     competition_rounds ||--o{ competition_encounters : "programmé au round (optionnel)"
 
-    competition_encounters ||--o{ encounter_sides : "camps collectifs (uniquement si COLLECTIVE)"
+    competition_encounters ||--o{ encounter_sides : "camps (uniquement si COLLECTIVE)"
     encounter_sides ||--o{ encounter_side_entrants : "compose le camp"
-    competition_entrants ||--o{ encounter_side_entrants : "assigné au camp"
+    competition_entrants ||--o{ encounter_side_entrants : "affecté au camp"
 
     competition_encounters ||--o{ encounter_matches : "contient 1 à N matchs"
     
-    encounter_matches ||--o{ match_slots : "reçoit 2 à N slots d'opposants"
-    competition_entrants ||--o| match_slots : "occupe le slot"
-    encounter_matches ||--o| match_slots : "source de qualification (FK)"
-    competition_groups ||--o| match_slots : "source de groupe (FK)"
+    encounter_matches ||--o{ match_slots : "reçoit 2 à N slots"
+    competition_entrants ||--o| match_slots : "assigné au slot"
+    encounter_sides ||--o| match_slots : "camp d'appartenance (si collectif)"
+    encounter_side_entrants ||--o| match_slots : "garantie d'appartenance composite"
 
-    encounter_matches ||--o{ match_games : "manches / cartes (BO1, BO3...)"
-    match_games ||--o{ game_metrics : "stats par manche"
-    match_slots ||--o{ game_metrics : "performance de l'opposant"
+    encounter_matches ||--o| match_slots : "source match amont (FK)"
+    competition_groups ||--o| match_slots : "source groupe amont (FK)"
+
+    encounter_matches ||--o{ match_games : "manches / cartes"
+    match_games ||--o{ game_metrics : "mesures par manche"
+    match_slots ||--o{ game_metrics : "performance du slot"
 ```
 
 ---
 
-## 3. Dictionnaire des Données et Cardinalités Exactes
+## 3. Spécification Détaillée des Tables et Contraintes SQL
 
 ### A. Niveau Compétition et Inscriptions
 
 #### 1. `tournaments`
-* **Rôle :** Conteneur permanent de la compétition (ex. *Ligue des Champions Games Trafics*).
-* **Colonnes clés :** `id` (UUID PK), `name` (unique), `game` (string), `platform` (enum), `organizer_id` (FK `users.id`).
-* **Sort :** Structure conservée et épurée des champs obsolètes. Données historiques purgées.
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `name` : `TEXT NOT NULL UNIQUE`
+* `slug` : `TEXT UNIQUE`
+* `game` : `TEXT NOT NULL`
+* `platform` : `TEXT NOT NULL DEFAULT 'MOBILE'`
+* `organizer_id` : `TEXT NOT NULL REFERENCES users(id)`
+* `description` : `TEXT`
+* `logo` : `TEXT`
+* `banner` : `TEXT`
+* `is_active` : `BOOLEAN DEFAULT TRUE`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* `updated_at` : `TIMESTAMP DEFAULT NOW()`
 
 #### 2. `tournament_editions`
-* **Rôle :** Instance événementielle temporelle (ex. *Édition 2026 - Saison 1*).
-* **Colonnes clés :** `id` (UUID PK), `tournament_id` (FK `tournaments.id` ON DELETE CASCADE), `edition_number` (int), `start_date` (timestamp), `end_date` (timestamp), `prize_pool` (numeric), `entry_fee` (numeric), `ruleset_id` (FK `competition_rulesets.id`), `ruleset_version` (int), `financial_account_id` (FK `financial_accounts.id`).
-* **Cardinalité :** 1 tournoi -> 1 à N éditions.
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `tournament_id` : `UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE`
+* `edition_number` : `INTEGER NOT NULL`
+* `name` : `TEXT NOT NULL`
+* `start_date` : `TIMESTAMP NOT NULL`
+* `end_date` : `TIMESTAMP`
+* `registration_opens` : `TIMESTAMP`
+* `registration_deadline` : `TIMESTAMP`
+* `max_entrants` : `INTEGER`
+* `entry_fee` : `NUMERIC(15, 2) DEFAULT '0'`
+* `prize_pool` : `NUMERIC(15, 2) DEFAULT '0'`
+* `prize_currency` : `TEXT DEFAULT 'GTC'`
+* `financial_account_id` : `TEXT REFERENCES financial_accounts(id)`
+* `default_ruleset_version_id` : `UUID REFERENCES ruleset_versions(id)`
+* `status` : `TEXT NOT NULL DEFAULT 'UPCOMING'` (UPCOMING, REGISTRATION, LIVE, COMPLETED, CANCELLED)
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* `updated_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(tournament_id, edition_number)`
 
 #### 3. `tournament_staff`
-* **Rôle :** Encadrement administratif et arbitrage de la compétition.
-* **Colonnes clés :** `id` (UUID PK), `tournament_id` (FK `tournaments.id` ON DELETE CASCADE), `edition_id` (FK nullable `tournament_editions.id`), `user_id` (FK `users.id`), `role` (enum: `ORGANIZER`, `HEAD_REFEREE`, `REFEREE`, `CASTER`), `permissions` (text[]).
-* **Contrainte d'unicité :** `UNIQUE(edition_id, user_id, role)`.
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `tournament_id` : `UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE`
+* `edition_id` : `UUID REFERENCES tournament_editions(id) ON DELETE CASCADE` (NULL si permanent)
+* `user_id` : `TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE`
+* `role` : `TEXT NOT NULL` (ORGANIZER, CO_ORGANIZER, HEAD_REFEREE, REFEREE, CASTER, OBSERVER)
+* `permissions` : `TEXT[] DEFAULT '{}'`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(tournament_id, edition_id, user_id, role)`
 
 #### 4. `competition_entrants`
-* **Rôle :** L'unique entité compétitrice admise dans l'édition.
-* **Colonnes clés :** `id` (UUID PK), `edition_id` (FK `tournament_editions.id` ON DELETE CASCADE), `type` (enum: `SOLO`, `TEAM`, `GUEST`), `user_id` (FK nullable `users.id`), `team_id` (FK nullable `teams.id`), `name` (string), `tag` (string), `logo` (string), `seed` (int nullable), `in_game_club` (string nullable, ex: *"Real Madrid"*), `status` (enum: `REGISTERED`, `CHECKED_IN`, `DISQUALIFIED`), `custom_fields` (jsonb).
-* **Contrainte :** `CHECK ((type = 'SOLO' AND user_id IS NOT NULL) OR (type = 'TEAM' AND team_id IS NOT NULL) OR (type = 'GUEST'))`.
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `edition_id` : `UUID NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE`
+* `type` : `TEXT NOT NULL` (SOLO, TEAM, GUEST)
+* `user_id` : `TEXT REFERENCES users(id) ON DELETE RESTRICT`
+* `team_id` : `TEXT REFERENCES teams(id) ON DELETE RESTRICT`
+* `name` : `TEXT NOT NULL`
+* `tag` : `TEXT`
+* `logo` : `TEXT`
+* `seed` : `INTEGER`
+* `in_game_club` : `TEXT` (ex. "Real Madrid", "Barcelone" — choix cosmétique en jeu)
+* `status` : `TEXT NOT NULL DEFAULT 'REGISTERED'` (REGISTERED, CHECKED_IN, DISQUALIFIED, WITHDRAWN)
+* `custom_fields` : `JSONB DEFAULT '{}'`
+* `final_rank` : `INTEGER`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* `updated_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contraintes SQL :**
+  ```sql
+  CHECK (
+    (type = 'SOLO' AND user_id IS NOT NULL AND team_id IS NULL) OR
+    (type = 'TEAM' AND team_id IS NOT NULL AND user_id IS NULL) OR
+    (type = 'GUEST' AND team_id IS NULL)
+  );
+  -- Unicité SOLO : un utilisateur ne peut s'inscrire qu'une fois en solo par édition
+  CREATE UNIQUE INDEX entrants_edition_user_unique ON competition_entrants(edition_id, user_id) WHERE type = 'SOLO';
+  -- Unicité TEAM : une équipe ne peut s'inscrire qu'une fois par édition
+  CREATE UNIQUE INDEX entrants_edition_team_unique ON competition_entrants(edition_id, team_id) WHERE type = 'TEAM';
+  ```
 
 #### 5. `entrant_roster_members`
-* **Rôle :** Composition humaine figée de l'entrant pour cette édition spécifique.
-* **Colonnes clés :** `id` (UUID PK), `entrant_id` (FK `competition_entrants.id` ON DELETE CASCADE), `user_id` (FK nullable `users.id`), `in_game_name` (string), `in_game_id` (string), `role` (enum: `CAPTAIN`, `STARTER`, `SUBSTITUTE`, `COACH`).
-* **Cardinalité :** 1 entrant -> 1 à N membres de roster. (Pour un solo, N = 1).
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `edition_id` : `UUID NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE`
+* `entrant_id` : `UUID NOT NULL REFERENCES competition_entrants(id) ON DELETE CASCADE`
+* `user_id` : `TEXT REFERENCES users(id) ON DELETE RESTRICT` (Optionnel pour invités)
+* `in_game_name` : `TEXT NOT NULL`
+* `in_game_id` : `TEXT`
+* `role` : `TEXT NOT NULL DEFAULT 'STARTER'` (CAPTAIN, STARTER, SUBSTITUTE, COACH)
+* `is_active` : `BOOLEAN DEFAULT TRUE`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contraintes SQL :**
+  ```sql
+  -- Unicité de rôle de capitaine par entrant
+  CREATE UNIQUE INDEX entrant_captain_unique ON entrant_roster_members(entrant_id) WHERE role = 'CAPTAIN';
+  -- Règle anti-cumul : un même utilisateur ne peut être joueur actif dans deux équipes de la même édition
+  CREATE UNIQUE INDEX roster_edition_user_unique ON entrant_roster_members(edition_id, user_id) 
+    WHERE user_id IS NOT NULL AND role IN ('CAPTAIN', 'STARTER', 'SUBSTITUTE');
+  ```
+
+#### 6. `registration_payments`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `entrant_id` : `UUID REFERENCES competition_entrants(id) ON DELETE SET NULL`
+* `transaction_id` : `TEXT NOT NULL REFERENCES wallet_transactions(id) ON DELETE RESTRICT`
+* `amount` : `NUMERIC(15, 2) NOT NULL`
+* `currency` : `TEXT DEFAULT 'GTC'`
+* `payment_method` : `TEXT DEFAULT 'WALLET'`
+* `status` : `TEXT DEFAULT 'COMPLETED'` (PENDING, COMPLETED, REFUNDED, FAILED)
+* `archived_edition_name` : `TEXT`
+* `legacy_registration_id` : `TEXT`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Index :** `INDEX(entrant_id)`, `INDEX(transaction_id)`
 
 ---
 
-### B. Niveau Structurel
+### B. Niveau Structurel et Règles
 
-#### 6. `competition_stages`
-* **Rôle :** Grande étape logique (ex. *Phase de Poules*, *Playoffs Double Elimination*).
-* **Colonnes clés :** `id` (UUID PK), `edition_id` (FK `tournament_editions.id` ON DELETE CASCADE), `name` (string), `stage_type` (enum: `ROUND_ROBIN`, `SINGLE_ELIMINATION`, `DOUBLE_ELIMINATION`, `SWISS`, `BATTLE_ROYALE_LADDER`), `order` (int).
-* **Cardinalité :** 1 édition -> 1 à N stages.
+#### 7. `competition_rulesets` & `ruleset_versions`
+* `competition_rulesets` :
+  * `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+  * `name` : `TEXT NOT NULL UNIQUE`
+  * `game` : `TEXT NOT NULL`
+  * `created_at` : `TIMESTAMP DEFAULT NOW()`
+* `ruleset_versions` :
+  * `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+  * `ruleset_id` : `UUID NOT NULL REFERENCES competition_rulesets(id) ON DELETE CASCADE`
+  * `version` : `INTEGER NOT NULL`
+  * `scoring_mode` : `TEXT NOT NULL` (POINTS_TABLE, METRIC_ACCUMULATION, SERIES_WINS)
+  * `config` : `JSONB NOT NULL` (barèmes, matrices, tiebreaker_chain, qualification)
+  * `is_published` : `BOOLEAN DEFAULT FALSE`
+  * `created_at` : `TIMESTAMP DEFAULT NOW()`
+  * **Contrainte d'unicité :** `UNIQUE(ruleset_id, version)`
 
-#### 7. `competition_groups`
-* **Rôle :** Poule de classement au sein d'une phase.
-* **Colonnes clés :** `id` (UUID PK), `stage_id` (FK `competition_stages.id` ON DELETE CASCADE), `name` (string, ex: *"Poule A"*), `order` (int).
-* **Cardinalité :** 1 stage -> 0 à N groups. (0 si élimination directe pure sans poules).
+#### 8. `competition_stages`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `edition_id` : `UUID NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE`
+* `ruleset_version_id` : `UUID NOT NULL REFERENCES ruleset_versions(id)`
+* `name` : `TEXT NOT NULL`
+* `stage_type` : `TEXT NOT NULL` (ROUND_ROBIN, SINGLE_ELIMINATION, DOUBLE_ELIMINATION, SWISS, BATTLE_ROYALE_LADDER, LEADERBOARD, TIME_TRIAL)
+* `order` : `INTEGER NOT NULL`
+* `status` : `TEXT NOT NULL DEFAULT 'PENDING'` (PENDING, ACTIVE, COMPLETED)
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(edition_id, order)`
 
-#### 8. `competition_rounds`
-* **Rôle :** Unité temporelle de calendrier.
-* **Colonnes clés :** `id` (UUID PK), `stage_id` (FK `competition_stages.id` ON DELETE CASCADE), `round_number` (int), `name` (string, ex: *"Journée 1"*, *"Quarts de Finale"*), `scheduled_date` (timestamp).
-* **Cardinalité :** 1 stage -> 1 à N rounds.
+#### 9. `competition_groups`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `stage_id` : `UUID NOT NULL REFERENCES competition_stages(id) ON DELETE CASCADE`
+* `name` : `TEXT NOT NULL` (ex. "Poule A", "Poule B")
+* `order` : `INTEGER NOT NULL`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(stage_id, order)`
+
+#### 10. `competition_rounds`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `stage_id` : `UUID NOT NULL REFERENCES competition_stages(id) ON DELETE CASCADE`
+* `round_number` : `INTEGER NOT NULL`
+* `name` : `TEXT NOT NULL` (ex. "Journée 1", "Quarts de finale")
+* `scheduled_date` : `TIMESTAMP`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(stage_id, round_number)`
 
 ---
 
 ### C. Niveau Rencontres, Matchs, Slots et Manches
 
-#### 9. `competition_encounters`
-* **Rôle :** Conteneur de confrontation globale (Duel, Choc Collectif ou Arène FFA).
-* **Colonnes clés :** `id` (UUID PK), `stage_id` (FK `competition_stages.id` ON DELETE CASCADE), `group_id` (FK nullable `competition_groups.id`), `round_id` (FK nullable `competition_rounds.id`), `encounter_type` (enum: `DUEL`, `FFA`, `COLLECTIVE_FIXTURE`), `aggregation_rule` (enum: `DIRECT`, `MATCH_POINTS`, `SCORE_SUM`, `SERIES_WINS`), `status` (enum: `PENDING`, `READY`, `LIVE`, `COMPLETED`, `DISPUTED`), `scheduled_time` (timestamp).
+#### 11. `competition_encounters`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `stage_id` : `UUID NOT NULL REFERENCES competition_stages(id) ON DELETE CASCADE`
+* `group_id` : `UUID REFERENCES competition_groups(id) ON DELETE CASCADE` (Nullable)
+* `round_id` : `UUID REFERENCES competition_rounds(id) ON DELETE CASCADE` (Nullable)
+* `code` : `TEXT` (ex. "ENC-01", "UB-R1-M1")
+* `encounter_type` : `TEXT NOT NULL` (DUEL, FFA, COLLECTIVE_FIXTURE)
+* `aggregation_rule` : `TEXT NOT NULL DEFAULT 'DIRECT'` (DIRECT, MATCH_POINTS, SCORE_SUM, SERIES_WINS)
+* `status` : `TEXT NOT NULL DEFAULT 'PENDING'` (PENDING, READY, LIVE, COMPLETED, DISPUTED, CANCELLED)
+* `scheduled_time` : `TIMESTAMP`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
 
-#### 10. `encounter_sides` (Utilisé UNIQUEMENT si `encounter_type = 'COLLECTIVE_FIXTURE'`)
-* **Rôle :** Représente les deux camps d'une confrontation collective (ex: Camp 1 = Dakar, Camp 2 = Thiès).
-* **Colonnes clés :** `id` (UUID PK), `encounter_id` (FK `competition_encounters.id` ON DELETE CASCADE), `side_number` (int: 1 ou 2), `name` (string), `final_aggregated_points` (numeric(12,4)), `result` (enum: `WIN`, `LOSS`, `DRAW`).
-* **Cardinalité :** 1 encounter collectif -> exactement 2 sides.
+#### 12. `encounter_sides` (Utilisé UNIQUEMENT si `encounter_type = 'COLLECTIVE_FIXTURE'`)
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `encounter_id` : `UUID NOT NULL REFERENCES competition_encounters(id) ON DELETE CASCADE`
+* `side_number` : `INTEGER NOT NULL` (1 ou 2)
+* `name` : `TEXT NOT NULL` (ex. "Région Dakar", "Région Thiès")
+* `final_aggregated_points` : `NUMERIC(12, 4) DEFAULT 0`
+* `result` : `TEXT` (WIN, LOSS, DRAW)
+* **Contrainte d'unicité :** `UNIQUE(encounter_id, side_number)`
 
-#### 11. `encounter_side_entrants`
-* **Rôle :** Liste des participants composant chaque camp collectif.
-* **Colonnes clés :** `id` (UUID PK), `side_id` (FK `encounter_sides.id` ON DELETE CASCADE), `entrant_id` (FK `competition_entrants.id` ON DELETE CASCADE).
+#### 13. `encounter_side_entrants`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `encounter_id` : `UUID NOT NULL REFERENCES competition_encounters(id) ON DELETE CASCADE`
+* `side_id` : `UUID NOT NULL REFERENCES encounter_sides(id) ON DELETE CASCADE`
+* `entrant_id` : `UUID NOT NULL REFERENCES competition_entrants(id) ON DELETE CASCADE`
+* **Contraintes SQL :**
+  ```sql
+  -- Clé composite pour permettre la FK composite depuis match_slots
+  UNIQUE(side_id, entrant_id);
+  -- Un entrant ne peut appartenir qu'à un seul camp dans la même rencontre
+  UNIQUE(encounter_id, entrant_id);
+  ```
 
-#### 12. `encounter_matches`
-* **Rôle :** Le match physique ou le sous-match disputé entre opposants.
-  * Dans un duel 1v1 ou TvT : l'encounter contient **exactement 1** `encounter_match`.
-  * Dans un FFA : l'encounter contient **exactement 1** `encounter_match` (qui réunit N slots).
-  * Dans une confrontation collective : l'encounter contient **N** `encounter_matches` (les sous-matchs : Match 1, Match 2, etc.).
-* **Colonnes clés :** `id` (UUID PK), `encounter_id` (FK `competition_encounters.id` ON DELETE CASCADE), `match_order` (int), `title` (string, ex: *"Simple 1"*, *"Lobby Principal"*), `match_format` (enum: `BEST_OF_1`, `BEST_OF_3`, `BEST_OF_5`, `TWO_LEGS_AGGREGATE`, `POINTS_SERIES`), `points_weight` (numeric(12,4) default 1.0), `status` (enum: `PENDING`, `COMPLETED`).
+#### 14. `encounter_matches`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `encounter_id` : `UUID NOT NULL REFERENCES competition_encounters(id) ON DELETE CASCADE`
+* `match_order` : `INTEGER NOT NULL DEFAULT 1`
+* `title` : `TEXT NOT NULL DEFAULT 'Match 1'` (ex. "Simple 1", "Lobby 12 Escouades")
+* `match_format` : `TEXT NOT NULL DEFAULT 'BEST_OF_1'` (BEST_OF_1, BEST_OF_3, BEST_OF_5, TWO_LEGS_AGGREGATE, POINTS_SERIES)
+* `points_weight` : `NUMERIC(12, 4) DEFAULT 1.0` (Points attribués dans la confrontation collective)
+* `status` : `TEXT NOT NULL DEFAULT 'PENDING'` (PENDING, READY, LIVE, COMPLETED, DISPUTED, CANCELLED)
+* `is_conditional` : `BOOLEAN DEFAULT FALSE` (Pour le Bracket Reset GF2)
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(encounter_id, match_order)`
 
-#### 13. `match_slots`
-* **Rôle :** Emplacement d'adversaire au sein d'un match.
-* **Colonnes clés :**
-  * `id` (UUID PK).
-  * `match_id` (FK `encounter_matches.id` ON DELETE CASCADE).
-  * `slot_position` (int : 1, 2 dans un duel ; 1 à N dans un FFA).
-  * `assigned_entrant_id` (FK nullable `competition_entrants.id`).
-  * `source_type` (enum: `DIRECT_SEED`, `MATCH_WINNER`, `MATCH_LOSER`, `GROUP_RANK`, `CROSS_GROUP_RANK`, `BYE`, `MANUAL_OVERRIDE`).
-  * `source_match_id` (FK nullable `encounter_matches.id`).
-  * `source_group_id` (FK nullable `competition_groups.id`).
-  * `source_rank` (int nullable).
-  * `is_locked` (boolean default false) : **Protège le slot contre tout recalcul automatique.**
-  * `final_match_score` (numeric(12,4)) : Score final ou manches gagnées.
-  * `final_match_rank` (int nullable) : Rang final dans le match.
-  * `is_winner` (boolean default false).
-* **Contrainte d'unicité :** `UNIQUE(match_id, slot_position)`.
+#### 15. `match_slots`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `match_id` : `UUID NOT NULL REFERENCES encounter_matches(id) ON DELETE CASCADE`
+* `slot_position` : `INTEGER NOT NULL` (1, 2 pour duel ; 1..N pour FFA)
+* `side_id` : `UUID REFERENCES encounter_sides(id) ON DELETE CASCADE` (Nullable si non-collectif)
+* `assigned_entrant_id` : `UUID REFERENCES competition_entrants(id) ON DELETE SET NULL`
+* `source_type` : `TEXT NOT NULL DEFAULT 'DIRECT_SEED'` (DIRECT_SEED, MATCH_WINNER, MATCH_LOSER, GROUP_RANK, CROSS_GROUP_RANK, BYE, MANUAL_OVERRIDE)
+* `source_match_id` : `UUID REFERENCES encounter_matches(id) ON DELETE SET NULL`
+* `source_group_id` : `UUID REFERENCES competition_groups(id) ON DELETE SET NULL`
+* `source_rank` : `INTEGER`
+* `is_locked` : `BOOLEAN DEFAULT FALSE` (**Protège contre les recalculs automatiques**)
+* `final_match_score` : `NUMERIC(12, 4) DEFAULT 0`
+* `final_match_rank` : `INTEGER`
+* `is_winner` : `BOOLEAN DEFAULT FALSE`
+* **Contraintes SQL Cruciales :**
+  ```sql
+  UNIQUE(match_id, slot_position);
+  -- GARANTIE ABSOLUE D'APPARTENANCE AU CAMP POUR LES CONFRONTATIONS COLLECTIVES :
+  FOREIGN KEY (side_id, assigned_entrant_id) 
+    REFERENCES encounter_side_entrants(side_id, entrant_id) 
+    ON DELETE RESTRICT;
+  ```
 
-#### 14. `match_games`
-* **Rôle :** Manche ou carte individuelle au sein d'un match (Carte 1, Carte 2...).
-* **Colonnes clés :** `id` (UUID PK), `match_id` (FK `encounter_matches.id` ON DELETE CASCADE), `game_number` (int), `map_name` (string nullable), `status` (enum: `PENDING`, `COMPLETED`), `proof_url` (string nullable).
-* **Cardinalité :** 1 match -> 1 à X games.
+#### 16. `match_games`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `match_id` : `UUID NOT NULL REFERENCES encounter_matches(id) ON DELETE CASCADE`
+* `game_number` : `INTEGER NOT NULL` (1, 2, 3...)
+* `map_name` : `TEXT`
+* `status` : `TEXT NOT NULL DEFAULT 'PENDING'` (PENDING, LIVE, COMPLETED)
+* `proof_url` : `TEXT`
+* `created_at` : `TIMESTAMP DEFAULT NOW()`
+* **Contrainte d'unicité :** `UNIQUE(match_id, game_number)`
 
-#### 15. `game_metrics`
-* **Rôle :** Statistiques brutes et points calculés pour chaque slot dans chaque manche.
-* **Colonnes clés :** `id` (UUID PK), `game_id` (FK `match_games.id` ON DELETE CASCADE), `slot_id` (FK `match_slots.id` ON DELETE CASCADE), `score` (int default 0), `kills` (int default 0), `placement` (int nullable), `survival_time_ms` (bigint nullable), `laps_time_ms` (bigint nullable), `penalties` (numeric(12,4) default 0), `points_awarded` (numeric(12,4) default 0).
-* **Contrainte d'unicité :** `UNIQUE(game_id, slot_id)`.
+#### 17. `game_metrics`
+* `id` : `UUID PRIMARY KEY DEFAULT gen_random_uuid()`
+* `game_id` : `UUID NOT NULL REFERENCES match_games(id) ON DELETE CASCADE`
+* `slot_id` : `UUID NOT NULL REFERENCES match_slots(id) ON DELETE CASCADE`
+* `metric_code` : `TEXT NOT NULL` (score, kills, assists, damage, placement, survival_time_ms, laps_time_ms, penalties)
+* `raw_value` : `NUMERIC(15, 4) NOT NULL DEFAULT 0`
+* `calculated_points` : `NUMERIC(12, 4) NOT NULL DEFAULT 0`
+* **Contrainte d'unicité :** `UNIQUE(game_id, slot_id, metric_code)`
 
 ---
 
 ## 4. Démonstration Concrète des Six Formats Compétitifs
 
 ### Format 1 : Duel Individuel 1v1 (eFootball / EA Sports FC)
-* **Configuration :** 1 `competition_encounter` (`encounter_type = 'DUEL'`, `aggregation_rule = 'DIRECT'`).
-* **Matches :** Exactement 1 `encounter_match` (`match_format = 'BEST_OF_1'`).
-* **Sides :** Aucun `encounter_sides` créé (inutile en duel simple).
-* **Slots :** 2 `match_slots` :
-  * Slot 1 : `assigned_entrant_id = Joueur A`, `slot_position = 1`.
-  * Slot 2 : `assigned_entrant_id = Joueur B`, `slot_position = 2`.
-* **Game :** 1 `match_game` (Game 1).
-* **Métriques :** Slot 1 : `score = 3` ; Slot 2 : `score = 1`.
-* **Résolution :** Slot 1 `is_winner = true`.
+* 1 `competition_encounters` (`encounter_type = 'DUEL'`, `aggregation_rule = 'DIRECT'`).
+* **Zéro `encounter_sides` créé.**
+* 1 `encounter_matches` (`match_format = 'BEST_OF_1'`).
+* 2 `match_slots` :
+  * Slot 1 : `slot_position = 1`, `side_id = NULL`, `assigned_entrant_id = Entrant_Amadou` (`in_game_club = 'Real Madrid'`).
+  * Slot 2 : `slot_position = 2`, `side_id = NULL`, `assigned_entrant_id = Entrant_Moussa` (`in_game_club = 'FC Barcelone'`).
+* 1 `match_games` (Game 1).
+* `game_metrics` : Amadou `metric_code = 'score'`, `raw_value = 3` ; Moussa `raw_value = 1`.
+* Résolution : Slot 1 gagne, `is_winner = true`.
 
-### Format 2 : Duel par Équipes (Team vs Team 5v5 — Valorant / League of Legends)
-* **Configuration :** 1 `competition_encounter` (`encounter_type = 'DUEL'`).
-* **Entrants :** Entrant A (Team Vitality), Entrant B (Karmine Corp).
-* **Rosters :** 5 joueurs titulaires liés à Entrant A dans `entrant_roster_members`, 5 à Entrant B.
-* **Slots :** 2 `match_slots` occupés par Entrant A et Entrant B.
-* **Résolution :** Victoire attribuée à l'entité équipe.
+### Format 2 : Duel par Équipes (Team vs Team 5v5 — Valorant / COD Mobile)
+* 1 `competition_encounters` (`encounter_type = 'DUEL'`).
+* Entrants de type `TEAM` : Entrant_Vitality (`team_id = tm_vit`), Entrant_Karmine (`team_id = tm_kcorp`).
+* Les 5 joueurs de chaque équipe sont figés dans `entrant_roster_members` pour l'édition.
+* Les slots reçoivent directement les entrants d'équipe. La victoire est collective.
 
-### Format 3 : Série en Manches Multiples BO3 / BO5 (COD Mobile Search & Destroy)
-* **Configuration :** 1 `encounter_match` (`match_format = 'BEST_OF_3'`).
-* **Manches :** 3 `match_games` pré-créées :
-  * Game 1 (Map: Standoff) : Slot 1 gagne 6-4.
-  * Game 2 (Map: Raid) : Slot 2 gagne 6-3.
-  * Game 3 (Map: Firing Range) : Slot 1 gagne 6-5.
-* **Résolution :** Le Rule Engine compte 2 manches gagnées pour le Slot 1 -> Slot 1 déclaré vainqueur 2-1 de la série.
+### Format 3 : Série en Manches Multiples BO3 / BO5
+* 1 `encounter_matches` (`match_format = 'BEST_OF_3'`).
+* 3 lignes dans `match_games` (Game 1, Game 2, Game 3).
+* Pour chaque game, les `game_metrics` stockent les scores par carte.
+* L'évaluateur compte les victoires de cartes : dès qu'un slot atteint 2 victoires, le match passe à `COMPLETED` et la 3e manche non jouée passe à `CANCELLED`.
 
-### Format 4 : FFA Direct sans Côtés Artificiels (Course Asphalt 9 à 8 Pilotes)
-* **Démonstration de non-nécessité des Sides :**
-  * `competition_encounters.encounter_type = 'FFA'`.
-  * Aucun enregistrement dans `encounter_sides`.
-  * 1 `encounter_match` (`match_format = 'POINTS_SERIES'`).
-  * **8 `match_slots` directs** (`slot_position` de 1 à 8), chacun assigné à un pilote indépendant.
-  * Pour chaque course (`match_games`), 8 enregistrements dans `game_metrics` contenant le `placement` (1 à 8) et le `laps_time_ms`.
-  * Les points sont calculés et cumulés par slot sans aucune structure artificielle à deux camps.
+### Format 4 : FFA Direct sans Côtés Artificiels (Course 8 Pilotes)
+* `encounter_type = 'FFA'`.
+* **Démonstration : aucun côté (`encounter_sides`) n'est créé.**
+* 1 `encounter_matches` (`match_format = 'POINTS_SERIES'`).
+* **8 `match_slots` directs** (`slot_position` 1 à 8, `side_id = NULL`), chacun lié à un pilote.
+* Chaque course (`match_games`) enregistre dans `game_metrics` pour chaque slot son `placement` et son chronomètre `laps_time_ms`.
+* Cumul des points direct sans aucune distorsion de modèle.
 
 ### Format 5 : Battle Royale Multi-Manches (Free Fire — 12 Escouades)
-* **Configuration :** `competition_encounters.encounter_type = 'FFA'`.
-* **Slots :** 12 `match_slots` directs (un par escouade).
-* **Manches :** 4 `match_games` (Manche 1: Bermuda, Manche 2: Purgatory, Manche 3: Kalahari, Manche 4: Bermuda).
-* **Calcul par Manche dans `game_metrics` :**
-  * Escouade 1 : `placement = 1` (12 pts) + `kills = 8` (8 pts) = 20 pts.
-  * Escouade 2 : `placement = 2` (9 pts) + `kills = 14` (14 pts) = 23 pts.
-* **Résultat Général de l'Encounter :** Somme arithmétique des `points_awarded` sur les 4 manches. Classement final généré instantanément.
+* `encounter_type = 'FFA'`.
+* 12 `match_slots` directs (`side_id = NULL`).
+* 4 `match_games` (Manches 1 à 4).
+* Pour chaque manche, chaque escouade a deux entrées dans `game_metrics` :
+  * `metric_code = 'placement'` $\rightarrow$ `calculated_points` calculés via la matrice de placement.
+  * `metric_code = 'kills'` $\rightarrow$ `calculated_points = raw_value * multiplier`.
+* Somme automatique des points par slot sur les 4 manches.
 
-### Format 6 : Confrontation Collective Inter-Régions (Région Dakar vs Région Thiès)
-* **Configuration Parent :**
-  * `competition_encounters.encounter_type = 'COLLECTIVE_FIXTURE'`.
-  * `aggregation_rule = 'MATCH_POINTS'`.
-* **Les Deux Camps (`encounter_sides`) :**
-  * Side 1 : `name = "Région Dakar"` (5 entrants liés via `encounter_side_entrants`).
-  * Side 2 : `name = "Région Thiès"` (5 entrants liés via `encounter_side_entrants`).
-* **Les Sous-Matchs (`encounter_matches`) :**
-  * Match 1 : `title = "Simple 1"`, Slot 1 (Dakar 1) vs Slot 2 (Thiès 1) -> Victoire Dakar (1 pt).
-  * Match 2 : `title = "Simple 2"`, Slot 1 (Dakar 2) vs Slot 2 (Thiès 2) -> Victoire Thiès (1 pt).
-  * Match 3 : `title = "Simple 3"`, Slot 1 (Dakar 3) vs Slot 2 (Thiès 3) -> Victoire Dakar (1 pt).
-  * Match 4 : `title = "Double"`, Slot 1 (Dakar 4) vs Slot 2 (Thiès 4) -> Victoire Thiès (1 pt).
-  * Match 5 : `title = "Match Décisif"`, Slot 1 (Dakar 5) vs Slot 2 (Thiès 5) -> Victoire Dakar (1 pt).
-* **Agrégation :** Side 1 totalise 3 points, Side 2 totalise 2 points -> Side 1 déclaré vainqueur de la confrontation 3 à 2.
+### Format 6 : Confrontation Collective Inter-Régions (Dakar vs Thiès)
+* `encounter_type = 'COLLECTIVE_FIXTURE'`, `aggregation_rule = 'MATCH_POINTS'`.
+* **2 côtés créés dans `encounter_sides` :**
+  * Side A : "Région Dakar" (`side_number = 1`).
+  * Side B : "Région Thiès" (`side_number = 2`).
+* 5 entrants inscrits dans Side A via `encounter_side_entrants` (A1, A2, A3, A4, A5).
+* 5 entrants inscrits dans Side B via `encounter_side_entrants` (B1, B2, B3, B4, B5).
+* 5 sous-matchs créés dans `encounter_matches` :
+  * Match 1 : Slot 1 (`side_id = Side A`, `assigned_entrant_id = A1`), Slot 2 (`side_id = Side B`, `assigned_entrant_id = B1`).
+  * Match 2 : Slot 1 (`side_id = Side A`, `assigned_entrant_id = A2`), Slot 2 (`side_id = Side B`, `assigned_entrant_id = B2`).
+  * ...
+* **Garantie d'intégrité :** La FK composite `(side_id, assigned_entrant_id)` **bloque physiquement au niveau SQL** toute tentative d'affecter A1 au Slot 2 (car A1 n'existe pas dans le Side B). Impossible d'avoir A1 contre A2 !
+* Résultat agrégé calculé sur les 5 matchs : Dakar gagne 3 à 2.
