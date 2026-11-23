@@ -141,6 +141,27 @@
       "when": 1793088000003,
       "tag": "0019_pin_reset_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793088000004,
+      "tag": "0020_chats_clips_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793088000005,
+      "tag": "0021_app_settings_singleton",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793088000006,
+      "tag": "0022_financial_cooldown",
+      "breakpoints": true
     }
   ]
 }

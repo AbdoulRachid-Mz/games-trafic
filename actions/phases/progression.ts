@@ -489,7 +489,7 @@ export async function propagateEliminationRoundToNextGroup(
     // 4. RE-FETCH winners from DB ONLY
     // Add type annotation for the map function
     const groupIds: string[] = groupsInCurrentRound.map((g: any) => g.id);
-    let allQualifiers = await getWinnersFromGroups(tx, groupIds);
+    const allQualifiers = await getWinnersFromGroups(tx, groupIds);
 
     if (allQualifiers.length === 0) {
       return {
@@ -719,7 +719,7 @@ export async function markGroupCompleteAction(
 
       // Qualifications transversales (meilleurs deuxièmes…) : candidats des
       // autres groupes du même tour, classés par les mêmes tiebreakers.
-      let additionalCandidates: any[] = [];
+      const additionalCandidates: any[] = [];
       if (qualification.additionalQualifiers > 0) {
         const siblingGroups = await db.query.phaseGroups.findMany({
           where: and(
@@ -1582,7 +1582,7 @@ export async function organizeNextPhaseAction(
 
     let generateNodes = options.generateNodes ?? true;
     let generateMatches = options.generateMatches ?? true;
-    let matchFormat = options.matchFormat ?? "BEST_OF_1";
+    const matchFormat = options.matchFormat ?? "BEST_OF_1";
     let isHomeAway = options.isHomeAway ?? false;
 
     if (isAutoMode) {

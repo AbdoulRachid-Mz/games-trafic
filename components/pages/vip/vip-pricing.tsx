@@ -120,11 +120,10 @@ export function VipPricing({ prices, highlightedPlan }: VipPricingProps) {
       return;
     }
 
-    // Rediriger vers la page de transaction
+    // Rediriger vers le wizard de transaction (prix recalculé côté serveur)
     const params = new URLSearchParams({
       type: "VIP_SUBSCRIPTION",
-      amount: price.toString(),
-      entityData: JSON.stringify({ plan: planId }),
+      plan: planId,
     });
 
     router.push(`/wallet/transactions/create?${params.toString()}`);
@@ -261,8 +260,7 @@ export function VipPricing({ prices, highlightedPlan }: VipPricingProps) {
                           data={encodeTransactionQR({
                             t: "VIP_SUBSCRIPTION",
                             id: plan.id,
-                            a: plan.price,
-                            m: { plan: plan.id }
+                            m: { plan: plan.id, planType: plan.id }
                           })}
                           label={`VIP ${plan.name}`}
                           className="shadow-none border-none p-0 bg-transparent"

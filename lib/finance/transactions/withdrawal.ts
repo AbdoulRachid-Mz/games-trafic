@@ -39,6 +39,8 @@ export interface WithdrawalReservationInput {
   actorLevel?: AdminLevel;
   /** Transaction Drizzle existante (composition atomique). */
   client?: DbClient;
+  /** Applique le cooldown financier 120s (initiation utilisateur). */
+  cooldownUserId?: string;
 }
 
 export interface WithdrawalSettlementInput {
@@ -186,6 +188,7 @@ export async function reserveWithdrawal(
       actorLevel: input.actorLevel,
       idempotencyKey: `withdrawal-reserve:${input.requestId}`,
       idempotencyScope: "withdrawal:reservation",
+      cooldownUserId: input.cooldownUserId,
       client: tx,
     });
   };

@@ -7,59 +7,50 @@ order: 3
 
 # Wallet GTC & Finances
 
-Le **Wallet GTC** est le cœur financier de Games-Trafics. Chaque utilisateur dispose d'un portefeuille numérique sécurisé permettant de régler ses achats d'items, payer ses droits d'inscription aux tournois, percevoir ses récompenses et encaisser les recettes de ses ventes.
+Le **Wallet GTC** est le cœur financier de Games-Trafics. Les soldes affichés proviennent des comptes financiers/ledger ; `balanceAfter` stocké sur une transaction est informatif et ne fait pas autorité.
 
 <Callout type="info" title="Monnaie GTC">
-Le GTC (Games-Trafics Currency) est l'unité monétaire de référence de la plateforme. 1 GTC équivaut à 1 unité de devise légale configurée selon les taux de conversion en vigueur.
+Le GTC est l'unité monétaire interne de la plateforme. Les conversions externes, si présentes, sont traitées par les workflows de dépôt/retrait approuvés.
 </Callout>
 
----
+## Architecture
 
-## 💰 Architecture du Portefeuille
+- **Comptes financiers** : source de vérité pour les mouvements.
+- **Ledger double-entrée** : chaque opération canonique poste des écritures équilibrées.
+- **Wallet utilisateur** : projection/liaison vers le compte financier utilisateur ; doit être actif, non verrouillé et éligible pour les opérations utilisateur.
+- **Fonds bloqués / escrow** : utilisés pour commandes, retraits en attente de règlement et certains flux de réservation.
 
-Chaque portefeuille est caractérisé par :
-- **Solde Disponible** : Fonds immédiatement utilisables pour les transferts, achats ou retraits.
-- **Fonds Bloqués (Escrow / Séquestre)** : Montants réservés lors d'une commande en attente de livraison ou d'un tournoi actif.
-- **Devise de Référence** : Par défaut en FCFA / XOF ou devise internationale selon votre localisation.
-- **Code PIN de Sécurité** : Clé secrète protégeant tout mouvement sortant de fonds.
-
----
-
-## ⚙️ Opérations Disponibles
+## Opérations
 
 <Steps>
-  <Step title="Dépôt de Fonds">
-    Alimentez votre portefeuille via les moyens de paiement intégrés (Mobile Money, Carte bancaire, partenaires agréés). Dès confirmation bancaire, votre solde GTC est crédité.
+  <Step title="Dépôt">
+    L'utilisateur crée une demande de dépôt. Aucun crédit immédiat. Un admin approuve via workflow canonique ; le net est crédité selon frais/politique.
   </Step>
-  <Step title="Transfert Peer-to-Peer (P2P)">
-    Envoyez instantanément des GTC à un autre joueur grâce à son pseudo ou en scannant son **QR Code Wallet**. Validation par code PIN obligatoire.
+  <Step title="Retrait">
+    L'utilisateur crée une demande de retrait avec preuve PIN/passkey. Les fonds sont réservés selon le workflow ; l'approbation règle vers clearing externe, le rejet/annulation libère la réservation.
   </Step>
-  <Step title="Paiement de Tournoi & Items">
-    Réglez vos frais d'entrée de tournois ou l'achat d'un skin/monnaie de jeu en débit direct sur votre solde.
+  <Step title="Transfert P2P / identités">
+    Transfert atomique serveur avec idempotence déterministe, cooldown 120s, frais serveur et preuve d'exécution.
   </Step>
-  <Step title="Retrait vers Compte Personnel">
-    Demandez le virement de vos gains vers votre compte bancaire ou compte Mobile Money enregistré. Les demandes sont traitées selon les délais opérationnels réglementaires.
+  <Step title="Paiements">
+    Achats boutique/items/thèmes/VIP/tournois : prix/frais recalculés serveur, `PRICE_CHANGED` en cas de dérive.
   </Step>
 </Steps>
 
----
-
-## 📋 Statuts de Transaction
-
-Toute opération financière passe par un cycle de vie strict et auditable :
+## Statuts
 
 | Statut | Signification |
 | :--- | :--- |
-| `PENDING` | L'ordre a été initié et est en attente de validation ou de paiement externe. |
-| `PROCESSING` | L'opération est en cours d'exécution auprès du processeur bancaire ou du réseau. |
-| `COMPLETED` | Les fonds ont été crédités ou transférés avec succès. La transaction est irréversible. |
-| `FAILED` | La transaction a échoué (solde insuffisant, rejet bancaire, code PIN erroné). |
-| `REFUNDED` | L'opération a été annulée et les fonds ont été restitués au portefeuille d'origine. |
+| `PENDING` | Demande créée ou fonds réservés/en attente de règlement métier. |
+| `PROCESSING` | Traitement en cours par un workflow autorisé. |
+| `COMPLETED` | Effet financier/métier terminé. |
+| `FAILED` | Échec explicite, aucun effet partiel silencieux attendu. |
+| `CANCELLED` | Annulé avant achèvement. |
+| `REFUNDED` | Remboursement/reversal canonique appliqué. |
 
----
+## Sécurité
 
-## 🛡️ Règles de Sécurité du Wallet
-
-1. **Aucun virement sans validation PIN** : Même avec un compte connecté, un transfert ne peut aboutir sans le code PIN.
-2. **Historique immuable** : Chaque transaction enregistre la date précise, le montant, les frais éventuels, le type d'opération et la référence de paiement.
-3. **Plafonds & Sécurité anti-fraude** : Des plafonds journaliers progressifs s'appliquent en fonction du niveau de vérification KYC de l'utilisateur.
+1. **PIN/Passkey obligatoire** sur les opérations utilisateur sensibles, preuve consommée à l'exécution.
+2. **Cooldown 120s** serveur/DB entre opérations utilisateur, sauf retry idempotent strict identique.
+3. **Pas de mutation directe de solde** comme autorité métier ; utiliser les services `lib/finance`.
+4. **Historique auditable** : transactions, entrées ledger et audit financier.

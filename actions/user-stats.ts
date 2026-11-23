@@ -59,7 +59,7 @@ import {
   not,
 } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { getAccountBalance } from "@/lib/finance";
 
 // ============================================================================
 // TYPES
@@ -1752,7 +1752,7 @@ async function getGameClipsStats(userId: string, filters: UserStatsFilters) {
     .limit(5);
 
   const clipIds = recentClips.map((c) => c.id);
-  let interactionsMap: Record<string, { views: number; likes: number }> = {};
+  const interactionsMap: Record<string, { views: number; likes: number }> = {};
 
   if (clipIds.length > 0) {
     const counts = await db

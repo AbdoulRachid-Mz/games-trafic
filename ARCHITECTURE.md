@@ -53,6 +53,7 @@ games-trafics/
 ├── database/                 # Schéma PostgreSQL Drizzle (schema.ts) et migrations
 ├── hooks/                    # Hooks React personnalisés (use-auth, use-profile, use-editions, etc.)
 ├── lib/                      # Services utilitaires (auth, encryption, safe-redirect, playoffs-engine)
+│   └── notifications/        # Moteur de notifications multi-canal (WhatsApp Cloud API, Resend Email, Web Push VAPID, In-App)
 ├── proxy.ts                  # Point d'entrée proxy Next.js 16 (contrôle d'accès et routage)
 ├── stores/                   # Stores Zustand (app-shell-store.ts)
 └── tests/                    # Suites de tests Vitest (sécurité, finance, tournois, permissions)
@@ -208,4 +209,40 @@ sequenceDiagram
 - **Static shell non vide** : avec `cacheComponents: true` et `partialPrefetching: true`, un `useSearchParams()` dans un provider/layout racine suspend tout l'arbre et vide le shell. Les lectures d'URL des providers racines se font donc côté client (`window.location.search`) ; les pages qui suspendent encore (marketplace, sign-up, welcome) sont enveloppées dans un `<Suspense>` à fallback statique. Aucun `export const instant = false` n'a été ajouté pour masquer le problème.
 - **Accessibilité de base** : `viewport` exporté séparément de `metadata` (zoom autorisé, WCAG 1.4.4), vrais `h1`–`h6` via `typography`, `aria-label` sur les actions de cards, `aria-pressed` sur les bascules de vue, `prefers-reduced-motion` dans `globals.css`.
 - **Validation** : voir `UI-UX-AUDIT.md` (8 largeurs × 2 thèmes, interactions réelles, état des avertissements résiduels).
+
+---
+
+## 10. Système de Notifications Multi-Canal
+
+```mermaid
+flowchart TD
+    Trigger[Événement métier : Inscription, Match, Dépôt, Retrait, Achat] --> Dispatcher[Dispatcher Central : lib/notifications/dispatcher.ts]
+    
+    Dispatcher --> Prefs[Résolution Préférences Utilisateur : users.settings.notifications]
+    
+    Prefs -->|Canal Actif| Template[Moteur de Rendu : lib/notifications/templates]
+    
+    Template --> InApp[In-App : Table notifications + SSE/Polling]
+    Template --> WhatsApp[WhatsApp Cloud API : Graph API Meta v21.0]
+    Template --> Email[Email Transactionnel : Resend API]
+    Template --> Push[Web Push : VAPID cryptographique + web-push]
+    
+    WebhookMeta[Meta WhatsApp Webhook] --> RouteWA[/api/webhooks/whatsapp]
+    RouteWA -->|hub.verify_token| Verify[Validation du Webhook GET]
+    RouteWA -->|Messages & Statuses| Handler[Traitement entrant POST]
+    
+    BrowserPush[Navigateur / PWA] --> RoutePushSub[/api/notifications/push-subscribe]
+    RoutePushSub --> PushTable[Table push_subscriptions]
+```
+
+### Canaux pris en charge
+1. **WhatsApp Cloud API** (`lib/notifications/channels/whatsapp.ts`) : Envoi direct via l'API Graph Meta v21.0 avec support du webhook de vérification et des templates. Normalisation automatique des numéros internationaux.
+2. **Email Transactionnel** (`lib/notifications/channels/email.ts`) : Intégration Resend avec templates HTML dark-first responsive et charte Games Trafics.
+3. **Web Push VAPID** (`lib/notifications/channels/push.ts`) : Notification standard push W3C chiffrée avec signature VAPID et gestion automatique du cycle de vie des abonnements expirés (404/410 auto-delete).
+4. **Notifications In-App** : Base PostgreSQL, affichage temps réel dans le centre de notifications et badge dynamique.
+
+### Interface & Gestion Utilisateur
+- **Composant dédié** : `components/notifications/notification-settings-card.tsx` intégré dans les paramètres de profil (`/profile/settings`).
+- **Tests instantanés** : Boutons "Tester" permettant à l'utilisateur d'envoyer un message de test sur chaque canal pour vérifier sa configuration.
+
 - **Périmètre 2** : les mêmes invariants s'appliquent aux routes wallet/games/admin/tournois. Aucun filtre ou action factice ne subsiste : la recherche est câblée (`DateRangePicker` réel, `ResponsiveFilters` sur les signaux), le litige est une Server Action authentifiée (`reportMatchDispute`), et les erreurs réseau ont toutes un état dédié avec « Réessayer ». Les surfaces où `ResponsiveTabs`/`ResponsiveFilters` n'ont pas été forcés (admin dashboard, sidebar games) sont documentées comme choix différés dans `UI-UX-AUDIT.md` plutôt que dupliquées.

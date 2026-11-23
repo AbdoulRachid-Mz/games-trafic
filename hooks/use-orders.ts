@@ -52,8 +52,15 @@ export function useOrderStats() {
 export function useCreateOrder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { productId: string; buyerInstructions?: string; totalAmount?: number }) =>
-      createProductOrder(data),
+    mutationFn: (input: {
+      data: { productId: string; buyerInstructions?: string };
+      options?: {
+        allowDuplicate?: boolean;
+        idempotencyKey?: string;
+        pin?: string;
+        passkeyProof?: { challengeId: string; assertion: unknown };
+      };
+    }) => createProductOrder(input.data, input.options),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [ORDERS_QUERY_KEY] });
       qc.invalidateQueries({ queryKey: [ORDER_STATS_QUERY_KEY] });

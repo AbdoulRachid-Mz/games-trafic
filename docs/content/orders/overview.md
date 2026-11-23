@@ -7,19 +7,26 @@ order: 4
 
 # Commandes (Orders)
 
-## 🧩 Vue d’ensemble
-Le système de `<beautifulMention>Commandes</beautifulMention>` centralise et lie un utilisateur avec une boutique pour l'achat de comptes ou de services.
+## Vue d'ensemble
+Les commandes produit utilisent un flux escrow canonique. Le prix est lu en base (jamais depuis le client), la capture est atomique et idempotente, et les transitions sensibles sont protégées par auth/éligibilité/PIN/passkey/cooldown selon le flux.
 
-## ⚙️ Fonctionnement
-1. **Création (Checkout)** : Ajout des éléments au panier depuis une boutique ou un service.
-2. **Paiement (Payment)** : Déduction instantanée sur `Wallet GTC`.
-3. **Livraison (Delivery)** : 
-   - Pour des biens en ligne, une validation ou le code numérique s'affiche dans l'UI.
-   - Pour des livraisons de services (Boosting etc.), un canal de chat (Orders Chat) est souvent initialisé avec le vendeur.
+## Cycle de vie
 
-## 👤 Côté utilisateur
-L'interface de `/orders` permet au client de suivre sa commande qui passe de `PENDING` -> `PROCESSING` -> `COMPLETED`. 
+1. **Création / Capture** : `createProductOrder` vérifie l'éligibilité, verrouille le produit, lit le prix DB, consomme la preuve PIN/passkey si requise, capture le montant en escrow via `executeFinancialOperation` (`PENDING`).
+2. **Validation boutique** : la boutique accepte et fournit les identifiants/livraison selon le flux commande.
+3. **Finalisation admin** : `completeOrderAdmin` libère l'escrow vers le vendeur (net) et la commission vers `PLATFORM_FEES` via postings canoniques.
+4. **Rejet / Annulation** : `rejectOrder` applique un remboursement canonique (`executeRefund`) si la capture escrow a eu lieu, puis met à jour le statut commande/produit.
 
-## 🧠 Logique métier
-- Si le vendeur annule, le webhook va émettre la création d'un solde dans les `walletTransactions` via une métadonnée d'état *REFUND*.
-- Des relations directes existent vers la table transaction pour toujours retracer l'origine d'un flux financier.
+## Règles
+
+- **Quantité** : un produit = exemplaire unique ; pas de quantité client arbitraire.
+- **Prix** : source DB, pas de montant client autoritaire.
+- **Escrow** : fonds capturés avant livraison/finalisation ; pas de payout vendeur avant finalisation admin.
+- **Idempotence** : clé déterministe par intention de capture ; retries stricts ne rejouent pas l'effet.
+- **Statuts** : `COMPLETED` commande seulement après règlement/libération effectif.
+
+## Relations
+
+- **Wallet/Transactions** : capture et payout génèrent des écritures ledger équilibrées.
+- **Boutiques** : le vendeur reçoit le net après commission.
+- **Admin** : finalisation/rejet soumis aux permissions serveur.

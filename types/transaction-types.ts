@@ -242,6 +242,8 @@ export interface TransactionData {
     sellerInstructions?: string;
     originalAmount?: number;
     image?: string;
+    plan?: "MONTHLY" | "YEARLY" | "LIFETIME";
+    planType?: "MONTHLY" | "YEARLY" | "LIFETIME";
   };
 }
 

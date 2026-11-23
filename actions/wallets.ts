@@ -46,15 +46,18 @@ import { createUserTrace } from '@/actions/user-traces';
 import { getCurrentUser } from '@/lib/auth/session';
 import { executeIssuance, getOrCreateSystemAccount } from '@/lib/finance';
 
-import { assertCanDeposit, assertOwnerOrAdmin, isAdmin } from '@/lib/auth/permissions';
+import { assertAdmin, assertCanDeposit, assertOwnerOrAdmin, isAdmin } from '@/lib/auth/permissions';
 import {
-  getAccountBalance
-} from '@/lib/ledger/ledger-utils';
-import {
+  calculateTransactionFees,
   executeFinancialOperation,
   executeTransfer,
+  getAccountBalance,
 } from '@/lib/finance';
 import { createTransaction as createWalletTransaction } from '@/actions/transactions';
+import {
+  consumePasskeyProofForIntent,
+  type PasskeyProof,
+} from '@/actions/passkey-transaction';
 import { revalidatePath } from 'next/cache';
 
 // ============================================================================
@@ -684,10 +687,21 @@ export async function createTransaction(
   );
 }
 
+/**
+ * @deprecated Mutation de statut générique dangereuse. Préférer les workflows financiers canoniques.
+ * Admin uniquement; ne peut pas forcer COMPLETED.
+ */
 export async function updateTransactionStatus(
   id: string,
   status: WalletTransaction['status']
 ): Promise<WalletTransaction> {
+  const user = await getCurrentUser();
+  assertAdmin(user);
+  if (status === 'COMPLETED') {
+    throw new Error(
+      'INVALID_FLOW: un statut COMPLETED ne peut pas être forcé directement. Utilisez le workflow financier canonique.'
+    );
+  }
   try {
     const [updatedTransaction] = await db
       .update(walletTransactions)
@@ -721,7 +735,12 @@ export async function transferMoney(
   fromUserId: string,
   toUserId: string,
   amount: number,
-  description?: string
+  description?: string,
+  options?: {
+    idempotencyKey?: string;
+    pin?: string;
+    passkeyProof?: PasskeyProof;
+  }
 ): Promise<{ success: boolean; transaction?: WalletTransaction; error?: string }> {
   try {
     const currentUser = await getCurrentUser();
@@ -754,22 +773,63 @@ export async function transferMoney(
       return { success: false, error: "Compte financier introuvable pour l'un des portefeuilles" };
     }
 
-    // Exécution du transfert atomique via le moteur autoritaire V2
-    const result = await executeTransfer({
-      fromAccountId: fromWallet.financialAccountId,
-      toAccountId: toWallet.financialAccountId,
-      amount,
-      walletId: fromWallet.id,
-      walletAccountId: fromWallet.financialAccountId,
-      fromUserId,
-      toUserId,
-      description: description || `Transfert vers ${toUserId}`,
-      createdByUserId: currentUser!.id,
-      metadata: {
-        transferType: "user_to_user",
-        recipientWalletId: toWallet.id,
+    const idempotencyKey =
+      typeof options?.idempotencyKey === "string" ? options.idempotencyKey.trim() : "";
+    if (!idempotencyKey) {
+      return {
+        success: false,
+        error: "IDEMPOTENCY_KEY_REQUIRED: une clé d'idempotence déterministe est requise.",
+      };
+    }
+
+    const result = await db.transaction(async (tx) => {
+      if (!isAdmin(currentUser) || fromUserId === currentUser!.id) {
+        const hasPin = typeof options?.pin === "string" && options.pin.length > 0;
+        const hasPasskeyProof = !!options?.passkeyProof?.challengeId && !!options?.passkeyProof?.assertion;
+
+        if (hasPasskeyProof) {
+          const feeCalc = await calculateTransactionFees("TRANSFER", amount);
+          await consumePasskeyProofForIntent(tx, {
+            userId: currentUser!.id,
+            proof: options!.passkeyProof!,
+            intent: {
+              walletId: fromWallet.id,
+              transactionType: "TRANSFER",
+              amount,
+              recipientId: toWallet.id,
+              fees: feeCalc.fees,
+            },
+          });
+        } else if (hasPin) {
+          const pinResult = await verifyWalletPin(fromWallet.id, options!.pin!);
+          if (!pinResult.success) {
+            throw new Error(pinResult.error || "Code PIN incorrect.");
+          }
+        } else if (fromWallet.pinHash) {
+          throw new Error("Code PIN ou preuve Passkey requis pour effectuer cette opération.");
+        }
+      }
+
+      return executeTransfer({
+        fromAccountId: fromWallet.financialAccountId!,
+        toAccountId: toWallet.financialAccountId!,
+        amount,
+        walletId: fromWallet.id,
+        walletAccountId: fromWallet.financialAccountId!,
+        fromUserId,
         toUserId,
-      },
+        description: description || `Transfert vers ${toUserId}`,
+        createdByUserId: currentUser!.id,
+        idempotencyKey,
+        cooldownUserId: currentUser!.id,
+        client: tx,
+        metadata: {
+          transferType: "user_to_user",
+          recipientWalletId: toWallet.id,
+          toUserId,
+          idempotencyKey,
+        },
+      });
     });
 
     // Journalisation de la trace utilisateur
@@ -803,10 +863,24 @@ export async function transferBetweenIdentities(params: {
   toType: 'USER' | 'SHOP' | 'TOURNAMENT';
   amount: number;
   description?: string;
+  idempotencyKey: string;
+  pin?: string;
+  passkeyProof?: PasskeyProof;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await getCurrentUser();
     if (!user) throw new Error("Non authentifié");
+
+    const idempotencyKey =
+      typeof params.idempotencyKey === "string" ? params.idempotencyKey.trim() : "";
+    if (!idempotencyKey) {
+      throw new Error("IDEMPOTENCY_KEY_REQUIRED: une clé d'idempotence déterministe est requise.");
+    }
+
+    const amount = Number(params.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Montant invalide");
+    }
 
     return await db.transaction(async (tx) => {
       // 1. Resolve source account
@@ -814,11 +888,13 @@ export async function transferBetweenIdentities(params: {
       if (params.fromType === 'USER') {
         const wallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, params.fromIdentityId) });
         if (wallet?.userId !== user.id) throw new Error("Accès refusé");
-        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, wallet.financialAccountId!) });
+        if (!wallet.financialAccountId) throw new Error("Compte financier source introuvable");
+        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, wallet.financialAccountId) });
       } else if (params.fromType === 'SHOP') {
         const shop = await tx.query.shops.findFirst({ where: eq(shops.id, params.fromIdentityId) });
         if (shop?.ownerId !== user.id) throw new Error("Accès refusé (Non propriétaire)");
-        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop.financialAccountId!) });
+        if (!shop.financialAccountId) throw new Error("Compte financier boutique introuvable");
+        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop.financialAccountId) });
       } else if (params.fromType === 'TOURNAMENT') {
         const edition = await tx.query.tournamentEditions.findFirst({
           where: eq(tournamentEditions.id, params.fromIdentityId),
@@ -826,24 +902,31 @@ export async function transferBetweenIdentities(params: {
         });
         if (!edition) throw new Error("Édition introuvable");
         if (edition.tournament?.organizerId !== user.id) throw new Error("Accès refusé (Non organisateur)");
-        
+
         // REQUISITION: On vérifie si une édition en cours et que le crédit à virer ne touche pas au crédit de cette édition.
         // Puisque chaque édition gère son propre compte, on exige que l'édition soit terminée (COMPLETED).
         if (edition.status !== 'COMPLETED' && edition.status !== 'CANCELLED') {
-           throw new Error("L'édition doit être terminée (COMPLETED) pour récupérer les fonds.");
+          throw new Error("L'édition doit être terminée (COMPLETED) pour récupérer les fonds.");
         }
 
-        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId!) });
+        if (!edition.financialAccountId) throw new Error("Compte financier édition introuvable");
+        fromAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId) });
       }
 
       // 2. Resolve destination account
       let toAccount: FinancialAccount | undefined;
+      let toUserId: string | null = null;
+      let recipientWalletId: string | null = null;
       if (params.toType === 'USER') {
         const wallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, params.toIdentityId) });
-        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, wallet!.financialAccountId!) });
+        if (!wallet?.financialAccountId) throw new Error("Compte financier destinataire introuvable");
+        toUserId = wallet.userId;
+        recipientWalletId = wallet.id;
+        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, wallet.financialAccountId) });
       } else if (params.toType === 'SHOP') {
         const shop = await tx.query.shops.findFirst({ where: eq(shops.id, params.toIdentityId) });
-        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop!.financialAccountId!) });
+        if (!shop?.financialAccountId) throw new Error("Compte financier boutique destinataire introuvable");
+        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, shop.financialAccountId) });
       } else if (params.toType === 'TOURNAMENT') {
         const edition = await tx.query.tournamentEditions.findFirst({
           where: eq(tournamentEditions.id, params.toIdentityId),
@@ -851,7 +934,8 @@ export async function transferBetweenIdentities(params: {
         });
         if (!edition) throw new Error("Édition introuvable");
         if (edition.tournament?.organizerId !== user.id) throw new Error("Accès refusé (Non organisateur)");
-        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId!) });
+        if (!edition.financialAccountId) throw new Error("Compte financier édition destinataire introuvable");
+        toAccount = await tx.query.financialAccounts.findFirst({ where: eq(financialAccounts.id, edition.financialAccountId) });
       }
 
       if (!fromAccount || !toAccount) throw new Error("Comptes introuvables");
@@ -860,18 +944,55 @@ export async function transferBetweenIdentities(params: {
       const userWallet = await tx.query.userWallets.findFirst({ where: eq(userWallets.userId, user.id) });
       if (!userWallet) throw new Error("Wallet utilisateur introuvable");
 
+      // Preuve PIN/passkey consommée à l'exécution (intention liée aux paramètres).
+      if (!isAdmin(user)) {
+        const hasPin = typeof params.pin === "string" && params.pin.length > 0;
+        const hasPasskeyProof = !!params.passkeyProof?.challengeId && !!params.passkeyProof?.assertion;
+
+        if (hasPasskeyProof) {
+          const feeCalc = await calculateTransactionFees("TRANSFER", amount);
+          await consumePasskeyProofForIntent(tx, {
+            userId: user.id,
+            proof: params.passkeyProof!,
+            intent: {
+              walletId: userWallet.id,
+              transactionType: "TRANSFER",
+              amount,
+              recipientId: params.toType === "USER" ? recipientWalletId : null,
+              fees: feeCalc.fees,
+            },
+          });
+        } else if (hasPin) {
+          const pinResult = await verifyWalletPin(userWallet.id, params.pin!);
+          if (!pinResult.success) {
+            throw new Error(pinResult.error || "Code PIN incorrect.");
+          }
+        } else if (userWallet.pinHash) {
+          throw new Error("Code PIN ou preuve Passkey requis pour effectuer cette opération.");
+        }
+      }
+
       await executeTransfer({
         fromAccountId: fromAccount.id,
         toAccountId: toAccount.id,
-        amount: params.amount,
+        amount,
         walletId: userWallet.id,
         walletAccountId: fromAccount.id,
         fromUserId: user.id,
-        toUserId: params.toType === 'USER' ? params.toIdentityId : null,
+        toUserId,
         description: params.description || `Transfert interne entre ${params.fromType} et ${params.toType}`,
         createdByUserId: user.id,
+        idempotencyKey,
+        cooldownUserId: user.id,
         client: tx,
-        metadata: { transferType: 'internal_identity_transfer' }
+        metadata: {
+          transferType: 'internal_identity_transfer',
+          fromType: params.fromType,
+          fromIdentityId: params.fromIdentityId,
+          toType: params.toType,
+          toIdentityId: params.toIdentityId,
+          idempotencyKey,
+        }
       });
 
       return { success: true };
@@ -889,7 +1010,8 @@ export async function transferBetweenIdentities(params: {
 export async function depositToWallet(
   walletId: string,
   amount: number,
-  method: string = 'MANUAL'
+  method: string = 'MANUAL',
+  options?: { idempotencyKey?: string }
 ): Promise<{ success: boolean; transaction?: WalletTransaction; error?: string }> {
   try {
     const currentUser = await getCurrentUser();
@@ -908,6 +1030,13 @@ export async function depositToWallet(
       return { success: false, error: 'Wallet non trouvé ou compte financier manquant' };
     }
 
+    const providedKey =
+      typeof options?.idempotencyKey === 'string' ? options.idempotencyKey.trim() : '';
+    const idempotencyKey =
+      providedKey.length > 0
+        ? providedKey
+        : `admin-deposit:${currentUser!.id}:${wallet.id}:${amount}:${method}`;
+
     const result = await db.transaction(async (tx) => {
       const clearing = await getOrCreateSystemAccount(tx, 'EXTERNAL_CLEARING');
       return executeFinancialOperation({
@@ -921,14 +1050,14 @@ export async function depositToWallet(
         toUserId: wallet.userId,
         description: `Dépôt manuel admin via ${method}`,
         reason: 'Dépôt manuel administrateur',
-        metadata: { depositMethod: method, approvedBy: currentUser!.id },
+        metadata: { depositMethod: method, approvedBy: currentUser!.id, idempotencyKey },
         postings: [
           { accountId: clearing.id, debit: amount },
           { accountId: wallet.financialAccountId!, credit: amount },
         ],
         netAmount: amount,
         createdByUserId: currentUser!.id,
-        idempotencyKey: `admin-deposit:${wallet.id}:${Date.now()}`,
+        idempotencyKey,
         idempotencyScope: 'admin:deposit',
         client: tx,
       });

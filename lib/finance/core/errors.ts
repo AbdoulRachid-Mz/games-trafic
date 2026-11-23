@@ -24,6 +24,7 @@ export type FinanceErrorCode =
   | "REFUND_EXCEEDS_REMAINING"
   | "IDEMPOTENCY_CONFLICT"
   | "IDEMPOTENCY_IN_PROGRESS"
+  | "COOLDOWN_ACTIVE"
   | "PRICE_CHANGED"
   | "SUPPLY_UNAVAILABLE"
   | "FEE_POLICY_UNAVAILABLE"
@@ -62,3 +63,4 @@ export function toFinanceError(
   }
   return new FinanceError(fallbackCode, "Erreur financière inconnue");
 }
+

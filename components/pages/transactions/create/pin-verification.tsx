@@ -10,15 +10,17 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { startAuthentication } from "@simplewebauthn/browser";
-import {
-  requestPasskeyChallenge,
-  verifyPasskeyChallenge,
-} from "@/actions/passkey-transaction";
+import { requestPasskeyChallenge } from "@/actions/passkey-transaction";
 import { toast } from "sonner";
+
+export interface PasskeyTransactionProof {
+  challengeId: string;
+  assertion: unknown;
+}
 
 interface PinVerificationProps {
   onVerify: (pin: string) => Promise<void>;
-  onVerifyPasskey?: () => Promise<void>;
+  onVerifyPasskey?: (proof: PasskeyTransactionProof) => Promise<void>;
   hasPasskey?: boolean;
   onBack: () => void;
   isLoading?: boolean;
@@ -50,14 +52,18 @@ export function PinVerification({
       setIsPasskeyLoading(true);
 
       const challengeResult = await requestPasskeyChallenge({
-        walletId: (transactionDetails as any).walletId || "",
+        walletId: transactionDetails.walletId || "",
         transactionType: transactionDetails.type,
         amount: transactionDetails.amount,
-        recipientId: (transactionDetails as any).recipientId || null,
+        recipientId: transactionDetails.recipientId || null,
         fees: transactionDetails.fees,
       });
 
-      if (!challengeResult.success || !challengeResult.options || !challengeResult.challengeId) {
+      if (
+        !challengeResult.success ||
+        !challengeResult.options ||
+        !challengeResult.challengeId
+      ) {
         throw new Error(challengeResult.error || "Impossible de générer le challenge");
       }
 
@@ -65,23 +71,11 @@ export function PinVerification({
         optionsJSON: challengeResult.options as any,
       });
 
-      const verification = await verifyPasskeyChallenge({
+      // La preuve est consommée côté serveur au moment de l'exécution financière.
+      await onVerifyPasskey({
         challengeId: challengeResult.challengeId,
         assertion,
-        transaction: {
-          walletId: (transactionDetails as any).walletId || "",
-          transactionType: transactionDetails.type,
-          amount: transactionDetails.amount,
-          recipientId: (transactionDetails as any).recipientId || null,
-          fees: transactionDetails.fees,
-        },
       });
-
-      if (!verification.success) {
-        throw new Error(verification.error || "Vérification Passkey échouée");
-      }
-
-      await onVerifyPasskey();
     } catch (error) {
       console.error(error);
       toast.error(
@@ -97,10 +91,9 @@ export function PinVerification({
       setIsPasskeyLoading(true);
       const { data, error } = await authClient.passkey.addPasskey();
       if (error) throw error;
-      toast.success("Passkey ajouté avec succès !");
-      if (onVerifyPasskey) {
-        await onVerifyPasskey();
-      }
+      toast.success(
+        "Passkey ajouté avec succès. Vous pouvez maintenant l'utiliser pour valider."
+      );
     } catch (error) {
       console.error(error);
       toast.error("Échec de l'ajout du Passkey");

@@ -55,7 +55,17 @@ export async function getAccountBalanceCents(
     .from(ledgerEntries)
     .where(eq(ledgerEntries.accountId, accountId));
 
-  return toCents(row?.balance ?? 0);
+  return toCents(String(row?.balance ?? 0));
+}
+
+/**
+ * Calcule le solde réel d'un compte depuis le ledger (GTC).
+ */
+export async function getAccountBalance(
+  accountId: string,
+  client: DbClient = db
+): Promise<number> {
+  return (await getAccountBalanceCents(accountId, client)) / 100;
 }
 
 /**

@@ -21,7 +21,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getEditionRegistrations, updateEditionRegistration, updateRegistrationPayment, getTournamentEditions } from "@/actions/tournaments";
 import { refundTransaction } from "@/actions/transactions";
-import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { getAccountBalance } from "@/lib/finance";
 import { EditionWalletCard } from "./edition-wallet-card";
 import { TournamentPayoutDialog } from "@/components/pages/tournaments/payments/payout-dialog";
 import {

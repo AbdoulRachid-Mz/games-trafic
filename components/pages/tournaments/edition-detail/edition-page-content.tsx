@@ -441,7 +441,18 @@ export function EditionPageContent({
       <EditionPaymentDialog
         edition={edition}
         open={showPaymentDialog}
-        onOpenChange={setShowPaymentDialog}
+        onOpenChange={(open) => {
+          setShowPaymentDialog(open);
+          if (!open) setJoinValues(null);
+        }}
+        userInfo={
+          joinValues
+            ? {
+                playerName: joinValues.playerName,
+                teamName: joinValues.teamName,
+              }
+            : undefined
+        }
       />
     </div>
   );

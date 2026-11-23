@@ -16,6 +16,9 @@ import {
   getNotificationById,
   createNotification,
   updateNotification,
+  getUserNotificationPreferencesAction,
+  updateUserNotificationPreferencesAction,
+  sendTestNotificationAction,
 } from "@/actions/notifications";
 import type { NotificationFilters } from "@/actions/notifications";
 
@@ -353,5 +356,66 @@ export function useCreateNotification() {
         });
       }
     },
+  });
+}
+
+/**
+ * Hook pour récupérer les préférences de notifications (in_app, email, whatsapp, push)
+ */
+export function useNotificationPreferences(userId?: string) {
+  return useQuery({
+    queryKey: ["notifications", "preferences", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const res = await getUserNotificationPreferencesAction(userId);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5, // 5 min
+  });
+}
+
+/**
+ * Hook pour mettre à jour les préférences de notifications
+ */
+export function useUpdateNotificationPreferences() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      userId,
+      preferences,
+    }: {
+      userId: string;
+      preferences: {
+        in_app?: boolean;
+        email?: boolean;
+        whatsapp?: boolean;
+        push?: boolean;
+        whatsappPhone?: string;
+        emailOverride?: string;
+      };
+    }) => updateUserNotificationPreferencesAction(userId, preferences),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({
+        queryKey: ["notifications", "preferences", vars.userId],
+      });
+    },
+  });
+}
+
+/**
+ * Hook pour envoyer une notification de test
+ */
+export function useSendTestNotification() {
+  return useMutation({
+    mutationFn: ({
+      userId,
+      channel,
+    }: {
+      userId: string;
+      channel: "in_app" | "email" | "whatsapp" | "push";
+    }) => sendTestNotificationAction(userId, channel),
   });
 }

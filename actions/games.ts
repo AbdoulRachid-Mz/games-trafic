@@ -7,6 +7,8 @@ import { db } from '@/lib/db';
 import { cacheTag, cacheLife } from 'next/cache';
 import { revalidateTag } from 'next/cache';
 import { type GameCard, GAME_CARD_COLUMNS, PAGINATION_DEFAULTS } from '@/types/view-models';
+import { getCurrentUser } from '@/lib/auth/session';
+import { assertAdmin } from '@/lib/auth/permissions';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -696,25 +698,38 @@ export async function updateGameItemRequest(id: string, requestData: Partial<New
 }
 
 /**
- * Traite une demande d'item de jeu (changé le statut et assigne l'admin)
+ * @deprecated Chemin legacy dangereux: ne pas utiliser pour compléter une demande GAME_ITEMS.
+ * La complétion financière doit passer par approveRequest (workflow canonique).
  */
-export async function processGameItemRequest(id: string, processedByUserId: string, status: 'COMPLETED' | 'FAILED' | 'CANCELLED', adminNotes?: string): Promise<Request> {
+export async function processGameItemRequest(
+  id: string,
+  processedByUserId: string,
+  status: 'COMPLETED' | 'FAILED' | 'CANCELLED',
+  adminNotes?: string
+): Promise<Request> {
   try {
+    const sessionUser = await getCurrentUser();
+    assertAdmin(sessionUser);
+
     const existingRequest = await getGameItemRequestById(id);
     if (!existingRequest) {
       throw new Error('Game item request not found');
     }
 
+    if (status === 'COMPLETED') {
+      throw new Error(
+        'INVALID_FLOW: la complétion d’une demande GAME_ITEMS doit passer par approveRequest (workflow canonique).'
+      );
+    }
+
     const updateData: Partial<NewRequest> = {
       status,
-      processedByUserId,
+      processedByUserId: sessionUser.id,
       processedAt: new Date(),
-      adminNotes
+      adminNotes,
     };
 
-    if (status === 'COMPLETED') {
-      updateData.completedAt = new Date();
-    } else if (status === 'CANCELLED') {
+    if (status === 'CANCELLED') {
       updateData.cancelledAt = new Date();
     }
 

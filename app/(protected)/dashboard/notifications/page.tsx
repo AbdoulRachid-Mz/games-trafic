@@ -9,7 +9,9 @@ import { useScreenSize } from "@/hooks/use-screen";
 import { useAuthContext } from "@/contexts/auth-context";
 import { getUserNotifications } from "@/actions/notifications";
 import { type Notification } from "@/database/schema";
-import { Bell } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { NotificationCard } from "@/components/cards/notification-card";
 
 export default function NotificationsDashboardPage() {
@@ -54,7 +56,16 @@ export default function NotificationsDashboardPage() {
   );
 
   return (
-    <div className="mx-auto p-4">
+    <div className="mx-auto p-4 space-y-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" asChild className="gap-2">
+          <Link href="/profile/settings">
+            <Settings className="h-4 w-4" />
+            <span>Paramètres de notification</span>
+          </Link>
+        </Button>
+      </div>
+
       <EntityList<Notification>
         title="Mes Notifications"
         description="Consultez et gérez vos notifications"

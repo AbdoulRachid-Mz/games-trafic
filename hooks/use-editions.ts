@@ -115,7 +115,6 @@ export function useDeleteEdition() {
 }
 
 // Dans useJoinEdition, assurez-vous de gérer les cas où l'utilisateur n'est pas membre
-// Dans useJoinEdition, assurez-vous de gérer les cas où l'utilisateur n'est pas membre
 export function useJoinEdition() {
   const queryClient = useQueryClient();
 
@@ -124,6 +123,7 @@ export function useJoinEdition() {
       editionId,
       userId,
       userInfo,
+      options,
     }: {
       editionId: string;
       userId: string;
@@ -134,9 +134,15 @@ export function useJoinEdition() {
         teamId?: string;
         teamName?: string;
       };
+      options?: {
+        payWithWallet?: boolean;
+        pin?: string;
+        passkeyProof?: { challengeId: string; assertion: unknown };
+        idempotencyKey?: string;
+      };
     }) => {
       try {
-        const response = await joinEdition(editionId, userId, userInfo);
+        const response = await joinEdition(editionId, userId, userInfo, options);
         return response;
       } catch (error: any) {
         throw new Error(error.message || "Erreur lors de l'inscription");

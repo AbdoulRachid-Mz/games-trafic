@@ -465,8 +465,13 @@ export async function cancelVipSubscription(id: string): Promise<VipSubscription
 }
 
 /**
- * Renouvelle un abonnement VIP
- * SEC-09 FIX: Owner or Admin auth check + calcul autoritaire de la durée côté serveur (I6-02)
+ * Renouvelle un abonnement VIP (action administrative).
+ *
+ * Non canonique pour un renouvellement utilisateur initié : un utilisateur doit
+ * acheter un nouvel abonnement VIP via le flux financier canonique (transaction
+ * serveur-priced, ledger, cooldown, idempotence, preuve d'exécution). Cette
+ * action n'encaisse aucun paiement et est réservée aux administrateurs pour
+ * ajustement contrôlé.
  */
 export async function renewVipSubscription(
   id: string,
@@ -475,14 +480,12 @@ export async function renewVipSubscription(
 ): Promise<VipSubscription> {
   try {
     const currentUser = await getCurrentUser();
-    assertAuthenticated(currentUser);
+    assertAdmin(currentUser);
 
     const subscription = await getVipSubscriptionById(id);
     if (!subscription) {
       throw new Error('VIP subscription not found');
     }
-
-    assertOwnerOrAdmin(currentUser, subscription.userId);
 
     if (subscription.status === 'CANCELLED') {
       throw new Error('Cannot renew a cancelled VIP subscription');
@@ -491,12 +494,15 @@ export async function renewVipSubscription(
     // Determine renewed end date server-side (I6-02)
     let calculatedEndDate = newEndDate;
     if (!calculatedEndDate) {
-      const baseDate = subscription.endDate && new Date(subscription.endDate) > new Date()
-        ? new Date(subscription.endDate)
-        : new Date();
+      const baseDate =
+        subscription.endDate && new Date(subscription.endDate) > new Date()
+          ? new Date(subscription.endDate)
+          : new Date();
       calculatedEndDate = new Date(baseDate);
       if (subscription.planType === 'YEARLY') {
         calculatedEndDate.setFullYear(calculatedEndDate.getFullYear() + 1);
+      } else if (subscription.planType === 'LIFETIME') {
+        calculatedEndDate.setFullYear(calculatedEndDate.getFullYear() + 100);
       } else {
         calculatedEndDate.setMonth(calculatedEndDate.getMonth() + 1);
       }

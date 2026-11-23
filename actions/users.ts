@@ -30,7 +30,7 @@ import {
   financialAccounts,
   passkey,
 } from "@/database/schema";
-import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { getAccountBalance } from "@/lib/finance";
 import { WalletUtils } from "@/lib/wallet/wallet-utils";
 import {
   eq,

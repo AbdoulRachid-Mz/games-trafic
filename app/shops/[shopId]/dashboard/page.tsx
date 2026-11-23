@@ -2,6 +2,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+
+function newIdempotencyKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -49,9 +55,20 @@ import { getProductStats } from "@/actions/products";
 import { AdvancedChart } from "@/components/ui/advanced-chart";
 import { ShopExportButton } from "@/components/pages/shops/shop-export-button";
 import { useAuthContext } from "@/contexts/auth-context";
+import { useUserProfile } from "@/hooks/use-profile";
 import { Input } from "@/components/ui/input";
 import { transferBetweenIdentities } from "@/actions/wallets";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  PinVerification,
+  type PasskeyTransactionProof,
+} from "@/components/pages/transactions/create/pin-verification";
 
 // Données pour les charts
 const salesData = [
@@ -85,10 +102,16 @@ const revenueData = [
 export default function ShopOverviewPage() {
   const params = useParams();
   const { user } = useAuthContext();
+  const { data: completeData } = useUserProfile({
+    mode: "partial",
+    relations: ["wallet"],
+  });
   const [timeRange, setTimeRange] = useState("7j");
   const [loading, setLoading] = useState(true);
   const [transferAmount, setTransferAmount] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
+  const [transferKey, setTransferKey] = useState(newIdempotencyKey);
+  const [pinOpen, setPinOpen] = useState(false);
   const [stats, setStats] = useState({
     revenue: { current: 0, change: 0 },
     expenses: { current: 0, change: 0 },
@@ -106,12 +129,27 @@ export default function ShopOverviewPage() {
     setLoading(true);
     try {
       const now = new Date();
-      const days = timeRange === "24h" ? 1 : timeRange === "7j" ? 7 : timeRange === "30j" ? 30 : 90;
+      const days =
+        timeRange === "24h"
+          ? 1
+          : timeRange === "7j"
+            ? 7
+            : timeRange === "30j"
+              ? 30
+              : 90;
       const currentStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-      const previousStart = new Date(now.getTime() - days * 2 * 24 * 60 * 60 * 1000);
+      const previousStart = new Date(
+        now.getTime() - days * 2 * 24 * 60 * 60 * 1000,
+      );
       const previousEnd = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-      const [shopStats, orderStats, productStats, ledgerStats, previousLedgerStats] = await Promise.all([
+      const [
+        shopStats,
+        orderStats,
+        productStats,
+        ledgerStats,
+        previousLedgerStats,
+      ] = await Promise.all([
         getShopStatsById(params.shopId as string),
         getShopOrderStats(params.shopId as string),
         getProductStats({ shopId: params.shopId as string }),
@@ -125,26 +163,30 @@ export default function ShopOverviewPage() {
         }),
       ]);
 
-// ... (omitted similar replacements found by tool)
-// I will use AllowMultiple: true to catch all params.id in this file
-// Actually, I should check if there are other params.id that are valid.
-// In [shopId]/dashboard/page.tsx, params.shopId is the correct name.
-
-
       const revenueChange = previousLedgerStats.income
-        ? ((ledgerStats.income - previousLedgerStats.income) / previousLedgerStats.income) * 100
+        ? ((ledgerStats.income - previousLedgerStats.income) /
+            previousLedgerStats.income) *
+          100
         : ledgerStats.income > 0
           ? 100
           : 0;
       const expenseChange = previousLedgerStats.expense
-        ? ((ledgerStats.expense - previousLedgerStats.expense) / previousLedgerStats.expense) * 100
+        ? ((ledgerStats.expense - previousLedgerStats.expense) /
+            previousLedgerStats.expense) *
+          100
         : ledgerStats.expense > 0
           ? 100
           : 0;
 
       setStats({
-        revenue: { current: ledgerStats?.income || 0, change: Number(revenueChange.toFixed(1)) },
-        expenses: { current: ledgerStats?.expense || 0, change: Number(expenseChange.toFixed(1)) },
+        revenue: {
+          current: ledgerStats?.income || 0,
+          change: Number(revenueChange.toFixed(1)),
+        },
+        expenses: {
+          current: ledgerStats?.expense || 0,
+          change: Number(expenseChange.toFixed(1)),
+        },
         orders: { current: orderStats?.total || 0, change: 0 },
         products: { current: productStats?.total || 0, change: 0 },
         visitors: { current: 0, change: 0 },
@@ -161,7 +203,7 @@ export default function ShopOverviewPage() {
     return <OverviewSkeleton />;
   }
 
-  const handleTransfer = async () => {
+  const openTransfer = () => {
     if (!user?.id) return;
     const amount = parseFloat(transferAmount || "0");
     if (!amount || amount <= 0) {
@@ -170,6 +212,19 @@ export default function ShopOverviewPage() {
     }
     if (amount > shopBalance) {
       toast.error("Solde insuffisant");
+      return;
+    }
+    setPinOpen(true);
+  };
+
+  const executeTransfer = async (auth: {
+    pin?: string;
+    passkeyProof?: PasskeyTransactionProof;
+  }) => {
+    if (!user?.id) return;
+    const amount = parseFloat(transferAmount || "0");
+    if (!amount || amount <= 0) {
+      toast.error("Montant invalide");
       return;
     }
     setIsTransferring(true);
@@ -181,13 +236,17 @@ export default function ShopOverviewPage() {
         toType: "USER",
         amount,
         description: "Virement des revenus boutique vers wallet",
+        idempotencyKey: transferKey,
+        ...auth,
       });
       if (!res.success) {
         toast.error(res.error || "Erreur lors du virement");
         return;
       }
       toast.success("Virement effectué vers votre wallet");
+      setPinOpen(false);
       setTransferAmount("");
+      setTransferKey(newIdempotencyKey());
       loadStats();
     } catch {
       toast.error("Erreur lors du virement");
@@ -273,9 +332,7 @@ export default function ShopOverviewPage() {
       <Card className="bg-card/40 backdrop-blur-xl border-border/50">
         <CardHeader>
           <CardTitle>Virement vers votre wallet</CardTitle>
-          <CardDescription>
-            Disponible: {shopBalance.toFixed(2)} GTC
-          </CardDescription>
+          <CardDescription>Disponible: {shopBalance.toFixed(2)} GTC</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col md:flex-row gap-3">
           <Input
@@ -287,7 +344,7 @@ export default function ShopOverviewPage() {
             className="max-w-sm"
           />
           <Button
-            onClick={handleTransfer}
+            onClick={openTransfer}
             disabled={isTransferring || !transferAmount}
             className="gap-2"
           >
@@ -600,9 +657,7 @@ export default function ShopOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Activité récente</CardTitle>
-            <CardDescription>
-              Dernières actions dans votre boutique
-            </CardDescription>
+            <CardDescription>Dernières actions dans votre boutique</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -657,6 +712,37 @@ export default function ShopOverviewPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog
+        open={pinOpen}
+        onOpenChange={(value) => {
+          setPinOpen(value);
+          if (!value) {
+            setTransferKey(newIdempotencyKey());
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Confirmer le virement</DialogTitle>
+          </DialogHeader>
+          <PinVerification
+            onVerify={async (pin) => executeTransfer({ pin })}
+            onVerifyPasskey={async (proof) => executeTransfer({ passkeyProof: proof })}
+            hasPasskey={!!completeData?.hasPasskey}
+            onBack={() => setPinOpen(false)}
+            isLoading={isTransferring}
+            transactionDetails={{
+              type: "TRANSFER",
+              amount: parseFloat(transferAmount || "0"),
+              fees: 0,
+              totalAmount: parseFloat(transferAmount || "0"),
+              walletId: completeData?.wallet?.id || "",
+              recipientId: completeData?.wallet?.id || null,
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

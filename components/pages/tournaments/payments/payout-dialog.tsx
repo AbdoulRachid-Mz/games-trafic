@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Typography } from "@/components/ui/typography";
-import { PinVerification } from "@/components/pages/transactions/create/pin-verification";
+import { PinVerification, type PasskeyTransactionProof } from "@/components/pages/transactions/create/pin-verification";
 import { useUserProfile } from "@/hooks/use-profile";
-import { transferBetweenIdentities, verifyWalletPin } from "@/actions/wallets";
+import { getUserWalletByUserId, transferBetweenIdentities } from "@/actions/wallets";
 import { toast } from "sonner";
+
+function newIdempotencyKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 interface TournamentPayoutDialogProps {
   editionId: string;
@@ -28,6 +34,24 @@ export function TournamentPayoutDialog({
   const [amount, setAmount] = useState("");
   const [step, setStep] = useState<"AMOUNT" | "PIN">("AMOUNT");
   const [isLoading, setIsLoading] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
+  const [recipientWalletId, setRecipientWalletId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!open) return;
+    (async () => {
+      try {
+        const wallet = await getUserWalletByUserId(recipientUserId);
+        if (!cancelled) setRecipientWalletId(wallet?.id ?? null);
+      } catch {
+        if (!cancelled) setRecipientWalletId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, recipientUserId]);
 
   const handleConfirmAmount = () => {
     const numericAmount = parseFloat(amount || "0");
@@ -38,7 +62,7 @@ export function TournamentPayoutDialog({
     setStep("PIN");
   };
 
-  const handleVerifyPin = async (pin: string) => {
+  const executePayout = async (auth: { pin?: string; passkeyProof?: PasskeyTransactionProof }) => {
     if (!completeData?.wallet?.id) {
       toast.error("Wallet requis");
       return;
@@ -50,11 +74,6 @@ export function TournamentPayoutDialog({
     }
     setIsLoading(true);
     try {
-      const verification = await verifyWalletPin(completeData.wallet.id, pin);
-      if (!verification.success) {
-        toast.error(verification.error || "PIN incorrect");
-        return;
-      }
       const result = await transferBetweenIdentities({
         fromIdentityId: editionId,
         fromType: "TOURNAMENT",
@@ -62,6 +81,8 @@ export function TournamentPayoutDialog({
         toType: "USER",
         amount: numericAmount,
         description: `Virement tournoi vers ${recipientName}`,
+        idempotencyKey,
+        ...auth,
       });
       if (!result.success) {
         toast.error(result.error || "Erreur lors du virement");
@@ -71,6 +92,7 @@ export function TournamentPayoutDialog({
       setOpen(false);
       setAmount("");
       setStep("AMOUNT");
+      setIdempotencyKey(newIdempotencyKey());
       onSuccess?.();
     } catch {
       toast.error("Erreur lors du virement");
@@ -88,6 +110,9 @@ export function TournamentPayoutDialog({
         setOpen(value);
         if (!value) {
           setStep("AMOUNT");
+          setAmount("");
+          setIdempotencyKey(newIdempotencyKey());
+          setRecipientWalletId(null);
         }
       }}>
         <DialogContent className="sm:max-w-xl">
@@ -119,7 +144,9 @@ export function TournamentPayoutDialog({
           )}
           {step === "PIN" && (
             <PinVerification
-              onVerify={handleVerifyPin}
+              onVerify={async (pin) => executePayout({ pin })}
+              onVerifyPasskey={async (proof) => executePayout({ passkeyProof: proof })}
+              hasPasskey={!!completeData?.hasPasskey}
               onBack={() => setStep("AMOUNT")}
               isLoading={isLoading}
               transactionDetails={{
@@ -127,6 +154,8 @@ export function TournamentPayoutDialog({
                 amount: parseFloat(amount || "0"),
                 fees: 0,
                 totalAmount: parseFloat(amount || "0"),
+                walletId: completeData?.wallet?.id || "",
+                recipientId: recipientWalletId,
               }}
             />
           )}

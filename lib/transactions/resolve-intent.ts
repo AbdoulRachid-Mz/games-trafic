@@ -39,6 +39,7 @@ export interface ResolvedTransactionIntent {
   paymentProvider?: string;
   paymentAccountId?: string;
   imageUrl?: string;
+  plan?: "MONTHLY" | "YEARLY" | "LIFETIME";
   issues: IntentIssue[];
 }
 
@@ -142,6 +143,14 @@ export function resolveTransactionIntent(
 
   const imageUrl = params.get("image");
   if (imageUrl) intent.imageUrl = imageUrl;
+
+  if (type === "VIP_SUBSCRIPTION") {
+    const plan = params.get("plan");
+    intent.plan =
+      plan === "YEARLY" || plan === "LIFETIME" || plan === "MONTHLY"
+        ? plan
+        : undefined;
+  }
 
   return intent;
 }

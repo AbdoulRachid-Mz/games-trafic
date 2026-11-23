@@ -7,13 +7,15 @@ import {
   type NewWalletTransaction, users, registrationPayments,
   requests
 , gameItems, themes, tournamentEditions,
-  tournamentMembers, editionRegistrations } from "@/database/schema";
+  tournamentMembers, editionRegistrations, 
+  themePurchases} from "@/database/schema";
 import {
   eq,
   and, desc,
   asc,
   sql,
   count, gte,
+  gt,
   lte,
   inArray
 } from "drizzle-orm";
@@ -29,7 +31,7 @@ import { randomUUID } from "crypto";
 import { getAppSettings } from "./app-settings";
 import { getUserWalletById, verifyWalletPin } from "./wallets";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isAdmin, assertAuthenticated } from "@/lib/auth/permissions";
+import { isAdmin, assertAuthenticated, assertAdmin } from "@/lib/auth/permissions";
 import {
   calculateTransactionFees,
   executeRefund,
@@ -39,6 +41,10 @@ import {
   type LedgerPosting,
   TransactionType,
 } from "@/lib/finance";
+import {
+  consumePasskeyProofForIntent,
+  type PasskeyProof,
+} from "@/actions/passkey-transaction";
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -269,6 +275,7 @@ export async function createTransaction(
     fees?: string;
     netAmount?: string;
     pin?: string;
+    passkeyProof?: PasskeyProof;
   },
   options?: { allowDuplicate?: boolean; isSystem?: boolean }
 ): Promise<WalletTransaction> {
@@ -280,10 +287,12 @@ export async function createTransaction(
   assertAuthenticated(user);
 
   const isAdminUser = isAdmin(user);
+  // Le flag `isSystem` ne peut être exercé que par un contexte admin serveur.
+  const isSystem = options?.isSystem === true && isAdminUser;
 
   // 🛡️ SEC-001: Bloquer tout crédit direct (DEPOSIT, BONUS, REFUND) non-admin et non-système
   const creditTypes = ["DEPOSIT", "BONUS", "REFUND"];
-  if (creditTypes.includes(data.type) && !isAdminUser && !options?.isSystem) {
+  if (creditTypes.includes(data.type) && !isAdminUser && !isSystem) {
     throw new Error(
       "Opération non autorisée: les crédits directs (dépôts, bonus, remboursements) doivent résulter d'un paiement certifié ou d'une validation administrateur."
     );
@@ -296,19 +305,6 @@ export async function createTransaction(
   if (!wallet.isActive) throw new Error("Wallet inactif");
   if (wallet.isLocked) throw new Error("Wallet verrouillé");
   if (!wallet.financialAccountId) throw new Error("Compte financier non lié");
-
-  // 🛡️ SEC-010: Validation obligatoire du code PIN côté serveur pour transferts et retraits
-  if (["TRANSFER", "WITHDRAWAL"].includes(data.type) && !isAdminUser && !options?.isSystem) {
-    if (wallet.pinHash) {
-      if (!data.pin) {
-        throw new Error("Code PIN requis pour effectuer cette opération.");
-      }
-      const pinResult = await verifyWalletPin(wallet.id, data.pin);
-      if (!pinResult.success) {
-        throw new Error(pinResult.error || "Code PIN incorrect.");
-      }
-    }
-  }
 
   let amount = Number(data.amount);
   // Compte cible du pool pour une inscription tournoi (aligné sur joinEdition).
@@ -411,55 +407,76 @@ export async function createTransaction(
     }
   } else if (data.type === "THEME_PURCHASE") {
     const themeId = data.metadata?.targetId || data.metadata?.themeId;
-    if (themeId) {
-      const theme = await db.query.themes.findFirst({
-        where: eq(themes.id, themeId),
-      });
-      if (!theme) {
-        throw new Error("Thème introuvable");
-      }
-      const serverPrice = parseFloat(theme.price || "0");
-      if (!isNaN(amount) && Math.abs(amount - serverPrice) > 0.01) {
-        throw new Error("PRICE_CHANGED: Le prix du thème a été actualisé.");
-      }
-      amount = serverPrice;
+    if (!themeId) {
+      throw new Error("Thème cible requis");
     }
+    const theme = await db.query.themes.findFirst({
+      where: eq(themes.id, themeId),
+    });
+    if (!theme || theme.isDeleted || !theme.isActive) {
+      throw new Error("Thème introuvable ou indisponible");
+    }
+    const existingThemePurchase = await db.query.themePurchases.findFirst({
+      where: and(
+        eq(themePurchases.userId, user.id),
+        eq(themePurchases.themeId, themeId)
+      ),
+    });
+    if (existingThemePurchase) {
+      throw new Error("Vous possédez déjà ce thème");
+    }
+    const serverPrice = parseFloat(theme.price || "0");
+    if (!(serverPrice > 0)) {
+      throw new Error("Ce thème n'est pas disponible à l'achat");
+    }
+    if (!isNaN(amount) && Math.abs(amount - serverPrice) > 0.01) {
+      throw new Error("PRICE_CHANGED: Le prix du thème a été actualisé.");
+    }
+    amount = serverPrice;
   } else if (data.type === "VIP_SUBSCRIPTION") {
+    const rawPlan = data.metadata?.plan ?? data.metadata?.planType;
+    const planType: "MONTHLY" | "YEARLY" | "LIFETIME" =
+      rawPlan === "YEARLY" || rawPlan === "LIFETIME" ? rawPlan : "MONTHLY";
     const settings = await getAppSettings();
-    const isYearly = data.metadata?.plan === "YEARLY";
-    const serverVipPrice = parseFloat(
-      (isYearly ? settings?.vipYearlyPrice : settings?.vipMonthlyPrice) || (isYearly ? "2500" : "250")
-    );
+    const serverVipPrice =
+      planType === "LIFETIME"
+        ? 25000
+        : parseFloat(
+            (planType === "YEARLY"
+              ? settings?.vipYearlyPrice
+              : settings?.vipMonthlyPrice) ||
+              (planType === "YEARLY" ? "2500" : "250"),
+          );
+    if (!(serverVipPrice > 0)) {
+      throw new Error("Tarif VIP indisponible");
+    }
     if (!isNaN(amount) && Math.abs(amount - serverVipPrice) > 0.01) {
       throw new Error("PRICE_CHANGED: Le tarif de l'abonnement VIP a été actualisé.");
     }
+    const existingActiveVip = await db.query.vipSubscriptions.findFirst({
+      where: and(
+        eq(vipSubscriptions.userId, user.id),
+        eq(vipSubscriptions.status, "ACTIVE"),
+        gt(vipSubscriptions.endDate, new Date()),
+      ),
+    });
+    if (existingActiveVip) {
+      throw new Error("Vous avez déjà un abonnement VIP actif");
+    }
     amount = serverVipPrice;
+    data.metadata = { ...(data.metadata ?? {}), plan: planType, planType };
   }
 
   if (isNaN(amount) || amount <= 0) {
     throw new Error("Montant invalide");
   }
 
-  const lastTx = await db
-    .select()
-    .from(walletTransactions)
-    .where(eq(walletTransactions.walletId, wallet.id))
-    .orderBy(desc(walletTransactions.createdAt))
-    .limit(1);
-  if (lastTx[0]?.createdAt) {
-    const lastDate = new Date(lastTx[0].createdAt as any).getTime();
-    const now = Date.now();
-    const minWait = 5_000; // Garde anti double-soumission rapide (5s) // 1 minute interval pour toute opération
-    const diff = now - lastDate;
-    if (diff < minWait) {
-      const remaining = Math.ceil((minWait - diff) / 1000);
-      throw new Error(`Veuillez patienter ${remaining}s avant une nouvelle transaction`);
-    }
-  }
+  // Cooldown financier uniforme (120s, serveur/DB, concurrence-safe) appliqué
+  // dans la transaction d'exécution via executeFinancialOperation + cooldownUserId.
+  // Les retries strictement idempotents (même scope+clé+payload) sont exemptés.
 
   if (
-    !options?.allowDuplicate &&
-    ["GAME_ITEM_PURCHASE", "DEPOSIT", "WITHDRAWAL", "ORDER_PURCHASE"].includes(data.type)
+    ["GAME_ITEM_PURCHASE", "ORDER_PURCHASE"].includes(data.type)
   ) {
     const existing = await db
       .select({ id: walletTransactions.id })
@@ -473,12 +490,22 @@ export async function createTransaction(
       )
       .limit(1);
     if (existing.length > 0) {
-      throw new Error("Une transaction du même type est déjà en cours");
+      throw new Error(
+        "DUPLICATE_TRANSACTION: Une transaction du même type est déjà en cours. Utilisez une nouvelle intention avec une nouvelle clé d'idempotence."
+      );
     }
   }
 
   // Déterminer les écritures et comptes selon le type de transaction
   const canonicalType: TransactionType = data.type as TransactionType;
+
+  // Les dépôts/retraits utilisateur doivent passer par le workflow de demande
+  // (createRequest + approbation/réservation/règlement), pas par exécution directe.
+  if (!isSystem && (canonicalType === "DEPOSIT" || canonicalType === "WITHDRAWAL")) {
+    throw new Error(
+      "INVALID_FLOW: les dépôts et retraits doivent être effectués via une demande (createRequest)."
+    );
+  }
 
   // L'inscription à un tournoi est un paiement immédiat : elle est validée
   // dans la même transaction que la création de l'inscription (voir
@@ -490,20 +517,36 @@ export async function createTransaction(
     ? "PENDING"
     : "COMPLETED";
 
-  const idempotencyKey =
-    typeof data.metadata?.idempotencyKey === "string" && data.metadata.idempotencyKey.trim().length > 0
-      ? data.metadata.idempotencyKey
-      : // Fallback : clé aléatoire (jamais de dédoublonnage artificiel entre deux
-        // opérations légitimes identiques, mais traçabilité en base).
-        `auto-${randomUUID()}`;
+  const providedIdempotencyKey =
+    typeof data.metadata?.idempotencyKey === "string"
+      ? data.metadata.idempotencyKey.trim()
+      : "";
 
-  const metadata = {
+  if (!isSystem && providedIdempotencyKey.length === 0) {
+    throw new Error(
+      "IDEMPOTENCY_KEY_REQUIRED: une clé d'idempotence déterministe est requise."
+    );
+  }
+
+  const idempotencyKey =
+    providedIdempotencyKey.length > 0
+      ? providedIdempotencyKey
+      : `system:${data.type.toLowerCase()}:${wallet.id}:${randomUUID()}`;
+
+  const metadata: Record<string, any> = {
     ...(data.metadata ?? {}),
     originalType: data.type,
   };
 
   const feeCalc = await calculateTransactionFees(canonicalType, amount);
   const fees = feeCalc.fees;
+
+  const transferRecipientWalletId =
+    canonicalType === "TRANSFER"
+      ? String((metadata as any)?.recipientWalletId ?? (data.metadata as any)?.recipientWalletId ?? "")
+      : "";
+  const passkeyIntentRecipientId =
+    canonicalType === "TRANSFER" ? transferRecipientWalletId || null : null;
 
   let operation: FinancialOperation;
 
@@ -576,8 +619,8 @@ export async function createTransaction(
       }
       fromUserId = null;
       toUserId = user.id;
-    } else if (canonicalType === "VIP_SUBSCRIPTION") {
-      // L'abonnement VIP est une recette plateforme.
+    } else if (canonicalType === "VIP_SUBSCRIPTION" || canonicalType === "THEME_PURCHASE") {
+      // Recette plateforme imm�diate (abonnement / achat num�rique).
       const feeAccount = await getOrCreateSystemAccount(db, "FEES");
       postings.push({ accountId: wallet.financialAccountId, debit: amount });
       postings.push({ accountId: feeAccount.id, credit: amount });
@@ -617,7 +660,6 @@ export async function createTransaction(
       [
         "ORDER_PURCHASE",
         "GAME_ITEM_PURCHASE",
-        "THEME_PURCHASE",
         "PURCHASE",
       ].includes(canonicalType)
     ) {
@@ -651,17 +693,44 @@ export async function createTransaction(
     };
   }
 
-  // 🚀 Moteur unique : écritures équilibrées, idempotence, verrouillage
-  //    ET side-effects métier composés dans UNE SEULE transaction —
-  //    plus de débité-sans-livraison possible.
+
+  // Moteur unique : écritures équilibrées, idempotence, verrouillage, cooldown
+  // serveur/DB et side-effects métier composés dans UNE SEULE transaction.
   const result = await db.transaction(async (tx) => {
+    if (!isSystem && !isAdminUser && wallet.userId === user.id) {
+      const hasPin = typeof data.pin === "string" && data.pin.length > 0;
+      const hasPasskeyProof = !!data.passkeyProof?.challengeId && !!data.passkeyProof?.assertion;
+
+      if (hasPasskeyProof) {
+        await consumePasskeyProofForIntent(tx, {
+          userId: user.id,
+          proof: data.passkeyProof!,
+          intent: {
+            walletId: wallet.id,
+            transactionType: canonicalType,
+            amount,
+            recipientId: passkeyIntentRecipientId,
+            fees,
+          },
+        });
+      } else if (hasPin) {
+        const pinResult = await verifyWalletPin(wallet.id, data.pin!);
+        if (!pinResult.success) {
+          throw new Error(pinResult.error || "Code PIN incorrect.");
+        }
+      } else if (wallet.pinHash) {
+        throw new Error("Code PIN ou preuve Passkey requis pour effectuer cette opération.");
+      }
+    }
+
     const opResult = await executeFinancialOperation({
       ...operation,
+      cooldownUserId: isSystem ? undefined : user.id,
       client: tx,
     });
 
     // Replay idempotent : les side-effects ont déjà été appliqués lors de
-    // l'exécution initiale — ne jamais les réappliquer (doublons).
+    // l'exécution initiale - ne jamais les réappliquer (doublons).
     if (!opResult.idempotentReplay) {
       await handleTransactionTypeSafe(tx, {
         type: canonicalType,
@@ -676,6 +745,33 @@ export async function createTransaction(
 
     return opResult;
   });
+
+  // Notifications asynchrones post-commit (non-bloquantes)
+  try {
+    const tx = result.transaction;
+    if (!result.idempotentReplay) {
+      const { notifyUser } = await import("@/lib/notifications");
+      if (tx.type === "TRANSFER" && tx.toUserId) {
+        notifyUser(tx.toUserId, "payment_transfer_received", {
+          amount: String(tx.amount),
+          senderName: user.name || "Un utilisateur",
+        }).catch((err) => console.error("[Notification] Erreur notification transfert:", err));
+      } else if (tx.type === "DEPOSIT" && tx.status === "COMPLETED") {
+        notifyUser(user.id, "payment_deposit_confirmed", {
+          amount: String(tx.amount),
+          currency: tx.currency,
+          transactionId: tx.id,
+        }).catch((err) => console.error("[Notification] Erreur notification dépôt:", err));
+      } else if (["GAME_ITEM_PURCHASE", "ORDER_PURCHASE"].includes(tx.type)) {
+        notifyUser(user.id, "payment_purchase_confirmed", {
+          itemName: (tx.metadata as any)?.itemName || "Article",
+          amount: String(tx.amount),
+        }).catch((err) => console.error("[Notification] Erreur notification achat:", err));
+      }
+    }
+  } catch (err) {
+    console.error("[Notification] Exception notification transaction:", err);
+  }
 
   return result.transaction;
 }
@@ -731,16 +827,39 @@ async function handleTransactionTypeSafe(
     // 💎 VIP
     // =====================================================
     case "VIP_SUBSCRIPTION": {
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1);
+      const rawPlan = metadata?.planType || metadata?.plan;
+      const planType: "MONTHLY" | "YEARLY" | "LIFETIME" =
+        rawPlan === "YEARLY" || rawPlan === "LIFETIME" ? rawPlan : "MONTHLY";
+
+      const existingActiveVip = await tx.query.vipSubscriptions.findFirst({
+        where: (v: any, { and: andFn, eq: eqFn, gt: gtFn }: any) =>
+          andFn(
+            eqFn(v.userId, userId),
+            eqFn(v.status, "ACTIVE"),
+            gtFn(v.endDate, new Date()),
+          ),
+      });
+      if (existingActiveVip) {
+        throw new Error("Vous avez déjà un abonnement VIP actif");
+      }
+      const startDate = new Date();
+      const endDate = new Date(startDate);
+      if (planType === "LIFETIME") {
+        endDate.setFullYear(endDate.getFullYear() + 100);
+      } else if (planType === "YEARLY") {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
 
       await tx.insert(vipSubscriptions).values({
         userId,
-        planType: "MONTHLY",
+        planType,
         status: "ACTIVE",
-        startDate: new Date(),
+        startDate,
         endDate,
         pricePaid: String(amount),
+        currency: wallet.currency ?? "GTC",
         transactionId,
         activeBenefits: [
           "theme_creation",
@@ -754,8 +873,50 @@ async function handleTransactionTypeSafe(
 
       await tx
         .update(users)
-        .set({ isVip: true })
+        .set({ isVip: true, updatedAt: new Date() })
         .where(eq(users.id, userId));
+
+      break;
+    }
+
+    // =====================================================
+    // 🎨 THEME
+    // =====================================================
+    case "THEME_PURCHASE": {
+      const themeId = metadata?.targetId || metadata?.themeId;
+      if (!themeId) {
+        throw new Error("Thème cible requis");
+      }
+
+      const theme = await tx.query.themes.findFirst({
+        where: (t: any, { eq: eqFn }: any) => eqFn(t.id, themeId),
+      });
+      if (!theme || theme.isDeleted || !theme.isActive) {
+        throw new Error("Thème introuvable ou indisponible");
+      }
+
+      const existingPurchase = await tx.query.themePurchases.findFirst({
+        where: (tp: any, { and: andFn, eq: eqFn }: any) =>
+          andFn(eqFn(tp.userId, userId), eqFn(tp.themeId, themeId)),
+      });
+      if (existingPurchase) {
+        throw new Error("Vous possédez déjà ce thème");
+      }
+
+      await tx.insert(themePurchases).values({
+        userId,
+        themeId,
+        price: String(amount),
+        createdAt: new Date(),
+      });
+
+      await tx
+        .update(themes)
+        .set({
+          downloads: sql`${themes.downloads} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(themes.id, themeId));
 
       break;
     }
@@ -961,13 +1122,24 @@ export async function getTransactionFees(type: string, amount: number) {
 }
 
 /**
- * Met à jour le statut d'une transaction
+ * Met à jour le statut d'une transaction.
+ * Réservé admin: ne doit pas être utilisé pour simuler un règlement financier.
+ * Les transitions monétaires doivent passer par les workflows financiers canoniques.
  */
 export async function updateTransactionStatus(
   id: string,
   status: WalletTransaction["status"],
   metadata?: Record<string, any>
 ): Promise<WalletTransaction> {
+  const user = await getCurrentUser();
+  assertAdmin(user);
+
+  if (status === "COMPLETED") {
+    throw new Error(
+      "INVALID_FLOW: un statut COMPLETED ne peut pas être forcé directement. Utilisez le workflow financier canonique."
+    );
+  }
+
   try {
     const updateData: Partial<NewWalletTransaction> = {
       status,

@@ -179,16 +179,37 @@ export default async function SubscriptionsDashboardPage() {
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-muted-foreground">
-                {active.autoRenew
-                  ? "Votre abonnement se renouvellera automatiquement à l'échéance via votre portefeuille."
-                  : "Le renouvellement automatique est désactivé : pensez à renouveler avant l'échéance."}
+                {active.planType === "LIFETIME"
+                  ? "Votre abonnement VIP est actif à vie."
+                  : active.autoRenew
+                    ? "Votre abonnement se renouvellera automatiquement à l'échéance via votre portefeuille."
+                    : remaining > 0
+                      ? "Votre abonnement est encore actif. Un renouvellement anticipé n'est pas disponible ; vous pourrez souscrire à nouveau après expiration."
+                      : "Le renouvellement automatique est désactivé : vous pouvez souscrire à nouveau."}
               </p>
-              <Button asChild className="gap-2 bg-purple-600 hover:bg-purple-700">
-                <Link href="/vip">
-                  {active.autoRenew ? "Voir les options" : "Renouveler"}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
+              {active.planType === "LIFETIME" ? (
+                <Button asChild className="gap-2 bg-purple-600 hover:bg-purple-700">
+                  <Link href="/vip">
+                    Voir les avantages
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : remaining > 0 ? (
+                <Button variant="outline" className="gap-2" disabled>
+                  Renouvellement disponible à l&apos;échéance
+                </Button>
+              ) : (
+                <Button asChild className="gap-2 bg-purple-600 hover:bg-purple-700">
+                  <Link
+                    href={`/wallet/transactions/create?type=VIP_SUBSCRIPTION&plan=${encodeURIComponent(
+                      active.planType || "MONTHLY",
+                    )}`}
+                  >
+                    Renouveler
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

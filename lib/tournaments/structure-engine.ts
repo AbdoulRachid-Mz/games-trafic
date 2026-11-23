@@ -259,7 +259,7 @@ function intelligentSeeding(participants: any[]) {
   const sorted: any[] = [];
   const teamLists = Object.values(teamGroups);
 
-  let maxLen = Math.max(...teamLists.map((l) => l.length), 0);
+  const maxLen = Math.max(...teamLists.map((l) => l.length), 0);
 
   for (let i = 0; i < maxLen; i++) {
     for (const list of teamLists) {
@@ -285,8 +285,8 @@ async function generatePreview(
   };
 
   let currentParticipantsCount = participantRegIds.length;
-  let totalMatches = 0;
-  let maxPhaseRounds = 0;
+  const totalMatches = 0;
+  const maxPhaseRounds = 0;
 
   phases.forEach((p, idx) => {
     const phasePreview: any = {

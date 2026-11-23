@@ -112,14 +112,14 @@ export async function getConversationsForUser(
       .map(c => c.lastMessageId)
       .filter(Boolean) as string[];
 
-    let lastMessagesMap = new Map<string, any>();
+    const lastMessagesMap = new Map<string, any>();
     if (lastMessageIds.length > 0) {
       const messagesData = await db.query.messages.findMany({
         where: (m, { inArray }) => inArray(m.id, lastMessageIds),
       });
 
       const senderIds = messagesData.map(m => m.senderId).filter(Boolean) as string[];
-      let sendersMap = new Map<string, any>();
+      const sendersMap = new Map<string, any>();
       if (senderIds.length > 0) {
         const sendersData = await db.query.users.findMany({
           where: (u, { inArray }) => inArray(u.id, senderIds),
@@ -205,7 +205,7 @@ export async function getConversationsForUser(
 
     // --- Mapping synchrone (plus d'await par conversation) ---
     const enrichedConversations = userConversations.map((conv) => {
-      let entityType = conv.entityType.toLowerCase() as any;
+      const entityType = conv.entityType.toLowerCase() as any;
       let entityId = conv.entityId;
       let entityData: any = null;
 

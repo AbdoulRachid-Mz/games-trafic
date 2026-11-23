@@ -87,6 +87,7 @@ function CreateTransactionContent() {
   });
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [verifiedPin, setVerifiedPin] = useState<string | null>(null);
+  const [passkeyProof, setPasskeyProof] = useState<{ challengeId: string; assertion: unknown } | null>(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [prefilledRecipientWalletId, setPrefilledRecipientWalletId] = useState<
     string | null
@@ -236,11 +237,27 @@ function CreateTransactionContent() {
           };
         }
 
-        if (type === "VIP_SUBSCRIPTION" && !newData.amount) {
-          const monthly = parseFloat(settings?.vipMonthlyPrice || "0");
-          if (monthly > 0) {
-            newData.amount = monthly;
-          }
+        if (type === "VIP_SUBSCRIPTION") {
+          const planType: "MONTHLY" | "YEARLY" | "LIFETIME" =
+            intent.plan === "YEARLY" || intent.plan === "LIFETIME"
+              ? intent.plan
+              : "MONTHLY";
+          const planPrice =
+            planType === "LIFETIME"
+              ? 25000
+              : parseFloat(
+                  (planType === "YEARLY"
+                    ? settings?.vipYearlyPrice
+                    : settings?.vipMonthlyPrice) ||
+                    (planType === "YEARLY" ? "2500" : "250"),
+                );
+          // Prix autoritaire côté serveur : recalculé et réappliqué à l'exécution ; ne pas faire confiance au montant client/URL.
+          newData.amount = planPrice;
+          newData.metadata = {
+            ...(newData.metadata || {}),
+            plan: planType,
+            planType,
+          } as any;
         }
 
         if (type === "TRANSFER" && actualEntityId) {
@@ -568,11 +585,12 @@ function CreateTransactionContent() {
           const body = await response.json();
           apiMessage = body?.error || body?.message || apiMessage;
         } catch {
-          // corps non JSON — message générique conservé
+          // corps non JSON - message générique conservé
         }
         throw new Error(apiMessage);
       }
       setVerifiedPin(pin);
+      setPasskeyProof(null);
       await refreshProfile();
       nextStep();
     } catch (error: any) {
@@ -586,6 +604,16 @@ function CreateTransactionContent() {
   };
 
   const executeConfirm = async (allowDuplicate: boolean) => {
+    // "Confirmer quand même" (doublon métier) = nouvelle intention utilisateur :
+    // nouvelle clé d'idempotence pour ne pas rejouer la même opération.
+    let operationIdempotencyKey = idempotencyKey;
+    if (allowDuplicate) {
+      operationIdempotencyKey =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `tk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setIdempotencyKey(operationIdempotencyKey);
+    }
     if (!transactionData.type || !transactionData.amount) {
       throw new Error("Données de transaction incomplètes");
     }
@@ -607,7 +635,12 @@ function CreateTransactionContent() {
           paymentProvider: transactionData.metadata?.paymentProvider,
           paymentAccountId: transactionData.metadata?.paymentAccountId,
         },
-        { allowDuplicate },
+        {
+          allowDuplicate,
+          idempotencyKey: operationIdempotencyKey,
+          pin: verifiedPin || undefined,
+          passkeyProof: passkeyProof || undefined,
+        },
       );
 
       if (!request) throw new Error("Erreur lors de la création de la requête");
@@ -648,7 +681,7 @@ function CreateTransactionContent() {
           type: "GAME_ITEMS",
           amount: transactionData.amount.toString(),
           gameItemId: transactionData.targetId,
-          // quantity EST une colonne top-level de requests — auparavant
+          // quantity EST une colonne top-level de requests - auparavant
           // seulement dans metadata (jamais lue par le serveur). Le serveur
           // revalide la quantité et recalcule le total depuis le prix en base.
           quantity: quantity.toString(),
@@ -660,7 +693,12 @@ function CreateTransactionContent() {
             totalGtc: transactionData.amount.toString(),
           },
         },
-        { allowDuplicate },
+        {
+          allowDuplicate,
+          idempotencyKey: operationIdempotencyKey,
+          pin: verifiedPin || undefined,
+          passkeyProof: passkeyProof || undefined,
+        },
       );
       setTransactionId(request.id);
       toast.success("Demande créée ! L’équipe va traiter votre achat.");
@@ -678,7 +716,12 @@ function CreateTransactionContent() {
             | string
             | undefined,
         },
-        { allowDuplicate },
+        {
+          allowDuplicate,
+          idempotencyKey: operationIdempotencyKey,
+          pin: verifiedPin || undefined,
+          passkeyProof: passkeyProof || undefined,
+        },
       );
       if (!order.success) {
         throw new Error(
@@ -706,14 +749,17 @@ function CreateTransactionContent() {
           feesAmount: feesObj.amount,
           feesPercentage: feesObj.percentage,
           totalCalculated: feesObj.totalAmount,
-          idempotencyKey,
+          idempotencyKey: operationIdempotencyKey,
         },
         pin: verifiedPin || undefined,
+        passkeyProof: passkeyProof || undefined,
       },
       { allowDuplicate },
     );
 
     setTransactionId(transaction.id);
+    setPasskeyProof(null);
+    setVerifiedPin(null);
     // Nouvelle clé pour la prochaine soumission (après succès).
     setIdempotencyKey(
       typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -932,8 +978,10 @@ function CreateTransactionContent() {
         return (
           <PinVerification
             onVerify={handlePinVerify}
-            onVerifyPasskey={async () => {
-              // Si le passkey est validé avec succès
+            onVerifyPasskey={async (proof) => {
+              // Preuve liée à l'intention, consommée côté serveur à l'exécution.
+              setPasskeyProof(proof);
+              setVerifiedPin(null);
               await refreshProfile();
               nextStep();
             }}

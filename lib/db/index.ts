@@ -15,7 +15,7 @@ neonConfig.webSocketConstructor = ws;
 
 // Declare the global Pool slot for HMR-safe singleton in development.
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __neonPool: Pool | undefined;
 }
 

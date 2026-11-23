@@ -642,7 +642,7 @@ export async function adminConfirmMatchResult(
       updatedMatch.id,
     );
 
-    let progressionInfo: any = { progressionResult };
+    const progressionInfo: any = { progressionResult };
 
     // Rétrocompatibilité avec l'ancien code du front-end
     if (

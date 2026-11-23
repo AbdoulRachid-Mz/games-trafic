@@ -347,20 +347,23 @@ export function useUpdateGameItemRequest() {
   });
 }
 
+/**
+ * @deprecated Le traitement COMPLETED des demandes GAME_ITEMS doit passer par le workflow canonique approveRequest.
+ * Ce hook ne doit pas être utilisé pour compléter financièrement une demande.
+ */
 export function useProcessGameItemRequest() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      processedByUserId,
-      status,
-      adminNotes,
-    }: {
+    mutationFn: async (_input: {
       id: string;
       processedByUserId: string;
       status: "COMPLETED" | "FAILED" | "CANCELLED";
       adminNotes?: string;
-    }) => processGameItemRequest(id, processedByUserId, status, adminNotes),
+    }) => {
+      throw new Error(
+        "INVALID_FLOW: utilisez le workflow canonique d’approbation/rejet des demandes GAME_ITEMS."
+      );
+    },
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: gameKeys.requests.detail(id) });
       queryClient.invalidateQueries({ queryKey: gameKeys.requests.lists() });

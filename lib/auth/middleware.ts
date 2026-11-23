@@ -51,6 +51,7 @@ export async function verifyAuthToken(): Promise<{
       postsCreatedCount: (session.user as any).postsCreatedCount as number,
       metadata: (session.user as any).metadata as any,
       lastLoginMethod: (session.user as any).lastLoginMethod as string | null,
+      lastFinancialActionAt: (session.user as any).lastFinancialActionAt as Date | null ?? null,
       createdAt: (session.user as any).createdAt as Date,
       updatedAt: (session.user as any).updatedAt as Date,
       lastLogin: (session.user as any).lastLogin as Date | null,

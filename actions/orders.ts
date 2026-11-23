@@ -29,6 +29,11 @@ import {
   PAGINATION_DEFAULTS,
 } from '@/types/view-models';
 import { cacheLife, cacheTag } from 'next/cache';
+import {
+  consumePasskeyProofForIntent,
+  type PasskeyProof,
+} from '@/actions/passkey-transaction';
+import { verifyWalletPin } from '@/actions/wallets';
 
 /**
  * Creates a new product order and reserves the product.
@@ -37,10 +42,15 @@ export async function createProductOrder(
   data: {
     productId: string;
     buyerInstructions?: string;
-    // NOTE: totalAmount is intentionally removed — price is always read from the
+    // NOTE: totalAmount is intentionally removed - price is always read from the
     // product record in the database to prevent client-side price manipulation.
   },
-  options?: { allowDuplicate?: boolean }
+  options?: {
+    allowDuplicate?: boolean;
+    idempotencyKey?: string;
+    pin?: string;
+    passkeyProof?: PasskeyProof;
+  }
 ): Promise<{ success: boolean; orderId?: string; error?: string; transactionId?: string }> {
   try {
     const user = await getCurrentUser();
@@ -58,31 +68,22 @@ export async function createProductOrder(
     }
 
     return await db.transaction(async (tx) => {
-      // 1. Fetch product and shop info
-      const product = await tx.query.products.findFirst({
-        where: eq(products.id, data.productId),
-        with: { shop: true }
-      });
+      // 1. Fetch product and shop info (lock for reservation consistency)
+      const [product] = await tx
+        .select()
+        .from(products)
+        .where(eq(products.id, data.productId))
+        .for('update')
+        .limit(1);
 
       if (!product) throw new Error("Produit non trouvé");
-      if (product.status !== 'NON_VENDU') throw new Error("Produit non disponible");
-      if (product.shop?.ownerId === user.id || product.userId === user.id) throw new Error("Vous ne pouvez pas acheter votre propre produit");
+      const shop = product.shopId
+        ? await tx.query.shops.findFirst({ where: eq(shops.id, product.shopId) })
+        : null;
 
-      if (!options?.allowDuplicate) {
-        const existing = await tx
-          .select({ id: orders.id })
-          .from(orders)
-          .where(
-            and(
-              eq(orders.productId, product.id),
-              eq(orders.buyerId, user.id),
-              inArray(orders.status, ['PENDING', 'ACCEPTED_BY_SHOP', 'PROCESSING_BY_ADMIN'])
-            )
-          )
-          .limit(1);
-        if (existing.length > 0) {
-          throw new Error("Une commande similaire est déjà en cours");
-        }
+      if (product.status !== 'NON_VENDU') throw new Error("Produit non disponible");
+      if (shop?.ownerId === user.id || product.userId === user.id) {
+        throw new Error("Vous ne pouvez pas acheter votre propre produit");
       }
 
       // 2. Fetch Buyer Wallet
@@ -93,12 +94,50 @@ export async function createProductOrder(
       if (!buyerWallet || !buyerWallet.financialAccountId) {
         throw new Error("Wallet non configuré. Veuillez créer un wallet.");
       }
+      if (!buyerWallet.isActive || buyerWallet.isLocked) {
+        throw new Error("Wallet indisponible pour une opération financière");
+      }
 
       // 3. Lire le prix depuis la DB (SEC-06 : jamais depuis le client)
-      const unitPrice = parseFloat(product.price);
-      const price = unitPrice;
+      const price = parseFloat(product.price);
+      if (!Number.isFinite(price) || price <= 0) {
+        throw new Error("Prix produit invalide");
+      }
 
-      // 4. Capture → Escrow via le moteur finance V2
+      const providedIdempotencyKey =
+        typeof options?.idempotencyKey === 'string' ? options.idempotencyKey.trim() : '';
+      const idempotencyKey =
+        providedIdempotencyKey.length > 0
+          ? providedIdempotencyKey
+          : `order-capture:${product.id}:${user.id}`;
+
+      // 4. Preuve PIN/passkey consommée à l'exécution (initiateur = acheteur).
+      if (!isAdmin(user)) {
+        const hasPin = typeof options?.pin === 'string' && options.pin.length > 0;
+        const hasPasskeyProof = !!options?.passkeyProof?.challengeId && !!options?.passkeyProof?.assertion;
+        if (hasPasskeyProof) {
+          await consumePasskeyProofForIntent(tx, {
+            userId: user.id,
+            proof: options!.passkeyProof!,
+            intent: {
+              walletId: buyerWallet.id,
+              transactionType: 'ORDER_PURCHASE',
+              amount: price,
+              recipientId: null,
+              fees: 0,
+            },
+          });
+        } else if (hasPin) {
+          const pinResult = await verifyWalletPin(buyerWallet.id, options!.pin!);
+          if (!pinResult.success) {
+            throw new Error(pinResult.error || 'Code PIN incorrect.');
+          }
+        } else if (buyerWallet.pinHash) {
+          throw new Error('Code PIN ou preuve Passkey requis pour effectuer cette opération.');
+        }
+      }
+
+      // 5. Capture -> Escrow via moteur finance V2 (cooldown + idempotence)
       const escrowAccount = await getOrCreateSystemAccount(tx, 'ESCROW');
       const captureResult = await executeFinancialOperation({
         kind: 'POST',
@@ -111,7 +150,7 @@ export async function createProductOrder(
         toUserId: null,
         description: `Réservation du produit: ${product.name}`,
         reason: 'Capture escrow commande',
-        metadata: { productId: product.id, shopId: product.shopId },
+        metadata: { productId: product.id, shopId: product.shopId, idempotencyKey },
         postings: buildOrderCapturePostings({
           buyerAccountId: buyerWallet.financialAccountId,
           escrowAccountId: escrowAccount.id,
@@ -119,17 +158,42 @@ export async function createProductOrder(
         }),
         netAmount: price,
         createdByUserId: user.id,
-        idempotencyKey: `order-capture:${product.id}:${user.id}`,
+        idempotencyKey,
         idempotencyScope: 'order:capture',
+        cooldownUserId: user.id,
         client: tx,
       });
       const transaction = captureResult.transaction;
 
-      // 5. Create Order
+      // Replay idempotent strict : ne pas recréer commande/réservation.
+      if (captureResult.idempotentReplay) {
+        const existingOrder = await tx.query.orders.findFirst({
+          where: eq(orders.walletTransactionId, transaction.id),
+        });
+        return { success: true, orderId: existingOrder?.id, transactionId: transaction.id };
+      }
+
+      // Anti-doublon métier (hors retry idempotent strict déjà résolu)
+      const existing = await tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.productId, product.id),
+            eq(orders.buyerId, user.id),
+            inArray(orders.status, ['PENDING', 'ACCEPTED_BY_SHOP', 'PROCESSING_BY_ADMIN'])
+          )
+        )
+        .limit(1);
+      if (existing.length > 0) {
+        throw new Error("Une commande similaire est déjà en cours");
+      }
+
+      // 6. Create Order
       const [newOrder] = await tx.insert(orders).values({
         productId: product.id,
         buyerId: user.id,
-        shopId: product.shopId,
+        shopId: product.shopId!,
         price: price.toFixed(2),
         status: 'PENDING',
         buyerInstructions: data.buyerInstructions,
@@ -138,11 +202,7 @@ export async function createProductOrder(
         updatedAt: new Date(),
       }).returning();
 
-      // Update tx metadata if needed later
-      // The below line was removed because an empty set({}) throws 'No values to set' in Drizzle
-      // await tx.update(orders).set({  }).where(eq(orders.id, newOrder.id));
-
-      // 6. Mark product as reserved
+      // 7. Mark product as reserved
       await tx.update(products)
         .set({ status: 'RESERVE' })
         .where(eq(products.id, product.id));

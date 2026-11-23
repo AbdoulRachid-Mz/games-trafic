@@ -26,6 +26,12 @@
   - Pilotage centralisé et dynamique du layout (`stores/app-shell-store.ts`) avec support des surcharges temporaires par composant (`requestOverride` / `clearOverride`).
   - Header Dashboard et Top Middle avec masquage au défilement descendant et réapparition fluide au défilement montant (scroll-reveal via Framer Motion).
   - Floating Action Button responsive intégré directement au Dock (4 éléments max sur mobile/tablette, 6 max sur desktop, défilement horizontal fluide et bouton d'action `+` fixe à droite).
+- **Système de Notifications Multi-Canal** :
+  - **WhatsApp Cloud API** : Notifications instantanées de tournois, inscriptions, programmation de matchs et alertes financières sur WhatsApp.
+  - **Email Transactionnel (Resend)** : Templates HTML e-sport responsive avec confirmation d'inscription, reçus et récapitulatifs de matchs.
+  - **Web Push (VAPID)** : Notifications natives navigateur et PWA avec signature cryptographique VAPID.
+  - **In-App** : Centre de notifications temps réel avec badge flottant, marquer comme lu et pagination infinie.
+  - **Dispatcher intelligent** : Routage automatique selon les préférences granulaires de l'utilisateur (`lib/notifications`).
 - **Administration & Modération** : Console d'administration centralisée, gestion des rôles, modération des utilisateurs, audits et monitoring financier.
 
 ---

@@ -1,12 +1,16 @@
 // @/actions/themes.ts
 'use server';
 
-import { themes, type Theme, type NewTheme, themePurchases, type ThemePurchase, type NewThemePurchase, users, interactions } from '@/database/schema';
+import { themes, type Theme, type NewTheme, themePurchases, type ThemePurchase, users } from '@/database/schema';
 import { eq, and, or, like, ilike, inArray, between, desc, asc, sql, count, gt, lt, gte, lte, isNull, isNotNull, exists } from 'drizzle-orm';
 import { type ThemeFilters, type ListQuery, type PaginationResponse, type QueryOptions } from '@/types/api';
 import { db } from '@/lib/db';
 import { cacheTag, cacheLife } from 'next/cache';
 import { revalidateTag } from 'next/cache';
+import { getCurrentUser } from '@/lib/auth/session';
+import { createTransaction } from '@/actions/transactions';
+import { userWallets } from '@/database/schema';
+import type { PasskeyProof } from '@/actions/passkey-transaction';
 
 // ============================================================================
 // QUERIES - Lecture des données
@@ -459,38 +463,18 @@ export async function incrementThemeViews(id: string): Promise<Theme> {
 // ============================================================================
 
 /**
- * Achète un thème pour un utilisateur
+ * @deprecated Utiliser le flux canonique /wallet/transactions/create (THEME_PURCHASE)
+ * qui applique pricing serveur, frais, cooldown, idempotence et preuve PIN/passkey.
  */
-export async function purchaseTheme(userId: string, themeId: string, price: number): Promise<ThemePurchase> {
-  try {
-    const existingPurchase = await db
-      .select()
-      .from(themePurchases)
-      .where(and(eq(themePurchases.userId, userId), eq(themePurchases.themeId, themeId)))
-      .limit(1);
-
-    if (existingPurchase.length > 0) {
-      throw new Error('Theme already purchased');
-    }
-
-    const result = await db
-      .insert(themePurchases)
-      .values({
-        userId,
-        themeId,
-        price: String(price),
-        createdAt: new Date(),
-      })
-      .returning();
-
-    return result[0];
-  } catch (error) {
-    console.error('Error purchasing theme:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to purchase theme');
-  }
+export async function purchaseTheme(
+  _themeId: string,
+  _options: { idempotencyKey: string; walletId?: string; pin?: string; passkeyProof?: PasskeyProof }
+): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  return {
+    success: false,
+    error:
+      "INVALID_FLOW: utilisez le flux canonique /wallet/transactions/create?type=THEME_PURCHASE pour acheter un thème.",
+  };
 }
 
 /**

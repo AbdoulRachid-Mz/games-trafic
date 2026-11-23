@@ -49,6 +49,7 @@ import {
   updateTransactionStatus,
 } from "@/actions/wallets";
 import { type WalletTransaction } from "@/database/schema";
+import { PinVerification } from "@/components/pages/transactions/create/pin-verification";
 import {
   CreditCard,
   Download,
@@ -79,13 +80,17 @@ export default function AdminTransactionsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [actionType, setActionType] = useState<TransactionType | null>(null);
-  const [actionStep, setActionStep] = useState<"DETAILS" | "AMOUNT" | "CONFIRM">("DETAILS");
+  const [actionStep, setActionStep] = useState<"DETAILS" | "AMOUNT" | "PIN_VERIFICATION" | "CONFIRM">("DETAILS");
   const [actionData, setActionData] = useState<{
     amount: number;
     metadata: Record<string, any>;
     recipientWalletId?: string;
     recipientUser?: { id: string; name: string; walletNumber: string };
   }>({ amount: 0, metadata: {} });
+  const [actionPin, setActionPin] = useState<string | null>(null);
+  const [actionPasskeyProof, setActionPasskeyProof] = useState<{ challengeId: string; assertion: unknown } | null>(null);
+  const [actionIdempotencyKey, setActionIdempotencyKey] = useState<string>("");
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
 
   const {
     fees: actionFees,
@@ -144,16 +149,71 @@ export default function AdminTransactionsPage() {
     setActionType(type);
     setActionStep("DETAILS");
     setActionData({ amount: 0, metadata: {} });
+    setActionPin(null);
+    setActionPasskeyProof(null);
+    setActionIdempotencyKey(
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `admin-req-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
+    setIsActionSubmitting(false);
   };
 
   const closeActionDialog = () => {
     setActionType(null);
     setActionStep("DETAILS");
     setActionData({ amount: 0, metadata: {} });
+    setActionPin(null);
+    setActionPasskeyProof(null);
+    setActionIdempotencyKey("");
+    setIsActionSubmitting(false);
+  };
+
+  const handleActionPinVerify = async (pin: string) => {
+    try {
+      const response = await fetch("/api/wallet/verify-pin", {
+        method: "POST",
+        body: JSON.stringify({
+          walletId: completeData?.wallet?.id,
+          pin,
+        }),
+      });
+      if (!response.ok) {
+        let apiMessage = "Code PIN incorrect";
+        try {
+          const body = await response.json();
+          apiMessage = body?.error || body?.message || apiMessage;
+        } catch {
+          // ignore
+        }
+        throw new Error(apiMessage);
+      }
+      setActionPin(pin);
+      setActionPasskeyProof(null);
+      setActionStep("CONFIRM");
+    } catch (error: any) {
+      toast.error(error?.message || "Code PIN incorrect");
+      throw error;
+    }
   };
 
   const handleActionConfirm = async () => {
     if (!actionType || !completeData?.wallet?.id || !user?.id) return;
+    if (actionType === "WITHDRAWAL" && !actionPin && !actionPasskeyProof) {
+      toast.error("Code PIN ou preuve Passkey requis pour confirmer le retrait.");
+      setActionStep("PIN_VERIFICATION");
+      return;
+    }
+    const operationIdempotencyKey =
+      actionIdempotencyKey ||
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `admin-req-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    if (!actionIdempotencyKey) {
+      setActionIdempotencyKey(operationIdempotencyKey);
+    }
+
+    setIsActionSubmitting(true);
     try {
       if (actionType === "DEPOSIT" || actionType === "WITHDRAWAL") {
         await createRequest(
@@ -168,7 +228,13 @@ export default function AdminTransactionsPage() {
             paymentConfirmationCode: actionData.metadata.paymentConfirmationCode,
             paymentImage: actionData.metadata.paymentImage,
           },
-          { allowDuplicate: false }
+          {
+            allowDuplicate: false,
+            idempotencyKey: operationIdempotencyKey,
+            ...(actionType === "WITHDRAWAL"
+              ? { pin: actionPin || undefined, passkeyProof: actionPasskeyProof || undefined }
+              : {}),
+          }
         );
       }
       toast.success("Action effectuée");
@@ -177,6 +243,8 @@ export default function AdminTransactionsPage() {
       closeActionDialog();
     } catch (error: any) {
       toast.error(error?.message || "Erreur lors de l'action");
+    } finally {
+      setIsActionSubmitting(false);
     }
   };
 
@@ -598,8 +666,33 @@ export default function AdminTransactionsPage() {
                   metadata: { ...prev.metadata, ...data },
                 }))
               }
-              onContinue={() => setActionStep("CONFIRM")}
+              onContinue={() =>
+                setActionStep(
+                  actionType === "WITHDRAWAL" ? "PIN_VERIFICATION" : "CONFIRM",
+                )
+              }
               onBack={() => setActionStep("DETAILS")}
+            />
+          )}
+
+          {actionType === "WITHDRAWAL" && actionStep === "PIN_VERIFICATION" && (
+            <PinVerification
+              onVerify={handleActionPinVerify}
+              onVerifyPasskey={async (proof) => {
+                setActionPasskeyProof(proof);
+                setActionPin(null);
+                setActionStep("CONFIRM");
+              }}
+              hasPasskey={!!completeData?.hasPasskey}
+              onBack={() => setActionStep("AMOUNT")}
+              transactionDetails={{
+                type: actionType,
+                amount: actionData.amount,
+                fees: actionFeesObj.amount,
+                totalAmount: actionFeesObj.totalAmount,
+                walletId: completeData?.wallet?.id || "",
+                recipientId: null,
+              }}
             />
           )}
 
@@ -649,11 +742,18 @@ export default function AdminTransactionsPage() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setActionStep("AMOUNT")}>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setActionStep(
+                      actionType === "WITHDRAWAL" ? "PIN_VERIFICATION" : "AMOUNT",
+                    )
+                  }
+                >
                   Retour
                 </Button>
-                <Button onClick={handleActionConfirm}>
-                  Confirmer
+                <Button onClick={handleActionConfirm} disabled={isActionSubmitting}>
+                  {isActionSubmitting ? "Traitement..." : "Confirmer"}
                 </Button>
               </DialogFooter>
             </div>

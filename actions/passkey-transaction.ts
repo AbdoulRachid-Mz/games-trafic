@@ -9,6 +9,8 @@ import type { AuthenticatorTransportFuture } from "@simplewebauthn/types";
 import { createHash, randomBytes } from "node:crypto";
 import { getAppHostEnv, getAppUrlEnv } from "@/utils/app-url";
 
+type DbClient = typeof db | any;
+
 // Passkey transaction challenge.
 // RP_ID/ORIGIN sont dérivés du contexte d'exécution :
 // - développement : localhost
@@ -25,7 +27,12 @@ export interface PasskeyChallengeParams {
   fees: number;
 }
 
-function computeTransactionHash(params: PasskeyChallengeParams): string {
+export interface PasskeyProof {
+  challengeId: string;
+  assertion: unknown;
+}
+
+export function computePasskeyTransactionHash(params: PasskeyChallengeParams): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
@@ -86,7 +93,7 @@ export async function requestPasskeyChallenge(
     });
 
     const challengeId = randomBytes(16).toString("hex");
-    const transactionHash = computeTransactionHash(params);
+    const transactionHash = computePasskeyTransactionHash(params);
     const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
 
     await db.insert(passkeyTransactionChallenges).values({
@@ -108,6 +115,106 @@ export async function requestPasskeyChallenge(
   }
 }
 
+/**
+ * Vérifie et consomme atomiquement une preuve passkey liée à une intention de
+ * transaction. À exécuter dans la transaction DB de l'opération financière.
+ */
+export async function consumePasskeyProofForIntent(
+  client: DbClient,
+  params: {
+    userId: string;
+    proof: PasskeyProof;
+    intent: PasskeyChallengeParams;
+  }
+): Promise<void> {
+  const { userId, proof, intent } = params;
+  if (!proof?.challengeId || !proof?.assertion) {
+    throw new Error("Preuve Passkey requise");
+  }
+
+  const assertion = proof.assertion as { id?: string };
+  if (!assertion?.id) {
+    throw new Error("Assertion Passkey invalide");
+  }
+
+  const [challengeRow] = await client
+    .select()
+    .from(passkeyTransactionChallenges)
+    .where(
+      and(
+        eq(passkeyTransactionChallenges.id, proof.challengeId),
+        eq(passkeyTransactionChallenges.userId, userId),
+        isNull(passkeyTransactionChallenges.consumedAt),
+        gt(passkeyTransactionChallenges.expiresAt, new Date())
+      )
+    )
+    .limit(1)
+    .for("update");
+
+  if (!challengeRow) {
+    throw new Error("Challenge Passkey invalide ou expiré");
+  }
+
+  const expectedHash = computePasskeyTransactionHash(intent);
+  if (expectedHash !== challengeRow.transactionHash) {
+    throw new Error("Les paramètres de la transaction ne correspondent pas à la preuve Passkey");
+  }
+
+  if (challengeRow.walletId !== intent.walletId) {
+    throw new Error("Wallet incohérent pour la preuve Passkey");
+  }
+
+  const [credential] = await client
+    .select()
+    .from(passkey)
+    .where(eq(passkey.credentialID, assertion.id))
+    .limit(1);
+
+  if (!credential || credential.userId !== userId) {
+    throw new Error("Credential Passkey inconnu");
+  }
+
+  const verification = await verifyAuthenticationResponse({
+    response: proof.assertion as any,
+    expectedChallenge: challengeRow.challenge,
+    expectedOrigin: ORIGIN,
+    expectedRPID: RP_ID,
+    credential: {
+      id: credential.credentialID,
+      publicKey: Buffer.from(credential.publicKey, "base64url"),
+      counter: credential.counter,
+      transports: credential.transports
+        ? (credential.transports.split(",") as AuthenticatorTransportFuture[])
+        : undefined,
+    },
+    requireUserVerification: false,
+  });
+
+  if (!verification.verified) {
+    throw new Error("Vérification Passkey échouée");
+  }
+
+  const consumed = await client
+    .update(passkeyTransactionChallenges)
+    .set({ consumedAt: new Date() })
+    .where(
+      and(
+        eq(passkeyTransactionChallenges.id, challengeRow.id),
+        isNull(passkeyTransactionChallenges.consumedAt)
+      )
+    )
+    .returning({ id: passkeyTransactionChallenges.id });
+
+  if (consumed.length === 0) {
+    throw new Error("Challenge Passkey déjà utilisé");
+  }
+
+  await client
+    .update(passkey)
+    .set({ counter: verification.authenticationInfo.newCounter })
+    .where(eq(passkey.id, credential.id));
+}
+
 export async function verifyPasskeyChallenge(params: {
   challengeId: string;
   assertion: unknown;
@@ -119,83 +226,13 @@ export async function verifyPasskeyChallenge(params: {
       return { success: false, error: "Non authentifié" };
     }
 
-    const [challengeRow] = await db
-      .select()
-      .from(passkeyTransactionChallenges)
-      .where(
-        and(
-          eq(passkeyTransactionChallenges.id, params.challengeId),
-          eq(passkeyTransactionChallenges.userId, user.id),
-          isNull(passkeyTransactionChallenges.consumedAt),
-          gt(passkeyTransactionChallenges.expiresAt, new Date())
-        )
-      )
-      .limit(1)
-      .for("update");
-
-    if (!challengeRow) {
-      return { success: false, error: "Challenge invalide ou expiré" };
-    }
-
-    const expectedHash = computeTransactionHash(params.transaction);
-    if (expectedHash !== challengeRow.transactionHash) {
-      return { success: false, error: "Paramètres de transaction modifiés" };
-    }
-
-    if (challengeRow.walletId !== params.transaction.walletId) {
-      return { success: false, error: "Wallet incohérent" };
-    }
-
-    const [credential] = await db
-      .select()
-      .from(passkey)
-      .where(eq(passkey.credentialID, (params.assertion as any).id))
-      .limit(1);
-
-    if (!credential || credential.userId !== user.id) {
-      return { success: false, error: "Credential inconnu" };
-    }
-
-    const verification = await verifyAuthenticationResponse({
-      response: params.assertion as any,
-      expectedChallenge: challengeRow.challenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
-      credential: {
-        id: credential.credentialID,
-        publicKey: Buffer.from(credential.publicKey, "base64url"),
-        counter: credential.counter,
-        transports: credential.transports
-          ? (credential.transports.split(",") as AuthenticatorTransportFuture[])
-          : undefined,
-      },
-      requireUserVerification: false,
+    await db.transaction(async (tx) => {
+      await consumePasskeyProofForIntent(tx, {
+        userId: user.id,
+        proof: { challengeId: params.challengeId, assertion: params.assertion },
+        intent: params.transaction,
+      });
     });
-
-    if (!verification.verified) {
-      return { success: false, error: "Vérification Passkey échouée" };
-    }
-
-    // Consommation atomique : seul le premier appel obtient la ligne non consommée.
-    const consumed = await db
-      .update(passkeyTransactionChallenges)
-      .set({ consumedAt: new Date() })
-      .where(
-        and(
-          eq(passkeyTransactionChallenges.id, challengeRow.id),
-          isNull(passkeyTransactionChallenges.consumedAt)
-        )
-      )
-      .returning({ id: passkeyTransactionChallenges.id });
-
-    if (consumed.length === 0) {
-      return { success: false, error: "Challenge déjà utilisé" };
-    }
-
-    await db
-      .update(passkey)
-      .set({ counter: verification.authenticationInfo.newCounter })
-      .where(eq(passkey.id, credential.id));
 
     return { success: true };
   } catch (error) {

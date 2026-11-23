@@ -146,7 +146,15 @@ export function useCreateRequest() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: NewRequest) => createRequest(data),
+    mutationFn: (input: {
+      data: NewRequest;
+      options?: {
+        allowDuplicate?: boolean;
+        idempotencyKey?: string;
+        pin?: string;
+        passkeyProof?: { challengeId: string; assertion: unknown };
+      };
+    }) => createRequest(input.data, input.options),
     onSuccess: (newRequest) => {
       // Invalidate list queries to refetch
       queryClient.invalidateQueries({ queryKey: requestKeys.lists() });

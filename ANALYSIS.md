@@ -1783,3 +1783,41 @@ Second passage d'audit et de correction, même référentiel `games-trafics-ui-u
 - **Accessibilité** : `h1`–`h3` rétablis, `aria-label` sur les actions icône, `htmlFor`/`id` et noms accessibles sur les inputs de score, `<div onClick>` → `<Link>`/`<button>`, `aria-pressed` sur les bascules de vue, dialogue de litige clavier-compatible.
 - **Responsive / thème** : vues cartes mobiles pour les tableaux, `min-w-[720px]` + `overflow-x-auto`, score `grid-cols-1 sm:grid-cols-7`, `p-4 md:p-6|8`, suppression des doubles offsets sticky, `hsl(var(--chart-N))` → `var(--chart-N)`, fonds durs → tokens OKLCH et variantes `dark:`.
 - **Vérifications** : `tsc --noEmit` ✅ ; lint ✅ 0 erreur / 4 355 avertissements préexistants (aucun ajouté) ; `vitest run tests/unit` ✅ 29 fichiers / 270 tests ; build ⚠️ compilation + TypeScript OK mais prerender interrompu par une déconnexion DB externe (`Connection terminated unexpectedly`), sans rapport avec les correctifs UI. Les routes protégées nécessitent une session authentifiée pour une certification visuelle ; aucune capture ni donnée fictive créée.
+
+
+## 21. MISE À JOUR FINANCE CANONIQUE (session 2026-05, post-84add63)
+
+> **Portée**: hardening moteur financier/transactions, sans refonte globale. **Migration**: `drizzle/0022_financial_cooldown.sql` existe dans le repo et a été ajoutée au journal drizzle; application DB déclarée par l'utilisateur mais **non re-vérifiée par requête DB** dans cette session. **Build**: non exécuté (demande utilisateur).
+
+### Constats vérifiés dans le code
+
+- **Autorité serveur / flux canoniques**: `actions/transactions.ts` canonique pour transactions wallet; prix fixes relus serveur (`GAME_ITEM_PURCHASE`, `THEME_PURCHASE`, `VIP_SUBSCRIPTION`, `TOURNAMENT_PARTICIPATION`), `PRICE_CHANGED` en cas de dérive, garde abonnement VIP actif. Dépôts/retraits utilisateur directs bloqués (`INVALID_FLOW`) au profit de `createRequest`.
+- **Cooldown 120s**: `lib/finance/core/cooldown.ts` + `executeFinancialOperation` (`cooldownUserId`), atomique en transaction DB; retries idempotents stricts exemptés.
+- **Idempotence déterministe**: clés requises/normalisées sur flux sensibles; `allowDuplicate` ne contourne plus le check "même type en cours" dans `createTransaction`.
+- **PIN/Passkey à l'exécution**: preuves consommées in-tx via `consumePasskeyProofForIntent`, intent bindé (type, montant, wallet, destinataire, frais). `transferMoney`/`transferBetweenIdentities` calculent les frais serveur TRANSFER avant consommation de preuve passkey.
+- **Dépôts/retraits**: `createRequest` + `lib/finance/transactions/deposit.ts`/`withdrawal.ts` gèrent demande/réservation/settlement/release. Pas de complétion financière générique par mutation de statut.
+- **Guards de statut**: `actions/transactions.ts#updateTransactionStatus` et `actions/wallets.ts#updateTransactionStatus` admin-only et refusent `COMPLETED` forcé. `actions/requests.ts#updateRequestStatus` refuse la complétion financière directe pour `DEPOSIT/WITHDRAWAL/GAME_ITEMS/VIP_SUBSCRIPTION`.
+- **Legacy GAME_ITEMS**: `actions/games.ts#processGameItemRequest` refuse `COMPLETED` et oriente vers `approveRequest`; `hooks/use-games.ts#useProcessGameItemRequest` déprécié/non-opérationnel pour complétion.
+- **Thèmes**: `actions/themes.ts#purchaseTheme` sans caller runtime; déprécié et renvoie `INVALID_FLOW` vers `/wallet/transactions/create?type=THEME_PURCHASE`.
+- **Finance core/legacy**: `lib/finance/core/ledger.ts` expose `getAccountBalance` (GTC). `lib/finance/index.ts` n'exporte plus `./ledger/ledger-engine`. `lib/finance/transactions/refund.ts` utilise `core/ledger`. Fichiers legacy `lib/ledger/ledger-utils.ts` et `lib/finance/ledger/ledger-engine.ts` supprimés (aucune référence runtime restante).
+- **API générique**: `app/api/transactions/create/route.ts` garde auth + ownership/admin, bloque crédits directs non-admin et `DEPOSIT/WITHDRAWAL` non-admin (`INVALID_FLOW`), et mappe `FinanceError`/erreurs métier vers 400/401/403/404/409/422/500 avec `code` quand disponible.
+
+### Vérifications exécutées (réelles)
+
+- `bun x vitest run tests/unit/security/transactions-rules.test.ts tests/unit/finance/fee-engine.test.ts` : **2 fichiers, 20 tests passés**.
+- `bun x tsc --noEmit` : **passé**.
+- `bun run lint` : **passé (0 errors, 4053 warnings)** après correction config ESLint flat + règles React Compiler préexistantes désactivées pour garder lint actionnable; warnings majoritairement préexistants.
+
+### Non vérifié / bloqué
+
+- `bun run build` : **non exécuté** (demande utilisateur). Build précédemment bloqué par `Error [SecurityFatalError]: Your version of Next.js is affected by a known security vulnerability.` dans l'environnement.
+- QA navigateur 320–1920 light/dark des parcours financiers touchés : **non exécutée**.
+- Réconciliation historique DB : **non exécutée** (read-only uniquement autorisé). Aucune écriture/correction automatique de données historiques effectuée.
+- Tests d'intégration/charge/concurrence réels DB : **non exécutés**.
+
+### Risques / décisions restantes
+
+- **Migration DB** : `0022_financial_cooldown.sql` présent + journal drizzle mis à jour; appliquer/vérifier en DB réelle reste requis en environnement cible (déclaré appliqué par utilisateur, non re-vérifié ici).
+- **VIP renewal avant expiration** : refusé par design serveur actuel si abonnement actif non expiré. Toute évolution produit doit passer par un chemin serveur canonique explicite (extension/planification/paiement anticipé) sans bypass des guards/pricing/cooldown/idempotence/proof.
+- **`balanceAfter`** : champ/cache historique encore présent dans `database/schema.ts`, UI/builders/documents. Ne pas l'utiliser comme source de vérité; suppression complète nécessite migration/compat prudente.
+- **Dette lint warnings** : 4053 warnings préexistants repo-wide; non bloquants, à traiter par chantier dédié.

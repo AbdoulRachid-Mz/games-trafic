@@ -110,7 +110,7 @@ export class WalletUtils {
 
   /**
    * Formatte le solde pour l'affichage
-   * ⚠️ NOTE: Le solde doit être calculé via getAccountBalance() de ledger-utils
+   * ⚠️ NOTE: Le solde doit être calculé via getAccountBalance() de lib/finance.
    * Ne jamais utiliser le champ `balance` de userWallets directement
    */
   static formatBalance(balance: string | number, currency: string = 'GTC'): string {

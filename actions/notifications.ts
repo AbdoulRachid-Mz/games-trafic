@@ -449,51 +449,20 @@ export async function sendPushNotification(
   }
 ) {
   try {
-    // Récupérer tous les abonnements push actifs de l'utilisateur
-    const subs = await db
-      .select()
-      .from(pushSubscriptions)
-      .where(eq(pushSubscriptions.userId, userId));
+    const { sendPushToUser } = await import("@/lib/notifications");
+    const result = await sendPushToUser(userId, {
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon,
+      badge: payload.badge,
+      image: payload.image,
+      actions: payload.actions,
+      notificationId: payload.data?.notificationId,
+      url: payload.data?.linkUrl,
+      type: payload.data?.type,
+    });
 
-    if (!subs.length) return { success: true, sent: 0 };
-
-    const results = await Promise.allSettled(
-      subs.map(async (sub) => {
-        try {
-          const res = await fetch(sub.endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              TTL: "86400",
-              // VAPID headers si besoin
-            },
-            body: JSON.stringify({
-              ...payload,
-              // Ajouter l'ID de la notification créée
-              data: { ...payload.data, notificationId: crypto.randomUUID() },
-            }),
-          });
-
-          if (!res.ok) {
-            // Si l'abonnement est expiré ou invalide, on le supprime
-            if (res.status === 404 || res.status === 410) {
-              await db
-                .delete(pushSubscriptions)
-                .where(eq(pushSubscriptions.id, sub.id));
-            }
-            throw new Error(`Push failed: ${res.status}`);
-          }
-          return res;
-        } catch (err) {
-          // En cas d'erreur réseau ou autre, on log et on continue
-          console.error("Push error for sub", sub.id, err);
-          throw err;
-        }
-      })
-    );
-
-    const sent = results.filter((r) => r.status === "fulfilled").length;
-    return { success: true, sent };
+    return { success: result.success, sent: result.success ? 1 : 0 };
   } catch (error) {
     console.error("Error sending push notification:", error);
     return { success: false, error: "Failed to send push notification" };
@@ -609,3 +578,136 @@ export async function subscribeToPush(
     return { success: false, error: "Failed to subscribe to push" };
   }
 }
+
+/**
+ * Récupère les préférences de notification d'un utilisateur
+ */
+export async function getUserNotificationPreferencesAction(userId: string) {
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: {
+        email: true,
+        phoneNumber: true,
+        settings: true,
+      },
+    });
+
+    if (!user) {
+      return { success: false, error: "Utilisateur non trouvé" };
+    }
+
+    const userSettings = (user.settings as Record<string, any>) ?? {};
+    const notifSettings = (userSettings.notifications as Record<string, any>) ?? {};
+
+    return {
+      success: true,
+      data: {
+        in_app: notifSettings.in_app !== false,
+        email: notifSettings.email !== false,
+        whatsapp: notifSettings.whatsapp === true,
+        push: notifSettings.push !== false,
+        whatsappPhone: (notifSettings.whatsappPhone as string) || user.phoneNumber || "",
+        emailOverride: (notifSettings.emailOverride as string) || user.email || "",
+      },
+    };
+  } catch (error) {
+    console.error("Error getting notification preferences:", error);
+    return { success: false, error: "Erreur lors de la récupération des préférences" };
+  }
+}
+
+/**
+ * Met à jour les préférences de notification d'un utilisateur
+ */
+export async function updateUserNotificationPreferencesAction(
+  userId: string,
+  preferences: {
+    in_app?: boolean;
+    email?: boolean;
+    whatsapp?: boolean;
+    push?: boolean;
+    whatsappPhone?: string;
+    emailOverride?: string;
+  }
+) {
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { settings: true },
+    });
+
+    if (!user) {
+      return { success: false, error: "Utilisateur non trouvé" };
+    }
+
+    const currentSettings = (user.settings as Record<string, any>) ?? {};
+    const currentNotifications = (currentSettings.notifications as Record<string, any>) ?? {};
+
+    const updatedSettings = {
+      ...currentSettings,
+      notifications: {
+        ...currentNotifications,
+        ...preferences,
+      },
+    };
+
+    await db
+      .update(users)
+      .set({
+        settings: updatedSettings,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return { success: true, data: updatedSettings.notifications };
+  } catch (error) {
+    console.error("Error updating notification preferences:", error);
+    return { success: false, error: "Erreur lors de la mise à jour des préférences" };
+  }
+}
+
+/**
+ * Envoie une notification de test à l'utilisateur
+ */
+export async function sendTestNotificationAction(
+  userId: string,
+  channel: "in_app" | "email" | "whatsapp" | "push"
+) {
+  try {
+    const { dispatchNotification, areExternalNotificationsEnabled } =
+      await import("@/lib/notifications");
+
+    if (channel !== "in_app" && !areExternalNotificationsEnabled()) {
+      return {
+        success: false,
+        error:
+          "Les notifications externes sont désactivées. Définissez ENABLE_EXTERNAL_NOTIFICATIONS=true dans votre .env pour les activer.",
+      };
+    }
+
+    const result = await dispatchNotification({
+      userId,
+      type: "admin_announcement",
+      channels: [channel],
+      data: {
+        title: `Test de notification (${channel.toUpperCase()})`,
+        message: `Ceci est un message de test envoyé depuis Games Trafics via le canal ${channel}. Votre configuration fonctionne parfaitement !`,
+      },
+    });
+
+    const channelResult = result.results.find((r) => r.channel === channel);
+    if (channelResult && !channelResult.success && channelResult.error) {
+      return { success: false, error: channelResult.error };
+    }
+
+    return { success: result.success, results: result.results };
+  } catch (error: any) {
+    console.error("Error sending test notification:", error);
+    return {
+      success: false,
+      error: error?.message || "Échec de l'envoi de la notification de test",
+    };
+  }
+}
+

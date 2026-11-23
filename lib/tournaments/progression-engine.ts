@@ -390,7 +390,7 @@ async function advanceWinnerToNextRound(
   }
 
   const metadata = (nextNode.metadata as any) || {};
-  let participants: string[] = metadata.participants || [];
+  const participants: string[] = metadata.participants || [];
 
   // ✅ Idempotence: check if winner already in participants
   if (participants.includes(winnerId)) {
@@ -624,7 +624,7 @@ async function advanceLoserToThirdPlaceNode(
   if (!thirdPlaceNode) return;
 
   const metadata = (thirdPlaceNode.metadata as any) || {};
-  let participants: string[] = metadata.participants || [];
+  const participants: string[] = metadata.participants || [];
 
   if (participants.includes(loserId)) return;
 

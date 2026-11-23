@@ -14,7 +14,6 @@ import {
   createVipSubscription,
   updateVipSubscription,
   cancelVipSubscription,
-  renewVipSubscription,
   deleteVipSubscription,
   restoreVipSubscription,
 } from "@/actions/vip";

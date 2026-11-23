@@ -28,6 +28,8 @@ export interface TransferInput {
   actorLevel?: AdminLevel;
   /** Transaction Drizzle existante (composition atomique). */
   client?: any;
+  /** Applique le cooldown financier 120s (opération utilisateur). */
+  cooldownUserId?: string;
 }
 
 export async function executeTransfer(
@@ -56,6 +58,7 @@ export async function executeTransfer(
     idempotencyScope: "transfer",
     createdByUserId: input.createdByUserId,
     actorLevel: input.actorLevel,
+    cooldownUserId: input.cooldownUserId,
     client: input.client,
   });
 }

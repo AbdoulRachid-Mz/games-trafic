@@ -1,7 +1,7 @@
 // @/actions/shops.ts
 'use server';
 import { getCurrentUser } from '@/lib/auth/session';
-import { getAccountBalance } from '@/lib/ledger/ledger-utils';
+import { getAccountBalance } from '@/lib/finance';
 
 import {
   shops, users, themes, products, entityCategories, categories,

@@ -1,5 +1,5 @@
 import { getWalletExpenses, getWalletRevenues } from "@/actions/wallets";
-import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { getAccountBalance } from "@/lib/finance";
 import { useQuery } from "@tanstack/react-query";
 // hooks/use-wallets.ts
 

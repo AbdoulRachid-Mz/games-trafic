@@ -32,6 +32,7 @@ import {
   postLedgerEntries,
   type LedgerPosting,
 } from "./ledger";
+import { assertFinancialCooldown } from "./cooldown";
 import { FinanceError, toFinanceError } from "./errors";
 import {
   assertTransition,
@@ -60,6 +61,13 @@ export interface OperationContext {
    * métier et une opération financière de façon atomique).
    */
   client?: DbClient;
+  /**
+   * User-initiated financial operations must enforce the 120s financial
+   * cooldown server-side. When set, cooldown is asserted (and consumed) in the
+   * same DB transaction, exempting only strict idempotent replays of this same
+   * operation (scope+key+payload hash).
+   */
+  cooldownUserId?: string;
 }
 
 interface OperationBase extends OperationContext {
@@ -235,6 +243,18 @@ async function executeInTransaction(
     requestHash: string;
   }
 ): Promise<FinancialOperationResult> {
+  if (operation.cooldownUserId) {
+    await assertFinancialCooldown(client, {
+      userId: operation.cooldownUserId,
+      idempotency: idempotency
+        ? {
+            scope: idempotency.scope,
+            key: idempotency.key,
+            requestHash: idempotency.requestHash,
+          }
+        : undefined,
+    });
+  }
   let replay: IdempotencyCheck | undefined;
 
   if (idempotency) {
@@ -397,13 +417,21 @@ export async function executeFinancialOperation(
             walletAccountId: operation.walletAccountId,
             fromAccountId:
               operation.kind === "TRANSFER" ? operation.fromAccountId : undefined,
-            toAccountId: operation.kind === "TRANSFER" ? operation.toAccountId : undefined,
+            toAccountId:
+              operation.kind === "TRANSFER" ? operation.toAccountId : undefined,
             postings: operation.kind === "POST" ? operation.postings : undefined,
             reason: operation.reason,
             metadata: operation.metadata,
           }),
         }
       : undefined;
+
+  if (operation.cooldownUserId && !idempotency) {
+    throw new FinanceError(
+      "VALIDATION_ERROR",
+      "Une clé d'idempotence déterministe est requise pour une opération financière utilisateur."
+    );
+  }
 
   try {
     if (operation.client) {

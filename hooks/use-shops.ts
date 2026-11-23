@@ -573,7 +573,7 @@ export function useShopsFilters() {
       params.delete(k),
     );
     router.replace(`${pathname}?${params.toString()}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams, router, pathname]);
 
   return {

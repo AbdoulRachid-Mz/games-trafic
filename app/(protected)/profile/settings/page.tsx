@@ -11,6 +11,7 @@ import {
   Link2,
   Image,
   Shield,
+  Bell,
   ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { ImagesForm } from "@/components/pages/profile/new/profile-settings/imag
 import { PersonalInfoForm } from "@/components/pages/profile/new/profile-settings/personal-info-form";
 import { SecurityForm } from "@/components/pages/profile/new/profile-settings/security-form";
 import { SocialLinksForm } from "@/components/pages/profile/new/profile-settings/social-links-form";
+import { NotificationSettingsCard } from "@/components/notifications/notification-settings-card";
 
 export default function ProfileSettingsPage() {
   const { user } = useAuthContext();
@@ -91,7 +93,7 @@ export default function ProfileSettingsPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-4 gap-2 w-full">
+        <TabsList className="grid grid-cols-5 gap-2 w-full">
           <TabsTrigger value="personal" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Informations</span>
@@ -107,6 +109,10 @@ export default function ProfileSettingsPage() {
           <TabsTrigger value="security" className="gap-2">
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Sécurité</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">Alertes</span>
           </TabsTrigger>
         </TabsList>
 
@@ -124,6 +130,10 @@ export default function ProfileSettingsPage() {
 
         <TabsContent value="security">
           {profile && <SecurityForm user={profile} />}
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          {profile && <NotificationSettingsCard userId={profile.id} />}
         </TabsContent>
       </Tabs>
     </div>

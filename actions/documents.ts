@@ -31,7 +31,7 @@ import {
 } from "@/database/schema";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getAccountBalance } from "@/lib/ledger/ledger-utils";
+import { getAccountBalance } from "@/lib/finance";
 import {
   buildBracketDocument,
   buildEditionParticipantsDocument,

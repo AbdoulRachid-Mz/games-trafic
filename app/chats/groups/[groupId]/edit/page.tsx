@@ -78,7 +78,7 @@ function EditGroupContent() {
 
     try {
       // TODO: Upload group image if changed
-      let imageUrl: string | undefined = group?.image || undefined;
+      const imageUrl: string | undefined = group?.image || undefined;
       if (groupImage) {
         // Implement image upload
         // imageUrl = await uploadImage(groupImage);

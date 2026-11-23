@@ -38,13 +38,21 @@ import {
 import { db } from '@/lib/db';
 import { encryptData, decryptData } from '@/lib/encryption';
 import {
+  assertFinancialCooldown,
+  calculateTransactionFees,
   executeDepositApproval,
   executeFinancialOperation,
   executeWithdrawalApproval,
   executeWithdrawalRejection,
   getOrCreateSystemAccount,
+  hashRequestPayload,
   reserveWithdrawal,
 } from '@/lib/finance';
+import {
+  consumePasskeyProofForIntent,
+  type PasskeyProof,
+} from '@/actions/passkey-transaction';
+import { verifyWalletPin } from '@/actions/wallets';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertCanApproveRequests, getAdminLevel, isAdmin } from '@/lib/auth/permissions';
 import { loadAdminActor } from '@/lib/finance/requests/credit-requests';
@@ -274,7 +282,12 @@ export async function getRequests(
  */
 export async function createRequest(
   requestData: NewRequest,
-  options?: { allowDuplicate?: boolean }
+  options?: {
+    allowDuplicate?: boolean;
+    idempotencyKey?: string;
+    pin?: string;
+    passkeyProof?: PasskeyProof;
+  }
 ): Promise<Request> {
   try {
     // Validation des données requises
@@ -291,6 +304,15 @@ export async function createRequest(
       throw new Error("Non autorisé à créer une demande pour un autre utilisateur");
     }
 
+    const idempotencyKey =
+      typeof options?.idempotencyKey === 'string' ? options.idempotencyKey.trim() : '';
+    if (!idempotencyKey) {
+      throw new Error('IDEMPOTENCY_KEY_REQUIRED: une clé d\'idempotence déterministe est requise.');
+    }
+
+    // Anti-doublon métier conservé (hors retries idempotents stricts gérés plus bas).
+    // allowDuplicate reste accepté pour compatibilité d'appel mais ne contourne pas
+    // les contrôles serveur de cooldown/idempotence/intégrité.
     if (!options?.allowDuplicate) {
       const existing = await db
         .select({ id: requests.id })
@@ -317,23 +339,6 @@ export async function createRequest(
 
     if (!user[0]) {
       throw new Error('User not found');
-    }
-
-    const last = await db
-      .select()
-      .from(requests)
-      .where(eq(requests.userId, requestData.userId))
-      .orderBy(desc(requests.createdAt))
-      .limit(1);
-    if (last[0]?.createdAt) {
-      const lastDate = new Date(last[0].createdAt as any).getTime();
-      const now = Date.now();
-      const minWait = 120_000;
-      const diff = now - lastDate;
-      if (diff < minWait) {
-        const remaining = Math.ceil((minWait - diff) / 1000);
-        throw new Error(`Veuillez patienter ${remaining}s avant une nouvelle demande`);
-      }
     }
 
     // Pour les requêtes de type GAME_ITEMS, vérification de l'item
@@ -376,19 +381,90 @@ export async function createRequest(
       : undefined;
 
     const result = await db.transaction(async (tx) => {
+      const cooldownScope = 'request:create';
+      const cooldownPayload = {
+        userId: requestData.userId,
+        type: requestData.type,
+        amount: String(requestData.amount),
+        currency: requestData.currency ?? null,
+        paymentMethod: requestData.paymentMethod ?? null,
+        paymentProvider: requestData.paymentProvider ?? null,
+        paymentAccountId: requestData.paymentAccountId ?? null,
+        gameItemId: requestData.gameItemId ?? null,
+        gameAccount: requestData.gameAccount ?? null,
+        quantity: requestData.quantity ?? null,
+        totalGtc: requestData.totalGtc ?? null,
+      };
+      const requestHash = hashRequestPayload(cooldownPayload);
+
+      // Replay idempotent strict (meme cle+payload) : retourner la demande
+      // existante sans consommer le cooldown (retry de la meme intention).
+      const [existingIdempotent] = await tx
+        .select()
+        .from(requests)
+        .where(
+          and(
+            eq(requests.userId, requestData.userId),
+            eq(requests.type, requestData.type),
+            sql`${requests.metadata}->>'idempotencyKey' = ${idempotencyKey}`,
+            sql`${requests.metadata}->>'idempotencyScope' = ${cooldownScope}`,
+            sql`${requests.metadata}->>'requestHash' = ${requestHash}`
+          )
+        )
+        .limit(1);
+
+      if (existingIdempotent) {
+        return existingIdempotent;
+      }
+
+      // Cooldown 120s consomme une fois pour cette intention utilisateur.
+      // La sous-operation de reservation retrait ne doit pas le re-consommer.
+      await assertFinancialCooldown(tx, {
+        userId: requestData.userId,
+        idempotency: {
+          scope: cooldownScope,
+          key: idempotencyKey,
+          payload: cooldownPayload,
+        },
+      });
+
+      // Re-verification apres verrou cooldown (course concurrente).
+      const [existingAfterLock] = await tx
+        .select()
+        .from(requests)
+        .where(
+          and(
+            eq(requests.userId, requestData.userId),
+            eq(requests.type, requestData.type),
+            sql`${requests.metadata}->>'idempotencyKey' = ${idempotencyKey}`,
+            sql`${requests.metadata}->>'idempotencyScope' = ${cooldownScope}`,
+            sql`${requests.metadata}->>'requestHash' = ${requestHash}`
+          )
+        )
+        .limit(1);
+      if (existingAfterLock) {
+        return existingAfterLock;
+      }
+
       const [created] = await tx
         .insert(requests)
         .values({
           ...requestData,
           encryptedPassword: encryptedPassword || requestData.encryptedPassword,
+          metadata: {
+            ...((requestData.metadata as Record<string, unknown>) ?? {}),
+            idempotencyKey,
+            idempotencyScope: cooldownScope,
+            requestHash,
+          },
           status: 'PENDING',
           createdAt: new Date(),
           updatedAt: new Date(),
         })
         .returning();
 
-      // Un retrait réserve immédiatement montant + frais (wallet → escrow)
-      // afin d'empêcher tout double spend avant l'approbation.
+      // Un retrait reserve immediatement montant + frais (wallet -> escrow)
+      // afin d'empecher tout double spend avant l'approbation.
       if (created.type === 'WITHDRAWAL') {
         const [wallet] = await tx
           .select()
@@ -398,6 +474,40 @@ export async function createRequest(
 
         if (!wallet?.financialAccountId) {
           throw new Error('Wallet financier introuvable pour le retrait');
+        }
+
+        // Opération initiée par le propriétaire : preuve PIN/passkey consommée à l'exécution.
+        if (sessionUser.id === created.userId) {
+          const hasPin = typeof options?.pin === 'string' && options.pin.length > 0;
+          const hasPasskeyProof = !!options?.passkeyProof?.challengeId && !!options?.passkeyProof?.assertion;
+          if (hasPasskeyProof) {
+            const [owner] = await tx
+              .select({ isVip: users.isVip })
+              .from(users)
+              .where(eq(users.id, created.userId))
+              .limit(1);
+            const feeCalc = await calculateTransactionFees('WITHDRAWAL', Number(created.amount), {
+              isVip: !!owner?.isVip,
+            });
+            await consumePasskeyProofForIntent(tx, {
+              userId: sessionUser.id,
+              proof: options!.passkeyProof!,
+              intent: {
+                walletId: wallet.id,
+                transactionType: 'WITHDRAWAL',
+                amount: Number(created.amount),
+                recipientId: null,
+                fees: feeCalc.fees,
+              },
+            });
+          } else if (hasPin) {
+            const pinResult = await verifyWalletPin(wallet.id, options!.pin!);
+            if (!pinResult.success) {
+              throw new Error(pinResult.error || 'Code PIN incorrect.');
+            }
+          } else if (wallet.pinHash) {
+            throw new Error('Code PIN ou preuve Passkey requis pour effectuer cette opération.');
+          }
         }
 
         await reserveWithdrawal({
@@ -426,7 +536,8 @@ export async function createRequest(
 }
 
 /**
- * Update request status
+ * Update request status.
+ * Admin-only low-level mutation. Financial completion must go through approve/reject/cancel workflows.
  */
 export async function updateRequestStatus(
   id: string,
@@ -435,20 +546,38 @@ export async function updateRequestStatus(
   rejectionReason?: string
 ): Promise<Request> {
   try {
+    const sessionUser = await getCurrentUser();
+    assertCanApproveRequests(sessionUser);
+
+    const existing = await getRequestById(id);
+    if (!existing) {
+      throw new Error('Request not found');
+    }
+
+    if (
+      status === 'COMPLETED' &&
+      ['DEPOSIT', 'WITHDRAWAL', 'GAME_ITEMS', 'VIP_SUBSCRIPTION'].includes(existing.type)
+    ) {
+      throw new Error(
+        'INVALID_FLOW: la complétion financière doit passer par le workflow canonique d’approbation/règlement.'
+      );
+    }
+
     const updateData: Partial<NewRequest> = {
       status,
       updatedAt: new Date(),
     };
 
-    if (adminUserId) {
-      updateData.processedByUserId = adminUserId;
+    const effectiveAdminId = adminUserId || sessionUser?.id;
+    if (effectiveAdminId) {
+      updateData.processedByUserId = effectiveAdminId;
       updateData.processedAt = new Date();
     }
 
     if (rejectionReason) {
       updateData.rejectionReason = rejectionReason;
       updateData.rejectedAt = new Date();
-      updateData.rejectedBy = adminUserId;
+      updateData.rejectedBy = effectiveAdminId;
     }
 
     if (status === 'COMPLETED') {
@@ -779,10 +908,23 @@ export async function cancelRequest(
 }
 
 /**
- * Supprime une requête (soft delete)
+ * Supprime une requête (soft delete). Admin uniquement.
  */
 export async function deleteRequest(id: string): Promise<Request> {
   try {
+    const sessionUser = await getCurrentUser();
+    assertCanApproveRequests(sessionUser);
+
+    const existing = await getRequestById(id);
+    if (!existing) {
+      throw new Error('Request not found');
+    }
+    if (existing.status === 'PENDING' && existing.type === 'WITHDRAWAL') {
+      throw new Error(
+        'INVALID_FLOW: annulez/rejetez d’abord une demande de retrait en attente pour libérer la réservation.'
+      );
+    }
+
     const result = await db
       .update(requests)
       .set({

@@ -29,6 +29,10 @@ import {
   buildTournamentEntryPostings,
 } from "@/lib/finance";
 import { verifyWalletPin } from "./wallets";
+import {
+  consumePasskeyProofForIntent,
+  type PasskeyProof,
+} from "@/actions/passkey-transaction";
 
 // Type for Edition with Relations
 // export type TournamentEditionWithRelations = TournamentEdition & {
@@ -159,6 +163,8 @@ export async function joinEdition(
   options?: {
     payWithWallet?: boolean;
     pin?: string;
+    passkeyProof?: PasskeyProof;
+    idempotencyKey?: string;
   }
 ): Promise<{
   success: boolean;
@@ -336,18 +342,7 @@ export async function joinEdition(
           throw new Error("Portefeuille introuvable ou compte financier manquant");
         }
 
-        // Validate PIN if configured
-        if (userWallet.pinHash) {
-          if (!options.pin) {
-            throw new Error("Code PIN requis pour valider le paiement d'inscription.");
-          }
-          const pinRes = await verifyWalletPin(userWallet.id, options.pin);
-          if (!pinRes.success) {
-            throw new Error(pinRes.error || "Code PIN incorrect.");
-          }
-        }
-
-        // Compte destination : prize pool de l'édition ou escrow plateforme
+        // Compte destination : prize pool de l’édition ou escrow plateforme
         const targetAccount =
           edition.financialAccountId
             ? { id: edition.financialAccountId }
@@ -362,6 +357,34 @@ export async function joinEdition(
         const fees = feeCalc.fees;
         const totalDebit = Math.round((entryFee + fees) * 100) / 100;
 
+        // Preuve PIN/passkey consommée à l'exécution (liée à l'intention serveur).
+        if (userWallet.pinHash) {
+          const hasPasskeyProof =
+            !!options?.passkeyProof?.challengeId && !!options?.passkeyProof?.assertion;
+          const hasPin = typeof options?.pin === "string" && options.pin.length > 0;
+
+          if (hasPasskeyProof) {
+            await consumePasskeyProofForIntent(tx, {
+              userId,
+              proof: options!.passkeyProof!,
+              intent: {
+                walletId: userWallet.id,
+                transactionType: "TOURNAMENT_PARTICIPATION",
+                amount: entryFee,
+                recipientId: null,
+                fees,
+              },
+            });
+          } else if (hasPin) {
+            const pinRes = await verifyWalletPin(userWallet.id, options!.pin!);
+            if (!pinRes.success) {
+              throw new Error(pinRes.error || "Code PIN incorrect.");
+            }
+          } else {
+            throw new Error("Code PIN ou preuve Passkey requis pour valider le paiement d'inscription.");
+          }
+        }
+
         const feeAccount =
           fees > 0 ? await getOrCreateSystemAccount(tx, "FEES") : null;
 
@@ -374,6 +397,10 @@ export async function joinEdition(
         });
 
         // Paiement atomique via moteur finance V2 (I2-02, I2-04, §3.2 frais tournoi)
+        const joinIdempotencyKey =
+          options?.idempotencyKey?.trim() ||
+          `tournament-join:${editionId}:${userId}`;
+
         const transferRes = await executeFinancialOperation({
           kind: "POST",
           type: "TOURNAMENT_PARTICIPATION",
@@ -396,8 +423,9 @@ export async function joinEdition(
           fees,
           netAmount: entryFee,
           createdByUserId: userId,
-          idempotencyKey: `tournament-join:${editionId}:${userId}`,
+          idempotencyKey: joinIdempotencyKey,
           idempotencyScope: "tournament:join",
+          cooldownUserId: userId,
           client: tx,
         });
 
@@ -443,6 +471,20 @@ export async function joinEdition(
 
       revalidatePath(`/tournaments/${edition.tournamentId}/editions/${editionId}`);
       revalidatePath(`/tournaments/${edition.tournamentId}/members/${member.id}`);
+
+      // Notification asynchrone non-bloquante
+      try {
+        const { notifyUser } = await import("@/lib/notifications");
+        notifyUser(userId, "tournament_registration_confirmed", {
+          tournamentName: tournament?.name || "Tournoi",
+          editionName: edition.name || `Édition #${edition.editionNumber}`,
+          tournamentId: edition.tournamentId,
+          editionId,
+          userName: currentUser.name || userInfo.username,
+        }).catch((err) => console.error("[Notifications] Échec envoi confirmation inscription:", err));
+      } catch (notifErr) {
+        console.error("[Notifications] Exception notification:", notifErr);
+      }
 
       return {
         success: true,
@@ -675,6 +717,22 @@ export async function addEditionParticipantAction(data: {
     revalidatePath(
       `/tournaments/${data.tournamentId}/editions/${data.editionId}/dashboard/participants`,
     );
+
+    // Notification asynchrone non-bloquante
+    if (data.userId) {
+      try {
+        const { notifyUser } = await import("@/lib/notifications");
+        notifyUser(data.userId, "tournament_registration_confirmed", {
+          tournamentName: "Tournoi",
+          editionName: "Édition",
+          tournamentId: data.tournamentId,
+          editionId: data.editionId,
+          userName: data.displayName,
+        }).catch((err) => console.error("[Notifications] Échec envoi participant notification:", err));
+      } catch (err) {
+        console.error("[Notifications] Exception notification participant:", err);
+      }
+    }
 
     return { success: true, registrationId: registration.id };
   } catch (error: any) {

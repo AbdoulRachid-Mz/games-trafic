@@ -58,7 +58,7 @@ export interface NotificationCardProps extends BaseCardProps<
 function formatTimeAgo(dateInput?: Date | string | null): string {
     if (!dateInput) return "Récemment";
     const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
-    // eslint-disable-next-line react-hooks/purity
+     
     const diffInSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
 
     if (diffInSeconds < 60) return "À l'instant";

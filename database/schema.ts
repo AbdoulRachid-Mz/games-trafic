@@ -133,6 +133,7 @@ export const users = pgTable('users', {
 
   metadata: jsonb('metadata').default({}),
   lastLoginMethod: text('last_login_method'),
+  lastFinancialActionAt: timestamp('last_financial_action_at', { withTimezone: true }),
 
   // Timestamps
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -3636,3 +3637,4 @@ export type TransactionMetadata =
   | TransferMetadata
   | DepositMetadata
   | Record<string, any>;
+

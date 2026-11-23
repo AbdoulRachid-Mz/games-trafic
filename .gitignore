@@ -40,6 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# IDE and editors
+.continue/
+.trae/
+.claude/
+
 # uploads
 /public/uploads/*
 !/public/uploads/.gitkeep
