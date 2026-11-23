@@ -1,142 +1,136 @@
-# Document 07 — Feuille de Route d'Implémentation et Stratégie de Transition
+# Document 07 — Feuille de Route d'Implémentation "Clean Slate" et Procédure de Purge Sécurisée
 
-Ce document détaille le plan de mise en œuvre opérationnel pour déployer l'architecture cible (Scénario B) de manière sécurisée, incrémentale et sans interruption de service.
-
----
-
-## 1. Principes de Déploiement : Zéro Régression et Zéro Downtime
-
-1. **Migrations Additives Uniquement :** Aucune colonne ou table existante n'est supprimée ou renommée dans les premières phases.
-2. **Double Écriture / Adaptateur :** Les anciennes interfaces continuent de fonctionner grâce à un pont de compatibilité (`legacy-tournament-adapter.ts`).
-3. **Validation Financière Indépendante :** Tout mouvement de fonds (inscription payée, distribution de gains) continue de s'appuyer sur le moteur financier déjà éprouvé (`lib/finance`).
-4. **Validation par Tests de Bout en Bout :** Chaque nouveau format (Duel, Équipes BO3, Battle Royale FFA) est validé par des suites de tests automatisés simulant l'inscription, la génération, la saisie des scores et la progression jusqu'au podium.
+Ce document détaille le plan de déploiement du Scénario C (Clean Slate Universel), incluant la procédure pas-à-pas de purge sécurisée garantissant l'intégrité absolue des données financières et des identités.
 
 ---
 
-## 2. Découpage en 5 Phases Opérationnelles
+## 1. Procédure de Purge Sécurisée et Préservation Financière
+
+Pour supprimer les anciennes compétitions sans jamais rompre l'auditabilité des transactions de portefeuilles (`wallets` et `walletTransactions`), la migration doit suivre une séquence chirurgicale stricte :
 
 ```mermaid
-flowchart LR
-    P0[Phase 0: Fondation Schéma] --> P1[Phase 1: Moteur de Scoring Abstrait]
-    P1 --> P2[Phase 2: Entrants & Rosters Figés]
-    P2 --> P3[Phase 3: Encounters & FFA Engine]
-    P3 --> P4[Phase 4: Dashboard UI & Saisie]
-    P4 --> P5[Phase 5: Bascule & Validation Finale]
+flowchart TD
+    A[Étape 1: Backup Complet DB & Snapshot] --> B[Étape 2: Découplage Comptable de registration_payments]
+    B --> C[Étape 3: Suppression Ordonnée des Tables Sportives Obsolètes]
+    C --> D[Étape 4: Application du Nouveau Schéma Drizzle Universel]
+    D --> E[Étape 5: Déploiement des Nouveaux Moteurs & Server Actions]
+    E --> F[Étape 6: Tests de Recette par Discipline]
+```
+
+### Détail des Étapes de la Purge
+1. **Étape 1 — Sauvegarde Complète :** Réalisation d'un dump SQL complet sous Neon / PostgreSQL avant toute manipulation.
+2. **Étape 2 — Préservation du Lien Financier :**
+   * Dans `registration_payments`, supprimer la contrainte `FOREIGN KEY ... ON DELETE CASCADE` vers `edition_registrations`.
+   * Transformer `registration_id` en champ historique non contraignant (`text`), ou archiver les lignes de `registration_payments` dans une table historique `archived_registration_payments` qui conserve le `transactionId`, le montant, la devise et le libellé de l'ancienne édition.
+   * Ainsi, aucune ligne de `wallet_transactions` ne se retrouve orpheline sans explication comptable.
+3. **Étape 3 — Purge des Tables Compétitives Obsolètes :**
+   * Suppression dans l'ordre strict des dépendances :
+     1. `matches`
+     2. `bracket_nodes`
+     3. `phase_group_participants`
+     4. `phase_groups`
+     5. `tournament_phases`
+     6. `edition_results`
+     7. `edition_registrations`
+     8. `tournament_members`
+     9. `tournament_editions`
+     10. `tournaments`
+4. **Étape 4 — Déploiement du Schéma Cible :**
+   * Création des nouvelles tables propres avec relations Drizzle complètes.
+
+---
+
+## 2. Feuille de Route Opérationnelle (4 Sprints de Développement)
+
+Grâce à la suppression du besoin d'adaptateurs de compatibilité, le délai de réalisation passe de 6 à **4 semaines de développement focalisé**.
+
+```mermaid
+gantt
+    title Déploiement Clean Slate du Moteur de Compétition
+    dateFormat  YYYY-MM-DD
+    section Sprint 1 : Purge & Schéma
+    Purge sécurisée & Schéma Cible       :s1_1, 2026-12-01, 4d
+    Types TypeScript Universels          :s1_2, after s1_1, 3d
+    section Sprint 2 : Moteur de Règles
+    Universal Rule Engine (Scoring)      :s2_1, after s1_2, 4d
+    Algorithme de Départage & Head-to-Head :s2_2, after s2_1, 3d
+    section Sprint 3 : Brackets & Collectif
+    Bracket DAG & Double Elimination     :s3_1, after s2_2, 4d
+    Moteur de Confrontations Collectives :s3_2, after s3_1, 3d
+    section Sprint 4 : Dashboard & Recette
+    Dashboards de Gestion & Saisie       :s4_1, after s3_2, 4d
+    Recette Complète & Mise en Ligne     :s4_2, after s4_1, 3d
 ```
 
 ---
 
-### Phase 0 : Fondations du Schéma et Types Universels (Semaine 1)
+### Sprint 1 : Purge Sécurisée, Déploiement du Schéma et Types (Semaine 1)
 
-#### Objectifs
-* Définir les nouvelles tables cibles dans `database/schema.ts` sans modifier les tables existantes.
-* Générer et appliquer la migration SQL avec Drizzle Kit.
-* Créer les interfaces TypeScript unifiées dans `lib/tournaments/types/universal.ts`.
-
-#### Tâches Techniques
-1. Ajouter les tables :
-   * `competition_entrants`
-   * `entrant_members`
-   * `competition_stages`
-   * `competition_rounds`
-   * `competition_encounters`
-   * `encounter_opponents`
-   * `encounter_games`
-   * `game_participant_scores`
-2. Définir les relations Drizzle correspondantes avec intégrité référentielle stricte (`onDelete: 'cascade'`).
-3. Écrire le convertisseur bidirectionnel de types (`toLegacyMatch()`, `toUniversalEncounter()`).
-
----
-
-### Phase 1 : Moteur de Scoring et Stratégies Enfichables (Semaine 2)
-
-#### Objectifs
-* Découpler le calcul des scores et des classements de toute sémantique footballistique.
-* Implémenter le patron de conception **Strategy** pour les différents types de jeux.
-
-#### Tâches Techniques
-1. Créer le répertoire `lib/tournaments/scoring/` :
-   * `base-scoring-strategy.ts` (Interface commune).
-   * `sports-scoring-strategy.ts` (Football : Victoire 3 pts, Nul 1 pt, Goal Average).
-   * `versus-series-scoring-strategy.ts` (FPS / Fighting : Best-of-3 / Best-of-5, victoires de cartes).
-   * `battle-royale-scoring-strategy.ts` (Barème de placement Top 1-20 + multiplicateur de frags).
-   * `racing-scoring-strategy.ts` (Points par rang + chronométrage).
-2. Adapter `lib/tournaments/standings.engine.ts` pour déléguer le tri et le calcul à la stratégie choisie par l'édition.
-3. Écrire des tests unitaires complets sur chaque barème avec cas d'égalités multiples.
+#### Livrables
+* Script SQL de purge sécurisée préservant le ledger et archivant les paiements d'inscriptions.
+* Nouveau schéma Drizzle dans `database/schema.ts` :
+  * `tournament_staff`
+  * `competition_entrants`
+  * `entrant_roster_members`
+  * `competition_stages`
+  * `competition_groups`
+  * `competition_rounds`
+  * `competition_encounters`
+  * `encounter_sides`
+  * `encounter_side_entrants`
+  * `encounter_matches`
+  * `match_slots`
+  * `match_games`
+  * `competition_rulesets`
+* Migration appliquée et validée.
 
 ---
 
-### Phase 2 : Gestion Avancée des Entrants et des Rosters (Semaine 3)
+### Sprint 2 : Moteur de Règles Universel et Calcul de Classement (Semaine 2)
 
-#### Objectifs
-* Permettre l'inscription d'équipes avec composition figée par édition.
-* Gérer les joueurs invités sans compte utilisateur de façon propre.
-
-#### Tâches Techniques
-1. Mettre à jour `actions/editions.ts` (`joinEdition`) :
-   * Lors de l'inscription d'une équipe, copier la liste des joueurs actuels dans `entrant_members` pour figer la composition.
-   * Permettre au capitaine d'ajouter des remplaçants (`SUBSTITUTE`) ou un coach.
-2. Développer l'action d'ajout manuel de participants invités (`addGuestEntrantAction`) :
-   * Crée directement un `competition_entrant` avec `is_guest = true`, sans polluer la table globale `tournament_members`.
-3. Mettre à jour le composant de gestion des participants (`participants-management-client.tsx`) pour afficher le roster d'équipe et les statuts de check-in.
-
----
-
-### Phase 3 : Moteur d'Encounters et Support FFA / Battle Royale (Semaine 4)
-
-#### Objectifs
-* Permettre la génération et la gestion de confrontations à N adversaires ($N \ge 2$).
-* Prendre en charge le découpage en sous-manches (`encounter_games`).
-
-#### Tâches Techniques
-1. Créer `lib/tournaments/encounter-engine.ts` :
-   * Création d'une confrontation avec collection d'opposants (`encounter_opponents`).
-   * Initialisation des manches prévues (`encounter_games`).
-2. Mettre à jour `match-generation-engine.ts` pour générer :
-   * Soit des duels classiques (Arbre ou Poules).
-   * Soit des salons/lobbies Battle Royale (ex. 16 escouades regroupées dans la même confrontation multi-manches).
-3. Mettre à jour `progression-engine.ts` pour propager les qualifiés en fonction des `calculated_points` de chaque opposant.
+#### Livrables
+* `lib/tournaments/rules/rule-engine.ts` : Évaluateur universel de règles sans classes par jeu.
+* Prise en charge des trois modes :
+  * Mode Points (Victoire/Nul/Défaite).
+  * Mode Accumulation Métrique (Battle Royale : Placement + Kills).
+  * Mode Séries (Best-of-X).
+* Implémentation complète et rigoureuse de la chaîne de départage :
+  * `POINTS`
+  * `HEAD_TO_HEAD` (vraie confrontation directe entre les participants à égalité)
+  * `GOAL_DIFF`
+  * `WINS_COUNT`
+  * `GOALS_FOR`
+  * `LAST_GAME_PLACEMENT`
+* Suite de tests unitaires (100% couverture sur le rule engine).
 
 ---
 
-### Phase 4 : Interfaces Utilisateurs et Saisie des Résultats (Semaine 5)
+### Sprint 3 : Brackets DAG, Double Élimination et Confrontations Collectives (Semaine 3)
 
-#### Objectifs
-* Offrir une ergonomie moderne pour la saisie et la validation des scores sur mobile et desktop.
-
-#### Tâches Techniques
-1. **Interface de Match Duel (BO3 / BO5) :**
-   * Affichage manche par manche (Carte 1, Carte 2, Carte 3).
-   * Saisie des scores par carte avec upload de screenshot de preuve.
-2. **Interface de Match Battle Royale (Lobby FFA) :**
-   * Tableau de saisie rapide : pour chaque escouade, saisie du rang (Top X) et du nombre de kills.
-   * Calcul en direct du total de points et du classement provisoire de la manche.
-3. **Tableau de Bord Organisateur :**
-   * Validation en un clic des résultats certifiés par l'arbitre.
-   * Déclenchement automatique de la progression vers le tour ou la phase suivante.
+#### Livrables
+* `lib/tournaments/brackets/dag-engine.ts` :
+  * Résolution des dépendances de progression relationnelles (`match_slots`).
+  * Upper Bracket, Lower Bracket, Grand Finals et Bracket Reset automatique.
+  * Validation d'acyclicité (aucun cycle possible dans l'arbre).
+  * Traitement formel des BYE et des dérogations manuelles par l'arbitre (`is_locked`).
+* `lib/tournaments/fixtures/collective-engine.ts` :
+  * Gestion des confrontations Région A contre Région B.
+  * Répartition des joueurs dans les camps (`encounter_sides`).
+  * Agrégation automatique des résultats des sous-matchs (points de match ou scores cumulés).
 
 ---
 
-### Phase 5 : Tests de Recette, Déploiement et Migration (Semaine 6)
+### Sprint 4 : Refonte des Dashboards et Recette Globale (Semaine 4)
 
-#### Objectifs
-* Déployer en production, tester les nouveaux formats réels et finaliser la documentation.
-
-#### Tâches Techniques
-1. Exécution de scénarios de tests complets sur environnement de staging :
-   * Tournoi eFootball 1v1 (Poules + Élimination directe).
-   * Tournoi Call of Duty Mobile 5v5 (Arbre BO3).
-   * Tournoi Free Fire Battle Royale (12 équipes, 4 manches).
-2. Déploiement progressif (Feature Flag : `ENABLE_UNIVERSAL_COMPETITION_ENGINE = true`).
-3. Formation et documentation pour les organisateurs de tournois.
-
----
-
-## 3. Matrice de Gestion des Risques
-
-| Risque Identifié | Probabilité | Impact | Stratégie d'Atténuation |
-|:---|:---:|:---:|:---|
-| **Régression sur les tournois eFootball en cours** | Faible | Élevé | Couche d'adaptation maintenant l'API historique ; les éditions existantes ne sont pas migrées de force. |
-| **Erreur de calcul sur le prize pool** | Très Faible | Critique | La table `financialAccounts` et les transactions du wallet restent la seule autorité pour les paiements. |
-| **Complexité de saisie mobile pour les tournois BR** | Moyenne | Moyen | Conception d'un formulaire de saisie ultra-simplifié pré-remplissant les escouades et vérifiant la somme des rangs. |
-| **Augmentation du temps de build ou de requête** | Faible | Faible | Indexation rigoureuse sur `(edition_id, stage_id, status)` et jointures optimisées Drizzle. |
+#### Livrables
+* Écrans de gestion rénovés :
+  * Page d'inscription avec composition de roster figée et choix du club en jeu.
+  * Tableau de saisie de match pour Duels BO3/BO5 (carte par carte avec preuves).
+  * Tableau de saisie rapide pour Lobbies Battle Royale (saisie Top et Kills en grille fluide).
+  * Vue de confrontation collective affichant le score global et les sous-matchs.
+* Recette fonctionnelle sur 4 tournois tests complets :
+  1. eFootball 1v1 (Championnat + Playoffs).
+  2. Call of Duty Mobile 5v5 (Arbre Double Élimination BO3).
+  3. Free Fire Battle Royale (12 escouades, 4 manches).
+  4. Choc Inter-Régions Dakar vs Thiès (Confrontation collective 5 sous-matchs).
+* Déploiement en production.

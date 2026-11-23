@@ -1,114 +1,89 @@
-# Document 06 — Scénarios d'Évolution Architecturale et Recommandation
+# Document 06 — Réévaluation des Scénarios d'Évolution Architecturale
 
-Ce document présente et évalue trois scénarios d'évolution pour le système de compétition de Games Trafics, allant du colmatage minimal à la refonte totale, afin de guider le choix stratégique de l'équipe.
+Ce document réévalue formellement les options stratégiques d'ingénierie à la lumière de la nouvelle directive métier : **aucune compétition n'est en cours, les anciennes éditions sont terminées et leurs structures sportives peuvent être supprimées, à la condition stricte de préserver les utilisateurs, les équipes générales et la traçabilité financière (wallets/ledger).**
 
 ---
 
-## 1. Description des Trois Scénarios
+## 1. Impact Fondamental de la Nouvelle Contrainte
+
+Dans l'évaluation initiale, le maintien d'une couche de compatibilité (Scénario B) était rendu obligatoire par l'hypothèse de tournois en production actifs qu'il ne fallait pas perturber.
+
+La confirmation que **toutes les anciennes compétitions peuvent être purgées** change radicalement l'équation d'ingénierie :
+* Maintenir des adaptateurs ou une double écriture devient un **gaspillage d'effort et une source inutile de complexité**.
+* Le patching par JSONB (Scénario A) perd sa seule justification (l'urgence).
+* L'opportunité d'une **transition nette ("Clean Slate Universel")** devient la voie royale : déployer directement le modèle cible parfait, sans compromis et sans code hérité.
+
+---
+
+## 2. Réévaluation Comparative des Scénarios
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          LES TROIS TRAJECTOIRES                             │
+│                 RÉÉVALUATION STRATÉGIQUE DES 3 SCÉNARIOS                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ SCÉNARIO A : Patching Incrémental (Aménagement de l'existant via JSONB)     │
-│   • On garde la table `matches` et `phase_groups`.                          │
-│   • On stocke les manches et les participants FFA dans `gameData: jsonb`.   │
+│ SCÉNARIO A : Patching Incrémental via JSONB                                 │
+│   • VERDICT : REJETÉ DÉFINITIVEMENT.                                        │
+│   • Aucun sens de bricoler du JSON sur un système sans tournoi en cours.    │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ SCÉNARIO B : Refonte Modulaire Hybride avec Couche de Compatibilité         │
-│   • Recommandé : On introduit les nouvelles tables relationnelles cibles.   │
-│   • Un adaptateur bidirectionnel assure la compatibilité avec l'existant.   │
-│   • Les tournois existants fonctionnent sans interruption.                  │
+│ SCÉNARIO B : Architecture Hybride avec Adaptateur de Rétrocompatibilité      │
+│   • VERDICT : RENDU OBSOLÈTE PAR LE NOUVEAU CONTEXTE.                       │
+│   • L'adaptateur ne servirait qu'à maintenir des données mortes.            │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ SCÉNARIO C : Réécriture Radicale "Big Bang" (Engine-First de zéro)          │
-│   • Remplacement brutal de tout le code tournoi par un nouveau moteur.      │
-│   • Rupture des anciennes données ou migration de force sous downtime.      │
+│ SCÉNARIO C : Clean Slate Universel avec Préservation Financière             │
+│   • VERDICT : FORTE RECOMMANDATION (LE MEILLEUR CHOIX TECHNIQUE).           │
+│   • Purge ciblée des tables sportives obsolètes.                            │
+│   • Conservation absolue du ledger financier, des users et des teams.       │
+│   • Déploiement direct du schéma cible universel de niveau international.   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Analyse Approfondie des Scénarios
+## 3. Analyse Détaillée du Scénario C (Clean Slate Universel)
 
-### Scénario A : Patching Incrémental (Court Terme / Dette Technique)
+### A. Périmètre de Ce Qui Est Préservé (Intangible)
+1. **Identités & Communauté :** Table `users` (profils, statistiques globales, avatars, identifiants).
+2. **Organisations Pérennes :** Table `teams` (clubs réels, logos, créateurs) et `team_members` (appartenance des joueurs).
+3. **Moteur Financier & Ledger :**
+   * `wallets` et `user_wallets` : soldes en GTC strictement préservés.
+   * `wallet_transactions` : historique immuable de tous les dépôts, retraits, transferts et paiements passés.
+   * `financial_accounts` : comptes escrow et comptes système.
+   * **Traitement de `registration_payments` :** Découplage de la contrainte `onDelete: 'cascade'` pour figer l'historique de paiement avant la suppression des anciennes éditions.
 
-#### Principe technique
-* Conserver les 11 tables actuelles sans altération majeure de structure.
-* Surcharger le champ `metadata` ou `gameData` de la table `matches` pour y consigner les sous-manches (BO3/BO5) et les listes d'adversaires pour le Battle Royale.
-* Ajouter des drapeaux booléens dans `editionConfig` et `phase.config`.
+### B. Périmètre de Ce Qui Est Purgé (Tables Sportives Obsolètes)
+* `matches` (modèle binaire 1v1 obsolète).
+* `bracket_nodes` (ancien arbre non relationnel).
+* `phase_group_participants` (statistiques de poules dénormalisées).
+* `phase_groups` (anciennes poules et journées confondues).
+* `tournament_phases` (anciennes phases).
+* `edition_results` (anciens résultats sportifs).
+* `tournament_members` (ancienne table ambiguë mélangeant staff et participants).
+* `tournament_editions` et `tournaments` (anciens conteneurs sportifs dont les structures sont obsolètes).
 
-#### Avantages
-* Temps de mise en œuvre initial très court (1 à 2 semaines).
-* Aucune migration de schéma critique.
-* Les pages UI existantes continuent d'afficher les matchs sans modification des requêtes ORM.
-
-#### Inconvénients et Risques Majeurs
-* **Requêtes et Indexation impossibles :** Impossible de faire des agrégations SQL rapides (ex. "Meilleur fragueur de l'édition", "Statistiques par arme") sur des structures JSON imbriquées non normalisées.
-* **Intégrité référentielle nulle :** Pas de clés étrangères (`foreign keys`) sur les identifiants d'adversaires dans le JSON ; risque élevé d'incohérences si un joueur est supprimé.
-* **Complexité exponentielle du code TypeScript :** Les moteurs doivent multiplier les `if (match.metadata?.isFFA) ... else ...`, augmentant le risque de régressions à chaque modification.
-* **Impasse à moyen terme :** Ce scénario reporte le problème et rendra la migration future deux fois plus douloureuse.
-
----
-
-### Scénario B : Refonte Modulaire avec Couche d'Adaptation (Recommandé)
-
-#### Principe technique
-* Création des nouvelles tables propres : `competition_entrants`, `entrant_members`, `competition_encounters`, `encounter_opponents`, `encounter_games`.
-* Déploiement d'un **Service Adaptateur (Tournament Compatibility Layer)** :
-  * Pour les tournois existants (ou formats 1v1 classiques) : le code existant continue de lire/écrire via l'API historique ou une vue unifiée.
-  * Pour les nouvelles éditions : le nouveau moteur universel prend en charge la totalité du cycle de vie.
-  * Les Server Actions exposent une interface uniforme aux composants React.
-* Refactorisation progressive des moteurs (`scoring`, `standings`, `progression`) pour consommer les entités normalisées.
-
-#### Avantages
-* **Pérennité absolue :** Modèle normalisé de niveau professionnel (similaire à Toornament et Start.gg).
-* **Zéro régression sur la production :** Les tournois déjà terminés ou en cours restent consultables et intacts.
-* **Support universel immédiat :** Permet de lancer officiellement des tournois PUBG Mobile, Free Fire et COD Mobile avec un scoring complet.
-* **Auditabilité financière préservée :** La relation entre l'entrant et le paiement d'inscription reste limpide et indexée.
-
-#### Inconvénients et Contraintes
-* Nécessite un effort d'ingénierie rigoureux sur 4 à 6 semaines (découpé en phases).
-* Nécessite la maintenance temporaire d'un adaptateur de compatibilité pendant la transition.
+### C. Déploiement du Nouveau Schéma Cible
+* Déploiement direct des tables propres : `tournament_staff`, `competition_entrants`, `entrant_roster_members`, `competition_stages`, `competition_groups`, `competition_rounds`, `competition_encounters`, `encounter_sides`, `encounter_side_entrants`, `encounter_matches`, `match_slots`, `match_games`, `competition_rulesets`.
+* Remplacement complet des anciens moteurs de `lib/tournaments/` par le nouveau moteur déclaratif universel.
 
 ---
 
-### Scénario C : Réécriture Radicale "Big Bang"
+## 4. Matrice de Décision Réactualisée
 
-#### Principe technique
-* Dépréciation immédiate des anciennes tables de matchs et de groupes.
-* Migration totale de toutes les anciennes données de la base de données vers le nouveau schéma en un seul script.
-* Réécriture complète de toutes les Server Actions et pages de dashboard.
-
-#### Avantages
-* Élimination instantanée de tout code hérité.
-* Base de code ultra-propre sans adaptateur intermédiaire.
-
-#### Inconvénients et Risques Majeurs
-* **Risque de corruption de données inacceptable :** Risque de casser les historiques de tournois, les statistiques de joueurs et les références financières d'anciennes éditions.
-* **Gel des développements :** Immobilise toute l'équipe pendant plusieurs semaines sans possibilité de livrer de correctifs sur la production.
-* **Risque élevé de bugs invisibles au lancement.**
-
----
-
-## 3. Matrice d'Évaluation Comparative
-
-| Critère d'Évaluation (sur 5) | Scénario A (Patching) | Scénario B (Modulaire - Recommandé) | Scénario C (Big Bang) |
+| Critère Stratégique | Scénario A (Patching) | Scénario B (Hybride Adaptateur) | Scénario C (Clean Slate - Recommandé) |
 |:---|:---:|:---:|:---:|
-| **Support réel de tous les formats (BR, TvT, Duels)** | 2 / 5 (Bricolé) | **5 / 5 (Natif)** | **5 / 5 (Natif)** |
-| **Robustesse et Intégrité des données** | 2 / 5 (Faible) | **5 / 5 (Maximale)** | 4 / 5 (Risque migration) |
-| **Sécurité pour les tournois en cours** | 4 / 5 | **5 / 5 (Zéro impact)** | 1 / 5 (Danger critique) |
-| **Maintenabilité du code à long terme** | 1 / 5 (Dette toxique) | **5 / 5 (Excellente)** | 5 / 5 (Excellente) |
-| **Facilité d'évolution future** | 1 / 5 | **5 / 5** | 5 / 5 |
-| **Délai de mise en production** | **5 / 5 (1-2 sem.)** | 4 / 5 (4-5 sem.) | 2 / 5 (8+ sem.) |
-| **Coût total de possession (TCO à 1 an)** | Élevé (Refonte inévitable) | **Faible / Optimal** | Moyen-Élevé |
+| **Qualité et Pureté du Code** | 1 / 5 | 3 / 5 | **5 / 5 (Excellente, zéro dette)** |
+| **Prise en charge de tous les formats (FFA, BR, Collectif)** | 2 / 5 | 5 / 5 | **5 / 5 (Natif et robuste)** |
+| **Sécurité Comptable et Financière** | 2 / 5 | 4 / 5 | **5 / 5 (Auditabilité totale)** |
+| **Rapidité de Développement** | 3 / 5 | 2 / 5 (Complexité adaptateur) | **4 / 5 (Moins de code d'adaptation)** |
+| **Charge de Maintenance Future** | 1 / 5 (Cauchemar) | 3 / 5 | **5 / 5 (Minimale)** |
+| **Stabilité des Performances** | 2 / 5 | 3 / 5 | **5 / 5 (Requêtes SQL optimales)** |
 
 ---
 
-## 4. Recommandation Finale et Justification
+## 5. Conclusion et Validation Stratégique
 
-### Choix Préconisé : **Scénario B (Refonte Modulaire Progressive)**
+La décision d'autoriser la suppression des anciennes données sportives offre à Games Trafics une **opportunité architecturale rare : repartir sur des bases saines sans traîner un passif technique.**
 
-Ce choix s'impose pour trois raisons stratégiques :
-
-1. **La réputation de fiabilité de Games Trafics :** La plateforme gérant des fonds réels (wallets GTC et prize pools), il est inconcevable d'opter pour le Scénario A (qui fragiliserait la cohérence des résultats et des gains) ou pour le Scénario C (qui mettrait en péril les éditions historiques).
-2. **L'ouverture immédiate aux marchés majeurs de l'Afrique et du mobile :** Les scènes esportives de Free Fire, PUBG Mobile et Call of Duty Mobile représentent un gisement de croissance massif. Le Scénario B apporte immédiatement le modèle d'équipes avec roster figé et le modèle de manches FFA indispensables à ces jeux.
-3. **Une transition indolore pour l'équipe :** Les organisateurs actuels de tournois eFootball et FIFA ne perçoivent aucun bouleversement, tandis qu'une nouvelle catégorie de tournois (Battle Royale et Tournois d'équipes) devient opérationnelle en parallèle.
+Le **Scénario C (Clean Slate Universel)** est la recommandation définitive :
+1. Il élimine 100 % de la dette technique accumulée.
+2. Il évite d'écrire des milliers de lignes de code d'adaptation temporaires qui auraient dû être jetées plus tard.
+3. Il garantit une sécurité financière absolue en protégeant le ledger de toute cascade destructrice.

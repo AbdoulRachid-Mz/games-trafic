@@ -1,229 +1,247 @@
-# Document 05 — Proposition d'Architecture Cible Universelle pour Games Trafics
+# Document 05 — Proposition d'Architecture Cible Universelle (Version Approfondie)
 
-Ce document présente l'architecture cible recommandée pour transformer Games Trafics en un moteur de compétition universel, robuste et hautement évolutif.
-
----
-
-## 1. Principes Fondateurs de l'Architecture Cible
-
-1. **Règle de l'Entrant Unique :** Un match ne manipule jamais directement des utilisateurs (`users`) ou des équipes (`teams`), mais exclusivement des **Entrants** (`competition_entrants`). Un Entrant encapsule le participant officiel d'une édition donnée (solo, duo, squad ou club).
-2. **Roster Figé par Édition :** La composition d'une équipe est instanciée et verrouillée au moment de l'inscription à l'édition (`entrant_members`). Elle ne subit pas les changements ultérieurs de l'équipe sur la plateforme.
-3. **Opposition N-aire (Opponents) :** Tout match réunit une collection d'adversaires (`encounter_opponents`). Un duel est un cas particulier où $N = 2$. Un Battle Royale est un cas où $N = 16$ à $100$. Une course est un cas où $N = 8$.
-4. **Découpage Confrontation / Manche (Encounter / Game) :** Une série de compétition (BO1, BO3, BO5 ou session de 4 cartes BR) est une confrontation (`encounter`), découpée en manches élémentaires (`encounter_games`).
-5. **Découplage Poule vs Calendrier (Group vs Round) :** Une poule (`group`) est un conteneur de classement et de qualification. Une journée (`round`) est une unité temporelle de calendrier.
-6. **Moteur de Scoring Abstrait (Strategy Pattern) :** Le calcul des points et des départages est délégué à des modules de règles spécialisés selon la discipline du jeu.
+Ce document présente l'architecture cible complète, corrigée et enrichie, répondant à l'ensemble des exigences de modularité, de flexibilité et de rigueur exprimées par l'équipe de Games Trafics.
 
 ---
 
-## 2. Modèle de Données Cible (Diagramme Entité-Relation Mermaid)
+## 1. Principes Directeurs et Séparation des Responsabilités
 
-```mermaid
-erDiagram
-    tournaments ||--o{ tournament_editions : "possède"
-    tournament_editions ||--o{ competition_entrants : "accueille"
-    users ||--o{ competition_entrants : "inscrit en solo (optionnel)"
-    teams ||--o{ competition_entrants : "inscrit en équipe (optionnel)"
-    competition_entrants ||--o{ entrant_members : "composition (roster)"
-    users ||--o{ entrant_members : "joueur titulaire/sub (optionnel)"
-
-    tournament_editions ||--o{ competition_stages : "découpé en étapes"
-    competition_stages ||--o{ competition_groups : "contient des poules"
-    competition_stages ||--o{ competition_rounds : "planifie des journées/tours"
-
-    competition_groups ||--o{ group_standings : "classement de la poule"
-    competition_entrants ||--o{ group_standings : "figurant au classement"
-
-    competition_stages ||--o{ competition_encounters : "rencontres de l'étape"
-    competition_groups ||--o{ competition_encounters : "associé à la poule"
-    competition_rounds ||--o{ competition_encounters : "associé au tour"
-
-    competition_encounters ||--o{ encounter_opponents : "adversaires en lice (N)"
-    competition_entrants ||--o{ encounter_opponents : "assigné à la place"
-
-    competition_encounters ||--o{ encounter_games : "manches / maps (BO-X)"
-    encounter_games ||--o{ game_participant_scores : "scores par manche"
-    encounter_opponents ||--o{ game_participant_scores : "performance de l'adversaire"
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    LES 5 PILIERS DE L'ARCHITECTURE CIBLE                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 1. DISSOCIATION STAFF / SPORT / IDENTITÉ / ASSET DE JEU                     │
+│    • Staff (arbitres, organisateurs) != Entrants (compétiteurs).            │
+│    • Entité compétitive (Entrant) != Roster physique (Membres).             │
+│    • Équipe réelle (FC Douane) != Club cosmétique de jeu (Real Madrid).     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 2. MODÉLISATION RELATIONNELLE DES CONFRONTATIONS COLLECTIVES                │
+│    • Support natif des chocs "Région A vs Région B" ou "Guerres de Clans".   │
+│    • Rencontre parent à 2 camps (Sides) contenant N sous-matchs individuels.│
+│    • Règles d'agrégation configurables (points de match, score cumulé).     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 3. SLOTS DE BRACKET RELATIONNELS ET PROGRESSION DAG                         │
+│    • Pas de JSON opaque pour les sources : clés étrangères relationnelles.  │
+│    • Support complet de la Double Élimination et du Bracket Reset.          │
+│    • Gestion des BYE, des reports et validation d'acyclicité (anti-boucles).│
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 4. MOTEUR DE RÈGLES DÉCLARATIF SANS CODE SPÉCIFIQUE (RULE ENGINE)           │
+│    • Les organisateurs configurent leurs barèmes, métriques et départages   │
+│      directement en base de données sans intervention de développeur.       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 5. HIERARCHIE STRUCTURELLE INTRANSIGEANTE                                   │
+│    • Phase (Étape logique) ──> Groupe (Poule de classement).                │
+│    • Round (Journée / Calendrier temporel, indépendant des poules).         │
+│    • Rencontre (Duel, Confrontation Collective ou Lobby FFA).               │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Spécification Détaillée des Entités Cibles
+## 2. Modèle Relationnel Cible Complet (Diagramme Mermaid)
 
-### A. Gestion des Participants : `competition_entrants` & `entrant_members`
+```mermaid
+erDiagram
+    tournaments ||--o{ tournament_staff : "encadré par"
+    users ||--o{ tournament_staff : "arbitre/orga"
 
-#### `competition_entrants` (L'entité compétitrice officielle)
-Remplace le couple ambigu `tournament_members` / `edition_registrations` comme référence sportive dans les matchs.
-* `id` : UUID (Primary Key).
+    tournaments ||--o{ tournament_editions : "possède des éditions"
+    tournament_editions ||--o{ competition_entrants : "inscrit à l'édition"
+    users ||--o| competition_entrants : "joueur solo (optionnel)"
+    teams ||--o| competition_entrants : "club compétitif (optionnel)"
+
+    competition_entrants ||--o{ entrant_roster_members : "composition (roster)"
+    users ||--o| entrant_roster_members : "joueur inscrit (optionnel)"
+
+    competition_entrants ||--o| registration_payments : "paiement d'entrée"
+    registration_payments ||--|| wallet_transactions : "traçabilité financière"
+
+    tournament_editions ||--o{ competition_stages : "étapes (phases)"
+    competition_stages ||--o{ competition_groups : "poules de classement"
+    competition_stages ||--o{ competition_rounds : "journées / tours calendaires"
+
+    competition_stages ||--o{ competition_encounters : "rencontres"
+    competition_groups ||--o{ competition_encounters : "rattaché à la poule"
+    competition_rounds ||--o{ competition_encounters : "programmé au round"
+
+    competition_encounters ||--o{ encounter_sides : "camps en présence (ex: Dakar vs Thiès)"
+    competition_entrants ||--o{ encounter_side_entrants : "membres du camp"
+    encounter_sides ||--o{ encounter_side_entrants : "compose le camp"
+
+    competition_encounters ||--o{ encounter_matches : "matchs élémentaires (sub-matches)"
+    encounter_matches ||--o{ match_slots : "emplacements de jeu (slots)"
+    competition_entrants ||--o| match_slots : "affecté au slot"
+
+    encounter_matches ||--o{ match_games : "manches / cartes (BO1, BO3)"
+    match_games ||--o{ game_metrics : "scores et stats par manche"
+    match_slots ||--o{ game_metrics : "performance du slot"
+```
+
+---
+
+## 3. Spécification Détaillée des Entités et Responsabilités
+
+### A. Participants, Rosters, Staff et Clubs en Jeu
+
+#### 1. `tournament_staff` (Encadrement et Rôles)
+Isole définitivement le staff de l'organisation sportive :
+* `id` : UUID.
+* `tournament_id` : UUID (FK vers `tournaments`).
+* `edition_id` : UUID (Optionnel, null si staff permanent du tournoi).
+* `user_id` : UUID (FK vers `users`).
+* `role` : Enum (`ORGANIZER`, `CO_ORGANIZER`, `HEAD_REFEREE`, `REFEREE`, `CASTER`, `OBSERVER`).
+* `permissions` : JSONB (`["VALIDATE_SCORES", "EDIT_SCHEDULE", "RESOLVE_DISPUTE"]`).
+
+#### 2. `competition_entrants` (L'Entité Compétitive Unique)
+Représente l'unique entité admise à concourir dans une édition :
+* `id` : UUID.
 * `edition_id` : UUID (FK vers `tournament_editions`).
-* `type` : Enum (`INDIVIDUAL`, `TEAM`).
-* `user_id` : UUID (Optionnel, FK vers `users`, si joueur solo inscrit).
-* `team_id` : UUID (Optionnel, FK vers `teams`, si équipe inscrite).
-* `name` : String (Nom d'affichage officiel pour l'édition, ex. *"Team Vitality"* ou *"ShadowNinja"*).
-* `tag` : String (Tag d'équipe ou préfixe de sponsor, ex. *"VIT"*).
-* `logo` : String (URL de l'image de compétition).
-* `seed` : Integer (Numéro de tête de série dans l'édition).
-* `status` : Enum (`PENDING`, `CONFIRMED`, `CHECKED_IN`, `DISQUALIFIED`, `WITHDRAWN`).
-* `custom_fields` : JSONB (Champs requis par l'organisateur : Riot ID, Gamertag, Téléphone WhatsApp, etc.).
-* `registration_payment_id` : UUID (Lien direct et immuable vers le paiement du wallet).
+* `type` : Enum (`SOLO`, `TEAM`, `GUEST`).
+* `user_id` : UUID (Nullable, FK vers `users`, si joueur solo).
+* `team_id` : UUID (Nullable, FK vers `teams`, si équipe globale officielle).
+* `name` : String (Nom d'affichage pour la compétition, ex. *"FC Douane"* ou *"Abidjan Esport"*).
+* `tag` : String (ex. *"FCD"*, *"ABJ"*).
+* `logo` : String (URL).
+* `seed` : Integer (Tête de série initiale).
+* `in_game_club` : String (Nullable, ex. *"Real Madrid"* ou *"Manchester City"* — le club de football choisi dans le jeu, **strictement dissocié** de l'équipe compétitive réelle `team_id`).
+* `status` : Enum (`PENDING`, `REGISTERED`, `CONFIRMED`, `CHECKED_IN`, `DISQUALIFIED`, `WITHDRAWN`).
+* `custom_fields` : JSONB (Riot ID, In-game UID, Téléphone, etc.).
+* `registration_payment_id` : UUID (Nullable, FK vers `registration_payments`).
 
-#### `entrant_members` (Le Roster figé de l'édition)
-Permet de figer qui a joué pour cette équipe lors de cette édition spécifique, sans risque d'altération si l'équipe change ses membres plus tard.
-* `id` : UUID (Primary Key).
+#### 3. `entrant_roster_members` (Composition Figée de l'Édition)
+* `id` : UUID.
 * `entrant_id` : UUID (FK vers `competition_entrants`, cascade).
-* `user_id` : UUID (Optionnel, FK vers `users`, nul si joueur invité sans compte).
-* `in_game_name` : String (Pseudo exact dans le jeu).
-* `in_game_id` : String (Identifiant en jeu : UID Free Fire, Tag Activision, etc.).
+* `user_id` : UUID (Nullable, pour les invités n'ayant pas de compte).
+* `in_game_name` : String (Pseudo du joueur en jeu).
+* `in_game_id` : String (Identifiant en jeu du joueur).
 * `role` : Enum (`CAPTAIN`, `STARTER`, `SUBSTITUTE`, `COACH`).
-* `is_verified` : Boolean.
+* `photo_url` : String (Nullable).
 
 ---
 
-### B. Découpage Structurel : Stages, Groups et Rounds
+### B. Confrontations Collectives (Inter-Régions, Clan Wars, Équipes vs Équipes)
 
-#### `competition_stages` (Les grandes étapes)
-* `id` : UUID.
-* `edition_id` : UUID.
-* `name` : String (ex. *"Phase de Groupes"*, *"Playoffs - Double Élimination"*, *"Lobby Final BR"*).
-* `stage_type` : Enum (`ROUND_ROBIN`, `SINGLE_ELIMINATION`, `DOUBLE_ELIMINATION`, `SWISS`, `BATTLE_ROYALE_LADDER`, `CUSTOM`).
-* `order` : Integer (1, 2, 3...).
-* `settings` : JSONB (Règles spécifiques d'avancée vers l'étape suivante).
+Pour modéliser une confrontation opposant la **Région Dakar** à la **Région Thiès**, où 5 sous-matchs ont lieu entre les joueurs des deux camps, le modèle utilise une relation hiérarchique parent/enfant :
 
-#### `competition_groups` (Les groupes de niveau / poules)
-* `id` : UUID.
-* `stage_id` : UUID.
-* `name` : String (ex. *"Poule A"*, *"Poule B"*, ou *"Arbre Principal"*).
-* `order` : Integer.
-* `settings` : JSONB (Barème de scoring propre au groupe).
-
-#### `competition_rounds` (Les journées / tours de jeu)
-Résout définitivement la surcharge des championnats !
-* `id` : UUID.
-* `stage_id` : UUID.
-* `round_number` : Integer (1, 2, 3...).
-* `name` : String (ex. *"Journée 1"*, *"Quarts de Finale"*, *"Manche 3"*).
-* `scheduled_date` : Timestamp.
-
----
-
-### C. Modèle Universel de Confrontation : `competition_encounters` & `encounter_opponents`
-
-#### `competition_encounters` (La Confrontation / Série)
+#### 1. `competition_encounters` (Rencontre Parent)
 * `id` : UUID.
 * `stage_id` : UUID.
 * `group_id` : UUID (Optionnel).
 * `round_id` : UUID (Optionnel).
-* `code` : String (ex. *"M01"*, *"WB-R1-M2"*).
-* `format` : Enum (`DUEL`, `FFA`).
-* `match_format` : Enum (`BEST_OF_1`, `BEST_OF_3`, `BEST_OF_5`, `TWO_LEGS_AGGREGATE`, `POINTS_ACCUMULATION`).
-* `status` : Enum (`PENDING`, `READY`, `IN_PROGRESS`, `COMPLETED`, `DISPUTED`, `CANCELLED`).
-* `scheduled_time` : Timestamp.
-* `winner_entrant_id` : UUID (Optionnel, raccourci pour les duels).
+* `encounter_type` : Enum (`DUEL`, `COLLECTIVE_FIXTURE`, `FFA_LOBBY`).
+* `aggregation_rule` : Enum (`MATCH_POINTS`, `SCORE_SUM`, `SERIES_WINS`, `TIED_POINTS_WITH_DECIDER`).
+  * `MATCH_POINTS` : Chaque sous-match rapporte des points (ex. 1 pt par victoire). Le camp qui a le plus de points gagne la rencontre.
+  * `SCORE_SUM` : Somme arithmétique des scores de tous les sous-matchs (ex. total des buts marqués).
+* `status` : Enum (`PENDING`, `SCHEDULED`, `LIVE`, `COMPLETED`, `DISPUTED`).
+* `winner_side_id` : UUID (Nullable, FK vers `encounter_sides`).
 
-#### `encounter_opponents` (La collection des N adversaires)
-Permet de modéliser un duel ($N=2$) comme un Battle Royale ($N=60$).
+#### 2. `encounter_sides` (Les Camps en Présence)
 * `id` : UUID.
 * `encounter_id` : UUID (FK vers `competition_encounters`).
-* `entrant_id` : UUID (Optionnel, null si slot d'arbre en attente de qualification).
-* `slot_origin` : JSONB (ex. `{"type": "WINNER_OF", "encounter_code": "M01"}` pour les brackets).
-* `position` : Integer (Position du slot : 1, 2 dans un duel ; 1 à 20 dans un BR).
-* `final_score` : Numeric (Score global de la confrontation, ex. 2 à 1 en BO3, ou 45 points en BR).
-* `final_rank` : Integer (1er, 2e, 3e... dans la confrontation).
-* `result` : Enum (`WIN`, `LOSS`, `DRAW`, `QUALIFIED`, `ELIMINATED`, `FORFEIT`).
+* `side_number` : Integer (1 = Côté Domicile / Camp A, 2 = Côté Extérieur / Camp B).
+* `name` : String (ex. *"Région Dakar"*, *"Clan Alpha"*).
+* `final_aggregated_score` : Numeric (Score global obtenu par le camp).
+* `result` : Enum (`WIN`, `LOSS`, `DRAW`).
 
----
-
-### D. Découpage en Manches Élémentaires : `encounter_games` & `game_participant_scores`
-
-#### `encounter_games` (La Manche / Carte)
+#### 3. `encounter_side_entrants` (Participants affectés à chaque camp)
 * `id` : UUID.
-* `encounter_id` : UUID.
-* `game_number` : Integer (1, 2, 3...).
-* `map_name` : String (ex. *"Bermuda"*, *"Standoff"*, *"Erangel"*).
-* `status` : Enum (`PENDING`, `IN_PROGRESS`, `COMPLETED`).
-* `proof_screenshot` : String.
-* `replay_data` : JSONB.
+* `side_id` : UUID (FK vers `encounter_sides`).
+* `entrant_id` : UUID (FK vers `competition_entrants`).
+* `role_in_side` : String (ex. *"Joueur 1"*, *"Capitaine"*, *"Duo A"*).
 
-#### `game_participant_scores` (Les statistiques par manche)
+#### 4. `encounter_matches` (Les Sous-Matchs Individuels Enfants)
 * `id` : UUID.
-* `game_id` : UUID.
-* `opponent_id` : UUID (FK vers `encounter_opponents`).
-* `score` : Integer (Score principal de la manche, ex. buts ou rounds gagnés).
-* `placement` : Integer (Pour les BR : rang de survie, ex. Top 1, Top 5).
-* `kills` : Integer (Pour les FPS/BR : éliminations réalisées).
-* `stats` : JSONB (Dégâts, temps de survie, passes décisives, etc.).
-* `calculated_points` : Numeric (Points attribués pour cette manche selon le barème).
+* `encounter_id` : UUID (FK vers `competition_encounters`).
+* `match_order` : Integer (Match 1, Match 2, Match 3...).
+* `title` : String (ex. *"Simple 1 (Dakar 1 vs Thiès 1)"*, *"Double Décisif"*).
+* `format` : Enum (`BEST_OF_1`, `BEST_OF_3`, `TWO_LEGS`).
+* `status` : Enum (`PENDING`, `COMPLETED`).
+* `points_value` : Numeric (Valeur du match dans l'agrégation, ex. 1 point ou 3 points pour le match des as).
 
 ---
 
-## 4. Diagrammes des Flux Fonctionnels
+### C. Slots de Bracket et Dépendances de Progression Relationnelles
 
-### A. Flux de Génération de Tournoi
+Pour bannir tout bricolage en JSON et fiabiliser la progression dans les arbres (Single Elimination, Double Elimination, Grand Finals et Bracket Reset) :
 
-```mermaid
-flowchart TD
-    A[Création Édition & Configuration] --> B[Clôture des Inscriptions & Check-in]
-    B --> C[Création des Entrants Officiels + Rosters figés]
-    C --> D[Initialisation du Stage 1]
-    D --> E{Type de Format?}
-    E -->|Poules / Championnat| F[Génération des Groupes & Calendrier des Rounds]
-    E -->|Élimination Directe| G[Génération de l'Arbre par Nœuds et Slots]
-    E -->|Battle Royale| H[Génération des Salons/Lobbies FFA de N escouades]
-    F --> I[Génération des Encounters & Opponents]
-    G --> I
-    H --> I
-    I --> J[Publication de la Structure / Reveal]
-```
+#### `match_slots` (Emplacements Relationnels d'un Match)
+* `id` : UUID.
+* `match_id` : UUID (FK vers `encounter_matches`).
+* `slot_position` : Integer (1 = Haut/Bleu, 2 = Bas/Rouge).
+* `assigned_entrant_id` : UUID (Nullable, FK vers `competition_entrants`).
+* **Source de Qualification Relationnelle (Colonnes strictes) :**
+  * `source_type` : Enum (`DIRECT_SEED`, `MATCH_WINNER`, `MATCH_LOSER`, `GROUP_RANK`, `CROSS_GROUP_RANK`, `BYE`, `MANUAL_OVERRIDE`).
+  * `source_match_id` : UUID (Nullable, FK vers `encounter_matches` pour `MATCH_WINNER` ou `MATCH_LOSER`).
+  * `source_group_id` : UUID (Nullable, FK vers `competition_groups` pour `GROUP_RANK`).
+  * `source_rank` : Integer (Nullable, ex. `1` pour le premier de poule, `2` pour le second).
+* `is_locked` : Boolean (Permet à un arbitre de figer un slot sans que l'algorithme ne l'écrase).
+* `score` : Integer (Score final de ce slot dans le match).
+* `is_winner` : Boolean.
 
-### B. Flux de Validation de Résultat et Progression
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Capitaine as Capitaine / Joueur
-    participant UI as Interface Match
-    participant Action as Server Action
-    participant Engine as Moteur de Scoring
-    participant Progression as Moteur de Progression
-    participant DB as Base de Données
-
-    Capitaine->>UI: Soumission scores des manches (Games) + Preuve
-    UI->>Action: submitEncounterResult(encounterId, gameScores)
-    Action->>Engine: Calculer scores agrégés selon barème (Football/BR/BO3)
-    Engine-->>Action: Opponents Résolus (Points, Rangs, Vainqueurs)
-    Action->>DB: Sauvegarde encounter_games & update encounter_opponents
-    Action->>Progression: progressTournamentAfterEncounter(encounterId)
-    Progression->>DB: Vérifier complétion du Round / Groupe / Stage
-    alt Si bracket éliminatoire
-        Progression->>DB: Propager le vainqueur vers le slot suivant
-    else Si poule terminée
-        Progression->>Engine: Calculer classement final de la poule
-        Progression->>DB: Propager les N premiers vers le Stage suivant
-    end
-    Progression-->>UI: Mise à jour temps réel + Notifications WhatsApp/Push
-```
+#### Gestion Avancée du Double Elimination et Bracket Reset
+* **Upper Bracket (Winner) :** Les vainqueurs progressent vers le tour supérieur de l'Upper Bracket (`source_type: MATCH_WINNER`).
+* **Lower Bracket (Loser) :** Les perdants de l'Upper descendent vers le tour correspondant du Lower Bracket (`source_type: MATCH_LOSER`).
+* **Grand Finals :** Slot 1 = Vainqueur Upper Bracket (`MATCH_WINNER`), Slot 2 = Vainqueur Lower Bracket (`MATCH_WINNER`).
+* **Bracket Reset Automatique :** Si le Slot 2 (venant du Lower Bracket) bat le Slot 1, un match additionnel pré-créé avec `is_conditional = true` s'active automatiquement pour déterminer le champion final.
 
 ---
 
-## 5. Support Natif des Formats selon la Discipline
+### D. Moteur de Règles Configurable en Base (Universal Rule Engine)
 
-### 1. Format Football / Sport (eFootball, EA Sports FC)
-* Confrontation en Duel ($N=2$) : match simple ou match Aller-Retour agrégé (`TWO_LEGS_AGGREGATE`).
-* Moteur de scoring : 3 points par victoire, 1 par nul, 0 par défaite. Départage : Points -> Confrontation directe -> Différence de buts -> Buts marqués.
+Plutôt que d'écrire une classe TypeScript pour chaque jeu, la configuration est entièrement stockée sous forme déclarative dans la table `competition_rulesets` :
 
-### 2. Format FPS / Arène par équipe (COD Mobile, Valorant)
-* Confrontation en Duel ($N=2$), match en Best-of-3 ou Best-of-5.
-* Chaque `game` représente une carte avec mode de jeu spécifique.
-* Score du match : nombre de cartes remportées.
+#### `competition_rulesets`
+* `id` : UUID.
+* `name` : String (ex. *"FIFA Standard 3-1-0"*, *"PUBG Mobile Esports Official"*, *"COD Mobile BO3"*).
+* `scoring_mode` : Enum (`POINTS_TABLE`, `METRIC_ACCUMULATION`, `SERIES_WINS`).
+* **Barème de base :**
+  * `points_for_win` : Numeric (ex. 3).
+  * `points_for_draw` : Numeric (ex. 1).
+  * `points_for_loss` : Numeric (ex. 0).
+* **Matrice de placement (Pour Battle Royale / Racing) :**
+  * `placement_points` : JSONB (ex. `{"1": 12, "2": 9, "3": 8, "4": 7, "5": 6, "6": 5, "7": 4, "8": 3, "9": 2, "10": 1}`).
+* **Multiplicateurs de métriques brutes :**
+  * `metric_multipliers` : JSONB (ex. `{"kills": 1, "lap_bonus": 2}`).
+* **Chaîne ordonnée de critères de départage (`tiebreaker_chain`) :**
+  * Liste ordonnée de critères évalués successivement :
+    `["POINTS", "HEAD_TO_HEAD", "GOAL_DIFF", "WINS_COUNT", "GOALS_FOR", "LAST_GAME_PLACEMENT"]`.
+* **Règles de qualification :**
+  * `advance_count` : Nombre de qualifiés par groupe.
+  * `cross_group_best_count` : Nombre de "meilleurs troisièmes" qualifiés transversalement.
 
-### 3. Format Battle Royale (PUBG Mobile, Free Fire)
-* Confrontation en mode FFA ($N=16$ à $25$ escouades).
-* Série de 4 ou 6 manches (`games`) sur des cartes différentes (ex. Bermuda, Purgatory, Kalahari).
-* Barème officiel esports :
-  * Top 1 : 12 pts, Top 2 : 9 pts, Top 3 : 8 pts, Top 4 : 7 pts, Top 5 : 6 pts, etc.
-  * Chaque kill = 1 pt supplémentaire.
-* Le vainqueur de la confrontation est l'escouade ayant accumulé le plus de points sur l'ensemble des manches.
+Un **Universal Rule Evaluator** unique en TypeScript applique cette configuration de façon déterministe. L'organisateur ajuste ses curseurs depuis son interface sans qu'aucune ligne de code ne soit déployée.
 
-### 4. Format Course / Racing (Asphalt 9)
-* Poule de 8 coureurs ($N=8$).
-* Série de 3 courses.
-* Barème par position (1er: 10 pts, 2e: 8 pts, 3e: 6 pts, etc.) avec conservation des chronomètres au millième en métadonnées.
+---
+
+## 4. Exemples Concrets d'Instanciation
+
+### Exemple 1 : Duel 1v1 eFootball avec Club Cosmétique
+* **Entrant :** Joueur solo Amadou (`user_id: usr_123`, `name: "Amadou99"`, `in_game_club: "FC Barcelone"`).
+* **Match :** 1 match, 2 `match_slots`. Score final : 3 - 1.
+* **Scoring :** Barème Sports standard (3 pts pour Amadou).
+
+### Exemple 2 : Match par Équipes COD Mobile 5v5 en Best-of-3
+* **Entrants :** Deux clubs compétitifs : FC Douane (`team_id: tm_1`) vs Dakar E-Club (`team_id: tm_2`).
+* **Rosters :** 5 titulaires + 1 remplaçant figés dans `entrant_roster_members`.
+* **Match :** 1 confrontation, 3 `match_games` (Carte 1: Hardpoint, Carte 2: SnD, Carte 3: Control).
+* **Score :** Résolu en `SERIES_WINS` (FC Douane gagne 2 à 1).
+
+### Exemple 3 : Manche de Battle Royale Free Fire (12 Escouades)
+* **Entrants :** 12 escouades de 4 joueurs.
+* **Encounter :** 1 confrontation FFA regroupant les 12 escouades.
+* **Résultat Manche 1 :**
+  * Escouade A : Top 1 (12 pts) + 8 kills (8 pts) = 20 pts.
+  * Escouade B : Top 2 (9 pts) + 12 kills (12 pts) = 21 pts (Leader au score malgré le Top 2).
+* Le Rule Engine calcule automatiquement les totaux sans code spécifique.
+
+### Exemple 4 : Confrontation Collective Inter-Régions (Dakar vs Thiès)
+* **Encounter :** `COLLECTIVE_FIXTURE`, `aggregation_rule: MATCH_POINTS`.
+* **Side 1 :** Région Dakar (composée de 5 entrants).
+* **Side 2 :** Région Thiès (composée de 5 entrants).
+* **5 Matchs individuels :**
+  * Match 1 : Dakar 1 bat Thiès 1 (Dakar : 1 pt)
+  * Match 2 : Thiès 2 bat Dakar 2 (Thiès : 1 pt)
+  * Match 3 : Dakar 3 bat Thiès 3 (Dakar : 1 pt)
+  * Match 4 : Thiès 4 bat Dakar 4 (Thiès : 1 pt)
+  * Match 5 : Dakar 5 bat Thiès 5 (Dakar : 1 pt)
+* **Score global agrégé :** Région Dakar remporte la confrontation 3 à 2.
