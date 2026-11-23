@@ -32,7 +32,7 @@ export interface PasskeyProof {
   assertion: unknown;
 }
 
-export function computePasskeyTransactionHash(params: PasskeyChallengeParams): string {
+function computePasskeyTransactionHash(params: PasskeyChallengeParams): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
