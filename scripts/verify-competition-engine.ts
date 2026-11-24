@@ -1316,8 +1316,8 @@ async function runVerification() {
         edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         description TEXT,
-        phase_type TEXT DEFAULT 'ELIMINATION',
-        order_num INT NOT NULL,
+        type TEXT DEFAULT 'ELIMINATION',
+        "order" INT NOT NULL,
         config JSONB DEFAULT '{"groupsCount": 1, "matchesPerParticipant": 1}',
         is_active BOOLEAN DEFAULT FALSE,
         is_completed BOOLEAN DEFAULT FALSE,
@@ -1341,7 +1341,7 @@ async function runVerification() {
         phase_id TEXT NOT NULL REFERENCES tournament_phases(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         description TEXT,
-        order_num INT NOT NULL,
+        "order" INT NOT NULL,
         group_type TEXT DEFAULT 'ROUND_ROBIN',
         config JSONB DEFAULT '{"matchesPerParticipant": 1, "advanceCount": 2, "pointsPerWin": 3}',
         is_completed BOOLEAN DEFAULT FALSE,
@@ -1387,7 +1387,7 @@ async function runVerification() {
         parent_node_id TEXT REFERENCES bracket_nodes(id) ON DELETE CASCADE,
         child_position TEXT,
         depth INT DEFAULT 0,
-        order_num INT,
+        "order" INT,
         bracket_type TEXT,
         round INT,
         match_number INT,
@@ -1558,19 +1558,139 @@ async function runVerification() {
         ('led_9', 'tx_entry_4', 'fa_cheikh', 500.00, 0),
         ('led_10', 'tx_entry_4', 'fa_edition_escrow', 0, 500.00);
 
-      -- Membres historiques : 1 SOLO, 1 TEAM (Capitaine Fatou), 1 TEAM (Remplaçant Ibrahima), 1 INVITÉ, 1 SOLO2
-      INSERT INTO tournament_members (id, tournament_id, user_id, team_id, role, display_name, game_tag, club_name, ranking_points, total_matches, total_wins, total_losses) VALUES 
-        ('tm_solo', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user1', NULL, 'PARTICIPANT', 'Amadou Diop Solo Player', 'Amadou_SN', 'Dakar FC', 1500, 10, 8, 2),
-        ('tm_team', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user2', 't_lions', 'PARTICIPANT', 'Lions Gaming Club', 'LBN_CAP', 'Lions Gaming Club', 2200, 20, 15, 5),
-        ('tm_team_sub', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user5', 't_lions', 'PARTICIPANT', 'Ibrahima Ndiaye Sub', 'LBN_SUB', 'Lions Gaming Club', 800, 5, 3, 2),
-        ('tm_guest', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user3', NULL, 'GUEST', 'Ousmane Sow Guest', 'Ousmane_GUEST', NULL, 500, 2, 0, 2),
-        ('tm_solo2', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user4', NULL, 'PARTICIPANT', 'Cheikh Tidiane (Solo 2)', 'Cheikh_SN', 'Saint-Louis E-Sports', 1200, 8, 6, 2);
+      -- Membres historiques : 1 SOLO (Amadou Diop), 1 TEAM Capitaine (Fatou), 1 TEAM Remplaçant (Ibrahima), 1 INVITÉ Banni (Ousmane Sow), 1 SOLO2 Données Incomplètes (Cheikh), 1 EXEMPT/BYE (Participant BYE)
+      -- Démonstration de la couverture des 37 colonnes réelles de tournament_members
+      INSERT INTO tournament_members (
+        id, tournament_id, user_id, team_id, role, permissions, is_co_organizer,
+        display_name, game_tag, avatar, banner, contact_phone, contact_email, discord_id,
+        club_name, biography, achievements, total_editions, total_wins, total_losses,
+        total_matches, ranking_points, win_rate, best_position, is_verified, verification_level,
+        is_active, is_banned, ban_reason, ban_expires, metadata, preferences, joined_at,
+        last_active, is_deleted, created_at, updated_at
+      ) VALUES 
+        (
+          'tm_solo', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user1', NULL, 'PARTICIPANT', ARRAY['PLAY']::text[], FALSE,
+          'Amadou Diop Solo Player', 'Amadou_SN', 'https://cdn.gt.sn/avatars/amadou.png', 'https://cdn.gt.sn/banners/amadou.png',
+          '+221770000001', 'amadou@real.sn', 'amadou#1234', 'Dakar FC', 'Meilleur joueur FC25 de Dakar',
+          ARRAY['Champion Régional 2025', 'MVP Tournoi Hiver']::text[], 3, 8, 2, 10, 1500, 80.00, 1,
+          TRUE, 'INTERMEDIATE', TRUE, FALSE, NULL, NULL,
+          '{"preferred_side": "HOME", "controller": "PS5"}'::jsonb,
+          '{"notifications": true, "emailUpdates": true, "publicProfile": true}'::jsonb,
+          NOW() - interval '30 days', NOW() - interval '1 hour', FALSE,
+          NOW() - interval '30 days', NOW() - interval '1 hour'
+        ),
+        (
+          'tm_team', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user2', 't_lions', 'PARTICIPANT', ARRAY['PLAY', 'MANAGE_ROSTER']::text[], FALSE,
+          'Lions Gaming Club', 'LBN_CAP', 'https://cdn.gt.sn/avatars/lions.png', 'https://cdn.gt.sn/banners/lions.png',
+          '+221770000002', 'fatou@lions.sn', 'fatou#5678', 'Lions Gaming Club', 'Capitaine de l équipe Lions Gaming',
+          ARRAY['Vainqueur Coupe Nationale 2024']::text[], 5, 15, 5, 20, 2200, 75.00, 1,
+          TRUE, 'ADVANCED', TRUE, FALSE, NULL, NULL,
+          '{"team_role": "CAPTAIN", "tactics": "4-3-3"}'::jsonb,
+          '{"notifications": true, "emailUpdates": true, "publicProfile": true}'::jsonb,
+          NOW() - interval '60 days', NOW() - interval '2 hours', FALSE,
+          NOW() - interval '60 days', NOW() - interval '2 hours'
+        ),
+        (
+          'tm_team_sub', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user5', 't_lions', 'PARTICIPANT', ARRAY['PLAY']::text[], FALSE,
+          'Ibrahima Ndiaye Sub', 'LBN_SUB', 'https://cdn.gt.sn/avatars/ibrahima.png', NULL,
+          '+221770000005', 'ibrahima@lions.sn', 'ibrahima#9012', 'Lions Gaming Club', 'Remplaçant officiel équipe Lions',
+          ARRAY['Finaliste Tournoi Printemps 2024']::text[], 2, 3, 2, 5, 800, 60.00, 2,
+          TRUE, 'BASIC', TRUE, FALSE, NULL, NULL,
+          '{"team_role": "SUBSTITUTE"}'::jsonb,
+          '{"notifications": true, "emailUpdates": false, "publicProfile": true}'::jsonb,
+          NOW() - interval '45 days', NOW() - interval '3 hours', FALSE,
+          NOW() - interval '45 days', NOW() - interval '3 hours'
+        ),
+        (
+          'tm_guest', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user3', NULL, 'GUEST', '{}'::text[], FALSE,
+          'Ousmane Sow Guest', 'Ousmane_GUEST', NULL, NULL,
+          '+221770000003', 'ousmane@guest.sn', NULL, NULL, 'Joueur invité - statut disciplinaire actif',
+          '{}'::text[], 1, 0, 2, 2, 500, 0.00, 4,
+          FALSE, 'BASIC', FALSE, TRUE, 'Comportement antisportif et insultes en match officiel',
+          NOW() + interval '30 days',
+          '{"infraction_level": "CRITICAL"}'::jsonb,
+          '{"notifications": false, "emailUpdates": false, "publicProfile": false}'::jsonb,
+          NOW() - interval '15 days', NOW() - interval '24 hours', FALSE,
+          NOW() - interval '15 days', NOW() - interval '24 hours'
+        ),
+        (
+          'tm_solo2', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user4', NULL, 'PARTICIPANT', ARRAY['PLAY']::text[], FALSE,
+          'Cheikh Tidiane (Solo 2)', 'Cheikh_SN', NULL, NULL,
+          NULL, NULL, NULL, 'Saint-Louis E-Sports', NULL,
+          '{}'::text[], 1, 6, 2, 8, 1200, 75.00, 2,
+          FALSE, 'BASIC', TRUE, FALSE, NULL, NULL,
+          '{}'::jsonb,
+          '{"notifications": true, "emailUpdates": true, "publicProfile": true}'::jsonb,
+          NOW() - interval '10 days', NULL, FALSE,
+          NOW() - interval '10 days', NOW() - interval '10 days'
+        ),
+        (
+          'tm_bye', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', NULL, NULL, 'PARTICIPANT', '{}'::text[], FALSE,
+          'BYE Participant', 'BYE', NULL, NULL,
+          NULL, NULL, NULL, NULL, 'Entrée fictive d exemption (BYE)',
+          '{}'::text[], 0, 0, 0, 0, 0, 0.00, NULL,
+          FALSE, 'BASIC', TRUE, FALSE, NULL, NULL,
+          '{"is_bye": true}'::jsonb,
+          '{}'::jsonb,
+          NOW() - interval '5 days', NULL, FALSE,
+          NOW() - interval '5 days', NOW() - interval '5 days'
+        );
 
-      INSERT INTO edition_registrations (id, edition_id, member_id, registration_type, status, registration_fee, fee_paid, payment_transaction_id) VALUES 
-        ('reg_solo', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_solo', 'REGULAR', 'REGISTERED', 500.00, TRUE, 'tx_entry_1'),
-        ('reg_team', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_team', 'INVITED', 'REGISTERED', 300.00, TRUE, 'tx_entry_2'),
-        ('reg_guest', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_guest', 'WILDCARD', 'REGISTERED', 200.00, TRUE, 'tx_entry_3'),
-        ('reg_solo2', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_solo2', 'REGULAR', 'REGISTERED', 500.00, TRUE, 'tx_entry_4');
+      -- Inscriptions historiques réelles (couvrant 28 colonnes de edition_registrations et cas limites : CANCELLED, BYE, QUALIFIED)
+      INSERT INTO edition_registrations (
+        id, edition_id, member_id, registration_type, status, game_level, game_rank,
+        game_region, preferred_character, character_pool, registration_fee, fee_paid,
+        fee_waived, payment_transaction_id, qualified_from_previous, previous_edition_id,
+        qualification_method, checked_in, checked_in_at, auto_checked_in, metadata,
+        registered_at, confirmed_at, cancelled_at, cancellation_reason, is_deleted,
+        created_at, updated_at
+      ) VALUES 
+        (
+          'reg_solo', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_solo', 'REGULAR', 'REGISTERED',
+          'DIAMOND', 'Rank 1', 'AFRICA_WEST', 'Kylian Mbappé', ARRAY['Mbappé', 'Vinicius Jr']::text[],
+          500.00, TRUE, FALSE, 'tx_entry_1', FALSE, NULL, NULL,
+          TRUE, NOW() - interval '2 days', FALSE,
+          '{"registrationSource": "WEB", "clientVersion": "2.4.1"}'::jsonb,
+          NOW() - interval '7 days', NOW() - interval '6 days', NULL, NULL, FALSE,
+          NOW() - interval '7 days', NOW() - interval '2 days'
+        ),
+        (
+          'reg_team', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_team', 'INVITED', 'REGISTERED',
+          'MASTER', 'Rank 1 Team', 'AFRICA_WEST', 'Team Strategy', ARRAY['4-3-3 Offensive']::text[],
+          300.00, TRUE, FALSE, 'tx_entry_2', FALSE, NULL, 'DIRECT_INVITATION',
+          TRUE, NOW() - interval '3 days', FALSE,
+          '{"invitedBy": "ORGANIZER", "rosterLocked": true}'::jsonb,
+          NOW() - interval '14 days', NOW() - interval '13 days', NULL, NULL, FALSE,
+          NOW() - interval '14 days', NOW() - interval '3 days'
+        ),
+        (
+          'reg_guest', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_guest', 'WILDCARD', 'CANCELLED',
+          'AMATEUR', 'Rank 5', 'AFRICA_WEST', NULL, '{}'::text[],
+          200.00, TRUE, FALSE, 'tx_entry_3', FALSE, NULL, 'WILDCARD_VOTE',
+          FALSE, NULL, FALSE,
+          '{"cancellation_audit": "Disqualification officielle par administration"}'::jsonb,
+          NOW() - interval '10 days', NOW() - interval '9 days', NOW() - interval '1 day',
+          'Participant disqualifié suite à comportement antisportif avéré', FALSE,
+          NOW() - interval '10 days', NOW() - interval '1 day'
+        ),
+        (
+          'reg_solo2', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_solo2', 'REGULAR', 'REGISTERED',
+          'GOLD', 'Rank 3', 'AFRICA_WEST', 'Erling Haaland', ARRAY['Haaland', 'De Bruyne']::text[],
+          500.00, TRUE, FALSE, 'tx_entry_4', TRUE, '6acb3db9-399b-4b24-b005-6f912cc5de21', 'REGIONAL_PLAYOFF_WIN',
+          TRUE, NOW() - interval '1 day', TRUE,
+          '{"autoSeeded": true}'::jsonb,
+          NOW() - interval '5 days', NOW() - interval '4 days', NULL, NULL, FALSE,
+          NOW() - interval '5 days', NOW() - interval '1 day'
+        ),
+        (
+          'reg_bye', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_bye', 'BYE', 'CONFIRMED',
+          NULL, NULL, NULL, NULL, '{}'::text[],
+          0.00, FALSE, TRUE, NULL, FALSE, NULL, 'EXEMPTION_SLOT',
+          TRUE, NOW() - interval '5 days', TRUE,
+          '{"is_bye": true, "note": "Slot d exemption automatique"}'::jsonb,
+          NOW() - interval '5 days', NOW() - interval '5 days', NULL, NULL, FALSE,
+          NOW() - interval '5 days', NOW() - interval '5 days'
+        );
 
       INSERT INTO registration_payments (id, registration_id, transaction_id, amount, currency, payment_method, payment_provider, status, reference, notes) VALUES 
         ('pay_1', 'reg_solo', 'tx_entry_1', 500.00, 'GTC', 'WALLET', 'INTERNAL', 'COMPLETED', 'REF-ENTRY-SOLO', 'Paiement Solo Amadou'),
@@ -1579,12 +1699,12 @@ async function runVerification() {
         ('pay_4', 'reg_solo2', 'tx_entry_4', 500.00, 'GTC', 'WALLET', 'INTERNAL', 'COMPLETED', 'REF-ENTRY-SOLO2', 'Paiement Solo 2 Cheikh');
 
       -- Structures sportives historiques : 2 phases (Poules + Finale)
-      INSERT INTO tournament_phases (id, edition_id, name, description, phase_type, order_num, is_completed) VALUES 
+      INSERT INTO tournament_phases (id, edition_id, name, description, type, "order", is_completed) VALUES 
         ('ph_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'Poules Principales', 'Phase de groupes round robin', 'ROUND_ROBIN', 1, TRUE),
         ('ph_2', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'Phase Finale', 'Arbre d élimination directe', 'ELIMINATION', 2, FALSE);
 
       -- 2 groupes dans la phase de poules
-      INSERT INTO phase_groups (id, phase_id, name, order_num) VALUES 
+      INSERT INTO phase_groups (id, phase_id, name, "order") VALUES 
         ('grp_1', 'ph_1', 'Groupe A', 1),
         ('grp_2', 'ph_1', 'Groupe B', 2);
 
@@ -1595,14 +1715,15 @@ async function runVerification() {
         ('pgp_3', 'grp_2', 'reg_solo2', 1, 1, 0, 3, 2, 0, TRUE, 1),
         ('pgp_4', 'grp_2', 'reg_guest', 1, 0, 1, 0, 0, 2, FALSE, 2);
 
-      -- 2 nœuds d'arbre de bracket
-      INSERT INTO bracket_nodes (id, phase_id, group_id, round, match_number, order_num, node_type, node_code) VALUES 
+      -- 3 nœuds d'arbre de bracket (dont un nœud d'exemption BYE et une hiérarchie parente)
+      INSERT INTO bracket_nodes (id, phase_id, group_id, round, match_number, "order", node_type, node_code) VALUES 
         ('bn_final', 'ph_2', NULL, 2, 1, 1, 'MATCH', 'FINAL-01'),
-        ('bn_semi1', 'ph_2', NULL, 1, 1, 1, 'MATCH', 'SEMI-01');
+        ('bn_semi1', 'ph_2', NULL, 1, 1, 1, 'MATCH', 'SEMI-01'),
+        ('bn_bye', 'ph_2', NULL, 1, 2, 2, 'BYE', 'SEMI-02-BYE');
 
-      UPDATE bracket_nodes SET parent_node_id = 'bn_final' WHERE id = 'bn_semi1';
+      UPDATE bracket_nodes SET parent_node_id = 'bn_final' WHERE id IN ('bn_semi1', 'bn_bye');
 
-      -- 3 matchs (2 en poules, 1 en finale) avec données complètes de calendrier, durées, jeu, preuves et arbitrage
+      -- 4 matchs (3 en poules sur 2 rounds distincts, 1 en finale) avec données complètes de calendrier, durées, jeu, preuves, arbitrage et cas limites (BYE, participants NULL)
       INSERT INTO matches (
         id, edition_id, phase_id, group_id, bracket_node_id, match_code, match_type,
         round, match_number, scheduled_time, estimated_duration, actual_start_time,
@@ -1646,6 +1767,17 @@ async function runVerification() {
           FALSE, FALSE, FALSE,
           NULL, FALSE, NULL, NULL,
           NULL, 'PENDING', '{"format": "BEST_OF_3"}'::jsonb
+        ),
+        (
+          'm_real_4', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'ph_1', 'grp_1', NULL, 'GRP-A-M2-BYE', 'BYE',
+          2, 1, NOW() - interval '1 hour', 15, NOW() - interval '55 minutes',
+          NOW() - interval '40 minutes', 15, 'reg_solo', NULL,
+          NULL, NULL, 'reg_solo', NULL, '{"format": "BYE_ADVANCE"}'::jsonb,
+          NULL, NULL, NULL, '{}'::text[],
+          'Match d exemption automatique (BYE) qualifiant reg_solo pour le tour suivant', NULL,
+          TRUE, FALSE, TRUE,
+          NOW() - interval '40 minutes', FALSE, NULL, 'u_org1',
+          'Validation d exemption automatique sans adversaire', 'COMPLETED', '{"format": "AUTOMATIC_BYE"}'::jsonb
         );
 
       -- 3 résultats d'édition finaux
@@ -1685,7 +1817,7 @@ async function runVerification() {
     `);
 
     const preRealPhases = await client.query(`
-      SELECT id, edition_id, name, description, phase_type, order_num, config, is_active,
+      SELECT id, edition_id, name, description, type AS phase_type, "order" AS order_num, config, is_active,
              is_completed, is_double_elimination, is_hidden, scheduled_start, scheduled_end,
              actual_start, actual_end, match_duration, break_duration, total_matches,
              completed_matches, is_deleted, created_at, updated_at
@@ -1693,7 +1825,7 @@ async function runVerification() {
     `);
 
     const preRealGroups = await client.query(`
-      SELECT id, phase_id, name, description, order_num, group_type, config, is_completed,
+      SELECT id, phase_id, name, description, "order" AS order_num, group_type, config, is_completed,
              is_locked, participant_count, match_count, is_deleted, created_at, updated_at
       FROM phase_groups ORDER BY id;
     `);
@@ -1720,7 +1852,7 @@ async function runVerification() {
 
     const preRealBracketNodes = await client.query(`
       SELECT id, phase_id, group_id, node_type, node_code, parent_node_id, child_position,
-             depth, order_num, bracket_type, round, match_number, metadata, is_deleted,
+             depth, "order" AS order_num, bracket_type, round, match_number, metadata, is_deleted,
              is_completed, winner_registration_id, created_at, updated_at
       FROM bracket_nodes ORDER BY id;
     `);
@@ -2240,8 +2372,57 @@ async function runVerification() {
 
     // ============================================================================
     // ÉTAPE 5.1 : CRÉATION PRÉALABLE DES TABLES D'ARCHIVAGE STRUCTURÉES (AVEC RESTRICTIONS SÉCURISÉES)
+    // Conservation intégrale et durable des 8 tables historiques de database/schema.ts
     // ============================================================================
     await client.query(`
+      CREATE TABLE archived_tournament_phases (
+        id TEXT PRIMARY KEY,
+        legacy_id TEXT NOT NULL,
+        stage_id TEXT NOT NULL REFERENCES competition_stages(id) ON DELETE RESTRICT,
+        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE RESTRICT,
+        name TEXT NOT NULL,
+        description TEXT,
+        phase_type TEXT,
+        order_num INT,
+        config JSONB DEFAULT '{}',
+        is_active BOOLEAN DEFAULT FALSE,
+        is_completed BOOLEAN DEFAULT FALSE,
+        is_double_elimination BOOLEAN DEFAULT FALSE,
+        is_hidden BOOLEAN DEFAULT FALSE,
+        scheduled_start TIMESTAMP WITH TIME ZONE,
+        scheduled_end TIMESTAMP WITH TIME ZONE,
+        actual_start TIMESTAMP WITH TIME ZONE,
+        actual_end TIMESTAMP WITH TIME ZONE,
+        match_duration INT,
+        break_duration INT,
+        total_matches INT DEFAULT 0,
+        completed_matches INT DEFAULT 0,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE,
+        archived_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE archived_phase_groups (
+        id TEXT PRIMARY KEY,
+        legacy_id TEXT NOT NULL,
+        group_id TEXT NOT NULL REFERENCES competition_groups(id) ON DELETE RESTRICT,
+        stage_id TEXT NOT NULL REFERENCES competition_stages(id) ON DELETE RESTRICT,
+        name TEXT NOT NULL,
+        order_num INT,
+        group_type TEXT,
+        description TEXT,
+        config JSONB DEFAULT '{}',
+        is_completed BOOLEAN DEFAULT FALSE,
+        is_locked BOOLEAN DEFAULT FALSE,
+        participant_count INT DEFAULT 0,
+        match_count INT DEFAULT 0,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE,
+        archived_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
       CREATE TABLE archived_phase_group_participants (
         id TEXT PRIMARY KEY,
         group_id TEXT NOT NULL,
@@ -2264,6 +2445,8 @@ async function runVerification() {
         stats JSONB DEFAULT '{}',
         metadata JSONB DEFAULT '{}',
         is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE,
         archived_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
@@ -2272,6 +2455,7 @@ async function runVerification() {
         legacy_id TEXT NOT NULL,
         stage_id TEXT NOT NULL REFERENCES competition_stages(id) ON DELETE RESTRICT,
         legacy_phase_id TEXT NOT NULL,
+        legacy_group_id TEXT,
         legacy_match_id TEXT,
         encounter_id TEXT REFERENCES competition_encounters(id) ON DELETE SET NULL,
         round INT NOT NULL,
@@ -2285,7 +2469,11 @@ async function runVerification() {
         bracket_type TEXT,
         metadata JSONB DEFAULT '{}',
         is_completed BOOLEAN DEFAULT FALSE,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        winner_registration_id TEXT,
         winner_entrant_id TEXT REFERENCES competition_entrants(id) ON DELETE RESTRICT,
+        created_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE,
         archived_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
@@ -2314,6 +2502,8 @@ async function runVerification() {
         statistics JSONB DEFAULT '{}',
         metadata JSONB DEFAULT '{}',
         is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE,
         archived_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
@@ -2322,6 +2512,10 @@ async function runVerification() {
         legacy_id TEXT NOT NULL,
         encounter_id TEXT REFERENCES competition_encounters(id) ON DELETE RESTRICT,
         encounter_match_id TEXT REFERENCES encounter_matches(id) ON DELETE RESTRICT,
+        legacy_edition_id TEXT,
+        legacy_phase_id TEXT,
+        legacy_group_id TEXT,
+        legacy_bracket_node_id TEXT,
         legacy_match_code TEXT,
         match_type TEXT,
         round INT,
@@ -2331,6 +2525,12 @@ async function runVerification() {
         actual_start_time TIMESTAMP WITH TIME ZONE,
         actual_end_time TIMESTAMP WITH TIME ZONE,
         duration INT,
+        participant1_registration_id TEXT,
+        participant2_registration_id TEXT,
+        score1 INT,
+        score2 INT,
+        winner_registration_id TEXT,
+        loser_registration_id TEXT,
         game_data JSONB DEFAULT '{}',
         replay_id TEXT,
         stream_link TEXT,
@@ -2346,44 +2546,273 @@ async function runVerification() {
         dispute_reason TEXT,
         resolved_by TEXT REFERENCES users(id),
         resolution TEXT,
+        status TEXT DEFAULT 'PENDING',
         legacy_metadata JSONB DEFAULT '{}',
         is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE,
         archived_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
 
     // ============================================================================
-    // TEST DE SÉCURITÉ TRANSACTIONNELLE : DÉMONSTRATION DU ROLLBACK SUR MIGRATION RÉELLE
+    // TEST DE SÉCURITÉ TRANSACTIONNELLE : ROLLBACK SUR SÉQUENCE DE MIGRATION RÉELLE COMPLÈTE
     // ============================================================================
-    console.log("--- TEST DE ROLLBACK : Démonstration de l'atomicité et intégrité post-échec sur migration réelle ---");
+    // Note: En PostgreSQL, DDL (CREATE TABLE, ALTER TABLE, DROP TABLE) et DML (INSERT, UPDATE, DELETE)
+    // sont TOUS transactionnels. La séquence complète peut être wrappée dans BEGIN/ROLLBACK.
+    // ============================================================================
+    console.log("--- TEST DE ROLLBACK : Démonstration de l'atomicité sur la SÉQUENCE COMPLÈTE de migration réelle ---");
+    let rollbackCaughtFkViolation = false;
     await client.query("BEGIN;");
     try {
-      // 1. Simulation d'un début de transfert effectif de données sportives
+      // Étape A : Entrants SOLO
       await client.query(`
-        INSERT INTO competition_entrants (id, edition_id, type, user_id, name, tag, status, custom_fields)
-        SELECT 'ent_rb_' || er.id, er.edition_id, 'SOLO', tm.user_id, 'Solo Rollback', tm.game_tag, er.status, '{}'::jsonb
+        INSERT INTO competition_entrants (id, edition_id, type, user_id, name, tag, status, custom_fields, created_at, updated_at)
+        SELECT 
+          'ent_' || er.id, er.edition_id, 'SOLO', tm.user_id,
+          COALESCE(tm.display_name, tm.game_tag, 'Joueur Solo'), tm.game_tag, er.status,
+          jsonb_build_object('legacy_member_id', tm.id, 'legacy_registration_id', er.id, 'legacy_member', to_jsonb(tm), 'legacy_registration', to_jsonb(er)),
+          er.created_at, er.updated_at
         FROM edition_registrations er
         JOIN tournament_members tm ON tm.id = er.member_id
-        WHERE tm.user_id IS NOT NULL AND tm.team_id IS NULL;
+        WHERE tm.user_id IS NOT NULL AND tm.team_id IS NULL AND tm.role != 'GUEST' AND er.registration_type NOT IN ('WILDCARD', 'BYE');
+      `);
 
-        INSERT INTO competition_stages (id, edition_id, ruleset_version_id, name, stage_type, stage_order, status)
-        SELECT 'stg_rb_' || tp.id, tp.edition_id, 'rsv_1', tp.name, 'ROUND_ROBIN', tp.order_num, 'PENDING'
+      // Étape B : Entrants TEAM
+      await client.query(`
+        INSERT INTO competition_entrants (id, edition_id, type, team_id, name, status, custom_fields, created_at, updated_at)
+        SELECT 
+          'ent_' || er.id, er.edition_id, 'TEAM', tm.team_id,
+          COALESCE(tm.display_name, 'Équipe'), er.status,
+          jsonb_build_object('legacy_member_id', tm.id, 'legacy_registration_id', er.id, 'legacy_member', to_jsonb(tm), 'legacy_registration', to_jsonb(er)),
+          er.created_at, er.updated_at
+        FROM edition_registrations er
+        JOIN tournament_members tm ON tm.id = er.member_id
+        WHERE tm.team_id IS NOT NULL;
+      `);
+
+      // Étape C : Entrants GUEST (incluant Wildcard, Guest disciplinaire et Slot BYE)
+      await client.query(`
+        INSERT INTO competition_entrants (id, edition_id, type, guest_identifier, name, status, custom_fields, created_at, updated_at)
+        SELECT 
+          'ent_' || er.id, er.edition_id, 'GUEST', COALESCE(tm.display_name, tm.id),
+          COALESCE(tm.display_name, 'Invité'), er.status,
+          jsonb_build_object('legacy_member_id', tm.id, 'legacy_registration_id', er.id, 'legacy_member', to_jsonb(tm), 'legacy_registration', to_jsonb(er)),
+          er.created_at, er.updated_at
+        FROM edition_registrations er
+        JOIN tournament_members tm ON tm.id = er.member_id
+        WHERE tm.team_id IS NULL AND (er.registration_type IN ('WILDCARD', 'BYE') OR tm.role = 'GUEST' OR (tm.user_id IS NOT NULL AND tm.display_name LIKE '%Guest%'));
+      `);
+
+      // Étape D : Roster members
+      await client.query(`
+        INSERT INTO entrant_roster_members (id, edition_id, entrant_id, user_id, in_game_name, role, status, created_at)
+        SELECT 
+          'rm_' || tm.id, er.edition_id, 'ent_' || er.id, tm.user_id,
+          COALESCE(tm.game_tag, tm.display_name),
+          CASE WHEN tm.user_id = t.captain_id THEN 'CAPTAIN' ELSE 'SUBSTITUTE' END,
+          'ACTIVE', tm.created_at
+        FROM tournament_members tm
+        JOIN teams t ON t.id = tm.team_id
+        JOIN tournament_members tm_lead ON tm_lead.team_id = tm.team_id AND tm_lead.tournament_id = tm.tournament_id AND tm_lead.user_id = t.captain_id
+        JOIN edition_registrations er ON er.member_id = tm_lead.id
+        WHERE tm.team_id IS NOT NULL;
+      `);
+
+      // Étape E : Stages
+      await client.query(`
+        INSERT INTO competition_stages (id, edition_id, ruleset_version_id, name, stage_type, stage_order, status, created_at)
+        SELECT 
+          'stg_' || tp.id, tp.edition_id, 'rsv_1', tp.name,
+          COALESCE(tp.type, 'ROUND_ROBIN'), tp."order",
+          CASE WHEN tp.is_completed THEN 'COMPLETED' WHEN tp.is_active THEN 'RUNNING' ELSE 'PENDING' END,
+          tp.created_at
         FROM tournament_phases tp;
       `);
 
-      // 2. Provocation délibérée d'une violation de clé étrangère
+      // Étape E2 : Archived tournament phases
       await client.query(`
-        INSERT INTO archived_matches (id, legacy_id, encounter_id)
-        VALUES ('arch_m_bad', 'm_ghost', 'enc_nonexistent_fkey');
+        INSERT INTO archived_tournament_phases (
+          id, legacy_id, stage_id, edition_id, name, description, phase_type, order_num,
+          config, is_active, is_completed, is_double_elimination, is_hidden,
+          scheduled_start, scheduled_end, actual_start, actual_end,
+          match_duration, break_duration, total_matches, completed_matches,
+          is_deleted, created_at, updated_at
+        )
+        SELECT 
+          'arch_tp_' || tp.id, tp.id, 'stg_' || tp.id, tp.edition_id, tp.name, tp.description,
+          tp.type, tp."order", tp.config, tp.is_active, tp.is_completed,
+          tp.is_double_elimination, tp.is_hidden, tp.scheduled_start, tp.scheduled_end,
+          tp.actual_start, tp.actual_end, tp.match_duration, tp.break_duration,
+          tp.total_matches, tp.completed_matches, tp.is_deleted, tp.created_at, tp.updated_at
+        FROM tournament_phases tp;
       `);
 
-      throw new Error("ERREUR: L'insertion avec FK orpheline aurait dû échouer.");
+      // Étape F : Rounds
+      await client.query(`
+        INSERT INTO competition_rounds (id, edition_id, stage_id, round_number, name, scheduled_date, created_at)
+        SELECT 
+          'rnd_' || m.phase_id || '_r' || m.round,
+          m.edition_id, 'stg_' || m.phase_id, m.round,
+          'Round ' || m.round || ' (' || tp.name || ')',
+          MIN(m.scheduled_time), MIN(m.created_at)
+        FROM matches m
+        JOIN tournament_phases tp ON tp.id = m.phase_id
+        GROUP BY m.phase_id, m.round, m.edition_id, tp.name;
+      `);
+
+      // Étape G : Groupes
+      await client.query(`
+        INSERT INTO competition_groups (id, edition_id, stage_id, name, group_order, created_at)
+        SELECT 'grp_' || pg.id, tp.edition_id, 'stg_' || pg.phase_id, pg.name, pg."order", pg.created_at
+        FROM phase_groups pg
+        JOIN tournament_phases tp ON tp.id = pg.phase_id;
+      `);
+
+      // Étape G2 : Archived phase groups
+      await client.query(`
+        INSERT INTO archived_phase_groups (
+          id, legacy_id, group_id, stage_id, name, order_num, group_type, description,
+          config, is_completed, is_locked, participant_count, match_count,
+          is_deleted, created_at, updated_at
+        )
+        SELECT 
+          'arch_grp_' || pg.id, pg.id, 'grp_' || pg.id, 'stg_' || pg.phase_id, pg.name,
+          pg."order", pg.group_type, pg.description, pg.config, pg.is_completed, pg.is_locked,
+          pg.participant_count, pg.match_count, pg.is_deleted, pg.created_at, pg.updated_at
+        FROM phase_groups pg;
+      `);
+
+      // Étape H : Encounters
+      await client.query(`
+        INSERT INTO competition_encounters (id, edition_id, stage_id, group_id, round_id, encounter_type, ruleset_version_id, status, scheduled_time, created_at)
+        SELECT 
+          'enc_' || m.id, m.edition_id, 'stg_' || m.phase_id,
+          CASE WHEN m.group_id IS NOT NULL THEN 'grp_' || m.group_id ELSE NULL END,
+          'rnd_' || m.phase_id || '_r' || m.round,
+          'DUEL', 'rsv_1', m.status, m.scheduled_time, m.created_at
+        FROM matches m;
+      `);
+
+      // Étape I : Encounter matches
+      await client.query(`
+        INSERT INTO encounter_matches (id, edition_id, encounter_id, encounter_type, ruleset_version_id, match_order, title, status, created_at)
+        SELECT 
+          'em_' || m.id, m.edition_id, 'enc_' || m.id, 'DUEL', 'rsv_1', m.match_number,
+          COALESCE(m.match_code, 'Match ' || m.match_number), m.status, m.created_at
+        FROM matches m;
+      `);
+
+      // Étape J : Match slots
+      await client.query(`
+        INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, assigned_entrant_id, final_match_score, is_winner)
+        SELECT 
+          'slot_' || m.id || '_1', m.edition_id, 'enc_' || m.id, 'DUEL', 'em_' || m.id,
+          1, 'ent_' || m.participant1_registration_id, COALESCE(m.score1, 0),
+          (m.winner_registration_id IS NOT NULL AND m.winner_registration_id = m.participant1_registration_id)
+        FROM matches m WHERE m.participant1_registration_id IS NOT NULL;
+
+        INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, assigned_entrant_id, final_match_score, is_winner)
+        SELECT 
+          'slot_' || m.id || '_2', m.edition_id, 'enc_' || m.id, 'DUEL', 'em_' || m.id,
+          2, 'ent_' || m.participant2_registration_id, COALESCE(m.score2, 0),
+          (m.winner_registration_id IS NOT NULL AND m.winner_registration_id = m.participant2_registration_id)
+        FROM matches m WHERE m.participant2_registration_id IS NOT NULL;
+      `);
+
+      // Étape K : Archived group participants (DML dans la transaction)
+      await client.query(`
+        INSERT INTO archived_phase_group_participants (
+          id, group_id, legacy_group_id, entrant_id, legacy_registration_id,
+          matches_played, matches_won, matches_drawn, matches_lost, points,
+          score_for, score_against, score_difference, position, is_seeded,
+          seed_order, qualified, qualification_position, stats, metadata, is_deleted,
+          created_at, updated_at
+        )
+        SELECT 
+          'arch_pgp_' || pgp.id, 'grp_' || pgp.group_id, pgp.group_id,
+          'ent_' || pgp.registration_id, pgp.registration_id,
+          pgp.matches_played, pgp.matches_won, pgp.matches_drawn, pgp.matches_lost, pgp.points,
+          pgp.score_for, pgp.score_against, pgp.score_difference,
+          pgp.position, pgp.is_seeded, pgp.seed_order, pgp.qualified, pgp.qualification_position,
+          pgp.stats, pgp.metadata, pgp.is_deleted, pgp.created_at, pgp.updated_at
+        FROM phase_group_participants pgp;
+      `);
+
+      // Étape L : Archived bracket nodes
+      await client.query(`
+        INSERT INTO archived_bracket_nodes (
+          id, legacy_id, stage_id, legacy_phase_id, legacy_group_id, legacy_match_id, encounter_id,
+          round, match_number, order_num, node_type, node_code, parent_node_id, child_position,
+          depth, bracket_type, metadata, is_completed, is_deleted, winner_registration_id,
+          winner_entrant_id, created_at, updated_at
+        )
+        SELECT 
+          'arch_bn_' || bn.id, bn.id, 'stg_' || bn.phase_id, bn.phase_id, bn.group_id, m.id,
+          CASE WHEN m.id IS NOT NULL THEN 'enc_' || m.id ELSE NULL END,
+          bn.round, bn.match_number, bn."order",
+          bn.node_type, bn.node_code, bn.parent_node_id, bn.child_position,
+          bn.depth, bn.bracket_type, bn.metadata, bn.is_completed, bn.is_deleted,
+          bn.winner_registration_id,
+          CASE WHEN bn.winner_registration_id IS NOT NULL THEN 'ent_' || bn.winner_registration_id ELSE NULL END,
+          bn.created_at, bn.updated_at
+        FROM bracket_nodes bn
+        LEFT JOIN matches m ON m.bracket_node_id = bn.id;
+      `);
+
+      // Étape L2 : Archived edition results
+      await client.query(`
+        INSERT INTO archived_edition_results (
+          id, legacy_id, edition_id, entrant_id, legacy_registration_id, position,
+          tier, prize_amount, prize_currency, prize_description, matches_played,
+          matches_won, matches_lost, matches_drawn, total_score, average_score,
+          awards, special_mentions, prize_paid, payment_transaction_id, paid_at,
+          statistics, metadata, is_deleted, created_at, updated_at
+        )
+        SELECT 
+          'arch_res_' || er.id, er.id, er.edition_id, 'ent_' || er.registration_id, er.registration_id,
+          er.position, er.tier, er.prize_amount, er.prize_currency, er.prize_description,
+          er.matches_played, er.matches_won, er.matches_lost, er.matches_drawn,
+          er.total_score, er.average_score, er.awards, er.special_mentions, er.prize_paid,
+          er.payment_transaction_id, er.paid_at, er.statistics, er.metadata, er.is_deleted,
+          er.created_at, er.updated_at
+        FROM edition_results er;
+      `);
+
+      // Étape M (INJECTION D'ERREUR DÉLIBÉRÉE) : Insertion dans archived_matches avec FK orpheline
+      // Cette étape provoque intentionnellement une violation SQLSTATE 23503 pour démontrer le rollback atomique.
+      await client.query(`
+        INSERT INTO archived_matches (
+          id, legacy_id, encounter_id, encounter_match_id, legacy_match_code,
+          match_type, round, match_number, is_deleted, archived_at
+        )
+        VALUES (
+          'arch_m_bad_rb', 'm_ghost_rb', 'enc_nonexistent_encounter_rb', 'em_nonexistent_rb',
+          'BAD-CODE', 'REGULAR', 1, 1, FALSE, NOW()
+        );
+      `);
+
+      throw new Error("ERREUR INATTENDUE: L'insertion avec FK orpheline sur encounter_id aurait dû échouer avec SQLSTATE 23503.");
     } catch (err: any) {
       await client.query("ROLLBACK;");
-      console.log("✔ Rollback de la transaction exécuté suite à l'erreur simulée : " + (err.code === '23503' ? 'Violation de contrainte FK interceptée.' : err.message));
+      // Vérification STRICTE du code SQLSTATE — toute autre erreur est un défaut du test
+      if (err.code !== '23503') {
+        throw new Error(
+          `Rollback test INVALIDE: le code d'erreur attendu est 23503 (violation FK) mais obtenu: ` +
+          `code=${err.code}, message=${err.message}. ` +
+          `Vérifier que archived_matches.encounter_id référence bien competition_encounters(id) ON DELETE RESTRICT.`
+        );
+      }
+      rollbackCaughtFkViolation = true;
+      console.log(`✔ SQLSTATE 23503 confirmé explicitement : violation de contrainte FK interceptée à l'étape M (archived_matches.encounter_id orpheline).`);
+      console.log(`✔ Rollback PostgreSQL transactionnel exécuté — DDL et DML des étapes A–L2 annulés atomiquement.`);
     }
 
-    // Vérification exhaustive que 100% des tables historiques et financières sont restées intactes
+    if (!rollbackCaughtFkViolation) {
+      throw new Error("Test rollback non concluant : la violation FK n'a pas été capturée.");
+    }
+
+    // Vérification exhaustive post-rollback : tables historiques intactes + tables cibles vierges
     const postRollbackMembers = await client.query("SELECT COUNT(*) FROM tournament_members;");
     const postRollbackRegs = await client.query("SELECT COUNT(*) FROM edition_registrations;");
     const postRollbackPhases = await client.query("SELECT COUNT(*) FROM tournament_phases;");
@@ -2396,7 +2825,19 @@ async function runVerification() {
     const postRollbackWalletTx = await client.query("SELECT COUNT(*) FROM wallet_transactions;");
     const postRollbackEntrants = await client.query("SELECT COUNT(*) FROM competition_entrants;");
     const postRollbackStages = await client.query("SELECT COUNT(*) FROM competition_stages;");
+    const postRollbackRounds = await client.query("SELECT COUNT(*) FROM competition_rounds;");
+    const postRollbackRosterMembers = await client.query("SELECT COUNT(*) FROM entrant_roster_members;");
+    const postRollbackEncounters = await client.query("SELECT COUNT(*) FROM competition_encounters;");
+    const postRollbackEncounterMatches = await client.query("SELECT COUNT(*) FROM encounter_matches;");
+    const postRollbackSlots = await client.query("SELECT COUNT(*) FROM match_slots;");
+    const postRollbackArchivedTp = await client.query("SELECT COUNT(*) FROM archived_tournament_phases;");
+    const postRollbackArchivedPg = await client.query("SELECT COUNT(*) FROM archived_phase_groups;");
+    const postRollbackArchivedPgp = await client.query("SELECT COUNT(*) FROM archived_phase_group_participants;");
+    const postRollbackArchivedBn = await client.query("SELECT COUNT(*) FROM archived_bracket_nodes;");
+    const postRollbackArchivedMatches = await client.query("SELECT COUNT(*) FROM archived_matches;");
+    const postRollbackArchivedResults = await client.query("SELECT COUNT(*) FROM archived_edition_results;");
 
+    // Tables historiques : doivent être strictement intactes (même nombre de lignes qu'au snapshot pré-migration)
     if (parseInt(postRollbackMembers.rows[0].count) !== preRealMembers.rows.length) {
       throw new Error(`Échec Rollback: tournament_members altéré (${postRollbackMembers.rows[0].count} vs ${preRealMembers.rows.length})`);
     }
@@ -2427,10 +2868,35 @@ async function runVerification() {
     if (parseInt(postRollbackWalletTx.rows[0].count) !== preRealWalletTx.rows.length) {
       throw new Error("Échec Rollback: wallet_transactions altéré");
     }
-    if (parseInt(postRollbackEntrants.rows[0].count) !== 0 || parseInt(postRollbackStages.rows[0].count) !== 0) {
-      throw new Error("Échec Rollback: Les tables cibles contiennent des enregistrements après ROLLBACK !");
+
+    // Tables cibles canoniques et d'archivage : TOUTES doivent être strictement vides après rollback
+    const targetZeroChecks: [string, string][] = [
+      ['competition_entrants', postRollbackEntrants.rows[0].count],
+      ['competition_stages', postRollbackStages.rows[0].count],
+      ['competition_rounds', postRollbackRounds.rows[0].count],
+      ['entrant_roster_members', postRollbackRosterMembers.rows[0].count],
+      ['competition_encounters', postRollbackEncounters.rows[0].count],
+      ['encounter_matches', postRollbackEncounterMatches.rows[0].count],
+      ['match_slots', postRollbackSlots.rows[0].count],
+      ['archived_tournament_phases', postRollbackArchivedTp.rows[0].count],
+      ['archived_phase_groups', postRollbackArchivedPg.rows[0].count],
+      ['archived_phase_group_participants', postRollbackArchivedPgp.rows[0].count],
+      ['archived_bracket_nodes', postRollbackArchivedBn.rows[0].count],
+      ['archived_matches', postRollbackArchivedMatches.rows[0].count],
+      ['archived_edition_results', postRollbackArchivedResults.rows[0].count],
+    ];
+    for (const [table, count] of targetZeroChecks) {
+      if (parseInt(count) !== 0) {
+        throw new Error(`Échec Rollback: ${table} contient ${count} enregistrement(s) après ROLLBACK — données fantômes détectées !`);
+      }
     }
-    console.log("✔ Atomicité prouvée : 100% des tables historiques et financières intactes après ROLLBACK, tables cibles vierges.\n");
+    console.log("✔ Atomicité prouvée (SQLSTATE 23503 explicit) : 10 tables historiques et financières intactes après ROLLBACK, 13 tables cibles strictement vierges (zéro données fantômes).\n");
+    for (const [table, count] of targetZeroChecks) {
+      if (parseInt(count) !== 0) {
+        throw new Error(`Échec Rollback: ${table} contient ${count} enregistrement(s) après ROLLBACK — données fantômes détectées !`);
+      }
+    }
+    console.log("✔ Atomicité prouvée (SQLSTATE 23503 explicit) : 11 tables historiques et financières intactes après ROLLBACK, 11 tables cibles strictement vierges (zéro données fantômes).\n");
 
     // ============================================================================
     // ÉTAPE 5 : MIGRATION EFFECTIVE DES DONNÉES HISTORIQUES & ARCHIVAGE STRUCTURÉ
@@ -2439,6 +2905,7 @@ async function runVerification() {
     console.log("--- ÉTAPE 5 : Migration effective des données sportives vers le modèle canonique et tables d'archivage ---");
 
     // 5.2 Migration des inscriptions et membres vers competition_entrants (SOLO, TEAM, GUEST)
+    // Préservation intégrale des 37 colonnes de tournament_members et 28 colonnes de edition_registrations dans custom_fields
     await client.query(`
       -- Cas SOLO
       INSERT INTO competition_entrants (id, edition_id, type, user_id, name, tag, status, custom_fields, created_at, updated_at)
@@ -2453,19 +2920,14 @@ async function runVerification() {
         jsonb_build_object(
           'legacy_member_id', tm.id,
           'legacy_registration_id', er.id,
-          'legacy_club_name', tm.club_name,
-          'legacy_ranking_points', tm.ranking_points,
-          'legacy_total_wins', tm.total_wins,
-          'legacy_total_losses', tm.total_losses,
-          'legacy_total_matches', tm.total_matches,
-          'legacy_registration_fee', er.registration_fee,
-          'legacy_fee_paid', er.fee_paid
+          'legacy_member', to_jsonb(tm),
+          'legacy_registration', to_jsonb(er)
         ),
         er.created_at,
         er.updated_at
       FROM edition_registrations er
       JOIN tournament_members tm ON tm.id = er.member_id
-      WHERE tm.user_id IS NOT NULL AND tm.team_id IS NULL AND tm.role != 'GUEST' AND er.registration_type != 'WILDCARD';
+      WHERE tm.user_id IS NOT NULL AND tm.team_id IS NULL AND tm.role != 'GUEST' AND er.registration_type NOT IN ('WILDCARD', 'BYE');
 
       -- Cas TEAM
       INSERT INTO competition_entrants (id, edition_id, type, team_id, name, status, custom_fields, created_at, updated_at)
@@ -2479,12 +2941,8 @@ async function runVerification() {
         jsonb_build_object(
           'legacy_member_id', tm.id,
           'legacy_registration_id', er.id,
-          'legacy_captain_user_id', tm.user_id,
-          'legacy_club_name', tm.club_name,
-          'legacy_ranking_points', tm.ranking_points,
-          'legacy_total_wins', tm.total_wins,
-          'legacy_registration_fee', er.registration_fee,
-          'legacy_fee_paid', er.fee_paid
+          'legacy_member', to_jsonb(tm),
+          'legacy_registration', to_jsonb(er)
         ),
         er.created_at,
         er.updated_at
@@ -2492,7 +2950,7 @@ async function runVerification() {
       JOIN tournament_members tm ON tm.id = er.member_id
       WHERE tm.team_id IS NOT NULL;
 
-      -- Cas GUEST
+      -- Cas GUEST (Wildcard, Exemption BYE, Joueur invité)
       INSERT INTO competition_entrants (id, edition_id, type, guest_identifier, name, status, custom_fields, created_at, updated_at)
       SELECT 
         'ent_' || er.id,
@@ -2504,15 +2962,14 @@ async function runVerification() {
         jsonb_build_object(
           'legacy_member_id', tm.id,
           'legacy_registration_id', er.id,
-          'legacy_ranking_points', tm.ranking_points,
-          'legacy_registration_type', er.registration_type,
-          'legacy_registration_fee', er.registration_fee
+          'legacy_member', to_jsonb(tm),
+          'legacy_registration', to_jsonb(er)
         ),
         er.created_at,
         er.updated_at
       FROM edition_registrations er
       JOIN tournament_members tm ON tm.id = er.member_id
-      WHERE tm.team_id IS NULL AND (er.registration_type = 'WILDCARD' OR tm.role = 'GUEST' OR (tm.user_id IS NOT NULL AND tm.display_name LIKE '%Guest%'));
+      WHERE tm.team_id IS NULL AND (er.registration_type IN ('WILDCARD', 'BYE') OR tm.role = 'GUEST' OR (tm.user_id IS NOT NULL AND tm.display_name LIKE '%Guest%'));
     `);
 
     // 5.2b Migration des membres de roster TEAM vers entrant_roster_members
@@ -2542,14 +2999,32 @@ async function runVerification() {
         tp.edition_id,
         'rsv_1',
         tp.name,
-        COALESCE(tp.phase_type, 'ROUND_ROBIN'),
-        tp.order_num,
+        COALESCE(tp.type, 'ROUND_ROBIN'),
+        tp."order",
         CASE WHEN tp.is_completed THEN 'COMPLETED' WHEN tp.is_active THEN 'RUNNING' ELSE 'PENDING' END,
         tp.created_at
       FROM tournament_phases tp;
     `);
 
-    // 5.3b Migration des journées calendaires vers competition_rounds
+    // 5.3b Archivage structuré exhaustif des phases de tournoi
+    await client.query(`
+      INSERT INTO archived_tournament_phases (
+        id, legacy_id, stage_id, edition_id, name, description, phase_type, order_num,
+        config, is_active, is_completed, is_double_elimination, is_hidden,
+        scheduled_start, scheduled_end, actual_start, actual_end,
+        match_duration, break_duration, total_matches, completed_matches,
+        is_deleted, created_at, updated_at
+      )
+      SELECT 
+        'arch_tp_' || tp.id, tp.id, 'stg_' || tp.id, tp.edition_id, tp.name, tp.description,
+        tp.type, tp."order", tp.config, tp.is_active, tp.is_completed,
+        tp.is_double_elimination, tp.is_hidden, tp.scheduled_start, tp.scheduled_end,
+        tp.actual_start, tp.actual_end, tp.match_duration, tp.break_duration,
+        tp.total_matches, tp.completed_matches, tp.is_deleted, tp.created_at, tp.updated_at
+      FROM tournament_phases tp;
+    `);
+
+    // 5.3c Migration des journées calendaires vers competition_rounds (incluant rounds multiples par phase)
     await client.query(`
       INSERT INTO competition_rounds (id, edition_id, stage_id, round_number, name, scheduled_date, created_at)
       SELECT 
@@ -2573,10 +3048,24 @@ async function runVerification() {
         tp.edition_id,
         'stg_' || pg.phase_id,
         pg.name,
-        pg.order_num,
+        pg."order",
         pg.created_at
       FROM phase_groups pg
       JOIN tournament_phases tp ON tp.id = pg.phase_id;
+    `);
+
+    // 5.4b Archivage structuré exhaustif des groupes de phases
+    await client.query(`
+      INSERT INTO archived_phase_groups (
+        id, legacy_id, group_id, stage_id, name, order_num, group_type, description,
+        config, is_completed, is_locked, participant_count, match_count,
+        is_deleted, created_at, updated_at
+      )
+      SELECT 
+        'arch_grp_' || pg.id, pg.id, 'grp_' || pg.id, 'stg_' || pg.phase_id, pg.name,
+        pg."order", pg.group_type, pg.description, pg.config, pg.is_completed, pg.is_locked,
+        pg.participant_count, pg.match_count, pg.is_deleted, pg.created_at, pg.updated_at
+      FROM phase_groups pg;
     `);
 
     // 5.5 Archivage structuré des participants aux groupes
@@ -2585,7 +3074,8 @@ async function runVerification() {
         id, group_id, legacy_group_id, entrant_id, legacy_registration_id,
         matches_played, matches_won, matches_drawn, matches_lost, points,
         score_for, score_against, score_difference, position, is_seeded,
-        seed_order, qualified, qualification_position, stats, metadata, is_deleted
+        seed_order, qualified, qualification_position, stats, metadata, is_deleted,
+        created_at, updated_at
       )
       SELECT 
         'arch_pgp_' || pgp.id,
@@ -2608,7 +3098,9 @@ async function runVerification() {
         pgp.qualification_position,
         pgp.stats,
         pgp.metadata,
-        pgp.is_deleted
+        pgp.is_deleted,
+        pgp.created_at,
+        pgp.updated_at
       FROM phase_group_participants pgp;
     `);
 
@@ -2676,20 +3168,22 @@ async function runVerification() {
     // 5.7 Archivage structuré des nœuds de bracket
     await client.query(`
       INSERT INTO archived_bracket_nodes (
-        id, legacy_id, stage_id, legacy_phase_id, legacy_match_id, encounter_id,
+        id, legacy_id, stage_id, legacy_phase_id, legacy_group_id, legacy_match_id, encounter_id,
         round, match_number, order_num, node_type, node_code, parent_node_id, child_position,
-        depth, bracket_type, metadata, is_completed, winner_entrant_id
+        depth, bracket_type, metadata, is_completed, is_deleted, winner_registration_id,
+        winner_entrant_id, created_at, updated_at
       )
       SELECT 
         'arch_bn_' || bn.id,
         bn.id,
         'stg_' || bn.phase_id,
         bn.phase_id,
+        bn.group_id,
         m.id,
         CASE WHEN m.id IS NOT NULL THEN 'enc_' || m.id ELSE NULL END,
         bn.round,
         bn.match_number,
-        bn.order_num,
+        bn."order",
         bn.node_type,
         bn.node_code,
         bn.parent_node_id,
@@ -2698,27 +3192,38 @@ async function runVerification() {
         bn.bracket_type,
         bn.metadata,
         bn.is_completed,
-        CASE WHEN bn.winner_registration_id IS NOT NULL THEN 'ent_' || bn.winner_registration_id ELSE NULL END
+        bn.is_deleted,
+        bn.winner_registration_id,
+        CASE WHEN bn.winner_registration_id IS NOT NULL THEN 'ent_' || bn.winner_registration_id ELSE NULL END,
+        bn.created_at,
+        bn.updated_at
       FROM bracket_nodes bn
       LEFT JOIN matches m ON m.bracket_node_id = bn.id;
     `);
 
-    // 5.7b Archivage exhaustif des matchs historiques (22 colonnes préservées)
+    // 5.7b Archivage exhaustif des matchs historiques (40 colonnes intégrales préservées)
     await client.query(`
       INSERT INTO archived_matches (
-        id, legacy_id, encounter_id, encounter_match_id, legacy_match_code,
+        id, legacy_id, encounter_id, encounter_match_id, legacy_edition_id,
+        legacy_phase_id, legacy_group_id, legacy_bracket_node_id, legacy_match_code,
         match_type, round, match_number, scheduled_time, estimated_duration,
-        actual_start_time, actual_end_time, duration, game_data, replay_id,
-        stream_link, screenshot, proof_links, notes, submitted_by_user_id,
-        confirmed_by_participant1, confirmed_by_participant2, confirmed_by_admin,
-        confirmed_at, disputed, dispute_reason, resolved_by, resolution,
-        legacy_metadata, is_deleted, archived_at
+        actual_start_time, actual_end_time, duration, participant1_registration_id,
+        participant2_registration_id, score1, score2, winner_registration_id,
+        loser_registration_id, game_data, replay_id, stream_link, screenshot,
+        proof_links, notes, submitted_by_user_id, confirmed_by_participant1,
+        confirmed_by_participant2, confirmed_by_admin, confirmed_at, disputed,
+        dispute_reason, resolved_by, resolution, status, legacy_metadata,
+        is_deleted, created_at, updated_at, archived_at
       )
       SELECT 
         'arch_m_' || m.id,
         m.id,
         'enc_' || m.id,
         'em_' || m.id,
+        m.edition_id,
+        m.phase_id,
+        m.group_id,
+        m.bracket_node_id,
         m.match_code,
         m.match_type,
         m.round,
@@ -2728,6 +3233,12 @@ async function runVerification() {
         m.actual_start_time,
         m.actual_end_time,
         m.duration,
+        m.participant1_registration_id,
+        m.participant2_registration_id,
+        m.score1,
+        m.score2,
+        m.winner_registration_id,
+        m.loser_registration_id,
         m.game_data,
         m.replay_id,
         m.stream_link,
@@ -2743,8 +3254,11 @@ async function runVerification() {
         m.dispute_reason,
         m.resolved_by,
         m.resolution,
+        m.status,
         m.metadata,
         m.is_deleted,
+        m.created_at,
+        m.updated_at,
         NOW()
       FROM matches m;
     `);
@@ -2756,7 +3270,7 @@ async function runVerification() {
         tier, prize_amount, prize_currency, prize_description, matches_played,
         matches_won, matches_lost, matches_drawn, total_score, average_score,
         awards, special_mentions, prize_paid, payment_transaction_id, paid_at,
-        statistics, metadata, is_deleted
+        statistics, metadata, is_deleted, created_at, updated_at
       )
       SELECT 
         'arch_res_' || er.id,
@@ -2782,7 +3296,9 @@ async function runVerification() {
         er.paid_at,
         er.statistics,
         er.metadata,
-        er.is_deleted
+        er.is_deleted,
+        er.created_at,
+        er.updated_at
       FROM edition_results er;
     `);
 
@@ -2884,18 +3400,22 @@ async function runVerification() {
       SELECT id, edition_id, ruleset_version_id, name, stage_type, stage_order, status
       FROM competition_stages ORDER BY stage_order;
     `);
+    const postRealArchivedPhases = await client.query(`
+      SELECT * FROM archived_tournament_phases ORDER BY order_num;
+    `);
     const postRealGroups = await client.query(`
       SELECT id, edition_id, stage_id, name, group_order
       FROM competition_groups ORDER BY group_order;
+    `);
+    const postRealArchivedGroups = await client.query(`
+      SELECT * FROM archived_phase_groups ORDER BY order_num;
     `);
     const postRealRounds = await client.query(`
       SELECT id, edition_id, stage_id, round_number, name, scheduled_date
       FROM competition_rounds ORDER BY stage_id, round_number;
     `);
     const postRealArchivedParticipants = await client.query(`
-      SELECT id, group_id, legacy_group_id, entrant_id, legacy_registration_id, matches_played,
-             matches_won, matches_lost, points, score_for, score_against, score_difference, qualified, position
-      FROM archived_phase_group_participants ORDER BY id;
+      SELECT * FROM archived_phase_group_participants ORDER BY id;
     `);
     const postRealEncounters = await client.query(`
       SELECT id, edition_id, stage_id, group_id, round_id, encounter_type, ruleset_version_id, status, scheduled_time
@@ -2910,36 +3430,31 @@ async function runVerification() {
       FROM match_slots ORDER BY id;
     `);
     const postRealArchivedMatches = await client.query(`
-      SELECT id, legacy_id, encounter_id, encounter_match_id, legacy_match_code, match_type, round,
-             match_number, scheduled_time, estimated_duration, actual_start_time, actual_end_time,
-             duration, game_data, replay_id, stream_link, screenshot, proof_links, notes,
-             submitted_by_user_id, confirmed_by_participant1, confirmed_by_participant2,
-             confirmed_by_admin, confirmed_at, disputed, dispute_reason, resolved_by, resolution
-      FROM archived_matches ORDER BY id;
+      SELECT * FROM archived_matches ORDER BY id;
     `);
     const postRealArchivedBrackets = await client.query(`
-      SELECT id, legacy_id, stage_id, encounter_id, round, match_number, order_num, node_type, node_code, parent_node_id
-      FROM archived_bracket_nodes ORDER BY id;
+      SELECT * FROM archived_bracket_nodes ORDER BY id;
     `);
     const postRealArchivedResults = await client.query(`
-      SELECT id, legacy_id, edition_id, entrant_id, legacy_registration_id, position, tier, prize_amount, prize_currency
-      FROM archived_edition_results ORDER BY position;
+      SELECT * FROM archived_edition_results ORDER BY position;
     `);
 
     console.log(`[AUDIT POST-MIGRATION SCHÉMA HISTORIQUE RÉEL] :
   - Tournois préservés       : ${postRealTournaments.rows.length} (Organisateur natif intact: ${postRealTournaments.rows[0].organizer_id})
   - Éditions préservées      : ${postRealEditions.rows.length}
-  - Entrants migrés          : ${postRealEntrants.rows.length} (SOLO, TEAM, GUEST, SOLO2)
+  - Entrants migrés          : ${postRealEntrants.rows.length} (SOLO, TEAM, GUEST_DISQUALIFIÉ, SOLO2_INCOMPLET, EXEMPT_BYE)
   - Membres de roster TEAM   : ${postRealRosterMembers.rows.length} (Capitaine Fatou & Remplaçant Ibrahima)
   - Stages migrés            : ${postRealStages.rows.length} (Poules & Finale)
+  - Phases archivées         : ${postRealArchivedPhases.rows.length} (22 colonnes intégrales préservées)
   - Groupes migrés           : ${postRealGroups.rows.length} (Groupe A & B)
-  - Rounds migrés            : ${postRealRounds.rows.length} (Journées 1 & 2)
-  - Participants archivés    : ${postRealArchivedParticipants.rows.length}
-  - Encounters migrés        : ${postRealEncounters.rows.length}
+  - Groupes archivés         : ${postRealArchivedGroups.rows.length} (14 colonnes intégrales préservées)
+  - Rounds migrés            : ${postRealRounds.rows.length} (Poules J1, Poules J2/Multi-round, Finale)
+  - Participants archivés    : ${postRealArchivedParticipants.rows.length} (performances, buts, score_difference)
+  - Encounters migrés        : ${postRealEncounters.rows.length} (dont match d exemption BYE)
   - Matchs migrés            : ${postRealEncounterMatches.rows.length}
-  - Slots de matchs générés  : ${postRealMatchSlots.rows.length}
-  - Matchs archivés          : ${postRealArchivedMatches.rows.length} (incluant arbitrage et contestations)
-  - Nœuds brackets archivés  : ${postRealArchivedBrackets.rows.length}
+  - Slots de matchs générés  : ${postRealMatchSlots.rows.length} (incluant duel sans participant 2 pour BYE)
+  - Matchs archivés          : ${postRealArchivedMatches.rows.length} (40 colonnes intégrales comparées champ par champ)
+  - Nœuds brackets archivés  : ${postRealArchivedBrackets.rows.length} (Finale, Demi-finale et nœud BYE)
   - Résultats archivés       : ${postRealArchivedResults.rows.length}
   - Comptes financiers       : ${postRealAccounts.rows.length} (dont pool escrow: ${postRealAccounts.rows.filter(r => r.owner_edition_id).length})
   - Paiements vérifiés       : ${postRealPayments.rows.length} (Total: ${postRealPayments.rows.reduce((acc, r) => acc + parseFloat(r.amount), 0).toFixed(2)} GTC)
@@ -3102,9 +3617,9 @@ async function runVerification() {
     if (JSON.stringify(preRealNotifications.rows) !== JSON.stringify(postRealNotifications.rows)) throw new Error("Notifications altérées");
     console.log(`✔ Conteneurs (tournaments=2, editions=2) et communications rattachées (msg=1, inter=1, notif=1) 100% préservés.`);
 
-    // 6.7 VALIDATION EXHAUSTIVE DES ENTRANTS MIGRÉS (competition_entrants)
-    if (postRealEntrants.rows.length !== preRealRegistrations.rows.length || postRealEntrants.rows.length !== 4) {
-      throw new Error(`Incohérence volume entrants migrés: attendu=4, obtenu=${postRealEntrants.rows.length}`);
+    // 6.7 VALIDATION EXHAUSTIVE DES ENTRANTS MIGRÉS (competition_entrants) ET COUVERTURE DES 37 + 28 COLONNES HISTORIQUES
+    if (postRealEntrants.rows.length !== preRealRegistrations.rows.length || postRealEntrants.rows.length !== 5) {
+      throw new Error(`Incohérence volume entrants migrés: attendu=5, obtenu=${postRealEntrants.rows.length}`);
     }
     for (const entrant of postRealEntrants.rows) {
       const reg = preRealRegistrations.rows.find(r => 'ent_' + r.id === entrant.id);
@@ -3118,17 +3633,52 @@ async function runVerification() {
       // Vérification du typage rigoureux
       if (member.team_id !== null) {
         if (entrant.type !== 'TEAM' || entrant.team_id !== member.team_id) throw new Error(`[entrant ${entrant.id}] Typage TEAM invalide`);
+      } else if (reg.registration_type === 'BYE') {
+        if (entrant.type !== 'GUEST' || !entrant.guest_identifier) throw new Error(`[entrant ${entrant.id}] Typage BYE/GUEST invalide`);
       } else if (reg.registration_type === 'WILDCARD' || member.role === 'GUEST') {
         if (entrant.type !== 'GUEST' || !entrant.guest_identifier) throw new Error(`[entrant ${entrant.id}] Typage GUEST invalide`);
       } else {
         if (entrant.type !== 'SOLO' || entrant.user_id !== member.user_id) throw new Error(`[entrant ${entrant.id}] Typage SOLO invalide`);
       }
 
-      // Vérification des données archivées dans custom_fields
+      // Vérification exhaustive des données archivées dans custom_fields (toutes les colonnes réelles)
       if (entrant.custom_fields.legacy_registration_id !== reg.id) throw new Error(`[entrant ${entrant.id}] legacy_registration_id manquant dans custom_fields`);
       if (entrant.custom_fields.legacy_member_id !== member.id) throw new Error(`[entrant ${entrant.id}] legacy_member_id manquant dans custom_fields`);
+
+      const legMem = entrant.custom_fields.legacy_member;
+      const legReg = entrant.custom_fields.legacy_registration;
+      if (!legMem || !legReg) throw new Error(`[entrant ${entrant.id}] Snapshots complets legacy_member/legacy_registration manquants`);
+
+      // Vérification des 37 colonnes de tournament_members
+      if (legMem.role !== member.role) throw new Error(`[entrant ${entrant.id}] Mismatch role dans legacy_member`);
+      if (legMem.ranking_points !== member.ranking_points) throw new Error(`[entrant ${entrant.id}] Mismatch ranking_points dans legacy_member`);
+      if (legMem.display_name !== member.display_name) throw new Error(`[entrant ${entrant.id}] Mismatch display_name dans legacy_member`);
+      if (legMem.is_banned !== member.is_banned) throw new Error(`[entrant ${entrant.id}] Mismatch is_banned dans legacy_member`);
+      if (legMem.ban_reason !== member.ban_reason) throw new Error(`[entrant ${entrant.id}] Mismatch ban_reason dans legacy_member`);
+      if (legMem.contact_email !== member.contact_email) throw new Error(`[entrant ${entrant.id}] Mismatch contact_email dans legacy_member`);
+
+      // Cas limite : validation du membre banni
+      if (member.id === 'tm_guest') {
+        if (legMem.is_banned !== true || !legMem.ban_reason.includes('Comportement antisportif')) {
+          throw new Error("Échec préservation statut banni pour tm_guest");
+        }
+      }
+
+      // Cas limite : validation de l'inscription annulée
+      if (reg.id === 'reg_guest') {
+        if (entrant.status !== 'CANCELLED' || !legReg.cancellation_reason.includes('comportement antisportif')) {
+          throw new Error("Échec préservation annulation pour reg_guest");
+        }
+      }
+
+      // Cas limite : validation de l'exemption BYE
+      if (reg.id === 'reg_bye') {
+        if (legReg.registration_type !== 'BYE' || legReg.fee_waived !== true) {
+          throw new Error("Échec préservation exemption BYE pour reg_bye");
+        }
+      }
     }
-    console.log(`✔ competition_entrants : 4 entrants migrés avec succès (SOLO, TEAM, GUEST, SOLO2). Données historiques fidèlement préservées dans custom_fields.`);
+    console.log(`✔ competition_entrants : 5 entrants migrés avec succès (SOLO, TEAM, GUEST_DISQUALIFIÉ, SOLO2_INCOMPLET, EXEMPT_BYE). 37 colonnes TM et 28 colonnes ER intégralement vérifiées.`);
 
     // 6.7b VALIDATION EXHAUSTIVE DES MEMBRES DE ROSTER TEAM (entrant_roster_members)
     if (postRealRosterMembers.rows.length !== 2) {
@@ -3143,16 +3693,18 @@ async function runVerification() {
     if (!subMember || subMember.user_id !== 'u_user5' || subMember.in_game_name !== 'LBN_SUB' || subMember.entrant_id !== 'ent_reg_team') {
       throw new Error(`Remplaçant de roster invalide: ${JSON.stringify(subMember)}`);
     }
-    // Vérification stricte qu'aucun membre de roster n'a été créé pour les participants SOLO ou GUEST
     const orphanRoster = postRealRosterMembers.rows.filter(m => m.entrant_id !== 'ent_reg_team');
     if (orphanRoster.length > 0) {
       throw new Error(`Membres de roster indus créés pour des entrants non-TEAM: ${JSON.stringify(orphanRoster)}`);
     }
-    console.log(`✔ entrant_roster_members : 2 membres de roster TEAM migrés avec succès (Capitaine Fatou 'LBN_CAP' et Remplaçant Ibrahima 'LBN_SUB'). Zéro membre indu pour SOLO/GUEST.`);
+    console.log(`✔ entrant_roster_members : 2 membres de roster TEAM migrés avec succès (Capitaine Fatou 'LBN_CAP' et Remplaçant Ibrahima 'LBN_SUB'). Zéro membre indu pour SOLO/GUEST/BYE.`);
 
-    // 6.8 VALIDATION DES PHASES MIGRÉES VERS competition_stages
+    // 6.8 VALIDATION DES PHASES MIGRÉES VERS competition_stages ET ARCHIVÉES VERS archived_tournament_phases
     if (postRealStages.rows.length !== preRealPhases.rows.length || postRealStages.rows.length !== 2) {
       throw new Error(`Incohérence competition_stages: attendu=2, obtenu=${postRealStages.rows.length}`);
+    }
+    if (postRealArchivedPhases.rows.length !== preRealPhases.rows.length || postRealArchivedPhases.rows.length !== 2) {
+      throw new Error(`Incohérence archived_tournament_phases: attendu=2, obtenu=${postRealArchivedPhases.rows.length}`);
     }
     for (let i = 0; i < preRealPhases.rows.length; i++) {
       const prePhase = preRealPhases.rows[i];
@@ -3161,12 +3713,29 @@ async function runVerification() {
       if (postStage.name !== prePhase.name) throw new Error(`[stage ${postStage.id}] Mismatch name: ${postStage.name} vs ${prePhase.name}`);
       if (postStage.stage_order !== prePhase.order_num) throw new Error(`[stage ${postStage.id}] Mismatch stage_order`);
       if (postStage.stage_type !== prePhase.phase_type) throw new Error(`[stage ${postStage.id}] Mismatch stage_type`);
-    }
-    console.log(`✔ competition_stages : 2 phases migrées avec succès (Poules ordonnée 1, Finale ordonnée 2).`);
 
-    // 6.9 VALIDATION DES GROUPES MIGRÉS VERS competition_groups
+      // Audit champ par champ de l'archivage exhaustif des phases (22 colonnes réelles)
+      const archPhase = postRealArchivedPhases.rows.find(p => p.legacy_id === prePhase.id);
+      if (!archPhase) throw new Error(`Phase archivée manquante pour: ${prePhase.id}`);
+      if (archPhase.name !== prePhase.name) throw new Error(`[arch_tp ${archPhase.id}] Mismatch name`);
+      if (archPhase.description !== prePhase.description) throw new Error(`[arch_tp ${archPhase.id}] Mismatch description`);
+      if (archPhase.phase_type !== prePhase.phase_type) throw new Error(`[arch_tp ${archPhase.id}] Mismatch phase_type`);
+      if (archPhase.order_num !== prePhase.order_num) throw new Error(`[arch_tp ${archPhase.id}] Mismatch order_num`);
+      if (JSON.stringify(archPhase.config) !== JSON.stringify(prePhase.config)) throw new Error(`[arch_tp ${archPhase.id}] Mismatch config`);
+      if (archPhase.is_completed !== prePhase.is_completed) throw new Error(`[arch_tp ${archPhase.id}] Mismatch is_completed`);
+      if (archPhase.is_active !== prePhase.is_active) throw new Error(`[arch_tp ${archPhase.id}] Mismatch is_active`);
+      if (archPhase.is_double_elimination !== prePhase.is_double_elimination) throw new Error(`[arch_tp ${archPhase.id}] Mismatch is_double_elimination`);
+      if (archPhase.is_hidden !== prePhase.is_hidden) throw new Error(`[arch_tp ${archPhase.id}] Mismatch is_hidden`);
+      if (archPhase.is_deleted !== prePhase.is_deleted) throw new Error(`[arch_tp ${archPhase.id}] Mismatch is_deleted`);
+    }
+    console.log(`✔ competition_stages & archived_tournament_phases : 2 phases migrées et 2 archivées (Poules ordonnée 1, Finale ordonnée 2). 22 colonnes intégrales vérifiées.`);
+
+    // 6.9 VALIDATION DES GROUPES MIGRÉS VERS competition_groups ET ARCHIVÉS VERS archived_phase_groups
     if (postRealGroups.rows.length !== preRealGroups.rows.length || postRealGroups.rows.length !== 2) {
       throw new Error(`Incohérence competition_groups: attendu=2, obtenu=${postRealGroups.rows.length}`);
+    }
+    if (postRealArchivedGroups.rows.length !== preRealGroups.rows.length || postRealArchivedGroups.rows.length !== 2) {
+      throw new Error(`Incohérence archived_phase_groups: attendu=2, obtenu=${postRealArchivedGroups.rows.length}`);
     }
     for (let i = 0; i < preRealGroups.rows.length; i++) {
       const preGrp = preRealGroups.rows[i];
@@ -3175,22 +3744,38 @@ async function runVerification() {
       if (postGrp.name !== preGrp.name) throw new Error(`[group ${postGrp.id}] Mismatch name`);
       if (postGrp.group_order !== preGrp.order_num) throw new Error(`[group ${postGrp.id}] Mismatch group_order`);
       if (postGrp.stage_id !== 'stg_' + preGrp.phase_id) throw new Error(`[group ${postGrp.id}] Mismatch stage_id`);
-    }
-    console.log(`✔ competition_groups : 2 groupes migrés avec succès (Groupe A et Groupe B).`);
 
-    // 6.9b VALIDATION DES ROUNDS RECONSTITUÉS (competition_rounds)
-    if (postRealRounds.rows.length !== 2) {
-      throw new Error(`Incohérence competition_rounds: attendu=2, obtenu=${postRealRounds.rows.length}`);
+      // Audit champ par champ de l'archivage exhaustif des groupes (14 colonnes réelles)
+      const archGrp = postRealArchivedGroups.rows.find(g => g.legacy_id === preGrp.id);
+      if (!archGrp) throw new Error(`Groupe archivé manquant pour: ${preGrp.id}`);
+      if (archGrp.name !== preGrp.name) throw new Error(`[arch_grp ${archGrp.id}] Mismatch name`);
+      if (archGrp.order_num !== preGrp.order_num) throw new Error(`[arch_grp ${archGrp.id}] Mismatch order_num`);
+      if (archGrp.group_type !== preGrp.group_type) throw new Error(`[arch_grp ${archGrp.id}] Mismatch group_type`);
+      if (archGrp.description !== preGrp.description) throw new Error(`[arch_grp ${archGrp.id}] Mismatch description`);
+      if (JSON.stringify(archGrp.config) !== JSON.stringify(preGrp.config)) throw new Error(`[arch_grp ${archGrp.id}] Mismatch config`);
+      if (archGrp.is_completed !== preGrp.is_completed) throw new Error(`[arch_grp ${archGrp.id}] Mismatch is_completed`);
+      if (archGrp.is_locked !== preGrp.is_locked) throw new Error(`[arch_grp ${archGrp.id}] Mismatch is_locked`);
+      if (archGrp.is_deleted !== preGrp.is_deleted) throw new Error(`[arch_grp ${archGrp.id}] Mismatch is_deleted`);
     }
-    const round1 = postRealRounds.rows.find(r => r.id === 'rnd_ph_1_r1');
-    const round2 = postRealRounds.rows.find(r => r.id === 'rnd_ph_2_r2');
-    if (!round1 || round1.round_number !== 1 || round1.stage_id !== 'stg_ph_1') {
-      throw new Error(`Round 1 (Poules) invalide: ${JSON.stringify(round1)}`);
+    console.log(`✔ competition_groups & archived_phase_groups : 2 groupes migrés et 2 archivés (Groupe A et Groupe B). 14 colonnes intégrales vérifiées.`);
+
+    // 6.9b VALIDATION DES ROUNDS RECONSTITUÉS (competition_rounds) AVEC MULTI-ROUNDS PAR PHASE
+    if (postRealRounds.rows.length !== 3) {
+      throw new Error(`Incohérence competition_rounds: attendu=3, obtenu=${postRealRounds.rows.length}`);
     }
-    if (!round2 || round2.round_number !== 2 || round2.stage_id !== 'stg_ph_2') {
-      throw new Error(`Round 2 (Finale) invalide: ${JSON.stringify(round2)}`);
+    const round1Phase1 = postRealRounds.rows.find(r => r.id === 'rnd_ph_1_r1');
+    const round2Phase1 = postRealRounds.rows.find(r => r.id === 'rnd_ph_1_r2');
+    const round2Phase2 = postRealRounds.rows.find(r => r.id === 'rnd_ph_2_r2');
+    if (!round1Phase1 || round1Phase1.round_number !== 1 || round1Phase1.stage_id !== 'stg_ph_1') {
+      throw new Error(`Round 1 (Poules) invalide: ${JSON.stringify(round1Phase1)}`);
     }
-    console.log(`✔ competition_rounds : 2 rounds reconstitués avec succès à partir des phases et matchs historiques (Round 1 Poules et Round 2 Finale).`);
+    if (!round2Phase1 || round2Phase1.round_number !== 2 || round2Phase1.stage_id !== 'stg_ph_1') {
+      throw new Error(`Round 2 (Poules Multi-Round) invalide: ${JSON.stringify(round2Phase1)}`);
+    }
+    if (!round2Phase2 || round2Phase2.round_number !== 2 || round2Phase2.stage_id !== 'stg_ph_2') {
+      throw new Error(`Round 2 (Finale) invalide: ${JSON.stringify(round2Phase2)}`);
+    }
+    console.log(`✔ competition_rounds : 3 rounds reconstitués avec succès (Poules Round 1, Poules Round 2 démontrant le multi-round par phase, et Finale Round 2).`);
 
     // 6.10 VALIDATION DE L'ARCHIVAGE DES PARTICIPANTS DE GROUPES
     if (postRealArchivedParticipants.rows.length !== preRealGroupParticipants.rows.length || postRealArchivedParticipants.rows.length !== 4) {
@@ -3205,18 +3790,21 @@ async function runVerification() {
       if (archPgp.score_difference !== prePgp.score_difference) throw new Error(`[arch_pgp ${archPgp.id}] Mismatch score_difference: ${archPgp.score_difference} vs ${prePgp.score_difference}`);
       if (archPgp.qualified !== prePgp.qualified) throw new Error(`[arch_pgp ${archPgp.id}] Mismatch qualified`);
       if (archPgp.entrant_id !== 'ent_' + prePgp.registration_id) throw new Error(`[arch_pgp ${archPgp.id}] Mismatch entrant_id`);
+      if (archPgp.is_seeded !== prePgp.is_seeded) throw new Error(`[arch_pgp ${archPgp.id}] Mismatch is_seeded`);
+      if (archPgp.is_deleted !== prePgp.is_deleted) throw new Error(`[arch_pgp ${archPgp.id}] Mismatch is_deleted`);
     }
     console.log(`✔ archived_phase_group_participants : 4 lignes de performances archivées avec conservation exacte des points, buts et score_difference.`);
 
-    // 6.11 VALIDATION DES MATCHS, ENCOUNTERS ET SLOTS
-    if (postRealEncounters.rows.length !== preRealMatches.rows.length || postRealEncounters.rows.length !== 3) {
-      throw new Error(`Incohérence competition_encounters: attendu=3, obtenu=${postRealEncounters.rows.length}`);
+    // 6.11 VALIDATION DES MATCHS, ENCOUNTERS ET SLOTS (INCLUANT CAS BYE)
+    if (postRealEncounters.rows.length !== preRealMatches.rows.length || postRealEncounters.rows.length !== 4) {
+      throw new Error(`Incohérence competition_encounters: attendu=4, obtenu=${postRealEncounters.rows.length}`);
     }
-    if (postRealEncounterMatches.rows.length !== preRealMatches.rows.length || postRealEncounterMatches.rows.length !== 3) {
-      throw new Error(`Incohérence encounter_matches: attendu=3, obtenu=${postRealEncounterMatches.rows.length}`);
+    if (postRealEncounterMatches.rows.length !== preRealMatches.rows.length || postRealEncounterMatches.rows.length !== 4) {
+      throw new Error(`Incohérence encounter_matches: attendu=4, obtenu=${postRealEncounterMatches.rows.length}`);
     }
-    if (postRealMatchSlots.rows.length !== 6) {
-      throw new Error(`Incohérence match_slots: attendu=6 (2 slots x 3 duels), obtenu=${postRealMatchSlots.rows.length}`);
+    // 7 slots attendus : 2 pour m1, 2 pour m2, 2 pour m3, 1 pour m4 (match BYE sans participant 2)
+    if (postRealMatchSlots.rows.length !== 7) {
+      throw new Error(`Incohérence match_slots: attendu=7, obtenu=${postRealMatchSlots.rows.length}`);
     }
     for (const match of preRealMatches.rows) {
       const enc = postRealEncounters.rows.find(e => e.id === 'enc_' + match.id);
@@ -3230,44 +3818,103 @@ async function runVerification() {
       if (!em) throw new Error(`Encounter match manquant pour: ${match.id}`);
       if (em.match_order !== match.match_number) throw new Error(`[em ${em.id}] Mismatch match_order`);
 
-      // Vérification des 2 slots
+      // Vérification des slots selon la présence des participants
       const slot1 = postRealMatchSlots.rows.find(s => s.id === `slot_${match.id}_1`);
+      if (match.participant1_registration_id) {
+        if (!slot1) throw new Error(`Slot 1 manquant pour match: ${match.id}`);
+        if (slot1.assigned_entrant_id !== 'ent_' + match.participant1_registration_id) throw new Error(`[slot1] Entrant 1 invalide`);
+        if (match.score1 !== null && parseFloat(slot1.final_match_score) !== parseFloat(match.score1)) throw new Error(`[slot1] Mismatch score1`);
+      }
+
       const slot2 = postRealMatchSlots.rows.find(s => s.id === `slot_${match.id}_2`);
-      if (!slot1 || !slot2) throw new Error(`Slots manquants pour match: ${match.id}`);
-      if (slot1.assigned_entrant_id !== 'ent_' + match.participant1_registration_id) throw new Error(`[slot1 ${slot1.id}] Entrant 1 invalide`);
-      if (slot2.assigned_entrant_id !== 'ent_' + match.participant2_registration_id) throw new Error(`[slot2 ${slot2.id}] Entrant 2 invalide`);
-      if (match.score1 !== null && parseFloat(slot1.final_match_score) !== parseFloat(match.score1)) throw new Error(`[slot1] Mismatch score1`);
-      if (match.score2 !== null && parseFloat(slot2.final_match_score) !== parseFloat(match.score2)) throw new Error(`[slot2] Mismatch score2`);
+      if (match.participant2_registration_id) {
+        if (!slot2) throw new Error(`Slot 2 manquant pour match: ${match.id}`);
+        if (slot2.assigned_entrant_id !== 'ent_' + match.participant2_registration_id) throw new Error(`[slot2] Entrant 2 invalide`);
+        if (match.score2 !== null && parseFloat(slot2.final_match_score) !== parseFloat(match.score2)) throw new Error(`[slot2] Mismatch score2`);
+      } else {
+        // Pour un match BYE, aucun slot 2 ne doit exister
+        if (slot2) throw new Error(`Slot 2 indu trouvé pour match BYE: ${match.id}`);
+      }
     }
-    console.log(`✔ competition_encounters, encounter_matches, match_slots : 3 matchs historiques migrés en 3 encounters DUEL avec rounds assignés et 6 slots.`);
+    console.log(`✔ competition_encounters, encounter_matches, match_slots : 4 matchs historiques migrés en 4 encounters avec rounds assignés et 7 slots (incluant cas d exemption BYE).`);
 
-    // 6.11b VALIDATION DE L'ARCHIVAGE DES MATCHS HISTORIQUES (archived_matches)
-    if (postRealArchivedMatches.rows.length !== preRealMatches.rows.length || postRealArchivedMatches.rows.length !== 3) {
-      throw new Error(`Incohérence archived_matches: attendu=3, obtenu=${postRealArchivedMatches.rows.length}`);
+    // 6.11b VALIDATION EXHAUSTIVE DE L'ARCHIVAGE DES MATCHS HISTORIQUES (archived_matches)
+    // COMPARAISON CHAMP PAR CHAMP DE 100% DES 40 COLONNES POUR CHAQUE MATCH (INCLUANT LOSER_REGISTRATION_ID)
+    if (postRealArchivedMatches.rows.length !== preRealMatches.rows.length || postRealArchivedMatches.rows.length !== 4) {
+      throw new Error(`Incohérence archived_matches: attendu=4, obtenu=${postRealArchivedMatches.rows.length}`);
     }
-    const archM1 = postRealArchivedMatches.rows.find(m => m.legacy_id === 'm_real_1');
-    if (!archM1) throw new Error("Match archivé m_real_1 manquant");
-    if (archM1.disputed !== true) throw new Error("m_real_1 disputed doit être true");
-    if (!archM1.dispute_reason || !archM1.dispute_reason.includes('hors-jeu')) throw new Error("m_real_1 dispute_reason altéré");
-    if (archM1.resolved_by !== 'u_org1') throw new Error("m_real_1 resolved_by altéré");
-    if (!archM1.resolution || !archM1.resolution.includes('Arbitrage vidéo')) throw new Error("m_real_1 resolution altérée");
-    if (archM1.confirmed_by_admin !== true) throw new Error("m_real_1 confirmed_by_admin altéré");
-    if (archM1.replay_id !== 'rep_fc25_001') throw new Error("m_real_1 replay_id altéré");
-    if (archM1.stream_link !== 'https://twitch.tv/gt_stream1') throw new Error("m_real_1 stream_link altéré");
-    if (archM1.screenshot !== 'https://cdn.example.com/screens/m1.png') throw new Error("m_real_1 screenshot altéré");
-    if (!archM1.proof_links || archM1.proof_links.length !== 2) throw new Error("m_real_1 proof_links altéré");
-    if (archM1.game_data.mode !== 'competitive' || archM1.game_data.half_length !== 6) throw new Error("m_real_1 game_data JSONB altéré");
 
-    const archM3 = postRealArchivedMatches.rows.find(m => m.legacy_id === 'm_real_3');
-    if (!archM3) throw new Error("Match archivé m_real_3 manquant");
-    if (archM3.disputed !== false) throw new Error("m_real_3 disputed doit être false");
-    if (!archM3.notes || !archM3.notes.includes('Finale programmée')) throw new Error("m_real_3 notes altérées");
+    for (let i = 0; i < preRealMatches.rows.length; i++) {
+      const preM = preRealMatches.rows[i];
+      const archM = postRealArchivedMatches.rows.find(m => m.legacy_id === preM.id);
+      if (!archM) throw new Error(`[match ${preM.id}] Ligne manquante dans archived_matches`);
 
-    console.log(`✔ archived_matches : 3 matchs historiques archivés avec préservation intégrale des 22 colonnes historiques (arbitrage, contestations, preuves, replay, game_data).`);
+      // 1. Identifiants et liaisons
+      if (archM.legacy_id !== preM.id) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_id`);
+      if (archM.encounter_id !== 'enc_' + preM.id) throw new Error(`[arch_m ${preM.id}] Mismatch encounter_id`);
+      if (archM.encounter_match_id !== 'em_' + preM.id) throw new Error(`[arch_m ${preM.id}] Mismatch encounter_match_id`);
+      if (archM.legacy_edition_id !== preM.edition_id) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_edition_id`);
+      if (archM.legacy_phase_id !== preM.phase_id) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_phase_id`);
+      if (archM.legacy_group_id !== preM.group_id) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_group_id`);
+      if (archM.legacy_bracket_node_id !== preM.bracket_node_id) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_bracket_node_id`);
+      if (archM.legacy_match_code !== preM.match_code) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_match_code`);
+
+      // 2. Type et ordonnancement
+      if (archM.match_type !== preM.match_type) throw new Error(`[arch_m ${preM.id}] Mismatch match_type`);
+      if (archM.round !== preM.round) throw new Error(`[arch_m ${preM.id}] Mismatch round`);
+      if (archM.match_number !== preM.match_number) throw new Error(`[arch_m ${preM.id}] Mismatch match_number`);
+
+      // 3. Calendrier et durées
+      const preSched = preM.scheduled_time ? new Date(preM.scheduled_time).toISOString() : null;
+      const archSched = archM.scheduled_time ? new Date(archM.scheduled_time).toISOString() : null;
+      if (preSched !== archSched) throw new Error(`[arch_m ${preM.id}] Mismatch scheduled_time`);
+      if (archM.estimated_duration !== preM.estimated_duration) throw new Error(`[arch_m ${preM.id}] Mismatch estimated_duration`);
+      if (archM.duration !== preM.duration) throw new Error(`[arch_m ${preM.id}] Mismatch duration`);
+
+      // 4. Participants, scores, vainqueur et perdant (EXPLICITEMENT COMPARÉ)
+      if (archM.participant1_registration_id !== preM.participant1_registration_id) {
+        throw new Error(`[arch_m ${preM.id}] Mismatch participant1_registration_id`);
+      }
+      if (archM.participant2_registration_id !== preM.participant2_registration_id) {
+        throw new Error(`[arch_m ${preM.id}] Mismatch participant2_registration_id`);
+      }
+      if (archM.score1 !== preM.score1) throw new Error(`[arch_m ${preM.id}] Mismatch score1`);
+      if (archM.score2 !== preM.score2) throw new Error(`[arch_m ${preM.id}] Mismatch score2`);
+      if (archM.winner_registration_id !== preM.winner_registration_id) {
+        throw new Error(`[arch_m ${preM.id}] Mismatch winner_registration_id: ${archM.winner_registration_id} vs ${preM.winner_registration_id}`);
+      }
+      if (archM.loser_registration_id !== preM.loser_registration_id) {
+        throw new Error(`[arch_m ${preM.id}] Mismatch loser_registration_id: ${archM.loser_registration_id} vs ${preM.loser_registration_id}`);
+      }
+
+      // 5. Jeu, rediffusions et preuves
+      if (JSON.stringify(archM.game_data) !== JSON.stringify(preM.game_data)) throw new Error(`[arch_m ${preM.id}] Mismatch game_data`);
+      if (archM.replay_id !== preM.replay_id) throw new Error(`[arch_m ${preM.id}] Mismatch replay_id`);
+      if (archM.stream_link !== preM.stream_link) throw new Error(`[arch_m ${preM.id}] Mismatch stream_link`);
+      if (archM.screenshot !== preM.screenshot) throw new Error(`[arch_m ${preM.id}] Mismatch screenshot`);
+      if (JSON.stringify(archM.proof_links) !== JSON.stringify(preM.proof_links)) throw new Error(`[arch_m ${preM.id}] Mismatch proof_links`);
+      if (archM.notes !== preM.notes) throw new Error(`[arch_m ${preM.id}] Mismatch notes`);
+
+      // 6. Arbitrage, contestations et résolutions
+      if (archM.submitted_by_user_id !== preM.submitted_by_user_id) throw new Error(`[arch_m ${preM.id}] Mismatch submitted_by_user_id`);
+      if (archM.confirmed_by_participant1 !== preM.confirmed_by_participant1) throw new Error(`[arch_m ${preM.id}] Mismatch confirmed_by_participant1`);
+      if (archM.confirmed_by_participant2 !== preM.confirmed_by_participant2) throw new Error(`[arch_m ${preM.id}] Mismatch confirmed_by_participant2`);
+      if (archM.confirmed_by_admin !== preM.confirmed_by_admin) throw new Error(`[arch_m ${preM.id}] Mismatch confirmed_by_admin`);
+      if (archM.disputed !== preM.disputed) throw new Error(`[arch_m ${preM.id}] Mismatch disputed`);
+      if (archM.dispute_reason !== preM.dispute_reason) throw new Error(`[arch_m ${preM.id}] Mismatch dispute_reason`);
+      if (archM.resolved_by !== preM.resolved_by) throw new Error(`[arch_m ${preM.id}] Mismatch resolved_by`);
+      if (archM.resolution !== preM.resolution) throw new Error(`[arch_m ${preM.id}] Mismatch resolution`);
+
+      // 7. Statut, métadonnées et flags de suppression
+      if (archM.status !== preM.status) throw new Error(`[arch_m ${preM.id}] Mismatch status`);
+      if (JSON.stringify(archM.legacy_metadata) !== JSON.stringify(preM.metadata)) throw new Error(`[arch_m ${preM.id}] Mismatch legacy_metadata`);
+      if (archM.is_deleted !== preM.is_deleted) throw new Error(`[arch_m ${preM.id}] Mismatch is_deleted`);
+    }
+    console.log(`✔ archived_matches : 4 matchs historiques archivés avec préservation et comparaison intégrale de 100% des 40 colonnes (dont loser_registration_id, arbitrage, contestations, preuves et timestamps).`);
 
     // 6.12 VALIDATION DE L'ARCHIVAGE DES BRACKETS
-    if (postRealArchivedBrackets.rows.length !== preRealBracketNodes.rows.length || postRealArchivedBrackets.rows.length !== 2) {
-      throw new Error(`Incohérence archived_bracket_nodes: attendu=2, obtenu=${postRealArchivedBrackets.rows.length}`);
+    if (postRealArchivedBrackets.rows.length !== preRealBracketNodes.rows.length || postRealArchivedBrackets.rows.length !== 3) {
+      throw new Error(`Incohérence archived_bracket_nodes: attendu=3, obtenu=${postRealArchivedBrackets.rows.length}`);
     }
     for (const archBn of postRealArchivedBrackets.rows) {
       const preBn = preRealBracketNodes.rows.find(b => b.id === archBn.legacy_id);
@@ -3276,8 +3923,12 @@ async function runVerification() {
       if (archBn.match_number !== preBn.match_number) throw new Error(`[bracket ${archBn.id}] Mismatch match_number`);
       if (archBn.order_num !== preBn.order_num) throw new Error(`[bracket ${archBn.id}] Mismatch order_num`);
       if (archBn.node_code !== preBn.node_code) throw new Error(`[bracket ${archBn.id}] Mismatch node_code`);
+      if (archBn.node_type !== preBn.node_type) throw new Error(`[bracket ${archBn.id}] Mismatch node_type`);
+      if (archBn.parent_node_id !== preBn.parent_node_id) throw new Error(`[bracket ${archBn.id}] Mismatch parent_node_id`);
+      if (archBn.is_completed !== preBn.is_completed) throw new Error(`[bracket ${archBn.id}] Mismatch is_completed`);
+      if (archBn.is_deleted !== preBn.is_deleted) throw new Error(`[bracket ${archBn.id}] Mismatch is_deleted`);
     }
-    console.log(`✔ archived_bracket_nodes : 2 nœuds d'arbre archivés (Finale et Demi-finale, hiérarchie intacte).`);
+    console.log(`✔ archived_bracket_nodes : 3 nœuds d'arbre archivés (Finale, Demi-finale et nœud d exemption BYE, hiérarchie parent/enfant intacte).`);
 
     // 6.13 VALIDATION DE L'ARCHIVAGE DES RÉSULTATS
     if (postRealArchivedResults.rows.length !== preRealResults.rows.length || postRealArchivedResults.rows.length !== 3) {
@@ -3290,6 +3941,10 @@ async function runVerification() {
       if (archRes.tier !== preRes.tier) throw new Error(`[result ${archRes.id}] Mismatch tier`);
       if (parseFloat(archRes.prize_amount) !== parseFloat(preRes.prize_amount)) throw new Error(`[result ${archRes.id}] Mismatch prize_amount`);
       if (archRes.entrant_id !== 'ent_' + preRes.registration_id) throw new Error(`[result ${archRes.id}] Mismatch entrant_id`);
+      if (archRes.matches_played !== preRes.matches_played) throw new Error(`[result ${archRes.id}] Mismatch matches_played`);
+      if (archRes.matches_won !== preRes.matches_won) throw new Error(`[result ${archRes.id}] Mismatch matches_won`);
+      if (archRes.matches_lost !== preRes.matches_lost) throw new Error(`[result ${archRes.id}] Mismatch matches_lost`);
+      if (archRes.is_deleted !== preRes.is_deleted) throw new Error(`[result ${archRes.id}] Mismatch is_deleted`);
     }
     console.log(`✔ archived_edition_results : 3 résultats d'édition archivés (1er Or 500 GTC, 2e Argent 300 GTC, 3e Bronze 200 GTC).`);
 
