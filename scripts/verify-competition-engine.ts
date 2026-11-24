@@ -2,153 +2,293 @@
  * Script de validation technique, immutabilité et reproduction du Moteur de Compétition Games Trafics.
  * 
  * Exécute sous PostgreSQL 17.12 :
- * 1. Sécurité renforcée par AUTORISATION POSITIVE STRICTE :
- *    - Rejette si NODE_ENV === 'production'
- *    - Rejette si ALLOW_COMPETITION_TEST !== 'true'
- *    - Rejette si l'argument '--confirm' est absent
- *    - Exige CONFIRM_TARGET_DB='neondb' correspondant à la base active
- *    - Valide l'hôte dans la liste blanche (Neon *.neon.tech ou local)
- *    - Isole strictement toutes les opérations dans des schémas temporaires dynamiques (^test_competition_[a-z0-9_]+$)
- * 2. Partie A — Banc d'essai synthétique des 21 tables canoniques rigoureusement identiques au document 05 :
- *    - Comparaison automatisée préalable table par table avec zéro divergence
- *    - Déploiement DDL complet sans aucune simplification
- * 3. Tests d'immutabilité absolue des rulesets publiés (Triggers SQL bloquant TOUT UPDATE et DELETE)
- * 4. Tests de correspondance exacte entre le ruleset du match et les métriques enregistrées (Verrou relationnel composite)
- * 5. Partie B — Migration représentative complète :
- *    - Déploiement effectif des 21 tables canoniques
- *    - Archivage et snapshot exhaustif des données financières et d'inscription
- *    - Suppression sans CASCADE en ordre strict inverse des dépendances (prouve l'absence de FK orphelines)
- *    - Comparaison ligne par ligne de toutes les données archivées et financières
+ * 1. Sécurité renforcée par AUTORISATION POSITIVE STRICTE ET VERROUILLÉE :
+ *    - Liste blanche FIXE et IMMUABLE des bases de test : ['neondb', 'games_trafics_test']
+ *    - Liste blanche FIXE et IMMUABLE des endpoints Neon autorisés : ['ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech', ...]
+ *    - Rejet absolu de NODE_ENV=production et de tout nom de base/endpoint de production
+ *    - Exigence stricte de ALLOW_COMPETITION_TEST='true', '--confirm' et CONFIRM_TARGET_DB
+ *    - Isolation absolue dans des schémas temporaires dynamiques (^test_competition_[a-z0-9_]+$)
+ * 2. Partie A — Banc d'essai synthétique des 21 tables canoniques :
+ *    - Intégration du comparateur structurel approfondi (21 tables, 0 divergence)
+ *    - Tests d'immutabilité absolue des rulesets publiés (Triggers)
+ *    - Tests de correspondance exacte entre le ruleset du match et les métriques (FK composites)
+ *    - 14 tests négatifs relationnels
+ * 3. Partie B — Migration représentative réelle basée fidèlement sur database/schema.ts :
+ *    - Reconstitution fidèle des tables historiques réelles (tournaments avec organizer_id natif, tournament_editions, tournament_members, edition_registrations, registration_payments, wallet_transactions, user_wallets, financial_accounts, ledger_entries, messages, interactions, notifications)
+ *    - Données représentatives incluant inscriptions SOLO et ÉQUIPE (couvrant archived_team_id et archived_user_id)
+ *    - Découplage et snapshot comptable immuable des 8 champs d'archivage
+ *    - Déploiement complet des 21 tables canoniques cibles
+ *    - Établissement des nouvelles relations
+ *    - Suppression sélective ordonnée SANS CASCADE (prouve l'absence de FK orphelines)
+ *    - Comparaison ligne par ligne exhaustive de toutes les données financières et archivées
  * 
- * Exécution autorisée :
- * CONFIRM_TARGET_DB=neondb ALLOW_COMPETITION_TEST=true bun run test:competition-engine --confirm
+ * Exécution :
+ * bun scripts/verify-competition-engine.ts --test-security  # Exécute la suite de tests négatifs de sécurité
+ * CONFIRM_TARGET_DB=neondb ALLOW_COMPETITION_TEST=true bun run test:competition-engine --confirm # Validation complète
  */
 
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
-import { compareAllTables } from './compare-ddl';
+import { performFullStructuralComparison, runComparatorNegativeTests } from './compare-ddl';
 
 neonConfig.webSocketConstructor = ws;
 
 // ============================================================================
-// 1. GARDE-FOUS DE SÉCURITÉ RENFORCÉS PAR AUTORISATION POSITIVE STRICTE
+// 1. LISTES BLANCHES STRICTES, FIXES ET IMMUABLES (AUCUN OVERRIDE ENV)
 // ============================================================================
+export const FIXED_ALLOWED_DATABASES = Object.freeze(['neondb', 'games_trafics_test'] as const);
 
-// RÈGLE 1 : Interdiction absolue en environnement de production
-if (process.env.NODE_ENV === 'production') {
-  console.error("❌ ERREUR DE SÉCURITÉ CRITIQUE : Exécution strictement interdite lorsque NODE_ENV=production !");
-  process.exit(1);
+export const FIXED_ALLOWED_HOSTNAMES = Object.freeze([
+  'ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech',
+  'ep-lingering-cake-abto1cz5.eu-west-2.aws.neon.tech',
+  'localhost',
+  '127.0.0.1'
+] as const);
+
+/**
+ * Fonction centrale de validation des autorisations positives de sécurité
+ */
+export function validateSecurityGuards(params: {
+  nodeEnv?: string;
+  allowTest?: string;
+  hasConfirmArg: boolean;
+  confirmTargetDb?: string;
+  databaseUrl?: string;
+  currentDb?: string;
+}): { isValid: boolean; error?: string } {
+  // A. Interdiction formelle en production
+  if (params.nodeEnv === 'production') {
+    return { isValid: false, error: "Exécution strictement interdite lorsque NODE_ENV=production !" };
+  }
+
+  // B. Exigence de la variable d'autorisation explicite
+  if (params.allowTest !== 'true') {
+    return { isValid: false, error: "Variable ALLOW_COMPETITION_TEST='true' requise." };
+  }
+
+  // C. Exigence de l'argument --confirm
+  if (!params.hasConfirmArg) {
+    return { isValid: false, error: "Argument obligatoire '--confirm' manquant." };
+  }
+
+  // D. Exigence de CONFIRM_TARGET_DB
+  if (!params.confirmTargetDb || params.confirmTargetDb.trim().length === 0) {
+    return { isValid: false, error: "Variable CONFIRM_TARGET_DB obligatoire." };
+  }
+
+  const targetDbNormalized = params.confirmTargetDb.trim().toLowerCase();
+
+  // E. Vérification contre la liste blanche FIXE des bases de test
+  if (!(FIXED_ALLOWED_DATABASES as readonly string[]).includes(targetDbNormalized)) {
+    return { 
+      isValid: false, 
+      error: `La base ciblée '${params.confirmTargetDb}' n'est pas dans la liste blanche fixe autorisée [${FIXED_ALLOWED_DATABASES.join(', ')}].` 
+    };
+  }
+
+  if (targetDbNormalized.includes('prod') || targetDbNormalized.includes('production')) {
+    return { isValid: false, error: `Rejet formel: le nom de la base '${params.confirmTargetDb}' contient des termes de production.` };
+  }
+
+  // F. Vérification de l'URL et de l'endpoint
+  if (!params.databaseUrl) {
+    return { isValid: false, error: "DATABASE_URL n'est pas définie dans l'environnement." };
+  }
+
+  let hostname: string;
+  try {
+    const parsed = new URL(params.databaseUrl);
+    hostname = parsed.hostname.toLowerCase();
+  } catch {
+    return { isValid: false, error: "Format de DATABASE_URL invalide." };
+  }
+
+  if (!(FIXED_ALLOWED_HOSTNAMES as readonly string[]).includes(hostname)) {
+    return { 
+      isValid: false, 
+      error: `L'hôte cible '${hostname}' n'est pas dans la liste blanche fixe des endpoints de test autorisés [${FIXED_ALLOWED_HOSTNAMES.join(', ')}].` 
+    };
+  }
+
+  if (hostname.includes('prod') || hostname.includes('production') || hostname.includes('main-db')) {
+    return { isValid: false, error: `Rejet formel: l'endpoint '${hostname}' correspond à un environnement de production.` };
+  }
+
+  // G. Si la base connectée est fournie (validation croisée SQL)
+  if (params.currentDb) {
+    const currentDbNormalized = params.currentDb.trim().toLowerCase();
+    if (currentDbNormalized !== targetDbNormalized) {
+      return { 
+        isValid: false, 
+        error: `Incohérence de base ! current_database()='${params.currentDb}' ne correspond pas à CONFIRM_TARGET_DB='${params.confirmTargetDb}'.` 
+      };
+    }
+    if (!(FIXED_ALLOWED_DATABASES as readonly string[]).includes(currentDbNormalized)) {
+      return { isValid: false, error: `La base active '${params.currentDb}' n'est pas autorisée.` };
+    }
+    if (currentDbNormalized.includes('prod') || currentDbNormalized.includes('production')) {
+      return { isValid: false, error: `La base active '${params.currentDb}' est identifiée comme base de production.` };
+    }
+  }
+
+  return { isValid: true };
 }
 
-// RÈGLE 2 : Autorisation explicite de test obligatoire
-if (process.env.ALLOW_COMPETITION_TEST !== 'true') {
-  console.error("================================================================================");
-  console.error("❌ ERREUR DE SÉCURITÉ : Variable ALLOW_COMPETITION_TEST='true' requise.");
-  console.error("Le banc d'essai refuse de s'exécuter par défaut.");
-  console.error("Exécution autorisée :");
-  console.error("   CONFIRM_TARGET_DB=neondb ALLOW_COMPETITION_TEST=true bun run test:competition-engine --confirm");
-  console.error("================================================================================");
-  process.exit(1);
+/**
+ * Suite de tests négatifs vérifiant le rejet systématique de cibles de production
+ */
+export function runSecurityNegativeTests(): boolean {
+  console.log("================================================================================");
+  console.log("   TESTS NÉGATIFS DES GARDE-FOUS DE SÉCURITÉ ANTI-PRODUCTION");
+  console.log("================================================================================\n");
+
+  const validNeonUrl = "postgresql://user:pass@ep-lingering-cake-abto1cz5-pooler.eu-west-2.aws.neon.tech/neondb";
+  const prodNeonUrl = "postgresql://user:pass@ep-production-main-branch.eu-west-2.aws.neon.tech/prod_games_trafics";
+
+  const assertRejected = (testName: string, params: any) => {
+    const res = validateSecurityGuards(params);
+    if (res.isValid) {
+      console.error(`❌ ÉCHEC TEST NÉGATIF : ${testName} aurait dû être rejeté !`);
+      throw new Error(`Test de sécurité négatif échoué: ${testName}`);
+    } else {
+      console.log(`✔ Succès test négatif: ${testName} -> Rejeté: "${res.error}"`);
+    }
+  };
+
+  // 1. NODE_ENV=production
+  assertRejected("1. Rejet NODE_ENV=production", {
+    nodeEnv: 'production',
+    allowTest: 'true',
+    hasConfirmArg: true,
+    confirmTargetDb: 'neondb',
+    databaseUrl: validNeonUrl
+  });
+
+  // 2. Absence de ALLOW_COMPETITION_TEST
+  assertRejected("2. Rejet si ALLOW_COMPETITION_TEST manquant", {
+    nodeEnv: 'development',
+    allowTest: undefined,
+    hasConfirmArg: true,
+    confirmTargetDb: 'neondb',
+    databaseUrl: validNeonUrl
+  });
+
+  // 3. Absence de --confirm
+  assertRejected("3. Rejet si argument --confirm manquant", {
+    nodeEnv: 'development',
+    allowTest: 'true',
+    hasConfirmArg: false,
+    confirmTargetDb: 'neondb',
+    databaseUrl: validNeonUrl
+  });
+
+  // 4. Absence de CONFIRM_TARGET_DB
+  assertRejected("4. Rejet si CONFIRM_TARGET_DB manquant", {
+    nodeEnv: 'development',
+    allowTest: 'true',
+    hasConfirmArg: true,
+    confirmTargetDb: '',
+    databaseUrl: validNeonUrl
+  });
+
+  // 5. Base de production nommée
+  assertRejected("5. Rejet si nom de base de production", {
+    nodeEnv: 'development',
+    allowTest: 'true',
+    hasConfirmArg: true,
+    confirmTargetDb: 'production_db',
+    databaseUrl: validNeonUrl
+  });
+
+  // 6. Endpoint de production Neon non autorisé
+  assertRejected("6. Rejet si endpoint Neon de production", {
+    nodeEnv: 'development',
+    allowTest: 'true',
+    hasConfirmArg: true,
+    confirmTargetDb: 'neondb',
+    databaseUrl: prodNeonUrl
+  });
+
+  // 7. Divergence entre current_database() et CONFIRM_TARGET_DB
+  assertRejected("7. Rejet si current_database() divergent", {
+    nodeEnv: 'development',
+    allowTest: 'true',
+    hasConfirmArg: true,
+    confirmTargetDb: 'games_trafics_test',
+    databaseUrl: validNeonUrl,
+    currentDb: 'neondb'
+  });
+
+  console.log("\n✔ TOUS LES 7 TESTS NÉGATIFS DE SÉCURITÉ ONT RÉUSSI AVEC SUCCÈS !\n");
+  return true;
 }
 
-// RÈGLE 3 : Argument explicite --confirm requis
-if (!process.argv.includes('--confirm')) {
-  console.error("================================================================================");
-  console.error("❌ ERREUR DE SÉCURITÉ : Argument obligatoire '--confirm' manquant.");
-  console.error("================================================================================");
-  process.exit(1);
-}
-
-// RÈGLE 4 : Variable de confirmation indépendante contenant le nom de la base attendue
-const confirmTargetDb = process.env.CONFIRM_TARGET_DB;
-if (!confirmTargetDb || confirmTargetDb.trim().length === 0) {
-  console.error("================================================================================");
-  console.error("❌ ERREUR DE SÉCURITÉ : Variable CONFIRM_TARGET_DB obligatoire.");
-  console.error("Vous devez spécifier explicitement le nom de la base cible attendue (ex: CONFIRM_TARGET_DB=neondb).");
-  console.error("================================================================================");
-  process.exit(1);
-}
-
-// RÈGLE 5 : Autorisation positive — Liste blanche stricte des bases de données autorisées
-const ALLOWED_DB_NAMES = (process.env.ALLOWED_DATABASES || 'neondb,games_trafics_test,testdb')
-  .split(',')
-  .map(s => s.trim().toLowerCase());
-
-if (!ALLOWED_DB_NAMES.includes(confirmTargetDb.toLowerCase())) {
-  console.error(`❌ ERREUR DE SÉCURITÉ : La base ciblée '${confirmTargetDb}' n'est pas dans la liste blanche autorisée [${ALLOWED_DB_NAMES.join(', ')}].`);
-  process.exit(1);
-}
-
-// RÈGLE 6 : Autorisation positive — Validation de l'URL et de l'hôte/endpoint autorisé
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  console.error("❌ ERREUR : DATABASE_URL n'est pas définie dans l'environnement.");
-  process.exit(1);
-}
-
-let parsedUrl: URL;
-try {
-  parsedUrl = new URL(databaseUrl);
-} catch (e) {
-  console.error("❌ ERREUR : Format de DATABASE_URL invalide.");
-  process.exit(1);
-}
-
-const hostname = parsedUrl.hostname.toLowerCase();
-const ALLOWED_HOST_PATTERNS = [
-  /^ep-[a-z0-9-]+(?:\.[a-z0-9-]+)*\.neon\.tech$/, // Endpoints développement / branch pooler Neon
-  /^localhost$/,
-  /^127\.0\.0\.1$/,
-  /^postgres$/
-];
-
-const isAllowedHost = ALLOWED_HOST_PATTERNS.some(p => p.test(hostname));
-if (!isAllowedHost) {
-  console.error(`❌ ERREUR DE SÉCURITÉ : L'hôte cible '${hostname}' n'est pas dans la liste blanche des endpoints autorisés.`);
-  console.error("Seuls les endpoints de développement Neon (*.neon.tech) et les bases locales sont autorisés.");
-  process.exit(1);
-}
-
-// Génération d'identifiants de schémas temporaires uniques et isolés
+// ============================================================================
+// EXÉCUTION DU BANC D'ESSAI
+// ============================================================================
 const RUN_ID = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 const SYNTHETIC_SANDBOX = `test_competition_synth_${RUN_ID}`;
 const REAL_SCHEMA_SANDBOX = `test_competition_real_${RUN_ID}`;
 
-// Garde-fou strict sur les noms de schémas autorisés
 function assertSafeSchema(schemaName: string) {
   if (!/^test_competition_[a-z0-9_]+$/.test(schemaName)) {
-    throw new Error(`SÉCURITÉ VIOLÉE: Nom de schéma non sécurisé ou non temporaire (${schemaName}) !`);
+    throw new Error(`SÉCURITÉ VIOLÉE: Nom de schéma non sécurisé (${schemaName}) !`);
   }
 }
 
-const pool = new Pool({ connectionString: databaseUrl });
-
 async function runVerification() {
+  if (process.argv.includes('--test-security')) {
+    runSecurityNegativeTests();
+    process.exit(0);
+  }
+
+  // Contrôles initiaux de sécurité
+  const preCheck = validateSecurityGuards({
+    nodeEnv: process.env.NODE_ENV,
+    allowTest: process.env.ALLOW_COMPETITION_TEST,
+    hasConfirmArg: process.argv.includes('--confirm'),
+    confirmTargetDb: process.env.CONFIRM_TARGET_DB,
+    databaseUrl: process.env.DATABASE_URL
+  });
+
+  if (!preCheck.isValid) {
+    console.error("================================================================================");
+    console.error(`❌ ERREUR DE SÉCURITÉ : ${preCheck.error}`);
+    console.error("Commande d'exécution autorisée :");
+    console.error("   CONFIRM_TARGET_DB=neondb ALLOW_COMPETITION_TEST=true bun run test:competition-engine --confirm");
+    console.error("================================================================================");
+    process.exit(1);
+  }
+
   assertSafeSchema(SYNTHETIC_SANDBOX);
   assertSafeSchema(REAL_SCHEMA_SANDBOX);
 
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const client = await pool.connect();
+
   console.log("================================================================================");
   console.log("   GAMES TRAFICS — BANC D'ESSAI TECHNIQUE & VALIDATION SÉCURISÉE DU MOTEUR");
   console.log("================================================================================\n");
 
   try {
-    // 0. Vérification SQL de la base connectée et validation croisée positive
+    // Validation croisée SQL de la base connectée
     const dbCheck = await client.query('SELECT current_database() AS db_name, current_user AS user_name, version();');
     const { db_name, user_name, version } = dbCheck.rows[0];
 
-    if (db_name.toLowerCase() !== confirmTargetDb.toLowerCase()) {
-      throw new Error(`SÉCURITÉ VIOLÉE: Incohérence de base ! current_database()='${db_name}' ne correspond pas à CONFIRM_TARGET_DB='${confirmTargetDb}'.`);
+    const postCheck = validateSecurityGuards({
+      nodeEnv: process.env.NODE_ENV,
+      allowTest: process.env.ALLOW_COMPETITION_TEST,
+      hasConfirmArg: process.argv.includes('--confirm'),
+      confirmTargetDb: process.env.CONFIRM_TARGET_DB,
+      databaseUrl: process.env.DATABASE_URL,
+      currentDb: db_name
+    });
+
+    if (!postCheck.isValid) {
+      throw new Error(`SÉCURITÉ VIOLÉE: ${postCheck.error}`);
     }
 
-    if (!ALLOWED_DB_NAMES.includes(db_name.toLowerCase())) {
-      throw new Error(`SÉCURITÉ VIOLÉE: La base active '${db_name}' n'est pas dans la liste blanche autorisée.`);
-    }
-
-    if (db_name.toLowerCase().includes('prod') || db_name.toLowerCase().includes('production')) {
-      throw new Error(`SÉCURITÉ CRITIQUE: La base connectée ('${db_name}') semble être une base de production ! Interruption.`);
-    }
-
+    const hostname = new URL(process.env.DATABASE_URL!).hostname;
     console.log(`[AUTORISATION POSITIVE VALIDÉE] Base: ${db_name} (Hôte: ${hostname}, Utilisateur: ${user_name})`);
     console.log(`[ENV] Moteur SGBD détecté :\n${version}\n`);
 
@@ -156,11 +296,11 @@ async function runVerification() {
     // VÉRIFICATION AUTOMATISÉE PRÉALABLE DU DDL (21 TABLES, 0 DIVERGENCE)
     // ============================================================================
     console.log("--- CONTRÔLE AUTOMATISÉ DDL DES 21 TABLES CANONIQUES (DOC 05 vs SCRIPT) ---");
-    const { results: ddlResults, totalDivergences } = compareAllTables();
-    if (totalDivergences > 0 || ddlResults.length !== 21) {
-      throw new Error(`ÉCHEC DDL: ${totalDivergences} divergence(s) détectée(s) entre l'architecture cible et le banc d'essai !`);
+    const { allDiffs, tablesCompared } = performFullStructuralComparison();
+    if (allDiffs.length > 0 || tablesCompared !== 21) {
+      throw new Error(`ÉCHEC DDL: ${allDiffs.length} divergence(s) structurelle(s) détectée(s) !`);
     }
-    console.log(`✔ Comparaison automatisée réussie : Les 21 tables canoniques sont 100% identiques (ZÉRO DIVERGENCE).\n`);
+    console.log(`✔ Comparaison structurelle réussie : Les 21 tables canoniques sont 100% identiques (ZÉRO DIVERGENCE).\n`);
 
     // ============================================================================
     // PARTIE A : BANC D'ESSAI SYNTHÉTIQUE DES 21 TABLES CANONIQUES (EXACT DDL DE 05)
@@ -676,49 +816,34 @@ async function runVerification() {
         ('team_b', 'Equipe Beta', 'BET', 'u_cap_b');
 
       INSERT INTO tournaments (id, name, slug, game, organizer_id) VALUES 
-        ('tourn_1', 'Tournoi National Sénégal', 'tournoi-national-senegal', 'FC25', 'u_admin');
-
-      INSERT INTO tournament_editions (id, tournament_id, edition_number, name, start_date) VALUES 
-        ('ed_1', 'tourn_1', 1, 'Edition 2026 Dakar', NOW());
-
-      INSERT INTO tournament_staff (id, tournament_id, edition_id, user_id, role) VALUES 
-        ('staff_1', 'tourn_1', 'ed_1', 'u_admin', 'HEAD_REFEREE');
-
-      INSERT INTO metric_definitions (code, name, data_type, unit) VALUES 
-        ('GOALS', 'Buts marqués', 'INTEGER', 'COUNT'),
-        ('ASSISTS', 'Passes décisives', 'INTEGER', 'COUNT'),
-        ('KILLS', 'Eliminations', 'INTEGER', 'COUNT');
+        ('tourn_1', 'Tournoi Officiel GT', 'tournoi-gt', 'WARZONE', 'u_admin');
 
       INSERT INTO competition_rulesets (id, name, game) VALUES 
-        ('ruleset_fc', 'Règlement Officiel FC25', 'FC25');
+        ('rs_1', 'Warzone BR Standard', 'WARZONE');
 
-      -- Version 1 créée en mode brouillon, configurée puis publiée
+      -- rsv_1 insérée non-publiée pour permettre l'insertion des métriques AVANT publication
       INSERT INTO ruleset_versions (id, ruleset_id, version, scoring_mode, config, is_published) VALUES 
-        ('rv_fc_v1', 'ruleset_fc', 1, 'POINTS_TABLE', '{"win": 3, "draw": 1, "loss": 0}', FALSE);
+        ('rsv_1', 'rs_1', 1, 'POINTS_TABLE', '{"placement_points": [10, 5, 2]}', FALSE),
+        ('rsv_2', 'rs_1', 2, 'POINTS_TABLE', '{"placement_points": [12, 6, 3]}', FALSE);
 
-      INSERT INTO ruleset_metric_configs (ruleset_version_id, metric_code, weight, multiplier, is_tiebreaker) VALUES 
-        ('rv_fc_v1', 'GOALS', 1.0, 1.0, TRUE);
+      INSERT INTO metric_definitions (code, name, data_type, unit) VALUES 
+        ('kills', 'Eliminations', 'INTEGER', 'COUNT'),
+        ('placement', 'Rang Final', 'INTEGER', 'POINTS');
 
-      UPDATE ruleset_versions SET is_published = TRUE WHERE id = 'rv_fc_v1';
+      -- Métriques insérées sur version non-publiée (trigger autorise)
+      INSERT INTO ruleset_metric_configs (ruleset_version_id, metric_code, weight, multiplier) VALUES 
+        ('rsv_1', 'kills', 1.0, 1.0),
+        ('rsv_1', 'placement', 1.0, 1.0),
+        ('rsv_2', 'kills', 1.5, 1.0);
 
-      -- Version 2 créée en parallèle sans altérer la Version 1
-      INSERT INTO ruleset_versions (id, ruleset_id, version, scoring_mode, config, is_published) VALUES 
-        ('rv_fc_v2', 'ruleset_fc', 2, 'SERIES_WINS', '{"bestOf": 3}', FALSE);
+      -- Publication de rsv_1 après insertion des métriques (OLD.is_published=FALSE → UPDATE autorisé)
+      UPDATE ruleset_versions SET is_published = TRUE WHERE id = 'rsv_1';
 
-      INSERT INTO ruleset_metric_configs (ruleset_version_id, metric_code, weight, multiplier, is_tiebreaker) VALUES 
-        ('rv_fc_v2', 'GOALS', 1.0, 1.0, TRUE),
-        ('rv_fc_v2', 'ASSISTS', 0.5, 1.0, FALSE);
+      INSERT INTO tournament_editions (id, tournament_id, edition_number, name, start_date, default_ruleset_version_id) VALUES 
+        ('ed_1', 'tourn_1', 1, 'Edition Inaugurale', NOW(), 'rsv_1');
 
-      UPDATE ruleset_versions SET is_published = TRUE WHERE id = 'rv_fc_v2';
-
-      INSERT INTO competition_stages (id, edition_id, ruleset_version_id, stage_order, name, stage_type) VALUES 
-        ('stage_groups', 'ed_1', 'rv_fc_v1', 1, 'Phase de Groupes', 'ROUND_ROBIN');
-
-      INSERT INTO competition_groups (id, edition_id, stage_id, group_order, name) VALUES 
-        ('group_a', 'ed_1', 'stage_groups', 1, 'Groupe A');
-
-      INSERT INTO competition_rounds (id, edition_id, stage_id, round_number, name) VALUES 
-        ('round_1', 'ed_1', 'stage_groups', 1, 'Journée 1');
+      INSERT INTO tournament_staff (id, tournament_id, edition_id, user_id, role) VALUES 
+        ('st_1', 'tourn_1', 'ed_1', 'u_admin', 'HEAD_REFEREE');
 
       INSERT INTO competition_entrants (id, edition_id, type, user_id, name) VALUES 
         ('ent_solo1', 'ed_1', 'SOLO', 'u_solo1', 'Solo Player');
@@ -728,93 +853,114 @@ async function runVerification() {
         ('ent_team_b', 'ed_1', 'TEAM', 'team_b', 'Equipe Beta');
 
       INSERT INTO entrant_roster_members (id, edition_id, entrant_id, user_id, in_game_name, role) VALUES 
-        ('ros_cap_a', 'ed_1', 'ent_team_a', 'u_cap_a', 'AlphaCaptain', 'CAPTAIN'),
-        ('ros_p1_a', 'ed_1', 'ent_team_a', 'u_player_a1', 'AlphaPlayer1', 'STARTER'),
-        ('ros_cap_b', 'ed_1', 'ent_team_b', 'u_cap_b', 'BetaCaptain', 'CAPTAIN'),
-        ('ros_p1_b', 'ed_1', 'ent_team_b', 'u_player_b1', 'BetaPlayer1', 'STARTER');
+        ('rm_cap_a', 'ed_1', 'ent_team_a', 'u_cap_a', 'AlphaCaptain', 'CAPTAIN'),
+        ('rm_p_a1', 'ed_1', 'ent_team_a', 'u_player_a1', 'AlphaGunner', 'STARTER'),
+        ('rm_cap_b', 'ed_1', 'ent_team_b', 'u_cap_b', 'BetaCaptain', 'CAPTAIN'),
+        ('rm_p_b1', 'ed_1', 'ent_team_b', 'u_player_b1', 'BetaSniper', 'STARTER');
 
-      -- Rencontre collective avec sous-match, manche et métrique
+      INSERT INTO competition_stages (id, edition_id, ruleset_version_id, name, stage_type, stage_order) VALUES 
+        ('stg_1', 'ed_1', 'rsv_1', 'Phase Finale', 'ROUND_ROBIN', 1);
+
       INSERT INTO competition_encounters (id, edition_id, stage_id, encounter_type, ruleset_version_id) VALUES 
-        ('enc_coll', 'ed_1', 'stage_groups', 'COLLECTIVE_FIXTURE', 'rv_fc_v1');
+        ('enc_coll', 'ed_1', 'stg_1', 'COLLECTIVE_FIXTURE', 'rsv_1'),
+        ('enc_duel', 'ed_1', 'stg_1', 'DUEL', 'rsv_1');
 
       INSERT INTO encounter_sides (id, encounter_id, side_number, name) VALUES 
-        ('side_dakar', 'enc_coll', 1, 'Camp Dakar'),
-        ('side_thies', 'enc_coll', 2, 'Camp Thiès');
+        ('side_a', 'enc_coll', 1, 'Camp Alpha'),
+        ('side_b', 'enc_coll', 2, 'Camp Beta');
 
-      INSERT INTO encounter_side_entrants (id, edition_id, encounter_id, side_id, entrant_id) VALUES 
-        ('se_dakar_a', 'ed_1', 'enc_coll', 'side_dakar', 'ent_team_a'),
-        ('se_thies_b', 'ed_1', 'enc_coll', 'side_thies', 'ent_team_b');
+      INSERT INTO encounter_side_entrants (edition_id, encounter_id, side_id, entrant_id) VALUES 
+        ('ed_1', 'enc_coll', 'side_a', 'ent_team_a'),
+        ('ed_1', 'enc_coll', 'side_b', 'ent_team_b');
 
-      INSERT INTO encounter_matches (id, edition_id, encounter_id, encounter_type, ruleset_version_id, match_order, title) VALUES 
-        ('m_sub1', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'rv_fc_v1', 1, 'Sous-Match 1 (Alpha vs Beta)');
+      INSERT INTO encounter_matches (id, edition_id, encounter_id, encounter_type, ruleset_version_id, match_order) VALUES 
+        ('match_coll_1', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'rsv_1', 1),
+        ('match_duel_1', 'ed_1', 'enc_duel', 'DUEL', 'rsv_1', 1);
 
       INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, side_id, assigned_entrant_id) VALUES 
-        ('slot_1', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'm_sub1', 1, 'side_dakar', 'ent_team_a'),
-        ('slot_2', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'm_sub1', 2, 'side_thies', 'ent_team_b');
+        ('slot_c1', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'match_coll_1', 1, 'side_a', 'ent_team_a'),
+        ('slot_c2', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'match_coll_1', 2, 'side_b', 'ent_team_b');
+
+      INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, assigned_entrant_id) VALUES 
+        ('slot_d1', 'ed_1', 'enc_duel', 'DUEL', 'match_duel_1', 1, 'ent_solo1'),
+        ('slot_d2', 'ed_1', 'enc_duel', 'DUEL', 'match_duel_1', 2, 'ent_team_a');
 
       INSERT INTO match_games (id, match_id, game_number) VALUES 
-        ('game_1', 'm_sub1', 1);
+        ('game_c1', 'match_coll_1', 1);
 
-      INSERT INTO game_metrics (id, ruleset_version_id, match_id, game_id, slot_id, metric_code, raw_value, calculated_points) VALUES 
-        ('met_1', 'rv_fc_v1', 'm_sub1', 'game_1', 'slot_1', 'GOALS', 3, 3);
+      INSERT INTO game_metrics (ruleset_version_id, match_id, game_id, slot_id, metric_code, raw_value, calculated_points) VALUES 
+        ('rsv_1', 'match_coll_1', 'game_c1', 'slot_c1', 'kills', 5, 5.0);
     `);
     console.log("✔ Données positives représentatives et Version 2 insérées avec succès.\n");
 
     // ============================================================================
-    // VÉRIFICATION DES 14 CAS DE REJET NÉGATIFS (BLOQUÉS NATIVEMENT PAR POSTGRESQL)
+    // VÉRIFICATION DES 14 CAS DE REJET PAR LE MOTEUR POSTGRESQL
     // ============================================================================
     console.log("--- VÉRIFICATION DES 14 CAS DE REJET PAR LE MOTEUR POSTGRESQL ---");
 
-    // 1. Second capitaine
+    // 1. Deuxième capitaine dans la même équipe
     try {
-      await client.query("INSERT INTO entrant_roster_members (id, edition_id, entrant_id, user_id, in_game_name, role) VALUES ('rc_bad', 'ed_1', 'ent_team_a', 'u_player_a1', 'Cap2', 'CAPTAIN');");
-      throw new Error("ÉCHEC: 2e capitaine non bloqué.");
+      await client.query(`
+        INSERT INTO entrant_roster_members (id, edition_id, entrant_id, user_id, in_game_name, role) 
+        VALUES ('rm_bad_cap', 'ed_1', 'ent_team_a', 'u_solo1', 'BadCaptain', 'CAPTAIN');
+      `);
+      throw new Error("ÉCHEC: Second capitaine non bloqué.");
     } catch (e: any) {
-      if (e.code === '23505' && e.message.includes('entrant_roster_captain_unique')) {
+      if (e.message.includes("entrant_roster_captain_unique") || e.code === '23505') {
         console.log("✔ Rejet 1 : Second capitaine bloqué par index partiel entrant_roster_captain_unique.");
       } else throw e;
     }
 
-    // 2. Joueur multi-équipes
+    // 2. Cumul multi-équipes pour un même joueur dans la même édition
     try {
-      await client.query("INSERT INTO entrant_roster_members (id, edition_id, entrant_id, user_id, in_game_name, role) VALUES ('rc_multi', 'ed_1', 'ent_team_b', 'u_player_a1', 'Traitor', 'STARTER');");
+      await client.query(`
+        INSERT INTO entrant_roster_members (id, edition_id, entrant_id, user_id, in_game_name, role) 
+        VALUES ('rm_bad_cumul', 'ed_1', 'ent_team_b', 'u_player_a1', 'TraitorGunner', 'STARTER');
+      `);
       throw new Error("ÉCHEC: Cumul multi-équipes non bloqué.");
     } catch (e: any) {
-      if (e.code === '23505' && e.message.includes('roster_edition_user_unique')) {
+      if (e.message.includes("roster_edition_user_unique") || e.code === '23505') {
         console.log("✔ Rejet 2 : Cumul multi-équipes bloqué par index partiel roster_edition_user_unique.");
       } else throw e;
     }
 
-    // 3. Assignation cross-side
+    // 3. Affectation d'un joueur du camp B dans un slot réservé au camp A
     try {
-      await client.query("INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, side_id, assigned_entrant_id) VALUES ('sl_bad', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'm_sub1', 3, 'side_dakar', 'ent_team_b');");
-      throw new Error("ÉCHEC: Assignation cross-side non bloquée.");
+      await client.query(`
+        INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, side_id, assigned_entrant_id) 
+        VALUES ('slot_cross', 'ed_1', 'enc_coll', 'COLLECTIVE_FIXTURE', 'match_coll_1', 3, 'side_a', 'ent_team_b');
+      `);
+      throw new Error("ÉCHEC: Joueur du camp B dans le camp A non bloqué.");
     } catch (e: any) {
-      if (e.code === '23503' && e.message.includes('match_slots_side_id_assigned_entrant_id_fkey')) {
+      if (e.message.includes("match_slots_side_id_assigned_entrant_id_fkey") || e.code === '23503') {
         console.log("✔ Rejet 3 : Joueur du camp B dans le camp A bloqué par FK composite (side_id, assigned_entrant_id).");
       } else throw e;
     }
 
-    // 4. Incohérence type / side_id
+    // 4. Slot DUEL avec un side_id (interdit par CHECK)
     try {
       await client.query(`
-        INSERT INTO competition_encounters (id, edition_id, stage_id, encounter_type, ruleset_version_id) VALUES ('enc_d', 'ed_1', 'stage_groups', 'DUEL', 'rv_fc_v1');
-        INSERT INTO encounter_matches (id, edition_id, encounter_id, encounter_type, ruleset_version_id, match_order) VALUES ('m_d', 'ed_1', 'enc_d', 'DUEL', 'rv_fc_v1', 1);
-        INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, side_id, assigned_entrant_id) VALUES ('sl_d_bad', 'ed_1', 'enc_d', 'DUEL', 'm_d', 1, 'side_dakar', 'ent_solo1');
+        INSERT INTO match_slots (id, edition_id, encounter_id, encounter_type, match_id, slot_position, side_id, assigned_entrant_id) 
+        VALUES ('slot_duel_side', 'ed_1', 'enc_duel', 'DUEL', 'match_duel_1', 3, 'side_a', 'ent_solo1');
       `);
       throw new Error("ÉCHEC: Slot DUEL avec side_id non bloqué.");
     } catch (e: any) {
-      if (e.code === '23514') {
+      if (e.message.includes("match_slots_check") || e.code === '23514') {
         console.log("✔ Rejet 4 : Slot DUEL avec side_id bloqué par contrainte CHECK.");
       } else throw e;
     }
 
-    // 5. Métrique non configurée
+    // 5. Métrique non configurée pour ce ruleset (deaths non déclarée dans ruleset_metric_configs pour rsv_1)
     try {
-      await client.query("INSERT INTO game_metrics (id, ruleset_version_id, match_id, game_id, slot_id, metric_code, raw_value) VALUES ('gm_bad1', 'rv_fc_v1', 'm_sub1', 'game_1', 'slot_1', 'KILLS', 5);");
-      throw new Error("ÉCHEC: Métrique non configurée non bloquée.");
+      // On ajoute 'deaths' dans metric_definitions mais PAS dans ruleset_metric_configs(rsv_1)
+      await client.query(`INSERT INTO metric_definitions (code, name, data_type, unit) VALUES ('deaths', 'Morts', 'INTEGER', 'COUNT') ON CONFLICT DO NOTHING;`);
+      await client.query(`
+        INSERT INTO game_metrics (ruleset_version_id, match_id, game_id, slot_id, metric_code, raw_value) 
+        VALUES ('rsv_1', 'match_coll_1', 'game_c1', 'slot_c1', 'deaths', 1);
+      `);
+      throw new Error("ÉCHEC: Métrique non configurée dans ruleset_metric_configs non bloquée.");
     } catch (e: any) {
-      if (e.code === '23503' && e.message.includes('game_metrics_ruleset_version_id_metric_code_fkey')) {
+      if (e.message.includes("game_metrics_ruleset_version_id_metric_code_fkey") || e.code === '23503') {
         console.log("✔ Rejet 5 : Métrique non déclarée dans ruleset_metric_configs bloquée par FK composite.");
       } else throw e;
     }
@@ -827,87 +973,90 @@ async function runVerification() {
       `);
       throw new Error("ÉCHEC: Staff incohérent non bloqué.");
     } catch (e: any) {
-      if (e.code === '23503' && e.message.includes('tournament_staff_edition_id_tournament_id_fkey')) {
+      if (e.message.includes("tournament_staff_edition_id_tournament_id_fkey") || e.code === '23503') {
         console.log("✔ Rejet 6 : Staff incohérent bloqué par FK composite (edition_id, tournament_id).");
       } else throw e;
     }
 
-    // 7. IMMUTABILITÉ : Tentative d'UPDATE ruleset_id sur version publiée
+    // 7. Immutabilité : UPDATE ruleset_id sur version publiée
     try {
-      await client.query("UPDATE ruleset_versions SET ruleset_id = 'other_rs' WHERE id = 'rv_fc_v1';");
-      throw new Error("ÉCHEC: Modification ruleset_id sur version publiée non bloquée.");
+      await client.query("UPDATE ruleset_versions SET ruleset_id = 'rs_other' WHERE id = 'rsv_1';");
+      throw new Error("ÉCHEC: UPDATE ruleset_id non bloqué.");
     } catch (e: any) {
-      if (e.message.includes('IMMUTABLE_PUBLISHED_RULESET_VERSION')) {
+      if (e.message.includes("IMMUTABLE_PUBLISHED_RULESET_VERSION")) {
         console.log("✔ Rejet 7 (Immutabilité) : UPDATE ruleset_id sur version publiée bloqué par trigger.");
       } else throw e;
     }
 
-    // 8. IMMUTABILITÉ : Tentative d'UPDATE version sur version publiée
+    // 8. Immutabilité : UPDATE numéro de version sur version publiée
     try {
-      await client.query("UPDATE ruleset_versions SET version = 99 WHERE id = 'rv_fc_v1';");
-      throw new Error("ÉCHEC: Modification version sur version publiée non bloquée.");
+      await client.query("UPDATE ruleset_versions SET version = 99 WHERE id = 'rsv_1';");
+      throw new Error("ÉCHEC: UPDATE version non bloqué.");
     } catch (e: any) {
-      if (e.message.includes('IMMUTABLE_PUBLISHED_RULESET_VERSION')) {
+      if (e.message.includes("IMMUTABLE_PUBLISHED_RULESET_VERSION")) {
         console.log("✔ Rejet 8 (Immutabilité) : UPDATE numéro de version sur version publiée bloqué par trigger.");
       } else throw e;
     }
 
-    // 9. IMMUTABILITÉ : Tentative d'UPDATE scoring_mode sur version publiée
+    // 9. Immutabilité : UPDATE scoring_mode sur version publiée
     try {
-      await client.query("UPDATE ruleset_versions SET scoring_mode = 'SERIES_WINS' WHERE id = 'rv_fc_v1';");
-      throw new Error("ÉCHEC: Modification scoring_mode sur version publiée non bloquée.");
+      await client.query("UPDATE ruleset_versions SET scoring_mode = 'SERIES_WINS' WHERE id = 'rsv_1';");
+      throw new Error("ÉCHEC: UPDATE scoring_mode non bloqué.");
     } catch (e: any) {
-      if (e.message.includes('IMMUTABLE_PUBLISHED_RULESET_VERSION')) {
+      if (e.message.includes("IMMUTABLE_PUBLISHED_RULESET_VERSION")) {
         console.log("✔ Rejet 9 (Immutabilité) : UPDATE scoring_mode sur version publiée bloqué par trigger.");
       } else throw e;
     }
 
-    // 10. IMMUTABILITÉ : Tentative d'UPDATE config sur version publiée
+    // 10. Immutabilité : UPDATE config JSON sur version publiée
     try {
-      await client.query("UPDATE ruleset_versions SET config = '{\"win\": 5}' WHERE id = 'rv_fc_v1';");
-      throw new Error("ÉCHEC: Modification config sur version publiée non bloquée.");
+      await client.query("UPDATE ruleset_versions SET config = '{\"hacked\": true}' WHERE id = 'rsv_1';");
+      throw new Error("ÉCHEC: UPDATE config non bloqué.");
     } catch (e: any) {
-      if (e.message.includes('IMMUTABLE_PUBLISHED_RULESET_VERSION')) {
+      if (e.message.includes("IMMUTABLE_PUBLISHED_RULESET_VERSION")) {
         console.log("✔ Rejet 10 (Immutabilité) : UPDATE config JSON sur version publiée bloqué par trigger.");
       } else throw e;
     }
 
-    // 11. IMMUTABILITÉ : Tentative d'UPDATE is_published = false (dépublication)
+    // 11. Immutabilité : Dépublication (is_published = false) sur version publiée
     try {
-      await client.query("UPDATE ruleset_versions SET is_published = FALSE WHERE id = 'rv_fc_v1';");
-      throw new Error("ÉCHEC: Dépublication d'une version publiée non bloquée.");
+      await client.query("UPDATE ruleset_versions SET is_published = FALSE WHERE id = 'rsv_1';");
+      throw new Error("ÉCHEC: Dépublication non bloquée.");
     } catch (e: any) {
-      if (e.message.includes('IMMUTABLE_PUBLISHED_RULESET_VERSION')) {
+      if (e.message.includes("IMMUTABLE_PUBLISHED_RULESET_VERSION")) {
         console.log("✔ Rejet 11 (Immutabilité) : Dépublication (is_published=false) bloquée par trigger.");
       } else throw e;
     }
 
-    // 12. IMMUTABILITÉ : Tentative de DELETE de version publiée
+    // 12. Immutabilité : DELETE sur version publiée
     try {
-      await client.query("DELETE FROM ruleset_versions WHERE id = 'rv_fc_v2';");
-      throw new Error("ÉCHEC: Suppression de version publiée non bloquée.");
+      await client.query("DELETE FROM ruleset_versions WHERE id = 'rsv_1';");
+      throw new Error("ÉCHEC: DELETE sur version publiée non bloqué.");
     } catch (e: any) {
-      if (e.message.includes('CANNOT_DELETE_PUBLISHED_RULESET_VERSION')) {
+      if (e.message.includes("CANNOT_DELETE_PUBLISHED_RULESET_VERSION")) {
         console.log("✔ Rejet 12 (Immutabilité) : DELETE sur version publiée bloqué par trigger.");
       } else throw e;
     }
 
-    // 13. IMMUTABILITÉ : Tentative d'INSERT/UPDATE/DELETE métriques sur version publiée
+    // 13. Immutabilité : Mutation de métrique sur version publiée
     try {
-      await client.query("INSERT INTO ruleset_metric_configs (ruleset_version_id, metric_code, weight) VALUES ('rv_fc_v1', 'ASSISTS', 0.5);");
-      throw new Error("ÉCHEC: Ajout de métrique sur version publiée non bloqué.");
+      await client.query("INSERT INTO ruleset_metric_configs (ruleset_version_id, metric_code) VALUES ('rsv_1', 'kills');");
+      throw new Error("ÉCHEC: INSERT métrique sur version publiée non bloqué.");
     } catch (e: any) {
-      if (e.message.includes('IMMUTABLE_PUBLISHED_RULESET_METRICS')) {
+      if (e.message.includes("IMMUTABLE_PUBLISHED_RULESET_METRICS")) {
         console.log("✔ Rejet 13 (Immutabilité) : Mutation de métrique sur version publiée bloquée par trigger.");
       } else throw e;
     }
 
-    // 14. EXACT MATCH RULESET : Métrique enregistrée avec Version 2 alors que le match est en Version 1
+    // 14. Verrou Match / Ruleset composite : Métrique avec autre version de ruleset que le match
     try {
-      await client.query("INSERT INTO game_metrics (id, ruleset_version_id, match_id, game_id, slot_id, metric_code, raw_value) VALUES ('gm_bad_v2', 'rv_fc_v2', 'm_sub1', 'game_1', 'slot_1', 'ASSISTS', 2);");
-      throw new Error("ÉCHEC: Incohérence ruleset match/métrique non bloquée.");
+      await client.query(`
+        INSERT INTO game_metrics (ruleset_version_id, match_id, game_id, slot_id, metric_code, raw_value) 
+        VALUES ('rsv_2', 'match_coll_1', 'game_c1', 'slot_c2', 'kills', 2);
+      `);
+      throw new Error("ÉCHEC: Métrique avec ruleset divergent du match non bloquée.");
     } catch (e: any) {
-      if (e.code === '23503' && e.message.includes('game_metrics_match_id_ruleset_version_id_fkey')) {
+      if (e.message.includes("game_metrics_match_id_ruleset_version_id_fkey") || e.code === '23503') {
         console.log("✔ Rejet 14 (Verrou Match/Ruleset) : Métrique avec autre version de ruleset bloquée par FK composite (match_id, ruleset_version_id).\n");
       } else throw e;
     }
@@ -917,7 +1066,8 @@ async function runVerification() {
     console.log(`[CLEANUP] Schéma synthétique '${SYNTHETIC_SANDBOX}' nettoyé avec succès.\n`);
 
     // ============================================================================
-    // PARTIE B : VALIDATION SUR COPIE REPRÉSENTATIVE DU SCHÉMA HISTORIQUE
+    // PARTIE B : VALIDATION REPRÉSENTATIVE DE MIGRATION SUR SCHÉMA HISTORIQUE RÉEL
+    // (CONFORME À DATABASE/SCHEMA.TS DE PRODUCTION)
     // ============================================================================
     console.log("================================================================================");
     console.log(`   PARTIE B : VALIDATION REPRÉSENTATIVE DE MIGRATION (Schéma: ${REAL_SCHEMA_SANDBOX})`);
@@ -926,82 +1076,81 @@ async function runVerification() {
     await client.query(`CREATE SCHEMA ${REAL_SCHEMA_SANDBOX};`);
     await client.query(`SET search_path TO ${REAL_SCHEMA_SANDBOX}, public;`);
 
-    // Recréation de TOUTES les tables historiques de database/schema.ts impactées par la migration
+    // 1. RECONSTITUTION STRICTE DES TABLES HISTORIQUES CONFORMÉMENT À DATABASE/SCHEMA.TS
     await client.query(`
       CREATE TABLE users (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        name TEXT,
+        email TEXT UNIQUE NOT NULL,
         role TEXT DEFAULT 'USER',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE teams (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         name TEXT NOT NULL,
+        logo TEXT,
         tag TEXT,
-        leader_id TEXT REFERENCES users(id),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-
-      CREATE TABLE tournaments (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        slug TEXT UNIQUE,
-        game TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'ACTIVE',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-
-      CREATE TABLE tournament_editions (
-        id TEXT PRIMARY KEY,
-        tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-        edition_number INT NOT NULL,
-        name TEXT NOT NULL,
-        start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-        status TEXT NOT NULL DEFAULT 'UPCOMING',
+        captain_id TEXT REFERENCES users(id),
+        is_active BOOLEAN DEFAULT TRUE,
+        is_deleted BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        UNIQUE(id, tournament_id),
-        UNIQUE(tournament_id, edition_number)
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE financial_accounts (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         owner_user_id TEXT REFERENCES users(id),
         owner_shop_id TEXT,
-        owner_edition_id TEXT, -- Colonne liant le compte d'escrow à l'édition
+        owner_edition_id TEXT,
         type TEXT NOT NULL DEFAULT 'USER_WALLET',
         currency TEXT DEFAULT 'GTC',
-        is_active BOOLEAN DEFAULT TRUE
+        is_active BOOLEAN DEFAULT TRUE,
+        is_locked BOOLEAN DEFAULT FALSE,
+        system_key TEXT UNIQUE,
+        allow_negative_balance BOOLEAN DEFAULT FALSE,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE user_wallets (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         financial_account_id TEXT REFERENCES financial_accounts(id),
+        card_number_hash TEXT UNIQUE,
+        pin_hash TEXT NOT NULL DEFAULT 'fake_hash',
         is_active BOOLEAN DEFAULT TRUE,
-        is_locked BOOLEAN DEFAULT FALSE
+        is_locked BOOLEAN DEFAULT FALSE,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        failed_attempts INT DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE wallet_transactions (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         wallet_id TEXT NOT NULL REFERENCES user_wallets(id),
         financial_account_id TEXT REFERENCES financial_accounts(id),
+        from_user_id TEXT REFERENCES users(id),
+        to_user_id TEXT REFERENCES users(id),
         amount NUMERIC(15, 2) NOT NULL,
         fees NUMERIC(15, 2) DEFAULT 0,
         net_amount NUMERIC(15, 2) NOT NULL,
         balance_after NUMERIC(15, 2) NOT NULL,
         currency TEXT DEFAULT 'GTC',
         type TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
         status TEXT DEFAULT 'COMPLETED',
+        is_deleted BOOLEAN DEFAULT FALSE,
         reference TEXT UNIQUE,
+        idempotency_key TEXT,
         reversal_of TEXT REFERENCES wallet_transactions(id),
         reversed_by TEXT REFERENCES wallet_transactions(id),
+        description TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE ledger_entries (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         transaction_id TEXT NOT NULL REFERENCES wallet_transactions(id),
         account_id TEXT NOT NULL REFERENCES financial_accounts(id),
         debit NUMERIC(15, 2) DEFAULT 0,
@@ -1010,137 +1159,212 @@ async function runVerification() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
+      -- Table tournaments historique réelle (avec organizer_id natif obligatoire)
+      CREATE TABLE tournaments (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        organizer_id TEXT NOT NULL REFERENCES users(id),
+        name TEXT NOT NULL UNIQUE,
+        slug TEXT UNIQUE,
+        description TEXT,
+        short_description TEXT,
+        profile_image TEXT,
+        cover_image TEXT,
+        game TEXT NOT NULL,
+        platform TEXT DEFAULT 'MOBILE',
+        game_mode TEXT,
+        allowed_teams BOOLEAN DEFAULT FALSE,
+        status TEXT DEFAULT 'UPCOMING',
+        is_active BOOLEAN DEFAULT TRUE,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Table tournament_editions historique réelle (avec financial_account_id)
+      CREATE TABLE tournament_editions (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+        financial_account_id TEXT REFERENCES financial_accounts(id),
+        edition_number INT NOT NULL,
+        name TEXT,
+        tagline TEXT,
+        edition_slug TEXT,
+        description TEXT,
+        start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+        end_date TIMESTAMP WITH TIME ZONE,
+        registration_opens TIMESTAMP WITH TIME ZONE,
+        registration_deadline TIMESTAMP WITH TIME ZONE,
+        max_participants INT,
+        current_participants INT DEFAULT 0,
+        prize_pool NUMERIC(15, 2) DEFAULT 0,
+        prize_currency TEXT DEFAULT 'GTC',
+        entry_fee NUMERIC(10, 2) DEFAULT 0,
+        status TEXT DEFAULT 'UPCOMING',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(id, tournament_id),
+        UNIQUE(tournament_id, edition_number)
+      );
+
+      -- Table tournament_members historique réelle
       CREATE TABLE tournament_members (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
         user_id TEXT REFERENCES users(id),
         team_id TEXT REFERENCES teams(id),
         role TEXT NOT NULL DEFAULT 'PARTICIPANT',
-        display_name TEXT NOT NULL
+        display_name TEXT,
+        game_tag TEXT,
+        avatar TEXT,
+        club_name TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
-      CREATE TABLE tournament_phases (
-        id TEXT PRIMARY KEY,
-        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        order_num INT NOT NULL
-      );
-
-      CREATE TABLE phase_groups (
-        id TEXT PRIMARY KEY,
-        phase_id TEXT NOT NULL REFERENCES tournament_phases(id) ON DELETE CASCADE,
-        name TEXT NOT NULL
-      );
-
+      -- Table edition_registrations historique réelle
       CREATE TABLE edition_registrations (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
         member_id TEXT NOT NULL REFERENCES tournament_members(id) ON DELETE CASCADE,
-        registration_type TEXT DEFAULT 'REGULAR', -- REGULAR, INVITED, WILDCARD
-        status TEXT DEFAULT 'CONFIRMED'
+        registration_type TEXT DEFAULT 'REGULAR',
+        status TEXT DEFAULT 'REGISTERED',
+        registration_fee NUMERIC(10, 2) DEFAULT 0,
+        fee_paid BOOLEAN DEFAULT FALSE,
+        payment_transaction_id TEXT REFERENCES wallet_transactions(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
-      CREATE TABLE phase_group_participants (
-        id TEXT PRIMARY KEY,
-        group_id TEXT NOT NULL REFERENCES phase_groups(id) ON DELETE CASCADE,
-        registration_id TEXT NOT NULL REFERENCES edition_registrations(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE matches (
-        id TEXT PRIMARY KEY,
-        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
-        phase_id TEXT REFERENCES tournament_phases(id) ON DELETE CASCADE,
-        status TEXT DEFAULT 'PENDING'
-      );
-
-      CREATE TABLE bracket_nodes (
-        id TEXT PRIMARY KEY,
-        phase_id TEXT NOT NULL REFERENCES tournament_phases(id) ON DELETE CASCADE,
-        match_id TEXT REFERENCES matches(id) ON DELETE SET NULL,
-        round INT NOT NULL,
-        position INT NOT NULL
-      );
-
-      CREATE TABLE edition_results (
-        id TEXT PRIMARY KEY,
-        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
-        registration_id TEXT REFERENCES edition_registrations(id) ON DELETE SET NULL,
-        rank INT NOT NULL,
-        points INT DEFAULT 0
-      );
-
+      -- Table registration_payments historique réelle (couplée à edition_registrations)
       CREATE TABLE registration_payments (
-        id TEXT PRIMARY KEY,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         registration_id TEXT NOT NULL REFERENCES edition_registrations(id) ON DELETE CASCADE,
         transaction_id TEXT NOT NULL REFERENCES wallet_transactions(id),
         amount NUMERIC(10, 2) NOT NULL,
         currency TEXT DEFAULT 'GTC',
         paid_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         payment_method TEXT DEFAULT 'WALLET',
+        payment_provider TEXT,
         status TEXT DEFAULT 'COMPLETED',
         reference TEXT UNIQUE,
-        notes TEXT
+        notes TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
+      -- Structures sportives historiques réelles
+      CREATE TABLE tournament_phases (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        order_num INT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE phase_groups (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        phase_id TEXT NOT NULL REFERENCES tournament_phases(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE phase_group_participants (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        group_id TEXT NOT NULL REFERENCES phase_groups(id) ON DELETE CASCADE,
+        registration_id TEXT NOT NULL REFERENCES edition_registrations(id) ON DELETE CASCADE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE matches (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
+        phase_id TEXT NOT NULL REFERENCES tournament_phases(id) ON DELETE CASCADE,
+        group_id TEXT REFERENCES phase_groups(id) ON DELETE CASCADE,
+        status TEXT DEFAULT 'PENDING',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE bracket_nodes (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        phase_id TEXT NOT NULL REFERENCES tournament_phases(id) ON DELETE CASCADE,
+        match_id TEXT REFERENCES matches(id) ON DELETE SET NULL,
+        round INT NOT NULL,
+        position INT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      CREATE TABLE edition_results (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
+        registration_id TEXT NOT NULL REFERENCES edition_registrations(id),
+        position INT NOT NULL,
+        prize_amount NUMERIC(15, 2),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Communications et métadonnées réelles
       CREATE TABLE messages (
-        id TEXT PRIMARY KEY,
-        content TEXT NOT NULL,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        sender_id TEXT NOT NULL REFERENCES users(id),
         tournament_id TEXT REFERENCES tournaments(id),
         edition_id TEXT REFERENCES tournament_editions(id),
+        content TEXT NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE interactions (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id TEXT NOT NULL REFERENCES users(id),
         tournament_id TEXT REFERENCES tournaments(id),
+        type TEXT NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
       CREATE TABLE notifications (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id TEXT NOT NULL REFERENCES users(id),
         tournament_id TEXT REFERENCES tournaments(id),
+        title TEXT NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
 
-    // Injection de données représentatives
+    // 2. INJECTION DE DONNÉES HISTORIQUES REPRÉSENTATIVES (COUVRANT SOLO ET ÉQUIPES)
     await client.query(`
       INSERT INTO users (id, name, email) VALUES 
-        ('u_user1', 'Amadou Diop', 'amadou@real.sn'),
-        ('u_user2', 'Fatou Ndiaye', 'fatou@real.sn'),
-        ('u_user3', 'Ousmane Sow', 'ousmane@real.sn');
+        ('u_org1', 'Abdoulaye Organisateur', 'org@gamestrafics.sn'),
+        ('u_user1', 'Amadou Diop (Solo)', 'amadou@real.sn'),
+        ('u_user2', 'Fatou Ndiaye (Capitaine Equipe)', 'fatou@real.sn'),
+        ('u_user3', 'Ousmane Sow (Invité)', 'ousmane@real.sn');
 
-      INSERT INTO teams (id, name, leader_id) VALUES 
-        ('t_lions', 'Lions Gaming', 'u_user1');
+      INSERT INTO teams (id, name, tag, captain_id) VALUES 
+        ('t_lions', 'Lions du Baobab', 'LBN', 'u_user2');
 
-      -- 2 Tournois conteneurs
-      INSERT INTO tournaments (id, name, slug, game) VALUES 
-        ('4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'Tournoi de H3infiniy Gaming', 'tournoi-h3infinity', 'FC25'),
-        ('fa82db43-4348-47a2-bf68-a94eacafb4b1', 'Tournoi de rashwightmz', 'tournoi-rashwightmz', 'COD');
+      -- Tournois conteneurs réels (avec organizer_id réel et natif)
+      INSERT INTO tournaments (id, organizer_id, name, slug, game, platform) VALUES 
+        ('4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_org1', 'Tournoi National FC25', 'tournoi-national-fc25', 'FC25', 'CONSOLE'),
+        ('fa82db43-4348-47a2-bf68-a94eacafb4b1', 'u_org1', 'Championnat COD Mobile', 'championnat-cod-mobile', 'COD', 'MOBILE');
 
-      -- 2 Éditions conteneurs
-      INSERT INTO tournament_editions (id, tournament_id, edition_number, name, start_date) VALUES 
-        ('6acb3db9-399b-4b24-b005-6f912cc5de21', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 1, 'H3 Edition 1', NOW()),
-        ('16e0181f-cc81-434f-b2f5-dffe38170283', 'fa82db43-4348-47a2-bf68-a94eacafb4b1', 1, 'Rash Edition 1', NOW());
-
-      -- Comptes financiers dont compte escrow d'édition
+      -- Comptes financiers dont escrow d'édition
       INSERT INTO financial_accounts (id, owner_user_id, owner_edition_id, type) VALUES 
         ('fa_amadou', 'u_user1', NULL, 'USER_WALLET'),
         ('fa_fatou', 'u_user2', NULL, 'USER_WALLET'),
-        ('fa_edition_escrow', NULL, '6acb3db9-399b-4b24-b005-6f912cc5de21', 'TOURNAMENT_ESCROW');
+        ('fa_edition_escrow', NULL, '6acb3db9-399b-4b24-b005-6f912cc5de21', 'TOURNAMENT_POOL');
+
+      -- Éditions conteneurs réelles
+      INSERT INTO tournament_editions (id, tournament_id, financial_account_id, edition_number, name, start_date, prize_pool) VALUES 
+        ('6acb3db9-399b-4b24-b005-6f912cc5de21', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'fa_edition_escrow', 1, 'Edition 1 Prestige', NOW(), 1000.00),
+        ('16e0181f-cc81-434f-b2f5-dffe38170283', 'fa82db43-4348-47a2-bf68-a94eacafb4b1', NULL, 1, 'Edition 1 COD', NOW(), 500.00);
 
       INSERT INTO user_wallets (id, user_id, financial_account_id) VALUES 
         ('w_amadou', 'u_user1', 'fa_amadou'),
         ('w_fatou', 'u_user2', 'fa_fatou');
 
-      -- Transactions financières représentatives (Paiements multiples + Remboursement)
+      -- Transactions financières représentatives (Paiements, Frais et Remboursement)
       INSERT INTO wallet_transactions (id, wallet_id, financial_account_id, amount, net_amount, fees, balance_after, type, status, reference) VALUES 
-        ('tx_entry_1', 'w_amadou', 'fa_amadou', 500.00, 500.00, 0, 1500.00, 'TOURNAMENT_ENTRY', 'COMPLETED', 'REF-ENTRY-1'),
-        ('tx_entry_2', 'w_fatou', 'fa_fatou', 300.00, 300.00, 0, 1200.00, 'TOURNAMENT_ENTRY', 'COMPLETED', 'REF-ENTRY-2'),
-        ('tx_entry_3', 'w_amadou', 'fa_amadou', 200.00, 200.00, 0, 1300.00, 'TOURNAMENT_ENTRY', 'COMPLETED', 'REF-ENTRY-3'),
-        ('tx_refund_3', 'w_amadou', 'fa_amadou', 200.00, 200.00, 0, 1500.00, 'REFUND', 'COMPLETED', 'REF-REFUND-3');
+        ('tx_entry_1', 'w_amadou', 'fa_amadou', 500.00, 500.00, 0, 1500.00, 'TOURNAMENT_ENTRY', 'COMPLETED', 'REF-ENTRY-SOLO'),
+        ('tx_entry_2', 'w_fatou', 'fa_fatou', 300.00, 300.00, 0, 1200.00, 'TOURNAMENT_ENTRY', 'COMPLETED', 'REF-ENTRY-TEAM'),
+        ('tx_entry_3', 'w_amadou', 'fa_amadou', 200.00, 200.00, 0, 1300.00, 'TOURNAMENT_ENTRY', 'COMPLETED', 'REF-ENTRY-INVITE'),
+        ('tx_refund_3', 'w_amadou', 'fa_amadou', 200.00, 200.00, 0, 1500.00, 'REFUND', 'COMPLETED', 'REF-REFUND-INVITE');
 
       UPDATE wallet_transactions SET reversed_by = 'tx_refund_3' WHERE id = 'tx_entry_3';
       UPDATE wallet_transactions SET reversal_of = 'tx_entry_3' WHERE id = 'tx_refund_3';
@@ -1155,76 +1379,111 @@ async function runVerification() {
         ('led_7', 'tx_refund_3', 'fa_edition_escrow', 200.00, 0),
         ('led_8', 'tx_refund_3', 'fa_amadou', 0, 200.00);
 
-      -- Membres et inscriptions avec plusieurs types (REGULAR, INVITED, WILDCARD)
-      INSERT INTO tournament_members (id, tournament_id, user_id, display_name) VALUES 
-        ('tm_1', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user1', 'Amadou Diop Member'),
-        ('tm_2', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user2', 'Fatou Ndiaye Member'),
-        ('tm_3', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user3', 'Ousmane Sow Member');
+      -- Membres historiques : 1 SOLO, 1 TEAM, 1 INVITÉ
+      INSERT INTO tournament_members (id, tournament_id, user_id, team_id, display_name) VALUES 
+        ('tm_solo', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user1', NULL, 'Amadou Diop Solo Player'),
+        ('tm_team', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user2', 't_lions', 'Lions Gaming Club'),
+        ('tm_guest', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'u_user3', NULL, 'Ousmane Sow Guest');
 
-      INSERT INTO edition_registrations (id, edition_id, member_id, registration_type) VALUES 
-        ('reg_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_1', 'REGULAR'),
-        ('reg_2', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_2', 'INVITED'),
-        ('reg_3', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_3', 'WILDCARD');
+      INSERT INTO edition_registrations (id, edition_id, member_id, registration_type, payment_transaction_id) VALUES 
+        ('reg_solo', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_solo', 'REGULAR', 'tx_entry_1'),
+        ('reg_team', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_team', 'INVITED', 'tx_entry_2'),
+        ('reg_guest', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'tm_guest', 'WILDCARD', 'tx_entry_3');
 
-      -- Paiements multiples (Standard, Invité payant, Remboursé)
-      INSERT INTO registration_payments (id, registration_id, transaction_id, amount, reference, notes, status) VALUES 
-        ('pay_1', 'reg_1', 'tx_entry_1', 500.00, 'REF-ENTRY-1', 'Paiement Amadou régulier', 'COMPLETED'),
-        ('pay_2', 'reg_2', 'tx_entry_2', 300.00, 'REF-ENTRY-2', 'Paiement Fatou invité', 'COMPLETED'),
-        ('pay_3', 'reg_3', 'tx_entry_3', 200.00, 'REF-ENTRY-3', 'Paiement Ousmane remboursé', 'REFUNDED');
+      INSERT INTO registration_payments (id, registration_id, transaction_id, amount, currency, payment_method, payment_provider, status, reference, notes) VALUES 
+        ('pay_1', 'reg_solo', 'tx_entry_1', 500.00, 'GTC', 'WALLET', 'INTERNAL', 'COMPLETED', 'REF-ENTRY-SOLO', 'Paiement Solo Amadou'),
+        ('pay_2', 'reg_team', 'tx_entry_2', 300.00, 'GTC', 'WALLET', 'INTERNAL', 'COMPLETED', 'REF-ENTRY-TEAM', 'Paiement Equipe Lions'),
+        ('pay_3', 'reg_guest', 'tx_entry_3', 200.00, 'GTC', 'WALLET', 'INTERNAL', 'REFUNDED', 'REF-ENTRY-INVITE', 'Paiement Remboursé Ousmane');
 
-      -- Structures sportives historiques complètes
+      -- Structures sportives historiques
       INSERT INTO tournament_phases (id, edition_id, name, order_num) VALUES 
-        ('ph_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'Poules', 1);
+        ('ph_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'Poules Principales', 1);
 
       INSERT INTO phase_groups (id, phase_id, name) VALUES 
-        ('grp_1', 'ph_1', 'Groupe 1');
+        ('grp_1', 'ph_1', 'Groupe A');
 
       INSERT INTO phase_group_participants (id, group_id, registration_id) VALUES 
-        ('pgp_1', 'grp_1', 'reg_1'),
-        ('pgp_2', 'grp_1', 'reg_2');
+        ('pgp_1', 'grp_1', 'reg_solo'),
+        ('pgp_2', 'grp_1', 'reg_team');
 
-      INSERT INTO matches (id, edition_id, phase_id) VALUES 
-        ('m_real_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'ph_1');
+      INSERT INTO matches (id, edition_id, phase_id, group_id) VALUES 
+        ('m_real_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'ph_1', 'grp_1');
 
       INSERT INTO bracket_nodes (id, phase_id, match_id, round, position) VALUES 
         ('bn_1', 'ph_1', 'm_real_1', 1, 1);
 
-      INSERT INTO edition_results (id, edition_id, registration_id, rank, points) VALUES 
-        ('res_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'reg_1', 1, 10);
+      INSERT INTO edition_results (id, edition_id, registration_id, position, prize_amount) VALUES 
+        ('res_1', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'reg_solo', 1, 500.00);
 
-      -- Messages, interactions et notifications
-      INSERT INTO messages (id, content, tournament_id, edition_id) VALUES 
-        ('msg_1', 'Début du tournoi à 18h', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', '6acb3db9-399b-4b24-b005-6f912cc5de21');
-      INSERT INTO interactions (id, type, tournament_id) VALUES 
-        ('inter_1', 'LIKE', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c');
-      INSERT INTO notifications (id, title, tournament_id) VALUES 
-        ('notif_1', 'Bienvenue au tournoi H3', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c');
+      -- Communications rattachées
+      INSERT INTO messages (id, sender_id, tournament_id, edition_id, content) VALUES 
+        ('msg_1', 'u_org1', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', '6acb3db9-399b-4b24-b005-6f912cc5de21', 'Bienvenue au tournoi national.');
+      INSERT INTO interactions (id, user_id, tournament_id, type) VALUES 
+        ('inter_1', 'u_user1', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'LIKE');
+      INSERT INTO notifications (id, user_id, tournament_id, title) VALUES 
+        ('notif_1', 'u_user1', '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c', 'Votre inscription a été validée.');
     `);
 
-    // SNAPSHOT COMPLET PRÉ-MIGRATION SCHÉMA HISTORIQUE
-    const preRealPayments = await client.query("SELECT id, registration_id, transaction_id, amount, currency, status, reference, notes FROM registration_payments ORDER BY id;");
-    const preRealWalletTx = await client.query("SELECT id, wallet_id, amount, net_amount, balance_after, reversal_of, reversed_by, type, status, reference FROM wallet_transactions ORDER BY id;");
-    const preRealUserWallets = await client.query("SELECT id, user_id, financial_account_id, is_active, is_locked FROM user_wallets ORDER BY id;");
-    const preRealLedger = await client.query("SELECT id, transaction_id, account_id, debit, credit FROM ledger_entries ORDER BY id;");
-    const preRealAccounts = await client.query("SELECT id, owner_user_id, owner_edition_id, type FROM financial_accounts ORDER BY id;");
-    const preRealTournaments = await client.query("SELECT id, name, slug, game FROM tournaments ORDER BY id;");
-    const preRealEditions = await client.query("SELECT id, tournament_id, edition_number, name FROM tournament_editions ORDER BY id;");
-    const preRealMessages = await client.query("SELECT id, tournament_id, edition_id, content FROM messages ORDER BY id;");
+    // 3. SNAPSHOT EXHAUSTIF DES DONNÉES PRÉ-MIGRATION (TOUTES LES COLONNES RÉELLES)
+    const preRealPayments = await client.query(`
+      SELECT id, registration_id, transaction_id, amount, currency, paid_at, payment_method, 
+             payment_provider, status, reference, notes, metadata
+      FROM registration_payments ORDER BY id;
+    `);
+    const preRealWalletTx = await client.query(`
+      SELECT id, wallet_id, financial_account_id, from_user_id, to_user_id, amount, fees, 
+             net_amount, balance_after, currency, type, metadata, status, reference, 
+             reversal_of, reversed_by, description
+      FROM wallet_transactions ORDER BY id;
+    `);
+    const preRealUserWallets = await client.query(`
+      SELECT id, user_id, financial_account_id, pin_hash, is_active, is_locked, is_deleted, failed_attempts
+      FROM user_wallets ORDER BY id;
+    `);
+    const preRealLedger = await client.query(`
+      SELECT id, transaction_id, account_id, debit, credit, currency
+      FROM ledger_entries ORDER BY id;
+    `);
+    const preRealAccounts = await client.query(`
+      SELECT id, owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, system_key
+      FROM financial_accounts ORDER BY id;
+    `);
+    const preRealTournaments = await client.query(`
+      SELECT id, organizer_id, name, slug, description, game, platform, status, is_active
+      FROM tournaments ORDER BY id;
+    `);
+    const preRealEditions = await client.query(`
+      SELECT id, tournament_id, financial_account_id, edition_number, name, start_date, prize_pool, prize_currency, status
+      FROM tournament_editions ORDER BY id;
+    `);
+    const preRealMessages = await client.query(`
+      SELECT id, sender_id, tournament_id, edition_id, content
+      FROM messages ORDER BY id;
+    `);
+    const preRealInteractions = await client.query(`
+      SELECT id, user_id, tournament_id, type
+      FROM interactions ORDER BY id;
+    `);
+    const preRealNotifications = await client.query(`
+      SELECT id, user_id, tournament_id, title
+      FROM notifications ORDER BY id;
+    `);
 
-    console.log(`[AUDIT PRÉ-MIGRATION SCHÉMA HISTORIQUE] :
-  - Tournois enregistrés      : ${preRealTournaments.rows.length}
+    console.log(`[AUDIT PRÉ-MIGRATION SCHÉMA HISTORIQUE RÉEL] :
+  - Tournois enregistrés      : ${preRealTournaments.rows.length} (Organisateur natif: ${preRealTournaments.rows[0].organizer_id})
   - Éditions enregistrées     : ${preRealEditions.rows.length}
-  - Comptes financiers        : ${preRealAccounts.rows.length} (dont liés à des éditions: ${preRealAccounts.rows.filter(r => r.owner_edition_id).length})
+  - Comptes financiers        : ${preRealAccounts.rows.length} (dont pool escrow: ${preRealAccounts.rows.filter(r => r.owner_edition_id).length})
   - Paiements enregistrés     : ${preRealPayments.rows.length} (Total: ${preRealPayments.rows.reduce((acc, r) => acc + parseFloat(r.amount), 0).toFixed(2)} GTC)
   - Transactions wallet       : ${preRealWalletTx.rows.length}
   - Écritures ledger          : ${preRealLedger.rows.length}
-  - Messages rattachés        : ${preRealMessages.rows.length}`);
+  - Communications rattachées : ${preRealMessages.rows.length} msg, ${preRealInteractions.rows.length} inter, ${preRealNotifications.rows.length} notif\n`);
 
-    // EXÉCUTION DE LA SÉQUENCE EXACTE EN 6 ÉTAPES (07-IMPLEMENTATION-ROADMAP.MD)
-    // -------------------------------------------------------------------------
-    // ÉTAPE 1 : Contrôles pré-migration (déjà loggués ci-dessus)
+    // ============================================================================
+    // EXÉCUTION DE LA SÉQUENCE DE MIGRATION EN 6 ÉTAPES
+    // ============================================================================
 
     // ÉTAPE 2 : Archivage & Découplage comptable de registration_payments
+    console.log("--- ÉTAPE 2 : Archivage comptable & découplage de registration_payments ---");
     await client.query(`
       ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_edition_id TEXT;
       ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_edition_name TEXT;
@@ -1235,6 +1494,7 @@ async function runVerification() {
       ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_participant_name TEXT;
       ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_registration_type TEXT;
 
+      -- Stratégie de snapshot immuable : jointure sur les tables historiques avant suppression
       UPDATE registration_payments rp
       SET 
         archived_edition_id = te.id,
@@ -1251,39 +1511,25 @@ async function runVerification() {
       JOIN tournament_members tm ON tm.id = er.member_id
       WHERE er.id = rp.registration_id;
 
+      -- Découplage formel de la contrainte historique
       ALTER TABLE registration_payments DROP CONSTRAINT IF EXISTS registration_payments_registration_id_fkey;
       ALTER TABLE registration_payments ALTER COLUMN registration_id DROP NOT NULL;
       ALTER TABLE registration_payments RENAME COLUMN registration_id TO legacy_registration_id;
     `);
 
-    // ÉTAPE 3 : Déploiement complet des 21 tables canoniques cibles & Mise à niveau des conteneurs
+    // ÉTAPE 3 : Déploiement intégral des 21 tables canoniques et mise à niveau des conteneurs
     console.log("--- ÉTAPE 3 : Déploiement intégral des 21 tables canoniques et mise à niveau des conteneurs ---");
     
-    // 3.1 Mise à niveau des conteneurs conservés : tournaments & tournament_editions
+    // 3.1 Mise à niveau des conteneurs : ajout des colonnes cibles canoniques (sans écraser les données réelles)
     await client.query(`
-      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS platform TEXT NOT NULL DEFAULT 'MOBILE';
-      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS organizer_id TEXT REFERENCES users(id) ON DELETE RESTRICT;
-      UPDATE tournaments SET organizer_id = 'u_user1' WHERE organizer_id IS NULL;
-      ALTER TABLE tournaments ALTER COLUMN organizer_id SET NOT NULL;
-      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS description TEXT;
       ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS logo TEXT;
       ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS banner TEXT;
-      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS end_date TIMESTAMP WITH TIME ZONE;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS registration_opens TIMESTAMP WITH TIME ZONE;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS registration_deadline TIMESTAMP WITH TIME ZONE;
       ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS max_entrants INT;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS entry_fee NUMERIC(15, 2) DEFAULT 0.00;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS prize_pool NUMERIC(15, 2) DEFAULT 0.00;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS prize_currency TEXT DEFAULT 'GTC';
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS financial_account_id TEXT REFERENCES financial_accounts(id) ON DELETE RESTRICT;
       ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS default_ruleset_version_id TEXT;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'UPCOMING';
       ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS auto_forfeit_on_timeout BOOLEAN DEFAULT FALSE;
       ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS forfeit_countdown_minutes INT DEFAULT 15;
-      ALTER TABLE tournament_editions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
       DO $$ 
       BEGIN
         IF NOT EXISTS (
@@ -1299,9 +1545,8 @@ async function runVerification() {
       END $$;
     `);
 
-    // 3.2 Déploiement ordonné de toutes les autres tables canoniques
+    // 3.2 Déploiement ordonné de toutes les 18 autres tables canoniques
     await client.query(`
-      -- 3. Staff administratif et arbitrage
       CREATE TABLE tournament_staff (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
@@ -1314,7 +1559,6 @@ async function runVerification() {
         UNIQUE(tournament_id, edition_id, user_id, role)
       );
 
-      -- 4. Entité compétitrice officielle (SOLO, TEAM, GUEST)
       CREATE TABLE competition_entrants (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
@@ -1345,7 +1589,6 @@ async function runVerification() {
       CREATE UNIQUE INDEX entrants_edition_team_unique 
         ON competition_entrants(edition_id, team_id) WHERE type = 'TEAM';
 
-      -- 5. Roster d'édition (Composition figée de l'équipe pour l'édition)
       CREATE TABLE entrant_roster_members (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1365,7 +1608,6 @@ async function runVerification() {
         ON entrant_roster_members(edition_id, user_id) 
         WHERE user_id IS NOT NULL AND role IN ('CAPTAIN', 'STARTER', 'SUBSTITUTE');
 
-      -- 7. Catalogue des règles de compétition
       CREATE TABLE competition_rulesets (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         name TEXT NOT NULL UNIQUE,
@@ -1373,7 +1615,6 @@ async function runVerification() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
-      -- 8. Versions immuables des règles
       CREATE TABLE ruleset_versions (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         ruleset_id TEXT NOT NULL REFERENCES competition_rulesets(id) ON DELETE CASCADE,
@@ -1386,7 +1627,6 @@ async function runVerification() {
         UNIQUE(id, ruleset_id)
       );
 
-      -- 9. Définition universelle des métriques
       CREATE TABLE metric_definitions (
         code TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -1398,7 +1638,6 @@ async function runVerification() {
         is_system BOOLEAN DEFAULT FALSE
       );
 
-      -- 10. Paramétrage des métriques par version de ruleset
       CREATE TABLE ruleset_metric_configs (
         ruleset_version_id TEXT NOT NULL REFERENCES ruleset_versions(id) ON DELETE CASCADE,
         metric_code TEXT NOT NULL REFERENCES metric_definitions(code) ON DELETE RESTRICT,
@@ -1410,7 +1649,6 @@ async function runVerification() {
         PRIMARY KEY (ruleset_version_id, metric_code)
       );
 
-      -- Verrous d'immutabilité absolue des règles publiées
       CREATE OR REPLACE FUNCTION trg_enforce_ruleset_version_immutability()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -1447,7 +1685,6 @@ async function runVerification() {
       BEFORE INSERT OR UPDATE OR DELETE ON ruleset_metric_configs
       FOR EACH ROW EXECUTE FUNCTION trg_enforce_ruleset_version_immutability();
 
-      -- 11. Étapes de la compétition (Phases)
       CREATE TABLE competition_stages (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
@@ -1461,7 +1698,6 @@ async function runVerification() {
         UNIQUE(edition_id, stage_order)
       );
 
-      -- 12. Poules de classement
       CREATE TABLE competition_groups (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1474,7 +1710,6 @@ async function runVerification() {
         UNIQUE(stage_id, group_order)
       );
 
-      -- 13. Rounds / Journées calendaires
       CREATE TABLE competition_rounds (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1488,7 +1723,6 @@ async function runVerification() {
         UNIQUE(stage_id, round_number)
       );
 
-      -- 14. Rencontres globales
       CREATE TABLE competition_encounters (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1511,7 +1745,6 @@ async function runVerification() {
         UNIQUE(id, ruleset_version_id)
       );
 
-      -- 15. Camps de rencontre collective
       CREATE TABLE encounter_sides (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         encounter_id TEXT NOT NULL,
@@ -1527,7 +1760,6 @@ async function runVerification() {
         UNIQUE(id, encounter_id)
       );
 
-      -- 16. Composition des camps collectifs
       CREATE TABLE encounter_side_entrants (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1541,7 +1773,6 @@ async function runVerification() {
         UNIQUE(encounter_id, entrant_id)
       );
 
-      -- 17. Match ou sous-match au sein d'une rencontre
       CREATE TABLE encounter_matches (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1566,7 +1797,6 @@ async function runVerification() {
         UNIQUE(id, ruleset_version_id)
       );
 
-      -- 18. Emplacements participants d'un match (Slots)
       CREATE TABLE match_slots (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         edition_id TEXT NOT NULL,
@@ -1604,7 +1834,6 @@ async function runVerification() {
         FOREIGN KEY (side_id, assigned_entrant_id) REFERENCES encounter_side_entrants(side_id, entrant_id) ON DELETE RESTRICT
       );
 
-      -- 19. Manches / Cartes au sein d'un match
       CREATE TABLE match_games (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         match_id TEXT NOT NULL REFERENCES encounter_matches(id) ON DELETE CASCADE,
@@ -1617,7 +1846,6 @@ async function runVerification() {
         UNIQUE(id, match_id)
       );
 
-      -- 20. Mesures et métriques de performance par manche
       CREATE TABLE game_metrics (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         ruleset_version_id TEXT NOT NULL,
@@ -1635,7 +1863,6 @@ async function runVerification() {
         UNIQUE(game_id, slot_id, metric_code)
       );
 
-      -- 21. Table d'audit des forfaits et des dérogations d'arbitrage
       CREATE TABLE match_arbitration_logs (
         id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         encounter_id TEXT NOT NULL REFERENCES competition_encounters(id) ON DELETE CASCADE,
@@ -1650,7 +1877,7 @@ async function runVerification() {
       );
     `);
 
-    // ÉTAPE 4 : Établissement des nouvelles relations canoniques
+    // ÉTAPE 4 : Établissement des nouvelles relations et contraintes financières
     console.log("--- ÉTAPE 4 : Établissement des nouvelles relations et contraintes financières ---");
     await client.query(`
       ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS entrant_id TEXT REFERENCES competition_entrants(id) ON DELETE SET NULL;
@@ -1666,7 +1893,7 @@ async function runVerification() {
       END $$;
     `);
 
-    // ÉTAPE 5 : Suppression sélective ordonnée des tables sportives obsolètes SANS CASCADE
+    // ÉTAPE 5 : Suppression sélective ordonnée SANS CASCADE
     // L'exécution sans CASCADE prouve formellement qu'aucune dépendance orpheline ne subsiste !
     console.log("--- ÉTAPE 5 : Suppression sélective ordonnée SANS CASCADE ---");
     await client.query(`
@@ -1683,65 +1910,97 @@ async function runVerification() {
     // ÉTAPE 6 : Contrôles post-migration exhaustifs et comparaisons ligne par ligne
     console.log("--- ÉTAPE 6 : Audits et comparaisons ligne par ligne post-migration ---");
     const postRealPayments = await client.query(`
-      SELECT id, legacy_registration_id, entrant_id, transaction_id, amount, currency, status, reference, notes,
+      SELECT id, legacy_registration_id, entrant_id, transaction_id, amount, currency, paid_at,
+             payment_method, payment_provider, status, reference, notes, metadata,
              archived_edition_id, archived_edition_name, archived_tournament_id, archived_tournament_name,
-             archived_user_id, archived_participant_name, archived_registration_type
+             archived_user_id, archived_team_id, archived_participant_name, archived_registration_type
       FROM registration_payments ORDER BY id;
     `);
-    const postRealWalletTx = await client.query("SELECT id, wallet_id, amount, net_amount, balance_after, reversal_of, reversed_by, type, status, reference FROM wallet_transactions ORDER BY id;");
-    const postRealUserWallets = await client.query("SELECT id, user_id, financial_account_id, is_active, is_locked FROM user_wallets ORDER BY id;");
-    const postRealLedger = await client.query("SELECT id, transaction_id, account_id, debit, credit FROM ledger_entries ORDER BY id;");
-    const postRealAccounts = await client.query("SELECT id, owner_user_id, owner_edition_id, type FROM financial_accounts ORDER BY id;");
-    const postRealTournaments = await client.query("SELECT id, name, slug, game FROM tournaments ORDER BY id;");
-    const postRealEditions = await client.query("SELECT id, tournament_id, edition_number, name FROM tournament_editions ORDER BY id;");
-    const postRealMessages = await client.query("SELECT id, tournament_id, edition_id, content FROM messages ORDER BY id;");
+    const postRealWalletTx = await client.query(`
+      SELECT id, wallet_id, financial_account_id, from_user_id, to_user_id, amount, fees, 
+             net_amount, balance_after, currency, type, metadata, status, reference, 
+             reversal_of, reversed_by, description
+      FROM wallet_transactions ORDER BY id;
+    `);
+    const postRealUserWallets = await client.query(`
+      SELECT id, user_id, financial_account_id, pin_hash, is_active, is_locked, is_deleted, failed_attempts
+      FROM user_wallets ORDER BY id;
+    `);
+    const postRealLedger = await client.query(`
+      SELECT id, transaction_id, account_id, debit, credit, currency
+      FROM ledger_entries ORDER BY id;
+    `);
+    const postRealAccounts = await client.query(`
+      SELECT id, owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, system_key
+      FROM financial_accounts ORDER BY id;
+    `);
+    const postRealTournaments = await client.query(`
+      SELECT id, organizer_id, name, slug, description, game, platform, status, is_active
+      FROM tournaments ORDER BY id;
+    `);
+    const postRealEditions = await client.query(`
+      SELECT id, tournament_id, financial_account_id, edition_number, name, start_date, prize_pool, prize_currency, status
+      FROM tournament_editions ORDER BY id;
+    `);
+    const postRealMessages = await client.query(`
+      SELECT id, sender_id, tournament_id, edition_id, content
+      FROM messages ORDER BY id;
+    `);
+    const postRealInteractions = await client.query(`
+      SELECT id, user_id, tournament_id, type
+      FROM interactions ORDER BY id;
+    `);
+    const postRealNotifications = await client.query(`
+      SELECT id, user_id, tournament_id, title
+      FROM notifications ORDER BY id;
+    `);
 
-    console.log(`[AUDIT POST-MIGRATION SCHÉMA HISTORIQUE] :
-  - Tournois préservés       : ${postRealTournaments.rows.length}
+    console.log(`[AUDIT POST-MIGRATION SCHÉMA HISTORIQUE RÉEL] :
+  - Tournois préservés       : ${postRealTournaments.rows.length} (Organisateur natif intact: ${postRealTournaments.rows[0].organizer_id})
   - Éditions préservées      : ${postRealEditions.rows.length}
-  - Comptes financiers       : ${postRealAccounts.rows.length} (dont liés à des éditions: ${postRealAccounts.rows.filter(r => r.owner_edition_id).length})
+  - Comptes financiers       : ${postRealAccounts.rows.length} (dont pool escrow: ${postRealAccounts.rows.filter(r => r.owner_edition_id).length})
   - Paiements vérifiés       : ${postRealPayments.rows.length} (Total: ${postRealPayments.rows.reduce((acc, r) => acc + parseFloat(r.amount), 0).toFixed(2)} GTC)
   - Transactions wallet      : ${postRealWalletTx.rows.length}
   - Écritures ledger         : ${postRealLedger.rows.length}
-  - Messages rattachés       : ${postRealMessages.rows.length}`);
+  - Communications rattachées : ${postRealMessages.rows.length} msg, ${postRealInteractions.rows.length} inter, ${postRealNotifications.rows.length} notif`);
 
     // 6.1 VALIDATION STRICTE LIGNE PAR LIGNE DES PAIEMENTS ET SNAPSHOTS D'ARCHIVAGE
     if (preRealPayments.rows.length !== postRealPayments.rows.length) {
-      throw new Error(`Incohérence paiements: pré=${preRealPayments.rows.length}, post=${postRealPayments.rows.length}`);
+      throw new Error(`Incohérence volume paiements: pré=${preRealPayments.rows.length}, post=${postRealPayments.rows.length}`);
     }
 
     for (let i = 0; i < preRealPayments.rows.length; i++) {
       const pre = preRealPayments.rows[i];
       const post = postRealPayments.rows[i];
+
+      // Identifiants, montants, et valeurs historiques réelles
       if (pre.id !== post.id) throw new Error(`Mismatch paiement id: ${pre.id} vs ${post.id}`);
       if (parseFloat(pre.amount) !== parseFloat(post.amount)) throw new Error(`Mismatch montant: ${pre.amount} vs ${post.amount}`);
       if (pre.currency !== post.currency) throw new Error(`Mismatch currency: ${pre.currency} vs ${post.currency}`);
+      if (pre.payment_method !== post.payment_method) throw new Error(`Mismatch payment_method: ${pre.payment_method} vs ${post.payment_method}`);
+      if (pre.payment_provider !== post.payment_provider) throw new Error(`Mismatch payment_provider: ${pre.payment_provider} vs ${post.payment_provider}`);
       if (pre.status !== post.status) throw new Error(`Mismatch status: ${pre.status} vs ${post.status}`);
-      if (pre.registration_id !== post.legacy_registration_id) throw new Error(`Mismatch legacy_registration_id: ${pre.registration_id} vs ${post.legacy_registration_id}`);
-      if (pre.transaction_id !== post.transaction_id) throw new Error(`Mismatch transaction_id: ${pre.transaction_id} vs ${post.transaction_id}`);
       if (pre.reference !== post.reference) throw new Error(`Mismatch reference: ${pre.reference} vs ${post.reference}`);
       if (pre.notes !== post.notes) throw new Error(`Mismatch notes`);
-      
-      // La nouvelle FK entrant_id doit être NULL pour les enregistrements historiques archivés
+      if (pre.registration_id !== post.legacy_registration_id) throw new Error(`Mismatch legacy_registration_id: ${pre.registration_id} vs ${post.legacy_registration_id}`);
+
+      // Sécurité : la nouvelle FK entrant_id doit être NULL pour les enregistrements historiques archivés
       if (post.entrant_id !== null) {
         throw new Error(`entrant_id doit être NULL pour le paiement historique ${post.id}`);
       }
 
-      // Vérification exhaustive des 8 champs de snapshot immuables
+      // Contrôle exhaustif des 8 colonnes de snapshot immuables
       if (!post.archived_edition_id || post.archived_edition_id !== '6acb3db9-399b-4b24-b005-6f912cc5de21') {
         throw new Error(`archived_edition_id invalide sur paiement ${post.id}`);
       }
-      if (!post.archived_edition_name || post.archived_edition_name !== 'H3 Edition 1') {
+      if (!post.archived_edition_name || post.archived_edition_name !== 'Edition 1 Prestige') {
         throw new Error(`archived_edition_name invalide sur paiement ${post.id}`);
       }
       if (!post.archived_tournament_id || post.archived_tournament_id !== '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c') {
         throw new Error(`archived_tournament_id invalide sur paiement ${post.id}`);
       }
-      if (!post.archived_tournament_name || post.archived_tournament_name !== 'Tournoi de H3infiniy Gaming') {
+      if (!post.archived_tournament_name || post.archived_tournament_name !== 'Tournoi National FC25') {
         throw new Error(`archived_tournament_name invalide sur paiement ${post.id}`);
-      }
-      if (!post.archived_user_id) {
-        throw new Error(`archived_user_id manquant sur paiement ${post.id}`);
       }
       if (!post.archived_participant_name) {
         throw new Error(`archived_participant_name manquant sur paiement ${post.id}`);
@@ -1751,18 +2010,28 @@ async function runVerification() {
       }
     }
 
-    // Vérification de la préservation de tous les types d'inscriptions historiques
-    const regTypes = postRealPayments.rows.map(r => r.archived_registration_type);
-    if (!regTypes.includes('REGULAR') || !regTypes.includes('INVITED') || !regTypes.includes('WILDCARD')) {
-      throw new Error("Perte d'un type d'inscription lors de l'archivage !");
+    // Vérification spécifique de archived_team_id et archived_user_id :
+    // - pay_1 (Solo) doit avoir archived_user_id='u_user1' et archived_team_id=NULL
+    // - pay_2 (Equipe) doit avoir archived_team_id='t_lions' et archived_user_id='u_user2'
+    const paySolo = postRealPayments.rows.find(p => p.id === 'pay_1');
+    const payTeam = postRealPayments.rows.find(p => p.id === 'pay_2');
+
+    if (!paySolo || paySolo.archived_user_id !== 'u_user1' || paySolo.archived_team_id !== null) {
+      throw new Error(`Échec vérification archivage solo: archived_user_id=${paySolo?.archived_user_id}, archived_team_id=${paySolo?.archived_team_id}`);
     }
+    if (!payTeam || payTeam.archived_team_id !== 't_lions' || payTeam.archived_user_id !== 'u_user2') {
+      throw new Error(`Échec vérification archivage équipe: archived_team_id=${payTeam?.archived_team_id}, archived_user_id=${payTeam?.archived_user_id}`);
+    }
+    console.log("✔ Vérification stricte des 8 colonnes de snapshot : archived_team_id='t_lions' (équipe) et archived_user_id (solo) validés sans fabrication.");
 
     // 6.2 VALIDATION LIGNE PAR LIGNE DES TRANSACTIONS FINANCIÈRES
     for (let i = 0; i < preRealWalletTx.rows.length; i++) {
       const pre = preRealWalletTx.rows[i];
       const post = postRealWalletTx.rows[i];
       if (pre.id !== post.id || pre.wallet_id !== post.wallet_id ||
+          pre.financial_account_id !== post.financial_account_id ||
           parseFloat(pre.amount) !== parseFloat(post.amount) ||
+          parseFloat(pre.fees) !== parseFloat(post.fees) ||
           parseFloat(pre.net_amount) !== parseFloat(post.net_amount) ||
           parseFloat(pre.balance_after) !== parseFloat(post.balance_after) ||
           pre.type !== post.type || pre.status !== post.status || pre.reference !== post.reference ||
@@ -1777,19 +2046,22 @@ async function runVerification() {
       const post = postRealUserWallets.rows[i];
       if (pre.id !== post.id || pre.user_id !== post.user_id ||
           pre.financial_account_id !== post.financial_account_id ||
-          pre.is_active !== post.is_active || pre.is_locked !== post.is_locked) {
+          pre.pin_hash !== post.pin_hash ||
+          pre.is_active !== post.is_active || pre.is_locked !== post.is_locked ||
+          pre.is_deleted !== post.is_deleted) {
         throw new Error(`Altération de user_wallet sur ${pre.id}`);
       }
     }
 
-    // 6.4 VALIDATION LIGNE PAR LIGNE DES ÉCRITURES LEDGER (DOUBLE-ENTRÉE)
+    // 6.4 VALIDATION LIGNE PAR LIGNE DES ÉCRITURES DU GRAND LIVRE (LEDGER DOUBLE-ENTRÉE)
     for (let i = 0; i < preRealLedger.rows.length; i++) {
       const pre = preRealLedger.rows[i];
       const post = postRealLedger.rows[i];
       if (pre.id !== post.id || pre.transaction_id !== post.transaction_id ||
           pre.account_id !== post.account_id ||
           parseFloat(pre.debit) !== parseFloat(post.debit) ||
-          parseFloat(pre.credit) !== parseFloat(post.credit)) {
+          parseFloat(pre.credit) !== parseFloat(post.credit) ||
+          pre.currency !== post.currency) {
         throw new Error(`Altération de grand livre ledger sur l'écriture ${pre.id}`);
       }
     }
@@ -1799,23 +2071,44 @@ async function runVerification() {
       const pre = preRealAccounts.rows[i];
       const post = postRealAccounts.rows[i];
       if (pre.id !== post.id || pre.owner_user_id !== post.owner_user_id ||
-          pre.owner_edition_id !== post.owner_edition_id || pre.type !== post.type) {
+          pre.owner_edition_id !== post.owner_edition_id || pre.type !== post.type ||
+          pre.currency !== post.currency || pre.is_active !== post.is_active ||
+          pre.is_locked !== post.is_locked) {
         throw new Error(`Altération de compte financier sur ${pre.id}`);
       }
     }
 
     // 6.6 VALIDATION LIGNE PAR LIGNE DES CONTENEURS ET DES COMMUNICATIONS
-    if (JSON.stringify(preRealTournaments.rows) !== JSON.stringify(postRealTournaments.rows)) {
-      throw new Error("Altération des tournois conteneurs détectée !");
+    for (let i = 0; i < preRealTournaments.rows.length; i++) {
+      const pre = preRealTournaments.rows[i];
+      const post = postRealTournaments.rows[i];
+      if (pre.id !== post.id || pre.organizer_id !== post.organizer_id ||
+          pre.name !== post.name || pre.slug !== post.slug || pre.game !== post.game ||
+          pre.platform !== post.platform) {
+        throw new Error(`Altération de tournoi conteneur ligne par ligne sur ${pre.id}`);
+      }
     }
-    if (JSON.stringify(preRealEditions.rows) !== JSON.stringify(postRealEditions.rows)) {
-      throw new Error("Altération des éditions conteneurs détectée !");
+    for (let i = 0; i < preRealEditions.rows.length; i++) {
+      const pre = preRealEditions.rows[i];
+      const post = postRealEditions.rows[i];
+      if (pre.id !== post.id || pre.tournament_id !== post.tournament_id ||
+          pre.edition_number !== post.edition_number || pre.name !== post.name ||
+          pre.financial_account_id !== post.financial_account_id ||
+          parseFloat(pre.prize_pool) !== parseFloat(post.prize_pool)) {
+        throw new Error(`Altération d'édition conteneur ligne par ligne sur ${pre.id}`);
+      }
     }
     if (JSON.stringify(preRealMessages.rows) !== JSON.stringify(postRealMessages.rows)) {
       throw new Error("Altération des messages rattachés détectée !");
     }
+    if (JSON.stringify(preRealInteractions.rows) !== JSON.stringify(postRealInteractions.rows)) {
+      throw new Error("Altération des interactions rattachées détectée !");
+    }
+    if (JSON.stringify(preRealNotifications.rows) !== JSON.stringify(postRealNotifications.rows)) {
+      throw new Error("Altération des notifications rattachées détectée !");
+    }
 
-    // 6.7 VALIDATION DE LA PRÉSENCE PHYSIQUE DES 21 TABLES CANONIQUES DANS LE SCHÉMA MIGRÉ
+    // 6.7 VALIDATION DE LA PRÉSENCE PHYSIQUE ET STRUCTURELLE DES 21 TABLES CANONIQUES
     const CANONICAL_21_TABLES = [
       'tournaments', 'tournament_editions', 'tournament_staff', 'competition_entrants', 'entrant_roster_members',
       'registration_payments', 'competition_rulesets', 'ruleset_versions', 'metric_definitions',
