@@ -17,11 +17,12 @@ Par conséquent, **les lignes de `tournaments` et `tournament_editions` sont rig
 
 ```mermaid
 flowchart TD
-    A[Étape 1: Contrôles de Cohérence Pré-Migration] --> B[Étape 2: Découplage & Archivage Comptable de registration_payments]
-    B --> C[Étape 3: Suppression Sélective des Tables Sportives Obsolètes]
-    C --> D[Étape 4: Déploiement des 21 Tables Canoniques Drizzle]
-    D --> E[Étape 5: Contrôles de Cohérence Post-Migration]
-    E --> F[Étape 6: Déploiement des Moteurs & Server Actions]
+    A[Étape 1: Contrôles de Cohérence Pré-Migration] --> B[Étape 2: Archivage & Découplage Comptable de registration_payments]
+    B --> C[Étape 3: Déploiement des 21 Tables Canoniques]
+    C --> D[Étape 4: Établissement des Nouvelles Relations FK entrant_id]
+    D --> E[Étape 5: Suppression Sélective des Tables Sportives Obsolètes]
+    E --> F[Étape 6: Contrôles de Cohérence Post-Migration]
+    F --> G[Étape 7: Déploiement des Moteurs & Server Actions]
 ```
 
 ### Script SQL de Migration Vérifié sous PostgreSQL 17.12
@@ -38,6 +39,7 @@ SELECT count(*) AS edition_accounts FROM financial_accounts WHERE owner_edition_
 -- ============================================================================
 -- 2. DÉCOUPLAGE ET ARCHIVAGE DE LA TRAÇABILITÉ FINANCIÈRE
 -- ============================================================================
+-- A. Ajouter les colonnes de snapshot contextuel
 ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_edition_id TEXT;
 ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_edition_name TEXT;
 ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_tournament_id TEXT;
@@ -47,6 +49,7 @@ ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_team_id TEXT
 ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_participant_name TEXT;
 ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS archived_registration_type TEXT;
 
+-- B. Peupler le snapshot immuable depuis les tables actuelles
 UPDATE registration_payments rp
 SET 
   archived_edition_id = te.id,
@@ -63,14 +66,28 @@ JOIN tournaments t ON t.id = te.tournament_id
 JOIN tournament_members tm ON tm.id = er.member_id
 WHERE er.id = rp.registration_id;
 
--- Supprimer la FK cascade vers les anciennes inscriptions et renommer en legacy
+-- C. Supprimer la FK cascade vers les anciennes inscriptions et renommer en legacy
 ALTER TABLE registration_payments DROP CONSTRAINT IF EXISTS registration_payments_registration_id_fkey;
 ALTER TABLE registration_payments ALTER COLUMN registration_id DROP NOT NULL;
 ALTER TABLE registration_payments RENAME COLUMN registration_id TO legacy_registration_id;
-ALTER TABLE registration_payments ADD COLUMN entrant_id TEXT REFERENCES competition_entrants(id) ON DELETE SET NULL;
 
 -- ============================================================================
--- 3. SUPPRESSION SÉLECTIVE DES TABLES SPORTIVES OBSOLÈTES
+-- 3. DÉPLOIEMENT DU SCHÉMA DES 21 TABLES CANONIQUES (DRIZZLE MIGRATION)
+-- ============================================================================
+-- Création des tables : competition_rulesets, ruleset_versions, metric_definitions,
+-- ruleset_metric_configs, competition_stages, competition_groups, competition_rounds,
+-- competition_entrants, entrant_roster_members, competition_encounters, encounter_sides,
+-- encounter_side_entrants, encounter_matches, match_slots, match_games, game_metrics,
+-- match_arbitration_logs, tournament_staff.
+
+-- ============================================================================
+-- 4. ÉTABLISSEMENT DES NOUVELLES RELATIONS (APRÈS CRÉATION DE competition_entrants)
+-- ============================================================================
+ALTER TABLE registration_payments ADD COLUMN IF NOT EXISTS entrant_id TEXT 
+  REFERENCES competition_entrants(id) ON DELETE SET NULL;
+
+-- ============================================================================
+-- 5. SUPPRESSION SÉLECTIVE DES TABLES SPORTIVES OBSOLÈTES
 -- (Les conteneurs tournaments et tournament_editions sont INTÉGRALEMENT CONSERVÉS)
 -- ============================================================================
 DROP TABLE IF EXISTS matches;
@@ -83,7 +100,7 @@ DROP TABLE IF EXISTS edition_registrations;
 DROP TABLE IF EXISTS tournament_members;
 
 -- ============================================================================
--- 4. CONTRÔLES POST-MIGRATION (VALIDATION DE PRÉSERVATION FINANCIÈRE ABSOLUE)
+-- 6. CONTRÔLES POST-MIGRATION (VALIDATION DE PRÉSERVATION FINANCIÈRE ABSOLUE)
 -- ============================================================================
 SELECT count(*) AS verified_payments, sum(amount) AS verified_total_amount FROM registration_payments;
 SELECT count(*) AS total_wallet_transactions FROM wallet_transactions;

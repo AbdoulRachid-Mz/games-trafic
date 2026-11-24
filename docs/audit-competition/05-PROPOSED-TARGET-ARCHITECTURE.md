@@ -324,28 +324,23 @@ RETURNS TRIGGER AS $$
 BEGIN
     IF TG_TABLE_NAME = 'ruleset_versions' THEN
         IF TG_OP = 'UPDATE' THEN
+            -- Une version publiée est 100% immuable : aucune colonne ne peut être altérée
             IF OLD.is_published = TRUE THEN
-                IF NEW.is_published = FALSE THEN
-                    RAISE EXCEPTION 'CANNOT_UNPUBLISH_RULESET_VERSION: Une version publiée ne peut être dépubliée.';
-                END IF;
-                IF NEW.scoring_mode IS DISTINCT FROM OLD.scoring_mode OR
-                   NEW.config IS DISTINCT FROM OLD.config THEN
-                    RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_VERSION: Modification interdite sur une version publiée.';
-                END IF;
+                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_VERSION: Toute modification d''une version de ruleset publiée est strictement interdite (ruleset_id, version, scoring_mode, config, is_published).';
             END IF;
         ELSIF TG_OP = 'DELETE' THEN
             IF OLD.is_published = TRUE THEN
-                RAISE EXCEPTION 'CANNOT_DELETE_PUBLISHED_RULESET_VERSION: Suppression interdite sur une version publiée.';
+                RAISE EXCEPTION 'CANNOT_DELETE_PUBLISHED_RULESET_VERSION: Suppression d''une version de ruleset publiée strictement interdite.';
             END IF;
         END IF;
     ELSIF TG_TABLE_NAME = 'ruleset_metric_configs' THEN
         IF TG_OP IN ('INSERT', 'UPDATE') THEN
             IF EXISTS (SELECT 1 FROM ruleset_versions WHERE id = NEW.ruleset_version_id AND is_published = TRUE) THEN
-                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_METRICS: Ajout/Modification de métrique interdite sur version publiée.';
+                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_METRICS: Ajout ou modification de métrique interdite sur une version de ruleset publiée.';
             END IF;
         ELSIF TG_OP = 'DELETE' THEN
             IF EXISTS (SELECT 1 FROM ruleset_versions WHERE id = OLD.ruleset_version_id AND is_published = TRUE) THEN
-                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_METRICS: Suppression de métrique interdite sur version publiée.';
+                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_METRICS: Suppression de métrique interdite sur une version de ruleset publiée.';
             END IF;
         END IF;
     END IF;
