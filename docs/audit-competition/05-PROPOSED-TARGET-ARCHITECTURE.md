@@ -121,7 +121,7 @@ L'audit technique confirme que les tables conteneurs `tournaments` et `tournamen
 ```sql
 -- 1. Compétition parent
 CREATE TABLE tournaments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     name TEXT NOT NULL UNIQUE,
     slug TEXT UNIQUE,
     game TEXT NOT NULL,
@@ -137,8 +137,8 @@ CREATE TABLE tournaments (
 
 -- 2. Édition de compétition
 CREATE TABLE tournament_editions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
     edition_number INT NOT NULL,
     name TEXT NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -150,7 +150,7 @@ CREATE TABLE tournament_editions (
     prize_pool NUMERIC(15, 2) DEFAULT 0.00,
     prize_currency TEXT DEFAULT 'GTC',
     financial_account_id TEXT REFERENCES financial_accounts(id) ON DELETE RESTRICT,
-    default_ruleset_version_id UUID, -- Défini après création de ruleset_versions
+    default_ruleset_version_id TEXT, -- Défini après création de ruleset_versions
     status TEXT NOT NULL DEFAULT 'UPCOMING', -- UPCOMING, REGISTRATION, LIVE, COMPLETED, CANCELLED
     auto_forfeit_on_timeout BOOLEAN DEFAULT FALSE,
     forfeit_countdown_minutes INT DEFAULT 15,
@@ -164,9 +164,9 @@ CREATE TABLE tournament_editions (
 
 -- 3. Staff administratif et arbitrage (strictement séparé des compétiteurs)
 CREATE TABLE tournament_staff (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-    edition_id UUID,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    edition_id TEXT,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ORGANIZER', 'HEAD_REFEREE', 'REFEREE', 'CASTER', 'OBSERVER')),
     permissions TEXT[] DEFAULT '{}',
@@ -177,8 +177,8 @@ CREATE TABLE tournament_staff (
 
 -- 4. Entité compétitrice officielle (SOLO, TEAM, GUEST)
 CREATE TABLE competition_entrants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
     type TEXT NOT NULL, -- 'SOLO', 'TEAM', 'GUEST'
     user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
     team_id TEXT REFERENCES teams(id) ON DELETE RESTRICT,
@@ -213,9 +213,9 @@ CREATE UNIQUE INDEX entrants_edition_team_unique
 
 -- 5. Roster d'édition (Composition figée de l'équipe pour l'édition)
 CREATE TABLE entrant_roster_members (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    entrant_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    entrant_id TEXT NOT NULL,
     user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
     in_game_name TEXT NOT NULL,
     in_game_id TEXT,
@@ -239,8 +239,8 @@ CREATE UNIQUE INDEX roster_edition_user_unique
 
 -- 6. Paiements d'inscriptions et traçabilité financière (Découplé)
 CREATE TABLE registration_payments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    entrant_id UUID REFERENCES competition_entrants(id) ON DELETE SET NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    entrant_id TEXT REFERENCES competition_entrants(id) ON DELETE SET NULL,
     transaction_id TEXT NOT NULL REFERENCES wallet_transactions(id) ON DELETE RESTRICT,
     amount NUMERIC(15, 2) NOT NULL,
     currency TEXT DEFAULT 'GTC',
@@ -273,7 +273,7 @@ CREATE UNIQUE INDEX registration_payments_transaction_unique ON registration_pay
 ```sql
 -- 7. Catalogue des règles de compétition
 CREATE TABLE competition_rulesets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     name TEXT NOT NULL UNIQUE,
     game TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -281,14 +281,15 @@ CREATE TABLE competition_rulesets (
 
 -- 8. Versions immuables des règles
 CREATE TABLE ruleset_versions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ruleset_id UUID NOT NULL REFERENCES competition_rulesets(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    ruleset_id TEXT NOT NULL REFERENCES competition_rulesets(id) ON DELETE CASCADE,
     version INT NOT NULL,
     scoring_mode TEXT NOT NULL, -- POINTS_TABLE, METRIC_ACCUMULATION, SERIES_WINS
     config JSONB NOT NULL,       -- Paramètres de départage, barème de base, etc.
     is_published BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(ruleset_id, version)
+    UNIQUE(ruleset_id, version),
+    UNIQUE(id, ruleset_id)
 );
 
 -- 9. Définition universelle des métriques
@@ -305,22 +306,66 @@ CREATE TABLE metric_definitions (
 
 -- 10. Paramétrage des métriques par version de ruleset
 CREATE TABLE ruleset_metric_configs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ruleset_version_id UUID NOT NULL REFERENCES ruleset_versions(id) ON DELETE CASCADE,
+    ruleset_version_id TEXT NOT NULL REFERENCES ruleset_versions(id) ON DELETE CASCADE,
     metric_code TEXT NOT NULL REFERENCES metric_definitions(code) ON DELETE RESTRICT,
     weight NUMERIC(12, 4) DEFAULT 1.0,
     multiplier NUMERIC(12, 4) DEFAULT 1.0,
     is_tiebreaker BOOLEAN DEFAULT FALSE,
     tiebreaker_priority INT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(ruleset_version_id, metric_code)
+    PRIMARY KEY (ruleset_version_id, metric_code)
 );
+
+-- ============================================================================
+-- VERROU RELATIONNEL SGBD : IMMUTABILITÉ ABSOLUE DES VERSIONS PUBLIÉES
+-- ============================================================================
+CREATE OR REPLACE FUNCTION trg_enforce_ruleset_version_immutability()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'ruleset_versions' THEN
+        IF TG_OP = 'UPDATE' THEN
+            IF OLD.is_published = TRUE THEN
+                IF NEW.is_published = FALSE THEN
+                    RAISE EXCEPTION 'CANNOT_UNPUBLISH_RULESET_VERSION: Une version publiée ne peut être dépubliée.';
+                END IF;
+                IF NEW.scoring_mode IS DISTINCT FROM OLD.scoring_mode OR
+                   NEW.config IS DISTINCT FROM OLD.config THEN
+                    RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_VERSION: Modification interdite sur une version publiée.';
+                END IF;
+            END IF;
+        ELSIF TG_OP = 'DELETE' THEN
+            IF OLD.is_published = TRUE THEN
+                RAISE EXCEPTION 'CANNOT_DELETE_PUBLISHED_RULESET_VERSION: Suppression interdite sur une version publiée.';
+            END IF;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'ruleset_metric_configs' THEN
+        IF TG_OP IN ('INSERT', 'UPDATE') THEN
+            IF EXISTS (SELECT 1 FROM ruleset_versions WHERE id = NEW.ruleset_version_id AND is_published = TRUE) THEN
+                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_METRICS: Ajout/Modification de métrique interdite sur version publiée.';
+            END IF;
+        ELSIF TG_OP = 'DELETE' THEN
+            IF EXISTS (SELECT 1 FROM ruleset_versions WHERE id = OLD.ruleset_version_id AND is_published = TRUE) THEN
+                RAISE EXCEPTION 'IMMUTABLE_PUBLISHED_RULESET_METRICS: Suppression de métrique interdite sur version publiée.';
+            END IF;
+        END IF;
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_ruleset_versions_immutability
+BEFORE UPDATE OR DELETE ON ruleset_versions
+FOR EACH ROW EXECUTE FUNCTION trg_enforce_ruleset_version_immutability();
+
+CREATE TRIGGER trg_ruleset_metric_configs_immutability
+BEFORE INSERT OR UPDATE OR DELETE ON ruleset_metric_configs
+FOR EACH ROW EXECUTE FUNCTION trg_enforce_ruleset_version_immutability();
 
 -- 11. Étapes de la compétition (Phases)
 CREATE TABLE competition_stages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
-    ruleset_version_id UUID NOT NULL REFERENCES ruleset_versions(id) ON DELETE RESTRICT,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL REFERENCES tournament_editions(id) ON DELETE CASCADE,
+    ruleset_version_id TEXT NOT NULL REFERENCES ruleset_versions(id) ON DELETE RESTRICT,
     name TEXT NOT NULL,
     stage_type TEXT NOT NULL, -- ROUND_ROBIN, SINGLE_ELIMINATION, DOUBLE_ELIMINATION, SWISS, BATTLE_ROYALE_LADDER, LEADERBOARD, TIME_TRIAL
     stage_order INT NOT NULL,
@@ -334,9 +379,9 @@ CREATE TABLE competition_stages (
 
 -- 12. Poules de classement
 CREATE TABLE competition_groups (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    stage_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    stage_id TEXT NOT NULL,
     name TEXT NOT NULL, -- "Poule A", "Poule B"
     group_order INT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -348,9 +393,9 @@ CREATE TABLE competition_groups (
 
 -- 13. Rounds / Journées calendaires
 CREATE TABLE competition_rounds (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    stage_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    stage_id TEXT NOT NULL,
     round_number INT NOT NULL,
     name TEXT NOT NULL, -- "Journée 1", "Quarts de Finale"
     scheduled_date TIMESTAMP WITH TIME ZONE,
@@ -369,13 +414,14 @@ CREATE TABLE competition_rounds (
 ```sql
 -- 14. Rencontre globale (Duel, FFA ou Choc Collectif)
 CREATE TABLE competition_encounters (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    stage_id UUID NOT NULL,
-    group_id UUID,
-    round_id UUID,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    stage_id TEXT NOT NULL,
+    group_id TEXT,
+    round_id TEXT,
     code TEXT,
     encounter_type TEXT NOT NULL, -- 'DUEL', 'FFA', 'COLLECTIVE_FIXTURE'
+    ruleset_version_id TEXT NOT NULL REFERENCES ruleset_versions(id) ON DELETE RESTRICT,
     aggregation_rule TEXT NOT NULL DEFAULT 'DIRECT', -- 'DIRECT', 'MATCH_POINTS', 'SCORE_SUM', 'SERIES_WINS'
     status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, READY, LIVE, COMPLETED, DISPUTED, CANCELLED
     scheduled_time TIMESTAMP WITH TIME ZONE,
@@ -387,15 +433,16 @@ CREATE TABLE competition_encounters (
     FOREIGN KEY (group_id, stage_id) REFERENCES competition_groups(id, stage_id) ON DELETE CASCADE,
     FOREIGN KEY (round_id, stage_id) REFERENCES competition_rounds(id, stage_id) ON DELETE CASCADE,
     
-    -- Clé composite essentielle pour propager edition_id et encounter_type
+    -- Clés composites essentielles pour propager edition_id, encounter_type et ruleset_version_id
     UNIQUE(id, edition_id),
-    UNIQUE(id, encounter_type)
+    UNIQUE(id, encounter_type),
+    UNIQUE(id, ruleset_version_id)
 );
 
 -- 15. Camps de la rencontre (Strictement pour les rencontres collectives)
 CREATE TABLE encounter_sides (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    encounter_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    encounter_id TEXT NOT NULL,
     encounter_type TEXT NOT NULL DEFAULT 'COLLECTIVE_FIXTURE',
     side_number INT NOT NULL, -- 1 ou 2
     name TEXT NOT NULL,       -- "Région Dakar", "Région Thiès"
@@ -414,11 +461,11 @@ CREATE TABLE encounter_sides (
 
 -- 16. Composition des camps collectifs
 CREATE TABLE encounter_side_entrants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    encounter_id UUID NOT NULL,
-    side_id UUID NOT NULL,
-    entrant_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    encounter_id TEXT NOT NULL,
+    side_id TEXT NOT NULL,
+    entrant_id TEXT NOT NULL,
     
     -- Règle d'intégrité : side_id appartient bien à encounter_id
     FOREIGN KEY (side_id, encounter_id) 
@@ -437,10 +484,11 @@ CREATE TABLE encounter_side_entrants (
 
 -- 17. Match ou sous-match au sein d'une rencontre
 CREATE TABLE encounter_matches (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    encounter_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    encounter_id TEXT NOT NULL,
     encounter_type TEXT NOT NULL,
+    ruleset_version_id TEXT NOT NULL,
     match_order INT NOT NULL DEFAULT 1,
     title TEXT NOT NULL DEFAULT 'Match 1',
     match_format TEXT NOT NULL DEFAULT 'BEST_OF_1', -- BEST_OF_1, BEST_OF_3, BEST_OF_5, TWO_LEGS_AGGREGATE, POINTS_SERIES
@@ -454,31 +502,35 @@ CREATE TABLE encounter_matches (
         REFERENCES competition_encounters(id, edition_id) ON DELETE CASCADE,
     FOREIGN KEY (encounter_id, encounter_type) 
         REFERENCES competition_encounters(id, encounter_type) ON DELETE CASCADE,
+    -- Hérite obligatoirement du ruleset_version_id exact de la rencontre parente
+    FOREIGN KEY (encounter_id, ruleset_version_id) 
+        REFERENCES competition_encounters(id, ruleset_version_id) ON DELETE CASCADE,
         
     UNIQUE(encounter_id, match_order),
     UNIQUE(id, encounter_id),
     UNIQUE(id, edition_id),
-    UNIQUE(id, encounter_type)
+    UNIQUE(id, encounter_type),
+    UNIQUE(id, ruleset_version_id)
 );
 
 -- 18. Emplacements d'opposants (Slots) avec verrous relationnels absolus
 CREATE TABLE match_slots (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    edition_id UUID NOT NULL,
-    encounter_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    edition_id TEXT NOT NULL,
+    encounter_id TEXT NOT NULL,
     encounter_type TEXT NOT NULL,
-    match_id UUID NOT NULL,
+    match_id TEXT NOT NULL,
     slot_position INT NOT NULL, -- 1, 2 pour Duel ; 1..N pour FFA
     
     -- Camp d'appartenance (obligatoire si collectif, INTERDIT si duel ou FFA)
-    side_id UUID,
-    assigned_entrant_id UUID,
+    side_id TEXT,
+    assigned_entrant_id TEXT,
     
     -- Source relationnelle de qualification
     source_type TEXT NOT NULL DEFAULT 'DIRECT_SEED', -- DIRECT_SEED, MATCH_WINNER, MATCH_LOSER, GROUP_RANK, CROSS_GROUP_RANK, BYE, MANUAL_OVERRIDE
-    source_match_id UUID REFERENCES encounter_matches(id) ON DELETE SET NULL,
-    source_group_id UUID REFERENCES competition_groups(id) ON DELETE SET NULL,
-    source_stage_id UUID REFERENCES competition_stages(id) ON DELETE SET NULL,
+    source_match_id TEXT REFERENCES encounter_matches(id) ON DELETE SET NULL,
+    source_group_id TEXT REFERENCES competition_groups(id) ON DELETE SET NULL,
+    source_stage_id TEXT REFERENCES competition_stages(id) ON DELETE SET NULL,
     source_rank INT,
     selection_order INT, -- Pour les classements transversaux (1 = 1er meilleur 3e, 2 = 2e meilleur 3e)
     
@@ -530,8 +582,8 @@ CREATE TABLE match_slots (
 
 -- 19. Manches / Cartes au sein d'un match
 CREATE TABLE match_games (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    match_id UUID NOT NULL REFERENCES encounter_matches(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    match_id TEXT NOT NULL REFERENCES encounter_matches(id) ON DELETE CASCADE,
     game_number INT NOT NULL,
     map_name TEXT,
     status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, LIVE, COMPLETED, CANCELLED
@@ -545,21 +597,25 @@ CREATE TABLE match_games (
 
 -- 20. Mesures et métriques de performance par manche
 CREATE TABLE game_metrics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    ruleset_version_id UUID NOT NULL,
-    match_id UUID NOT NULL,
-    game_id UUID NOT NULL,
-    slot_id UUID NOT NULL,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    ruleset_version_id TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    game_id TEXT NOT NULL,
+    slot_id TEXT NOT NULL,
     metric_code TEXT NOT NULL,
     raw_value NUMERIC(15, 4) NOT NULL DEFAULT 0,
     calculated_points NUMERIC(12, 4) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
-    -- Règle d'intégrité absolue : game_id et slot_id appartiennent OBLIGATOIREMENT au même match !
+    -- Règle d'intégrité absolue 1 : game_id et slot_id appartiennent OBLIGATOIREMENT au même match !
     FOREIGN KEY (game_id, match_id) REFERENCES match_games(id, match_id) ON DELETE CASCADE,
     FOREIGN KEY (slot_id, match_id) REFERENCES match_slots(id, match_id) ON DELETE CASCADE,
     
-    -- Contrôle d'autorisation par le ruleset : seules les métriques déclarées dans la version active sont autorisées
+    -- Règle d'intégrité absolue 2 : ruleset_version_id appartient OBLIGATOIREMENT au match en cours !
+    FOREIGN KEY (match_id, ruleset_version_id) 
+        REFERENCES encounter_matches(id, ruleset_version_id) ON DELETE CASCADE,
+        
+    -- Règle d'intégrité absolue 3 : Seules les métriques déclarées dans CE ruleset_version_id sont autorisées
     FOREIGN KEY (ruleset_version_id, metric_code) 
         REFERENCES ruleset_metric_configs(ruleset_version_id, metric_code) ON DELETE RESTRICT,
     
@@ -568,10 +624,10 @@ CREATE TABLE game_metrics (
 
 -- 21. Table d'audit des forfaits et des dérogations d'arbitrage
 CREATE TABLE match_arbitration_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    encounter_id UUID NOT NULL REFERENCES competition_encounters(id) ON DELETE CASCADE,
-    match_id UUID REFERENCES encounter_matches(id) ON DELETE CASCADE,
-    slot_id UUID REFERENCES match_slots(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    encounter_id TEXT NOT NULL REFERENCES competition_encounters(id) ON DELETE CASCADE,
+    match_id TEXT REFERENCES encounter_matches(id) ON DELETE CASCADE,
+    slot_id TEXT REFERENCES match_slots(id) ON DELETE CASCADE,
     action_type TEXT NOT NULL, -- 'FORFEIT', 'MANUAL_OVERRIDE', 'RESULT_INVALIDATION', 'ROSTER_SUBSTITUTION'
     author_user_id TEXT NOT NULL REFERENCES users(id),
     previous_value JSONB,
