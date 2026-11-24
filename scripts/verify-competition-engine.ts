@@ -1123,6 +1123,7 @@ async function runVerification() {
         is_locked BOOLEAN DEFAULT FALSE,
         is_deleted BOOLEAN DEFAULT FALSE,
         failed_attempts INT DEFAULT 0,
+        last_failed_attempt TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
@@ -1146,6 +1147,9 @@ async function runVerification() {
         reversal_of TEXT REFERENCES wallet_transactions(id),
         reversed_by TEXT REFERENCES wallet_transactions(id),
         description TEXT,
+        created_by_user_id TEXT REFERENCES users(id),
+        actor_level TEXT,
+        completed_at TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
@@ -1427,17 +1431,19 @@ async function runVerification() {
     // 3. SNAPSHOT EXHAUSTIF DES DONNÉES PRÉ-MIGRATION (TOUTES LES COLONNES RÉELLES)
     const preRealPayments = await client.query(`
       SELECT id, registration_id, transaction_id, amount, currency, paid_at, payment_method, 
-             payment_provider, status, reference, notes, metadata
+             payment_provider, status, reference, notes, metadata, updated_at
       FROM registration_payments ORDER BY id;
     `);
     const preRealWalletTx = await client.query(`
       SELECT id, wallet_id, financial_account_id, from_user_id, to_user_id, amount, fees, 
-             net_amount, balance_after, currency, type, metadata, status, reference, 
-             reversal_of, reversed_by, description
+             net_amount, balance_after, currency, type, metadata, status, is_deleted, reference,
+             idempotency_key, reversal_of, reversed_by, description,
+             created_by_user_id, actor_level, completed_at
       FROM wallet_transactions ORDER BY id;
     `);
     const preRealUserWallets = await client.query(`
-      SELECT id, user_id, financial_account_id, pin_hash, is_active, is_locked, is_deleted, failed_attempts
+      SELECT id, user_id, financial_account_id, card_number_hash, pin_hash, is_active,
+             is_locked, is_deleted, failed_attempts, last_failed_attempt
       FROM user_wallets ORDER BY id;
     `);
     const preRealLedger = await client.query(`
@@ -1445,15 +1451,19 @@ async function runVerification() {
       FROM ledger_entries ORDER BY id;
     `);
     const preRealAccounts = await client.query(`
-      SELECT id, owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, system_key
+      SELECT id, owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, 
+             allow_negative_balance, metadata, system_key
       FROM financial_accounts ORDER BY id;
     `);
     const preRealTournaments = await client.query(`
-      SELECT id, organizer_id, name, slug, description, game, platform, status, is_active
+      SELECT id, organizer_id, name, slug, description, short_description, game, platform, 
+             game_mode, allowed_teams, status, is_active, is_deleted
       FROM tournaments ORDER BY id;
     `);
     const preRealEditions = await client.query(`
-      SELECT id, tournament_id, financial_account_id, edition_number, name, start_date, prize_pool, prize_currency, status
+      SELECT id, tournament_id, financial_account_id, edition_number, name, tagline, 
+             edition_slug, start_date, end_date, max_participants, current_participants,
+             prize_pool, prize_currency, entry_fee, status
       FROM tournament_editions ORDER BY id;
     `);
     const preRealMessages = await client.query(`
@@ -1911,19 +1921,21 @@ async function runVerification() {
     console.log("--- ÉTAPE 6 : Audits et comparaisons ligne par ligne post-migration ---");
     const postRealPayments = await client.query(`
       SELECT id, legacy_registration_id, entrant_id, transaction_id, amount, currency, paid_at,
-             payment_method, payment_provider, status, reference, notes, metadata,
+             payment_method, payment_provider, status, reference, notes, metadata, updated_at,
              archived_edition_id, archived_edition_name, archived_tournament_id, archived_tournament_name,
              archived_user_id, archived_team_id, archived_participant_name, archived_registration_type
       FROM registration_payments ORDER BY id;
     `);
     const postRealWalletTx = await client.query(`
       SELECT id, wallet_id, financial_account_id, from_user_id, to_user_id, amount, fees, 
-             net_amount, balance_after, currency, type, metadata, status, reference, 
-             reversal_of, reversed_by, description
+             net_amount, balance_after, currency, type, metadata, status, is_deleted, reference,
+             idempotency_key, reversal_of, reversed_by, description,
+             created_by_user_id, actor_level, completed_at
       FROM wallet_transactions ORDER BY id;
     `);
     const postRealUserWallets = await client.query(`
-      SELECT id, user_id, financial_account_id, pin_hash, is_active, is_locked, is_deleted, failed_attempts
+      SELECT id, user_id, financial_account_id, card_number_hash, pin_hash, is_active,
+             is_locked, is_deleted, failed_attempts, last_failed_attempt
       FROM user_wallets ORDER BY id;
     `);
     const postRealLedger = await client.query(`
@@ -1931,15 +1943,19 @@ async function runVerification() {
       FROM ledger_entries ORDER BY id;
     `);
     const postRealAccounts = await client.query(`
-      SELECT id, owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, system_key
+      SELECT id, owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, 
+             allow_negative_balance, metadata, system_key
       FROM financial_accounts ORDER BY id;
     `);
     const postRealTournaments = await client.query(`
-      SELECT id, organizer_id, name, slug, description, game, platform, status, is_active
+      SELECT id, organizer_id, name, slug, description, short_description, game, platform, 
+             game_mode, allowed_teams, status, is_active, is_deleted
       FROM tournaments ORDER BY id;
     `);
     const postRealEditions = await client.query(`
-      SELECT id, tournament_id, financial_account_id, edition_number, name, start_date, prize_pool, prize_currency, status
+      SELECT id, tournament_id, financial_account_id, edition_number, name, tagline, 
+             edition_slug, start_date, end_date, max_participants, current_participants,
+             prize_pool, prize_currency, entry_fee, status
       FROM tournament_editions ORDER BY id;
     `);
     const postRealMessages = await client.query(`
@@ -1965,148 +1981,246 @@ async function runVerification() {
   - Communications rattachées : ${postRealMessages.rows.length} msg, ${postRealInteractions.rows.length} inter, ${postRealNotifications.rows.length} notif`);
 
     // 6.1 VALIDATION STRICTE LIGNE PAR LIGNE DES PAIEMENTS ET SNAPSHOTS D'ARCHIVAGE
+    // ── Vérification du volume avant toute comparaison par index ──
     if (preRealPayments.rows.length !== postRealPayments.rows.length) {
       throw new Error(`Incohérence volume paiements: pré=${preRealPayments.rows.length}, post=${postRealPayments.rows.length}`);
+    }
+    if (preRealPayments.rows.length !== 3) {
+      throw new Error(`Nombre de paiements attendus: 3, obtenu: ${preRealPayments.rows.length}`);
     }
 
     for (let i = 0; i < preRealPayments.rows.length; i++) {
       const pre = preRealPayments.rows[i];
       const post = postRealPayments.rows[i];
 
-      // Identifiants, montants, et valeurs historiques réelles
-      if (pre.id !== post.id) throw new Error(`Mismatch paiement id: ${pre.id} vs ${post.id}`);
-      if (parseFloat(pre.amount) !== parseFloat(post.amount)) throw new Error(`Mismatch montant: ${pre.amount} vs ${post.amount}`);
-      if (pre.currency !== post.currency) throw new Error(`Mismatch currency: ${pre.currency} vs ${post.currency}`);
-      if (pre.payment_method !== post.payment_method) throw new Error(`Mismatch payment_method: ${pre.payment_method} vs ${post.payment_method}`);
-      if (pre.payment_provider !== post.payment_provider) throw new Error(`Mismatch payment_provider: ${pre.payment_provider} vs ${post.payment_provider}`);
-      if (pre.status !== post.status) throw new Error(`Mismatch status: ${pre.status} vs ${post.status}`);
-      if (pre.reference !== post.reference) throw new Error(`Mismatch reference: ${pre.reference} vs ${post.reference}`);
-      if (pre.notes !== post.notes) throw new Error(`Mismatch notes`);
-      if (pre.registration_id !== post.legacy_registration_id) throw new Error(`Mismatch legacy_registration_id: ${pre.registration_id} vs ${post.legacy_registration_id}`);
-
-      // Sécurité : la nouvelle FK entrant_id doit être NULL pour les enregistrements historiques archivés
-      if (post.entrant_id !== null) {
-        throw new Error(`entrant_id doit être NULL pour le paiement historique ${post.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[pay ligne ${i}] Mismatch id: ${pre.id} vs ${post.id}`);
+      if (pre.registration_id !== post.legacy_registration_id) throw new Error(`[pay ${post.id}] Mismatch legacy_registration_id: ${pre.registration_id} vs ${post.legacy_registration_id}`);
+      if (parseFloat(pre.amount) !== parseFloat(post.amount)) throw new Error(`[pay ${post.id}] Mismatch amount: ${pre.amount} vs ${post.amount}`);
+      if (pre.currency !== post.currency) throw new Error(`[pay ${post.id}] Mismatch currency: ${pre.currency} vs ${post.currency}`);
+      // paid_at : comparer en string ISO (les deux sont des timestamps PostgreSQL)
+      const prePaidAt = pre.paid_at ? new Date(pre.paid_at).toISOString() : null;
+      const postPaidAt = post.paid_at ? new Date(post.paid_at).toISOString() : null;
+      if (prePaidAt !== postPaidAt) throw new Error(`[pay ${post.id}] Mismatch paid_at: ${pre.paid_at} vs ${post.paid_at}`);
+      if (pre.payment_method !== post.payment_method) throw new Error(`[pay ${post.id}] Mismatch payment_method: ${pre.payment_method} vs ${post.payment_method}`);
+      if (pre.payment_provider !== post.payment_provider) throw new Error(`[pay ${post.id}] Mismatch payment_provider: ${pre.payment_provider} vs ${post.payment_provider}`);
+      if (pre.status !== post.status) throw new Error(`[pay ${post.id}] Mismatch status: ${pre.status} vs ${post.status}`);
+      if (pre.reference !== post.reference) throw new Error(`[pay ${post.id}] Mismatch reference: ${pre.reference} vs ${post.reference}`);
+      if (pre.notes !== post.notes) throw new Error(`[pay ${post.id}] Mismatch notes: ${pre.notes} vs ${post.notes}`);
+      // metadata : comparer en JSON normalisé
+      if (JSON.stringify(pre.metadata) !== JSON.stringify(post.metadata)) throw new Error(`[pay ${post.id}] Mismatch metadata`);
+      // updated_at : doit être présent avant ET après (peut changer lors de l'archivage UPDATE → on vérifie juste existence)
+      if (post.updated_at === undefined) throw new Error(`[pay ${post.id}] updated_at absent après migration`);
+      // entrant_id doit être NULL pour les enregistrements historiques archivés
+      if (post.entrant_id !== null) throw new Error(`[pay ${post.id}] entrant_id doit être NULL pour paiement historique archivé`);
 
       // Contrôle exhaustif des 8 colonnes de snapshot immuables
       if (!post.archived_edition_id || post.archived_edition_id !== '6acb3db9-399b-4b24-b005-6f912cc5de21') {
-        throw new Error(`archived_edition_id invalide sur paiement ${post.id}`);
+        throw new Error(`[pay ${post.id}] archived_edition_id invalide: ${post.archived_edition_id}`);
       }
       if (!post.archived_edition_name || post.archived_edition_name !== 'Edition 1 Prestige') {
-        throw new Error(`archived_edition_name invalide sur paiement ${post.id}`);
+        throw new Error(`[pay ${post.id}] archived_edition_name invalide: ${post.archived_edition_name}`);
       }
       if (!post.archived_tournament_id || post.archived_tournament_id !== '4b3e6516-8089-4c1b-a9b5-1cf7d42da01c') {
-        throw new Error(`archived_tournament_id invalide sur paiement ${post.id}`);
+        throw new Error(`[pay ${post.id}] archived_tournament_id invalide: ${post.archived_tournament_id}`);
       }
       if (!post.archived_tournament_name || post.archived_tournament_name !== 'Tournoi National FC25') {
-        throw new Error(`archived_tournament_name invalide sur paiement ${post.id}`);
+        throw new Error(`[pay ${post.id}] archived_tournament_name invalide: ${post.archived_tournament_name}`);
       }
       if (!post.archived_participant_name) {
-        throw new Error(`archived_participant_name manquant sur paiement ${post.id}`);
+        throw new Error(`[pay ${post.id}] archived_participant_name manquant`);
       }
       if (!post.archived_registration_type) {
-        throw new Error(`archived_registration_type manquant sur paiement ${post.id}`);
+        throw new Error(`[pay ${post.id}] archived_registration_type manquant`);
       }
     }
 
-    // Vérification spécifique de archived_team_id et archived_user_id :
-    // - pay_1 (Solo) doit avoir archived_user_id='u_user1' et archived_team_id=NULL
-    // - pay_2 (Equipe) doit avoir archived_team_id='t_lions' et archived_user_id='u_user2'
+    // Vérification spécifique archived_team_id et archived_user_id
     const paySolo = postRealPayments.rows.find(p => p.id === 'pay_1');
     const payTeam = postRealPayments.rows.find(p => p.id === 'pay_2');
-
     if (!paySolo || paySolo.archived_user_id !== 'u_user1' || paySolo.archived_team_id !== null) {
-      throw new Error(`Échec vérification archivage solo: archived_user_id=${paySolo?.archived_user_id}, archived_team_id=${paySolo?.archived_team_id}`);
+      throw new Error(`Échec archivage solo: archived_user_id=${paySolo?.archived_user_id}, archived_team_id=${paySolo?.archived_team_id}`);
     }
     if (!payTeam || payTeam.archived_team_id !== 't_lions' || payTeam.archived_user_id !== 'u_user2') {
-      throw new Error(`Échec vérification archivage équipe: archived_team_id=${payTeam?.archived_team_id}, archived_user_id=${payTeam?.archived_user_id}`);
+      throw new Error(`Échec archivage équipe: archived_team_id=${payTeam?.archived_team_id}, archived_user_id=${payTeam?.archived_user_id}`);
     }
     console.log("✔ Vérification stricte des 8 colonnes de snapshot : archived_team_id='t_lions' (équipe) et archived_user_id (solo) validés sans fabrication.");
+    console.log(`  Paiements : ${preRealPayments.rows.length} pré = ${postRealPayments.rows.length} post. Tous les champs vérifiés (id, amount, currency, paid_at, payment_method, payment_provider, status, reference, notes, metadata, updated_at, 8 colonnes archivage).`);
 
-    // 6.2 VALIDATION LIGNE PAR LIGNE DES TRANSACTIONS FINANCIÈRES
+    // 6.2 VALIDATION LIGNE PAR LIGNE DES TRANSACTIONS FINANCIÈRES (EXHAUSTIVE)
+    // ── Vérification du volume ──
+    if (preRealWalletTx.rows.length !== postRealWalletTx.rows.length) {
+      throw new Error(`Incohérence volume wallet_transactions: pré=${preRealWalletTx.rows.length}, post=${postRealWalletTx.rows.length}`);
+    }
+    if (preRealWalletTx.rows.length !== 4) {
+      throw new Error(`Nombre de transactions wallet attendues: 4, obtenu: ${preRealWalletTx.rows.length}`);
+    }
+
     for (let i = 0; i < preRealWalletTx.rows.length; i++) {
       const pre = preRealWalletTx.rows[i];
       const post = postRealWalletTx.rows[i];
-      if (pre.id !== post.id || pre.wallet_id !== post.wallet_id ||
-          pre.financial_account_id !== post.financial_account_id ||
-          parseFloat(pre.amount) !== parseFloat(post.amount) ||
-          parseFloat(pre.fees) !== parseFloat(post.fees) ||
-          parseFloat(pre.net_amount) !== parseFloat(post.net_amount) ||
-          parseFloat(pre.balance_after) !== parseFloat(post.balance_after) ||
-          pre.type !== post.type || pre.status !== post.status || pre.reference !== post.reference ||
-          pre.reversal_of !== post.reversal_of || pre.reversed_by !== post.reversed_by) {
-        throw new Error(`Altération de transaction financière ligne par ligne sur ${pre.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[wtx ligne ${i}] Mismatch id: ${pre.id} vs ${post.id}`);
+      if (pre.wallet_id !== post.wallet_id) throw new Error(`[wtx ${pre.id}] Mismatch wallet_id`);
+      if (pre.financial_account_id !== post.financial_account_id) throw new Error(`[wtx ${pre.id}] Mismatch financial_account_id`);
+      if (pre.from_user_id !== post.from_user_id) throw new Error(`[wtx ${pre.id}] Mismatch from_user_id: ${pre.from_user_id} vs ${post.from_user_id}`);
+      if (pre.to_user_id !== post.to_user_id) throw new Error(`[wtx ${pre.id}] Mismatch to_user_id: ${pre.to_user_id} vs ${post.to_user_id}`);
+      if (parseFloat(pre.amount) !== parseFloat(post.amount)) throw new Error(`[wtx ${pre.id}] Mismatch amount`);
+      if (parseFloat(pre.fees) !== parseFloat(post.fees)) throw new Error(`[wtx ${pre.id}] Mismatch fees`);
+      if (parseFloat(pre.net_amount) !== parseFloat(post.net_amount)) throw new Error(`[wtx ${pre.id}] Mismatch net_amount`);
+      if (parseFloat(pre.balance_after) !== parseFloat(post.balance_after)) throw new Error(`[wtx ${pre.id}] Mismatch balance_after`);
+      if (pre.currency !== post.currency) throw new Error(`[wtx ${pre.id}] Mismatch currency: ${pre.currency} vs ${post.currency}`);
+      if (pre.type !== post.type) throw new Error(`[wtx ${pre.id}] Mismatch type`);
+      if (JSON.stringify(pre.metadata) !== JSON.stringify(post.metadata)) throw new Error(`[wtx ${pre.id}] Mismatch metadata`);
+      if (pre.status !== post.status) throw new Error(`[wtx ${pre.id}] Mismatch status`);
+      if (pre.is_deleted !== post.is_deleted) throw new Error(`[wtx ${pre.id}] Mismatch is_deleted`);
+      if (pre.reference !== post.reference) throw new Error(`[wtx ${pre.id}] Mismatch reference`);
+      if (pre.idempotency_key !== post.idempotency_key) throw new Error(`[wtx ${pre.id}] Mismatch idempotency_key`);
+      if (pre.reversal_of !== post.reversal_of) throw new Error(`[wtx ${pre.id}] Mismatch reversal_of`);
+      if (pre.reversed_by !== post.reversed_by) throw new Error(`[wtx ${pre.id}] Mismatch reversed_by`);
+      if (pre.description !== post.description) throw new Error(`[wtx ${pre.id}] Mismatch description`);
+      if (pre.created_by_user_id !== post.created_by_user_id) throw new Error(`[wtx ${pre.id}] Mismatch created_by_user_id`);
+      if (pre.actor_level !== post.actor_level) throw new Error(`[wtx ${pre.id}] Mismatch actor_level`);
+      const preCompAt = pre.completed_at ? new Date(pre.completed_at).toISOString() : null;
+      const postCompAt = post.completed_at ? new Date(post.completed_at).toISOString() : null;
+      if (preCompAt !== postCompAt) throw new Error(`[wtx ${pre.id}] Mismatch completed_at`);
     }
+    console.log(`✔ wallet_transactions : ${preRealWalletTx.rows.length} lignes vérifiées. Tous les champs comparés (wallet_id, financial_account_id, from_user_id, to_user_id, amount, fees, net_amount, balance_after, currency, type, metadata, status, is_deleted, reference, idempotency_key, reversal_of, reversed_by, description, created_by_user_id, actor_level, completed_at).`);
 
     // 6.3 VALIDATION LIGNE PAR LIGNE DES PORTEFEUILLES UTILISATEURS (USER WALLETS)
+    // ── Vérification du volume ──
+    if (preRealUserWallets.rows.length !== postRealUserWallets.rows.length) {
+      throw new Error(`Incohérence volume user_wallets: pré=${preRealUserWallets.rows.length}, post=${postRealUserWallets.rows.length}`);
+    }
+    if (preRealUserWallets.rows.length !== 2) {
+      throw new Error(`Nombre de user_wallets attendus: 2, obtenu: ${preRealUserWallets.rows.length}`);
+    }
+
     for (let i = 0; i < preRealUserWallets.rows.length; i++) {
       const pre = preRealUserWallets.rows[i];
       const post = postRealUserWallets.rows[i];
-      if (pre.id !== post.id || pre.user_id !== post.user_id ||
-          pre.financial_account_id !== post.financial_account_id ||
-          pre.pin_hash !== post.pin_hash ||
-          pre.is_active !== post.is_active || pre.is_locked !== post.is_locked ||
-          pre.is_deleted !== post.is_deleted) {
-        throw new Error(`Altération de user_wallet sur ${pre.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[wallet ligne ${i}] Mismatch id`);
+      if (pre.user_id !== post.user_id) throw new Error(`[wallet ${pre.id}] Mismatch user_id`);
+      if (pre.financial_account_id !== post.financial_account_id) throw new Error(`[wallet ${pre.id}] Mismatch financial_account_id`);
+      if (pre.card_number_hash !== post.card_number_hash) throw new Error(`[wallet ${pre.id}] Mismatch card_number_hash`);
+      if (pre.pin_hash !== post.pin_hash) throw new Error(`[wallet ${pre.id}] Mismatch pin_hash`);
+      if (pre.is_active !== post.is_active) throw new Error(`[wallet ${pre.id}] Mismatch is_active`);
+      if (pre.is_locked !== post.is_locked) throw new Error(`[wallet ${pre.id}] Mismatch is_locked`);
+      if (pre.is_deleted !== post.is_deleted) throw new Error(`[wallet ${pre.id}] Mismatch is_deleted`);
+      if (String(pre.failed_attempts) !== String(post.failed_attempts)) throw new Error(`[wallet ${pre.id}] Mismatch failed_attempts: ${pre.failed_attempts} vs ${post.failed_attempts}`);
+      // last_failed_attempt : NULL par défaut dans les données de test
+      const preLFA = pre.last_failed_attempt ? new Date(pre.last_failed_attempt).toISOString() : null;
+      const postLFA = post.last_failed_attempt ? new Date(post.last_failed_attempt).toISOString() : null;
+      if (preLFA !== postLFA) throw new Error(`[wallet ${pre.id}] Mismatch last_failed_attempt`);
     }
+    console.log(`✔ user_wallets : ${preRealUserWallets.rows.length} lignes vérifiées. Champs comparés : user_id, financial_account_id, card_number_hash, pin_hash, is_active, is_locked, is_deleted, failed_attempts, last_failed_attempt.`);
 
     // 6.4 VALIDATION LIGNE PAR LIGNE DES ÉCRITURES DU GRAND LIVRE (LEDGER DOUBLE-ENTRÉE)
+    // ── Vérification du volume ──
+    if (preRealLedger.rows.length !== postRealLedger.rows.length) {
+      throw new Error(`Incohérence volume ledger_entries: pré=${preRealLedger.rows.length}, post=${postRealLedger.rows.length}`);
+    }
+    if (preRealLedger.rows.length !== 8) {
+      throw new Error(`Nombre d'écritures ledger attendues: 8, obtenu: ${preRealLedger.rows.length}`);
+    }
+
     for (let i = 0; i < preRealLedger.rows.length; i++) {
       const pre = preRealLedger.rows[i];
       const post = postRealLedger.rows[i];
-      if (pre.id !== post.id || pre.transaction_id !== post.transaction_id ||
-          pre.account_id !== post.account_id ||
-          parseFloat(pre.debit) !== parseFloat(post.debit) ||
-          parseFloat(pre.credit) !== parseFloat(post.credit) ||
-          pre.currency !== post.currency) {
-        throw new Error(`Altération de grand livre ledger sur l'écriture ${pre.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[ledger ligne ${i}] Mismatch id`);
+      if (pre.transaction_id !== post.transaction_id) throw new Error(`[ledger ${pre.id}] Mismatch transaction_id`);
+      if (pre.account_id !== post.account_id) throw new Error(`[ledger ${pre.id}] Mismatch account_id`);
+      if (parseFloat(pre.debit) !== parseFloat(post.debit)) throw new Error(`[ledger ${pre.id}] Mismatch debit`);
+      if (parseFloat(pre.credit) !== parseFloat(post.credit)) throw new Error(`[ledger ${pre.id}] Mismatch credit`);
+      if (pre.currency !== post.currency) throw new Error(`[ledger ${pre.id}] Mismatch currency`);
+    }
+    console.log(`✔ ledger_entries : ${preRealLedger.rows.length} lignes vérifiées. Champs comparés : id, transaction_id, account_id, debit, credit, currency.`);
+
+    // 6.5 VALIDATION LIGNE PAR LIGNE DES COMPTES FINANCIERS (EXHAUSTIVE)
+    // ── Vérification du volume ──
+    if (preRealAccounts.rows.length !== postRealAccounts.rows.length) {
+      throw new Error(`Incohérence volume financial_accounts: pré=${preRealAccounts.rows.length}, post=${postRealAccounts.rows.length}`);
+    }
+    if (preRealAccounts.rows.length !== 3) {
+      throw new Error(`Nombre de comptes financiers attendus: 3, obtenu: ${preRealAccounts.rows.length}`);
     }
 
-    // 6.5 VALIDATION LIGNE PAR LIGNE DES COMPTES FINANCIERS
     for (let i = 0; i < preRealAccounts.rows.length; i++) {
       const pre = preRealAccounts.rows[i];
       const post = postRealAccounts.rows[i];
-      if (pre.id !== post.id || pre.owner_user_id !== post.owner_user_id ||
-          pre.owner_edition_id !== post.owner_edition_id || pre.type !== post.type ||
-          pre.currency !== post.currency || pre.is_active !== post.is_active ||
-          pre.is_locked !== post.is_locked) {
-        throw new Error(`Altération de compte financier sur ${pre.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[account ligne ${i}] Mismatch id`);
+      if (pre.owner_user_id !== post.owner_user_id) throw new Error(`[account ${pre.id}] Mismatch owner_user_id`);
+      if (pre.owner_shop_id !== post.owner_shop_id) throw new Error(`[account ${pre.id}] Mismatch owner_shop_id: pré='${pre.owner_shop_id}' vs post='${post.owner_shop_id}'`);
+      if (pre.owner_edition_id !== post.owner_edition_id) throw new Error(`[account ${pre.id}] Mismatch owner_edition_id`);
+      if (pre.type !== post.type) throw new Error(`[account ${pre.id}] Mismatch type`);
+      if (pre.currency !== post.currency) throw new Error(`[account ${pre.id}] Mismatch currency`);
+      if (pre.is_active !== post.is_active) throw new Error(`[account ${pre.id}] Mismatch is_active`);
+      if (pre.is_locked !== post.is_locked) throw new Error(`[account ${pre.id}] Mismatch is_locked`);
+      if (String(pre.allow_negative_balance) !== String(post.allow_negative_balance)) throw new Error(`[account ${pre.id}] Mismatch allow_negative_balance: ${pre.allow_negative_balance} vs ${post.allow_negative_balance}`);
+      if (JSON.stringify(pre.metadata) !== JSON.stringify(post.metadata)) throw new Error(`[account ${pre.id}] Mismatch metadata`);
+      if (pre.system_key !== post.system_key) throw new Error(`[account ${pre.id}] Mismatch system_key`);
     }
+    console.log(`✔ financial_accounts : ${preRealAccounts.rows.length} lignes vérifiées. Champs comparés : owner_user_id, owner_shop_id, owner_edition_id, type, currency, is_active, is_locked, allow_negative_balance, metadata, system_key.`);
 
     // 6.6 VALIDATION LIGNE PAR LIGNE DES CONTENEURS ET DES COMMUNICATIONS
+    // ── Vérification du volume ──
+    if (preRealTournaments.rows.length !== postRealTournaments.rows.length) {
+      throw new Error(`Incohérence volume tournaments: pré=${preRealTournaments.rows.length}, post=${postRealTournaments.rows.length}`);
+    }
+    if (preRealEditions.rows.length !== postRealEditions.rows.length) {
+      throw new Error(`Incohérence volume tournament_editions: pré=${preRealEditions.rows.length}, post=${postRealEditions.rows.length}`);
+    }
+
     for (let i = 0; i < preRealTournaments.rows.length; i++) {
       const pre = preRealTournaments.rows[i];
       const post = postRealTournaments.rows[i];
-      if (pre.id !== post.id || pre.organizer_id !== post.organizer_id ||
-          pre.name !== post.name || pre.slug !== post.slug || pre.game !== post.game ||
-          pre.platform !== post.platform) {
-        throw new Error(`Altération de tournoi conteneur ligne par ligne sur ${pre.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[tournament ligne ${i}] Mismatch id`);
+      if (pre.organizer_id !== post.organizer_id) throw new Error(`[tournament ${pre.id}] Mismatch organizer_id`);
+      if (pre.name !== post.name) throw new Error(`[tournament ${pre.id}] Mismatch name`);
+      if (pre.slug !== post.slug) throw new Error(`[tournament ${pre.id}] Mismatch slug`);
+      if (pre.description !== post.description) throw new Error(`[tournament ${pre.id}] Mismatch description`);
+      if (pre.short_description !== post.short_description) throw new Error(`[tournament ${pre.id}] Mismatch short_description`);
+      if (pre.game !== post.game) throw new Error(`[tournament ${pre.id}] Mismatch game`);
+      if (pre.platform !== post.platform) throw new Error(`[tournament ${pre.id}] Mismatch platform`);
+      if (pre.game_mode !== post.game_mode) throw new Error(`[tournament ${pre.id}] Mismatch game_mode`);
+      if (String(pre.allowed_teams) !== String(post.allowed_teams)) throw new Error(`[tournament ${pre.id}] Mismatch allowed_teams`);
+      if (pre.status !== post.status) throw new Error(`[tournament ${pre.id}] Mismatch status`);
+      if (pre.is_active !== post.is_active) throw new Error(`[tournament ${pre.id}] Mismatch is_active`);
+      if (pre.is_deleted !== post.is_deleted) throw new Error(`[tournament ${pre.id}] Mismatch is_deleted`);
     }
+    console.log(`✔ tournaments : ${preRealTournaments.rows.length} lignes vérifiées. Champs : organizer_id, name, slug, description, short_description, game, platform, game_mode, allowed_teams, status, is_active, is_deleted.`);
+
     for (let i = 0; i < preRealEditions.rows.length; i++) {
       const pre = preRealEditions.rows[i];
       const post = postRealEditions.rows[i];
-      if (pre.id !== post.id || pre.tournament_id !== post.tournament_id ||
-          pre.edition_number !== post.edition_number || pre.name !== post.name ||
-          pre.financial_account_id !== post.financial_account_id ||
-          parseFloat(pre.prize_pool) !== parseFloat(post.prize_pool)) {
-        throw new Error(`Altération d'édition conteneur ligne par ligne sur ${pre.id}`);
-      }
+      if (pre.id !== post.id) throw new Error(`[edition ligne ${i}] Mismatch id`);
+      if (pre.tournament_id !== post.tournament_id) throw new Error(`[edition ${pre.id}] Mismatch tournament_id`);
+      if (pre.financial_account_id !== post.financial_account_id) throw new Error(`[edition ${pre.id}] Mismatch financial_account_id`);
+      if (String(pre.edition_number) !== String(post.edition_number)) throw new Error(`[edition ${pre.id}] Mismatch edition_number`);
+      if (pre.name !== post.name) throw new Error(`[edition ${pre.id}] Mismatch name`);
+      if (pre.tagline !== post.tagline) throw new Error(`[edition ${pre.id}] Mismatch tagline`);
+      if (pre.edition_slug !== post.edition_slug) throw new Error(`[edition ${pre.id}] Mismatch edition_slug`);
+      const preStart = pre.start_date ? new Date(pre.start_date).toISOString() : null;
+      const postStart = post.start_date ? new Date(post.start_date).toISOString() : null;
+      if (preStart !== postStart) throw new Error(`[edition ${pre.id}] Mismatch start_date`);
+      const preEnd = pre.end_date ? new Date(pre.end_date).toISOString() : null;
+      const postEnd = post.end_date ? new Date(post.end_date).toISOString() : null;
+      if (preEnd !== postEnd) throw new Error(`[edition ${pre.id}] Mismatch end_date`);
+      if (String(pre.max_participants) !== String(post.max_participants)) throw new Error(`[edition ${pre.id}] Mismatch max_participants`);
+      if (String(pre.current_participants) !== String(post.current_participants)) throw new Error(`[edition ${pre.id}] Mismatch current_participants`);
+      if (parseFloat(pre.prize_pool) !== parseFloat(post.prize_pool)) throw new Error(`[edition ${pre.id}] Mismatch prize_pool`);
+      if (pre.prize_currency !== post.prize_currency) throw new Error(`[edition ${pre.id}] Mismatch prize_currency`);
+      if (parseFloat(pre.entry_fee) !== parseFloat(post.entry_fee)) throw new Error(`[edition ${pre.id}] Mismatch entry_fee`);
+      if (pre.status !== post.status) throw new Error(`[edition ${pre.id}] Mismatch status`);
     }
-    if (JSON.stringify(preRealMessages.rows) !== JSON.stringify(postRealMessages.rows)) {
-      throw new Error("Altération des messages rattachés détectée !");
-    }
-    if (JSON.stringify(preRealInteractions.rows) !== JSON.stringify(postRealInteractions.rows)) {
-      throw new Error("Altération des interactions rattachées détectée !");
-    }
-    if (JSON.stringify(preRealNotifications.rows) !== JSON.stringify(postRealNotifications.rows)) {
-      throw new Error("Altération des notifications rattachées détectée !");
-    }
+    console.log(`✔ tournament_editions : ${preRealEditions.rows.length} lignes vérifiées. Champs : tournament_id, financial_account_id, edition_number, name, tagline, edition_slug, start_date, end_date, max_participants, current_participants, prize_pool, prize_currency, entry_fee, status.`);
+
+    // Communications
+    if (preRealMessages.rows.length !== postRealMessages.rows.length) throw new Error(`Incohérence volume messages: pré=${preRealMessages.rows.length}, post=${postRealMessages.rows.length}`);
+    if (preRealInteractions.rows.length !== postRealInteractions.rows.length) throw new Error(`Incohérence volume interactions: pré=${preRealInteractions.rows.length}, post=${postRealInteractions.rows.length}`);
+    if (preRealNotifications.rows.length !== postRealNotifications.rows.length) throw new Error(`Incohérence volume notifications: pré=${preRealNotifications.rows.length}, post=${postRealNotifications.rows.length}`);
+    if (JSON.stringify(preRealMessages.rows) !== JSON.stringify(postRealMessages.rows)) throw new Error("Altération des messages rattachés détectée !");
+    if (JSON.stringify(preRealInteractions.rows) !== JSON.stringify(postRealInteractions.rows)) throw new Error("Altération des interactions rattachées détectée !");
+    if (JSON.stringify(preRealNotifications.rows) !== JSON.stringify(postRealNotifications.rows)) throw new Error("Altération des notifications rattachées détectée !");
+    console.log(`✔ Communications : messages=${postRealMessages.rows.length}, interactions=${postRealInteractions.rows.length}, notifications=${postRealNotifications.rows.length} — tous champs identiques pré/post (id, sender_id/user_id, tournament_id, edition_id, content/type/title).`);
 
     // 6.7 VALIDATION DE LA PRÉSENCE PHYSIQUE ET STRUCTURELLE DES 21 TABLES CANONIQUES
     const CANONICAL_21_TABLES = [
@@ -2130,7 +2244,7 @@ async function runVerification() {
     }
 
     console.log(`✔ Déploiement complet des 21 tables canoniques vérifié dans le schéma migré.`);
-    console.log("✔ Validation représentative ligne par ligne 100% conforme : Séquence ordonnée sans CASCADE respectée, Container Preservation validé, zéro perte financière.\n");
+    console.log("✔ Validation représentative ligne par ligne 100% conforme : Séquence ordonnée sans CASCADE respectée, Container Preservation validé, zéro perte financière.");
 
     // Nettoyage Partie B
     await client.query(`DROP SCHEMA ${REAL_SCHEMA_SANDBOX} CASCADE;`);

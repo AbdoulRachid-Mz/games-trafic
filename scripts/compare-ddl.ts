@@ -1,22 +1,26 @@
 /**
  * Comparateur Structurel Approfondi DDL : Architecture Canonique vs Banc d'essai
- * 
- * Effectue une analyse syntaxique et structurelle complète (AST relationnel) :
+ *
+ * Analyse syntaxique et structurelle complète (AST relationnel) :
  * - Colonnes : nom, type SQL exact, nullabilité, valeur par défaut normalisée
- * - Clés primaires : simples et composites (ordre exact)
- * - Clés étrangères : colonnes source, table cible, colonnes cible, ON DELETE, ON UPDATE
+ * - Clés primaires : simples et composites (ordre POSITIONNEL exact — pas de tri)
+ * - Clés étrangères : association positionnelle exacte (source[i] ↔ cible[i]), table cible, ON DELETE, ON UPDATE
  * - Contraintes UNIQUE : colonnes exactes
  * - Contraintes CHECK : expressions canoniques normalisées
- * - Index et Index partiels : nom, colonnes, prédicat WHERE
- * - Détection stricte des tables manquantes et supplémentaires
- * 
+ * - Index et index partiels : nom, colonnes (ordre positionnel), prédicat WHERE
+ * - Détection stricte des tables manquantes, supplémentaires, colonnes manquantes/supplémentaires
+ *
  * Exécution :
- * bun scripts/compare-ddl.ts               # Exécution de la comparaison
- * bun scripts/compare-ddl.ts --test-negative # Exécution des tests négatifs de validation du comparateur
+ * bun scripts/compare-ddl.ts                # Comparaison des 21 tables canoniques
+ * bun scripts/compare-ddl.ts --test-negative  # 16 tests négatifs de validation du comparateur
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 export interface ColumnDef {
   name: string;
@@ -26,10 +30,13 @@ export interface ColumnDef {
 }
 
 export interface ForeignKeyDef {
+  /** Colonnes sources dans leur ordre de déclaration exact */
   sourceCols: string[];
   targetTable: string;
+  /** Colonnes cibles dans leur ordre de déclaration exact (sourceCols[i] ↔ targetCols[i]) */
   targetCols: string[];
   onDelete: string;
+  onUpdate: string;
 }
 
 export interface UniqueConstraintDef {
@@ -51,6 +58,7 @@ export interface IndexDef {
 export interface TableStructuralDef {
   name: string;
   columns: Map<string, ColumnDef>;
+  /** Ordre positionnel conservé — NE PAS TRIER */
   primaryKey: string[];
   foreignKeys: ForeignKeyDef[];
   uniqueConstraints: UniqueConstraintDef[];
@@ -64,34 +72,31 @@ export interface StructuralDiff {
   description: string;
 }
 
+// ============================================================================
+// UTILITAIRES DE NORMALISATION
+// ============================================================================
+
 export function normalizeSQLString(s: string): string {
   return s
-    .replace(/--.*$/gm, '') // Supprime les commentaires SQL
-    .replace(/\/\*[\s\S]*?\*\//g, '') // Supprime les blocs de commentaires
+    .replace(/--.*$/gm, '')         // Commentaires SQL ligne
+    .replace(/\/\*[\s\S]*?\*\//g, '') // Blocs de commentaires
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 export function normalizeCheckExpression(expr: string): string {
-  // Supprime les parenthèses superflues et normalise les opérateurs
   let normalized = expr.trim();
+  // Supprime les parenthèses englobantes superflues
   while (normalized.startsWith('(') && normalized.endsWith(')')) {
-    // Vérifie si les parenthèses englobent toute l'expression
     let depth = 0;
     let fullWrap = true;
     for (let i = 0; i < normalized.length - 1; i++) {
       if (normalized[i] === '(') depth++;
       else if (normalized[i] === ')') depth--;
-      if (depth === 0) {
-        fullWrap = false;
-        break;
-      }
+      if (depth === 0) { fullWrap = false; break; }
     }
-    if (fullWrap) {
-      normalized = normalized.slice(1, -1).trim();
-    } else {
-      break;
-    }
+    if (fullWrap) normalized = normalized.slice(1, -1).trim();
+    else break;
   }
   return normalized
     .replace(/\s+/g, ' ')
@@ -102,7 +107,31 @@ export function normalizeCheckExpression(expr: string): string {
 }
 
 /**
- * Analyse structurelle approfondie du corps d'un CREATE TABLE
+ * Extrait ON DELETE et ON UPDATE d'une clause FK.
+ * Les deux actions peuvent apparaître dans n'importe quel ordre.
+ * La valeur par défaut est 'NO ACTION' si la clause est absente.
+ */
+function parseReferentialActions(rest: string): { onDelete: string; onUpdate: string } {
+  const upper = rest.toUpperCase();
+
+  // ON DELETE extraction — termine avant ON UPDATE ou fin de chaîne
+  const delMatch = upper.match(/ON\s+DELETE\s+(SET\s+NULL|SET\s+DEFAULT|CASCADE|RESTRICT|NO\s+ACTION)/);
+  const onDelete = delMatch ? delMatch[1].replace(/\s+/g, ' ').trim() : 'NO ACTION';
+
+  // ON UPDATE extraction — termine avant ON DELETE ou fin de chaîne
+  const updMatch = upper.match(/ON\s+UPDATE\s+(SET\s+NULL|SET\s+DEFAULT|CASCADE|RESTRICT|NO\s+ACTION)/);
+  const onUpdate = updMatch ? updMatch[1].replace(/\s+/g, ' ').trim() : 'NO ACTION';
+
+  return { onDelete, onUpdate };
+}
+
+// ============================================================================
+// PARSEUR STRUCTUREL
+// ============================================================================
+
+/**
+ * Analyse structurelle approfondie du corps d'un CREATE TABLE.
+ * L'ordre positionnel des PK et des associations source/cible de FK est conservé exactement.
  */
 export function parseTableStructure(tableName: string, rawBody: string): TableStructuralDef {
   const clean = normalizeSQLString(rawBody);
@@ -112,7 +141,7 @@ export function parseTableStructure(tableName: string, rawBody: string): TableSt
   const uniqueConstraints: UniqueConstraintDef[] = [];
   const checkConstraints: CheckConstraintDef[] = [];
 
-  // Découpage équilibré au niveau des virgules
+  // Découpage équilibré au niveau des virgules (respecte les parenthèses imbriquées)
   const items: string[] = [];
   let depth = 0;
   let current = '';
@@ -132,27 +161,28 @@ export function parseTableStructure(tableName: string, rawBody: string): TableSt
   if (current.trim()) items.push(current.trim());
 
   for (const item of items) {
-    const upper = item.toUpperCase();
 
-    // 1. Clé primaire au niveau table : PRIMARY KEY (col1, col2)
+    // 1. PRIMARY KEY au niveau table : PRIMARY KEY (col1, col2, ...)
     const pkTableMatch = item.match(/^PRIMARY\s+KEY\s*\(([^)]+)\)/i);
     if (pkTableMatch) {
+      // Ordre positionnel conservé — PAS de .sort()
       primaryKey = pkTableMatch[1].split(',').map(s => s.trim().toLowerCase());
       continue;
     }
 
-    // 2. Clé étrangère au niveau table : FOREIGN KEY (col1, col2) REFERENCES target(t1, t2) ON DELETE ...
-    const fkTableMatch = item.match(/^FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+([a-z_0-9]+)\s*\(([^)]+)\)(?:\s+ON\s+DELETE\s+([A-Z\s]+))?/i);
+    // 2. FOREIGN KEY au niveau table : FOREIGN KEY (src1, src2) REFERENCES tbl(tgt1, tgt2) ON DELETE ... ON UPDATE ...
+    const fkTableMatch = item.match(/^FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+([a-z_0-9]+)\s*\(([^)]+)\)([\s\S]*)/i);
     if (fkTableMatch) {
+      // Ordre positionnel des colonnes sources et cibles conservé — PAS de .sort()
       const sourceCols = fkTableMatch[1].split(',').map(s => s.trim().toLowerCase());
       const targetTable = fkTableMatch[2].trim().toLowerCase();
       const targetCols = fkTableMatch[3].split(',').map(s => s.trim().toLowerCase());
-      const onDelete = (fkTableMatch[4] || 'NO ACTION').trim().toUpperCase();
-      foreignKeys.push({ sourceCols, targetTable, targetCols, onDelete });
+      const { onDelete, onUpdate } = parseReferentialActions(fkTableMatch[4] || '');
+      foreignKeys.push({ sourceCols, targetTable, targetCols, onDelete, onUpdate });
       continue;
     }
 
-    // 3. Contrainte UNIQUE au niveau table : UNIQUE(col1, col2)
+    // 3. UNIQUE au niveau table : UNIQUE(col1, col2)
     const uniqueMatch = item.match(/^UNIQUE\s*\(([^)]+)\)/i);
     if (uniqueMatch) {
       const cols = uniqueMatch[1].split(',').map(s => s.trim().toLowerCase());
@@ -160,7 +190,7 @@ export function parseTableStructure(tableName: string, rawBody: string): TableSt
       continue;
     }
 
-    // 4. Contrainte CHECK au niveau table : CHECK (...)
+    // 4. CHECK au niveau table : CHECK (...)
     const checkMatch = item.match(/^CHECK\s*\(([\s\S]+)\)$/i);
     if (checkMatch) {
       const expr = normalizeCheckExpression(checkMatch[1]);
@@ -168,7 +198,7 @@ export function parseTableStructure(tableName: string, rawBody: string): TableSt
       continue;
     }
 
-    // 5. Définition de colonne avec contraintes en ligne
+    // 5. Définition de colonne
     const colMatch = item.match(/^([a-z_0-9]+)\s+([A-Z0-9_\[\]]+(?:\s*\([0-9,\s]+\))?(?:\s+WITH\s+TIME\s+ZONE)?)(.*)$/i);
     if (!colMatch) {
       throw new Error(`ERREUR DDL: Impossible d'analyser l'instruction dans la table '${tableName}': "${item}"`);
@@ -179,50 +209,47 @@ export function parseTableStructure(tableName: string, rawBody: string): TableSt
     const rest = colMatch[3].trim();
     const restUpper = rest.toUpperCase();
 
-    // Primary key inline
+    // PK inline
     if (restUpper.includes('PRIMARY KEY')) {
-      primaryKey = [colName];
+      primaryKey = [colName]; // Ordre positionnel (une seule colonne)
     }
 
-    // Nullability
+    // Nullabilité
     const isExplicitNotNull = restUpper.includes('NOT NULL');
     const isPrimaryKey = restUpper.includes('PRIMARY KEY');
     const nullable = !isExplicitNotNull && !isPrimaryKey;
 
-    // Default value
+    // Valeur par défaut
     let defaultValue: string | undefined;
     const defaultMatch = rest.match(/DEFAULT\s+([^\s]+(?:\s*\(.*?\))?(?:::[a-z_]+)?)/i);
     if (defaultMatch) {
       defaultValue = defaultMatch[1].trim();
     }
 
-    // Inline Foreign Key : REFERENCES target(col) ON DELETE ...
-    const inlineRefMatch = rest.match(/REFERENCES\s+([a-z_0-9]+)(?:\s*\(([^)]+)\))?(?:\s+ON\s+DELETE\s+([A-Z\s]+))?/i);
+    // FK inline : REFERENCES tbl(col) ON DELETE ... ON UPDATE ...
+    const inlineRefMatch = rest.match(/REFERENCES\s+([a-z_0-9]+)(?:\s*\(([^)]+)\))?([\s\S]*)/i);
     if (inlineRefMatch) {
       const targetTable = inlineRefMatch[1].trim().toLowerCase();
-      const targetCols = inlineRefMatch[2] ? inlineRefMatch[2].split(',').map(s => s.trim().toLowerCase()) : ['id'];
-      const onDelete = (inlineRefMatch[3] || 'NO ACTION').trim().toUpperCase();
-      foreignKeys.push({ sourceCols: [colName], targetTable, targetCols, onDelete });
+      const targetCols = inlineRefMatch[2]
+        ? inlineRefMatch[2].split(',').map(s => s.trim().toLowerCase())
+        : ['id'];
+      const { onDelete, onUpdate } = parseReferentialActions(inlineRefMatch[3] || '');
+      foreignKeys.push({ sourceCols: [colName], targetTable, targetCols, onDelete, onUpdate });
     }
 
-    // Inline Unique
+    // UNIQUE inline
     if (restUpper.includes('UNIQUE')) {
       uniqueConstraints.push({ columns: [colName] });
     }
 
-    // Inline Check
+    // CHECK inline
     const inlineCheckMatch = rest.match(/CHECK\s*\(([\s\S]+)\)/i);
     if (inlineCheckMatch) {
       const expr = normalizeCheckExpression(inlineCheckMatch[1]);
       checkConstraints.push({ expression: expr });
     }
 
-    columns.set(colName, {
-      name: colName,
-      type: colType,
-      nullable,
-      defaultValue
-    });
+    columns.set(colName, { name: colName, type: colType, nullable, defaultValue });
   }
 
   return {
@@ -237,7 +264,8 @@ export function parseTableStructure(tableName: string, rawBody: string): TableSt
 }
 
 /**
- * Extrait les index (partiels ou standards) du script ou de la documentation
+ * Extrait les index (partiels ou standards) d'un texte SQL ou markdown.
+ * L'ordre des colonnes de l'index est conservé.
  */
 export function parseIndexes(sqlContent: string): Map<string, IndexDef[]> {
   const indexMap = new Map<string, IndexDef[]>();
@@ -248,17 +276,12 @@ export function parseIndexes(sqlContent: string): Map<string, IndexDef[]> {
     const isUnique = Boolean(match[1]);
     const indexName = match[2].trim().toLowerCase();
     const tableName = match[3].trim().toLowerCase();
+    // Ordre positionnel des colonnes d'index — PAS de .sort()
     const columns = match[4].split(',').map(s => s.trim().toLowerCase());
     const wherePredicate = match[5] ? normalizeCheckExpression(match[5]) : undefined;
 
     const list = indexMap.get(tableName) || [];
-    list.push({
-      name: indexName,
-      tableName,
-      columns,
-      isUnique,
-      wherePredicate
-    });
+    list.push({ name: indexName, tableName, columns, isUnique, wherePredicate });
     indexMap.set(tableName, list);
   }
 
@@ -266,14 +289,14 @@ export function parseIndexes(sqlContent: string): Map<string, IndexDef[]> {
 }
 
 /**
- * Extrait toutes les tables et index d'un texte SQL ou markdown
+ * Extrait toutes les tables et index d'un texte SQL ou markdown.
  */
 export function extractSchemaDefinitions(sourceText: string, isDocument: boolean): Map<string, TableStructuralDef> {
   const tables = new Map<string, TableStructuralDef>();
   let contentToParse = sourceText;
 
   if (!isDocument) {
-    // Isoler la partie A du script
+    // Isoler la Partie A du script (avant la Partie B qui contient les tables historiques)
     const partAStart = sourceText.indexOf('PARTIE A');
     const partBStart = sourceText.indexOf('PARTIE B');
     if (partAStart !== -1 && partBStart !== -1) {
@@ -286,7 +309,7 @@ export function extractSchemaDefinitions(sourceText: string, isDocument: boolean
 
   while ((match = tableRegex.exec(contentToParse)) !== null) {
     const tableName = match[1].toLowerCase();
-    // Exclure les tables systèmes pré-existantes qui ne font pas partie des 21 tables canoniques
+    // Exclure les tables systèmes pré-existantes non canoniques
     if (['users', 'teams', 'financial_accounts', 'user_wallets', 'wallet_transactions', 'ledger_entries'].includes(tableName)) {
       continue;
     }
@@ -294,7 +317,7 @@ export function extractSchemaDefinitions(sourceText: string, isDocument: boolean
     tables.set(tableName, tableDef);
   }
 
-  // Association des index
+  // Association des index aux tables
   const indexMap = parseIndexes(contentToParse);
   for (const [tName, indexes] of indexMap.entries()) {
     if (tables.has(tName)) {
@@ -305,127 +328,142 @@ export function extractSchemaDefinitions(sourceText: string, isDocument: boolean
   return tables;
 }
 
+// ============================================================================
+// COMPARATEUR STRUCTUREL
+// ============================================================================
+
 /**
- * Comparateur structurel strict table par table
+ * Génère la signature positionnelle d'une FK : "src1,src2->tbl->tgt1,tgt2|ONDELETE|ONUPDATE"
+ * Utilisée pour localiser la FK correspondante dans le script.
+ */
+function fkSignature(fk: ForeignKeyDef): string {
+  return `${fk.sourceCols.join(',')}`;
+}
+
+/**
+ * Compare structure par structure, champ par champ, deux tables.
+ * Toutes les comparaisons sont positionnelles — aucun tri implicite.
  */
 export function compareTableStructures(docTable: TableStructuralDef, scriptTable: TableStructuralDef): StructuralDiff[] {
   const diffs: StructuralDiff[] = [];
   const tName = docTable.name;
 
-  // 1. COMPARAISON DES COLONNES
+  // -------------------------------------------------------------------------
+  // 1. COLONNES : présence, type, nullabilité, valeur par défaut
+  // -------------------------------------------------------------------------
   for (const [colName, docCol] of docTable.columns.entries()) {
     const scriptCol = scriptTable.columns.get(colName);
     if (!scriptCol) {
       diffs.push({ table: tName, category: 'COLUMN', description: `Colonne '${colName}' manquante dans le script.` });
       continue;
     }
-
     if (docCol.type !== scriptCol.type) {
       diffs.push({ table: tName, category: 'COLUMN', description: `Type divergent pour '${colName}': Doc='${docCol.type}' vs Script='${scriptCol.type}'.` });
     }
-
     if (docCol.nullable !== scriptCol.nullable) {
       diffs.push({ table: tName, category: 'COLUMN', description: `Nullabilité divergente pour '${colName}': Doc=${docCol.nullable} vs Script=${scriptCol.nullable}.` });
     }
-
     if (docCol.defaultValue !== scriptCol.defaultValue) {
       diffs.push({ table: tName, category: 'COLUMN', description: `Default divergent pour '${colName}': Doc='${docCol.defaultValue}' vs Script='${scriptCol.defaultValue}'.` });
     }
   }
-
   for (const colName of scriptTable.columns.keys()) {
     if (!docTable.columns.has(colName)) {
       diffs.push({ table: tName, category: 'COLUMN', description: `Colonne supplémentaire non documentée dans le script: '${colName}'.` });
     }
   }
 
-  // 2. COMPARAISON DE LA CLÉ PRIMAIRE
-  const docPK = docTable.primaryKey.slice().sort().join(',');
-  const scriptPK = scriptTable.primaryKey.slice().sort().join(',');
+  // -------------------------------------------------------------------------
+  // 2. CLÉ PRIMAIRE : ordre positionnel exact (PAS de tri)
+  // -------------------------------------------------------------------------
+  const docPK = docTable.primaryKey.join(',');
+  const scriptPK = scriptTable.primaryKey.join(',');
   if (docPK !== scriptPK) {
     diffs.push({ table: tName, category: 'PRIMARY_KEY', description: `Clé primaire divergente: Doc=[${docPK}] vs Script=[${scriptPK}].` });
   }
 
-  // 3. COMPARAISON DES CLÉS ÉTRANGÈRES
+  // -------------------------------------------------------------------------
+  // 3. CLÉS ÉTRANGÈRES
+  //    Chaque FK du doc est identifiée par ses colonnes sources (signature positionnelle).
+  //    Une fois trouvée, toutes les propriétés sont comparées positionnellement :
+  //      - sourceCols[i] ↔ targetCols[i] (association positionnelle)
+  //      - targetTable
+  //      - onDelete
+  //      - onUpdate
+  // -------------------------------------------------------------------------
   for (const docFK of docTable.foreignKeys) {
-    const matchFK = scriptTable.foreignKeys.find(sfk => 
-      sfk.sourceCols.slice().sort().join(',') === docFK.sourceCols.slice().sort().join(',')
-    );
+    const docSig = fkSignature(docFK);
+
+    // Localisation dans le script par signature de colonnes sources (ordre positionnel exact)
+    const matchFK = scriptTable.foreignKeys.find(sfk => fkSignature(sfk) === docSig);
 
     if (!matchFK) {
-      diffs.push({ 
-        table: tName, 
-        category: 'FOREIGN_KEY', 
-        description: `FK sur [${docFK.sourceCols.join(',')}] manquante dans le script.` 
-      });
+      diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK sur [${docFK.sourceCols.join(',')}] manquante dans le script.` });
       continue;
     }
 
+    // Table cible
     if (matchFK.targetTable !== docFK.targetTable) {
-      diffs.push({ 
-        table: tName, 
-        category: 'FOREIGN_KEY', 
-        description: `FK sur [${docFK.sourceCols.join(',')}]: table cible divergente '${matchFK.targetTable}' (attendu: '${docFK.targetTable}').` 
-      });
+      diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK sur [${docFK.sourceCols.join(',')}]: table cible divergente '${matchFK.targetTable}' (attendu: '${docFK.targetTable}').` });
     }
 
-    const docTarget = docFK.targetCols.slice().sort().join(',');
-    const scriptTarget = matchFK.targetCols.slice().sort().join(',');
-    if (docTarget !== scriptTarget) {
-      diffs.push({ 
-        table: tName, 
-        category: 'FOREIGN_KEY', 
-        description: `FK sur [${docFK.sourceCols.join(',')}]: colonnes cibles divergentes [${scriptTarget}] (attendu: [${docTarget}]).` 
-      });
+    // Colonnes cibles — comparaison positionnelle exacte (sourceCols[i] ↔ targetCols[i])
+    if (docFK.targetCols.length !== matchFK.targetCols.length) {
+      diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK sur [${docFK.sourceCols.join(',')}]: nombre de colonnes cibles divergent (Doc=${docFK.targetCols.length} vs Script=${matchFK.targetCols.length}).` });
+    } else {
+      for (let i = 0; i < docFK.targetCols.length; i++) {
+        if (docFK.targetCols[i] !== matchFK.targetCols[i]) {
+          diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK sur [${docFK.sourceCols.join(',')}]: colonne cible[${i}] divergente: Doc='${docFK.targetCols[i]}' vs Script='${matchFK.targetCols[i]}'.` });
+        }
+      }
     }
 
+    // ON DELETE
     if (matchFK.onDelete !== docFK.onDelete) {
-      diffs.push({ 
-        table: tName, 
-        category: 'FOREIGN_KEY', 
-        description: `FK sur [${docFK.sourceCols.join(',')}]: ON DELETE divergent '${matchFK.onDelete}' (attendu: '${docFK.onDelete}').` 
-      });
+      diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK sur [${docFK.sourceCols.join(',')}]: ON DELETE divergent '${matchFK.onDelete}' (attendu: '${docFK.onDelete}').` });
+    }
+
+    // ON UPDATE
+    if (matchFK.onUpdate !== docFK.onUpdate) {
+      diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK sur [${docFK.sourceCols.join(',')}]: ON UPDATE divergent '${matchFK.onUpdate}' (attendu: '${docFK.onUpdate}').` });
     }
   }
 
+  // FK supplémentaires dans le script
   for (const scriptFK of scriptTable.foreignKeys) {
-    const existsInDoc = docTable.foreignKeys.some(dfk => 
-      dfk.sourceCols.slice().sort().join(',') === scriptFK.sourceCols.slice().sort().join(',')
-    );
+    const existsInDoc = docTable.foreignKeys.some(dfk => fkSignature(dfk) === fkSignature(scriptFK));
     if (!existsInDoc) {
-      diffs.push({ 
-        table: tName, 
-        category: 'FOREIGN_KEY', 
-        description: `FK supplémentaire non documentée sur [${scriptFK.sourceCols.join(',')}].` 
-      });
+      diffs.push({ table: tName, category: 'FOREIGN_KEY', description: `FK supplémentaire non documentée sur [${scriptFK.sourceCols.join(',')}].` });
     }
   }
 
-  // 4. COMPARAISON DES CONTRAINTES UNIQUE
+  // -------------------------------------------------------------------------
+  // 4. CONTRAINTES UNIQUE
+  // -------------------------------------------------------------------------
   for (const docUnq of docTable.uniqueConstraints) {
     const docSig = docUnq.columns.slice().sort().join(',');
     const found = scriptTable.uniqueConstraints.some(su => su.columns.slice().sort().join(',') === docSig);
     if (!found) {
-      diffs.push({ table: tName, category: 'UNIQUE', description: `Contrainte UNIQUE([${docSig}]) manquante dans le script.` });
+      diffs.push({ table: tName, category: 'UNIQUE', description: `Contrainte UNIQUE([${docUnq.columns.join(',')}]) manquante dans le script.` });
     }
   }
-
   for (const scriptUnq of scriptTable.uniqueConstraints) {
     const scriptSig = scriptUnq.columns.slice().sort().join(',');
     const found = docTable.uniqueConstraints.some(du => du.columns.slice().sort().join(',') === scriptSig);
     if (!found) {
-      diffs.push({ table: tName, category: 'UNIQUE', description: `Contrainte UNIQUE([${scriptSig}]) supplémentaire dans le script.` });
+      diffs.push({ table: tName, category: 'UNIQUE', description: `Contrainte UNIQUE([${scriptUnq.columns.join(',')}]) supplémentaire dans le script.` });
     }
   }
 
-  // 5. COMPARAISON DES CONTRAINTES CHECK
+  // -------------------------------------------------------------------------
+  // 5. CONTRAINTES CHECK
+  // -------------------------------------------------------------------------
   for (const docChk of docTable.checkConstraints) {
     const found = scriptTable.checkConstraints.some(sc => sc.expression === docChk.expression);
     if (!found) {
       diffs.push({ table: tName, category: 'CHECK', description: `Contrainte CHECK manquante ou divergente: "${docChk.expression}".` });
     }
   }
-
   for (const scriptChk of scriptTable.checkConstraints) {
     const found = docTable.checkConstraints.some(dc => dc.expression === scriptChk.expression);
     if (!found) {
@@ -433,29 +471,29 @@ export function compareTableStructures(docTable: TableStructuralDef, scriptTable
     }
   }
 
-  // 6. COMPARAISON DES INDEX ET INDEX PARTIELS
+  // -------------------------------------------------------------------------
+  // 6. INDEX ET INDEX PARTIELS
+  //    Comparaison par nom, puis : unicité, colonnes (ordre positionnel), prédicat WHERE
+  // -------------------------------------------------------------------------
   for (const docIdx of docTable.indexes) {
     const matchIdx = scriptTable.indexes.find(si => si.name === docIdx.name);
     if (!matchIdx) {
       diffs.push({ table: tName, category: 'INDEX', description: `Index '${docIdx.name}' manquant dans le script.` });
       continue;
     }
-
     if (matchIdx.isUnique !== docIdx.isUnique) {
       diffs.push({ table: tName, category: 'INDEX', description: `Index '${docIdx.name}': unicité divergente (Doc=${docIdx.isUnique} vs Script=${matchIdx.isUnique}).` });
     }
-
+    // Colonnes d'index : ordre positionnel exact
     const docCols = docIdx.columns.join(',');
     const scriptCols = matchIdx.columns.join(',');
     if (docCols !== scriptCols) {
       diffs.push({ table: tName, category: 'INDEX', description: `Index '${docIdx.name}': colonnes divergentes [${scriptCols}] vs [${docCols}].` });
     }
-
     if (docIdx.wherePredicate !== matchIdx.wherePredicate) {
       diffs.push({ table: tName, category: 'INDEX', description: `Index '${docIdx.name}': prédicat WHERE divergent: Doc="${docIdx.wherePredicate}" vs Script="${matchIdx.wherePredicate}".` });
     }
   }
-
   for (const scriptIdx of scriptTable.indexes) {
     if (!docTable.indexes.some(di => di.name === scriptIdx.name)) {
       diffs.push({ table: tName, category: 'INDEX', description: `Index supplémentaire non documenté: '${scriptIdx.name}'.` });
@@ -465,9 +503,10 @@ export function compareTableStructures(docTable: TableStructuralDef, scriptTable
   return diffs;
 }
 
-/**
- * Compare l'ensemble des 21 tables canoniques entre document 05 et le script
- */
+// ============================================================================
+// COMPARAISON COMPLÈTE DES 21 TABLES
+// ============================================================================
+
 export function performFullStructuralComparison(customDocPath?: string, customScriptPath?: string): {
   tablesCompared: number;
   allDiffs: StructuralDiff[];
@@ -494,151 +533,231 @@ export function performFullStructuralComparison(customDocPath?: string, customSc
   const allDiffs: StructuralDiff[] = [];
   const tableSummaries: any[] = [];
 
-  // Vérification des tables manquantes
   for (const [name, docTable] of docTables.entries()) {
     const scriptTable = scriptTables.get(name);
     if (!scriptTable) {
       allDiffs.push({ table: name, category: 'MISSING_TABLE', description: `Table '${name}' entièrement manquante dans le script !` });
       tableSummaries.push({
-        table: name,
-        columnsCount: docTable.columns.size,
-        pk: docTable.primaryKey.join(','),
-        fksCount: docTable.foreignKeys.length,
-        uniquesCount: docTable.uniqueConstraints.length,
-        checksCount: docTable.checkConstraints.length,
-        indexesCount: docTable.indexes.length,
+        table: name, columnsCount: docTable.columns.size, pk: docTable.primaryKey.join(','),
+        fksCount: docTable.foreignKeys.length, uniquesCount: docTable.uniqueConstraints.length,
+        checksCount: docTable.checkConstraints.length, indexesCount: docTable.indexes.length,
         status: 'DIVERGENT'
       });
       continue;
     }
 
     const tableDiffs = compareTableStructures(docTable, scriptTable);
-    if (tableDiffs.length > 0) {
-      allDiffs.push(...tableDiffs);
-    }
-
+    allDiffs.push(...tableDiffs);
     tableSummaries.push({
-      table: name,
-      columnsCount: docTable.columns.size,
-      pk: docTable.primaryKey.join(','),
-      fksCount: docTable.foreignKeys.length,
-      uniquesCount: docTable.uniqueConstraints.length,
-      checksCount: docTable.checkConstraints.length,
-      indexesCount: docTable.indexes.length,
+      table: name, columnsCount: docTable.columns.size, pk: docTable.primaryKey.join(','),
+      fksCount: docTable.foreignKeys.length, uniquesCount: docTable.uniqueConstraints.length,
+      checksCount: docTable.checkConstraints.length, indexesCount: docTable.indexes.length,
       status: tableDiffs.length === 0 ? 'CONFORME' : 'DIVERGENT'
     });
   }
 
-  // Vérification des tables supplémentaires dans le script
   for (const name of scriptTables.keys()) {
     if (!docTables.has(name)) {
       allDiffs.push({ table: name, category: 'EXTRA_TABLE', description: `Table '${name}' présente dans le script mais absente de l'architecture canonique.` });
     }
   }
 
-  return {
-    tablesCompared: docTables.size,
-    allDiffs,
-    tableSummaries
-  };
+  return { tablesCompared: docTables.size, allDiffs, tableSummaries };
 }
 
-/**
- * Suite de tests négatifs vérifiant que TOUTE altération est infailliblement détectée
- */
+// ============================================================================
+// TESTS NÉGATIFS (16 mutations — chacune DOIT être détectée)
+// ============================================================================
+
 export function runComparatorNegativeTests(): boolean {
   console.log("================================================================================");
-  console.log("   TESTS NÉGATIFS DU COMPARATEUR STRUCTUREL DDL");
+  console.log("   TESTS NÉGATIFS DU COMPARATEUR STRUCTUREL DDL (16 mutations)");
   console.log("================================================================================\n");
 
+  // DDL de référence : table avec PK composite, FK composite avec ON UPDATE, DEFAULT, index unique partiel
   const baseDocSQL = `
     CREATE TABLE test_table (
-      id TEXT PRIMARY KEY,
+      id TEXT NOT NULL,
       edition_id TEXT NOT NULL,
       status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLOSED')),
-      team_id TEXT REFERENCES teams(id) ON DELETE CASCADE,
+      team_id TEXT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE NO ACTION,
       amount NUMERIC(10, 2) DEFAULT 0.00,
-      UNIQUE(edition_id, id)
+      score INT,
+      PRIMARY KEY (id, edition_id),
+      UNIQUE(edition_id, id),
+      FOREIGN KEY (team_id, edition_id) REFERENCES other_teams(team_id, edition_id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
     CREATE UNIQUE INDEX test_partial_idx ON test_table(edition_id) WHERE status = 'OPEN';
+    CREATE INDEX test_score_idx ON test_table(score, edition_id);
   `;
 
-  const runMutationTest = (testName: string, mutatedScriptSQL: string, expectedCategory: string) => {
-    const docDef = extractSchemaDefinitions(baseDocSQL, true).get('test_table')!;
-    const scriptDef = extractSchemaDefinitions(mutatedScriptSQL, false).get('test_table')!;
-    const diffs = compareTableStructures(docDef, scriptDef);
+  let allPassed = true;
 
+  /**
+   * Exécute un test négatif : la mutation DOIT produire une divergence dans la catégorie attendue.
+   * Si le comparateur laisse passer la divergence → ÉCHEC du test.
+   */
+  const runMutationTest = (testName: string, mutatedScriptSQL: string, expectedCategory: string) => {
+    const docDef = extractSchemaDefinitions(baseDocSQL, true).get('test_table');
+    if (!docDef) throw new Error(`ERREUR INTERNE: test_table non trouvée dans le DDL de référence.`);
+    const scriptDef = extractSchemaDefinitions(mutatedScriptSQL, false).get('test_table');
+    if (!scriptDef) throw new Error(`ERREUR INTERNE: test_table non trouvée dans le DDL muté pour: ${testName}`);
+
+    // Merge indexes (parseIndexes ne retourne que les index CREATE INDEX)
+    const docIdxMap = parseIndexes(baseDocSQL);
+    docDef.indexes = docIdxMap.get('test_table') || [];
+    const scriptIdxMap = parseIndexes(mutatedScriptSQL);
+    scriptDef.indexes = scriptIdxMap.get('test_table') || [];
+
+    const diffs = compareTableStructures(docDef, scriptDef);
     const detected = diffs.some(d => d.category === expectedCategory);
+
     if (!detected) {
-      console.error(`❌ ÉCHEC TEST NÉGATIF : ${testName}`);
-      console.error(`   Différences trouvées:`, diffs);
-      throw new Error(`Test négatif échoué: ${testName} (attendait catégorie ${expectedCategory})`);
+      console.error(`❌ ÉCHEC TEST NÉGATIF [${testName}]`);
+      console.error(`   Aucune divergence de catégorie '${expectedCategory}' détectée.`);
+      console.error(`   Divergences effectives:`, diffs.length === 0 ? '(aucune)' : diffs.map(d => d.description));
+      allPassed = false;
     } else {
-      console.log(`✔ Succès test négatif: ${testName} -> Détecté: "${diffs.find(d => d.category === expectedCategory)?.description}"`);
+      const detectedDiff = diffs.find(d => d.category === expectedCategory)!;
+      console.log(`✔ Test négatif ${testName}`);
+      console.log(`   → Détecté [${expectedCategory}]: "${detectedDiff.description}"\n`);
     }
   };
 
-  // 1. Mutation de Clé Primaire
+  // ── 1. Inversion de l'ordre d'une PK composite ────────────────────────────
   runMutationTest(
-    "1. Altération de la Clé Primaire",
-    baseDocSQL.replace("id TEXT PRIMARY KEY", "id TEXT").replace("UNIQUE(edition_id, id)", "PRIMARY KEY (edition_id, id)"),
+    "1. Inversion ordre PK composite",
+    baseDocSQL.replace("PRIMARY KEY (id, edition_id)", "PRIMARY KEY (edition_id, id)"),
     "PRIMARY_KEY"
   );
 
-  // 2. Mutation de Clé Étrangère (Table cible)
+  // ── 2. Inversion de l'ordre des colonnes sources d'une FK composite ───────
   runMutationTest(
-    "2. Altération de la Table Cible d'une FK",
-    baseDocSQL.replace("REFERENCES teams(id)", "REFERENCES other_teams(id)"),
+    "2. Inversion ordre colonnes sources FK composite",
+    baseDocSQL.replace(
+      "FOREIGN KEY (team_id, edition_id) REFERENCES other_teams(team_id, edition_id)",
+      "FOREIGN KEY (edition_id, team_id) REFERENCES other_teams(edition_id, team_id)"
+    ),
     "FOREIGN_KEY"
   );
 
-  // 3. Mutation du comportement ON DELETE
+  // ── 3. Inversion de l'association source/cible d'une FK composite ─────────
+  //    Les colonnes sources restent (team_id, edition_id) mais les cibles sont inversées
   runMutationTest(
-    "3. Altération de la règle ON DELETE (CASCADE -> RESTRICT)",
-    baseDocSQL.replace("ON DELETE CASCADE", "ON DELETE RESTRICT"),
+    "3. Inversion association source/cible FK composite (targetCols[0]↔targetCols[1])",
+    baseDocSQL.replace(
+      "FOREIGN KEY (team_id, edition_id) REFERENCES other_teams(team_id, edition_id)",
+      "FOREIGN KEY (team_id, edition_id) REFERENCES other_teams(edition_id, team_id)"
+    ),
     "FOREIGN_KEY"
   );
 
-  // 4. Mutation d'une contrainte CHECK
+  // ── 4. Altération de la table cible d'une FK ─────────────────────────────
   runMutationTest(
-    "4. Altération d'une expression CHECK",
-    baseDocSQL.replace("status IN ('OPEN', 'CLOSED')", "status IN ('OPEN', 'CLOSED', 'ARCHIVED')"),
-    "CHECK"
+    "4. Altération table cible FK (teams → wrong_teams)",
+    baseDocSQL.replace("REFERENCES teams(id)", "REFERENCES wrong_teams(id)"),
+    "FOREIGN_KEY"
   );
 
-  // 5. Mutation d'une contrainte UNIQUE
+  // ── 5. Altération ON DELETE ───────────────────────────────────────────────
   runMutationTest(
-    "5. Altération des colonnes d'une contrainte UNIQUE",
-    baseDocSQL.replace("UNIQUE(edition_id, id)", "UNIQUE(edition_id, status)"),
-    "UNIQUE"
+    "5. Altération ON DELETE (CASCADE → RESTRICT sur FK inline)",
+    baseDocSQL.replace("ON DELETE CASCADE ON UPDATE NO ACTION", "ON DELETE RESTRICT ON UPDATE NO ACTION"),
+    "FOREIGN_KEY"
   );
 
-  // 6. Mutation du prédicat d'un Index Partiel
+  // ── 6. Altération ON UPDATE ───────────────────────────────────────────────
   runMutationTest(
-    "6. Altération du prédicat WHERE d'un Index Partiel",
+    "6. Altération ON UPDATE (CASCADE → RESTRICT sur FK composite)",
+    baseDocSQL.replace("ON DELETE RESTRICT ON UPDATE CASCADE", "ON DELETE RESTRICT ON UPDATE RESTRICT"),
+    "FOREIGN_KEY"
+  );
+
+  // ── 7. Suppression d'un index ─────────────────────────────────────────────
+  runMutationTest(
+    "7. Suppression d'un index (test_score_idx absent)",
+    baseDocSQL.replace("CREATE INDEX test_score_idx ON test_table(score, edition_id);", ""),
+    "INDEX"
+  );
+
+  // ── 8. Modification unicité d'un index (UNIQUE → non-UNIQUE) ─────────────
+  runMutationTest(
+    "8. Perte du UNIQUE sur test_partial_idx",
+    baseDocSQL.replace("CREATE UNIQUE INDEX test_partial_idx", "CREATE INDEX test_partial_idx"),
+    "INDEX"
+  );
+
+  // ── 9. Ajout d'une colonne supplémentaire ─────────────────────────────────
+  runMutationTest(
+    "9. Ajout d'une colonne supplémentaire (extra_col INT)",
+    baseDocSQL.replace("score INT,", "score INT, extra_col INT,"),
+    "COLUMN"
+  );
+
+  // ── 10. Modification d'une valeur DEFAULT ─────────────────────────────────
+  runMutationTest(
+    "10. Modification valeur DEFAULT (0.00 → 99.99)",
+    baseDocSQL.replace("NUMERIC(10, 2) DEFAULT 0.00", "NUMERIC(10, 2) DEFAULT 99.99"),
+    "COLUMN"
+  );
+
+  // ── 11. Altération du prédicat WHERE d'un index partiel ───────────────────
+  runMutationTest(
+    "11. Altération prédicat WHERE index partiel (OPEN → CLOSED)",
     baseDocSQL.replace("WHERE status = 'OPEN'", "WHERE status = 'CLOSED'"),
     "INDEX"
   );
 
-  // 7. Mutation de type de colonne
+  // ── 12. Altération d'une expression CHECK ────────────────────────────────
   runMutationTest(
-    "7. Altération du type d'une colonne (NUMERIC -> INT)",
+    "12. Altération expression CHECK",
+    baseDocSQL.replace("status IN ('OPEN', 'CLOSED')", "status IN ('OPEN', 'CLOSED', 'ARCHIVED')"),
+    "CHECK"
+  );
+
+  // ── 13. Altération du type d'une colonne (NUMERIC → INT) ─────────────────
+  runMutationTest(
+    "13. Altération type de colonne (NUMERIC → INT)",
     baseDocSQL.replace("NUMERIC(10, 2)", "INT"),
     "COLUMN"
   );
 
-  // 8. Mutation de nullabilité
+  // ── 14. Altération de nullabilité (NOT NULL retiré) ───────────────────────
   runMutationTest(
-    "8. Altération de nullabilité (NOT NULL retiré)",
-    baseDocSQL.replace("status TEXT NOT NULL", "status TEXT"),
+    "14. Altération nullabilité (NOT NULL retiré sur status)",
+    baseDocSQL.replace("status TEXT NOT NULL CHECK", "status TEXT CHECK"),
     "COLUMN"
   );
 
-  console.log("\n✔ TOUS LES 8 TESTS NÉGATIFS DU COMPARATEUR ONT RÉUSSI AVEC SUCCÈS !\n");
-  return true;
+  // ── 15. Altération des colonnes d'une contrainte UNIQUE ───────────────────
+  runMutationTest(
+    "15. Altération colonnes UNIQUE (edition_id,id → edition_id,status)",
+    baseDocSQL.replace("UNIQUE(edition_id, id)", "UNIQUE(edition_id, status)"),
+    "UNIQUE"
+  );
+
+  // ── 16. Altération de la Clé Primaire simple ─────────────────────────────
+  //    Modifie la PK composite en autre chose pour tester la détection sur une signature différente
+  runMutationTest(
+    "16. Mutation PK composite vers PK différente",
+    baseDocSQL.replace("PRIMARY KEY (id, edition_id)", "PRIMARY KEY (score, edition_id)"),
+    "PRIMARY_KEY"
+  );
+
+  if (allPassed) {
+    console.log("✔ TOUS LES 16 TESTS NÉGATIFS DU COMPARATEUR ONT RÉUSSI AVEC SUCCÈS !\n");
+  } else {
+    console.error("❌ CERTAINS TESTS NÉGATIFS ONT ÉCHOUÉ — le comparateur laisse passer des divergences !\n");
+    process.exit(1);
+  }
+
+  return allPassed;
 }
 
-// Point d'entrée CLI
+// ============================================================================
+// POINT D'ENTRÉE CLI
+// ============================================================================
+
 if (import.meta.main || process.argv[1]?.endsWith('compare-ddl.ts')) {
   if (process.argv.includes('--test-negative')) {
     runComparatorNegativeTests();
@@ -651,20 +770,20 @@ if (import.meta.main || process.argv[1]?.endsWith('compare-ddl.ts')) {
 
   const { tablesCompared, allDiffs, tableSummaries } = performFullStructuralComparison();
 
-  console.log("| #  | Table Name                | Colonnes | PK | FKs | Uniques | Checks | Index | Statut    |");
-  console.log("|----|---------------------------|----------|----|-----|---------|--------|-------|-----------|");
+  console.log("| #  | Table Name                | Colonnes | PK                             | FKs | Uniques | Checks | Index | Statut      |");
+  console.log("|----|---------------------------|----------|--------------------------------|-----|---------|--------|-------|-------------|");
 
   let idx = 1;
   for (const s of tableSummaries) {
     const num = String(idx++).padStart(2, ' ');
     const name = s.table.padEnd(25, ' ');
     const cols = String(s.columnsCount).padStart(8, ' ');
-    const pk = s.pk.padEnd(4, ' ');
+    const pk = s.pk.padEnd(30, ' ');
     const fks = String(s.fksCount).padStart(3, ' ');
     const unqs = String(s.uniquesCount).padStart(7, ' ');
     const chks = String(s.checksCount).padStart(6, ' ');
     const idxs = String(s.indexesCount).padStart(5, ' ');
-    const status = s.status === 'CONFORME' ? '✔ CONFORME' : '❌ DIVERGENT';
+    const status = s.status === 'CONFORME' ? '✔ CONFORME ' : '❌ DIVERGENT';
     console.log(`| ${num} | ${name} | ${cols} | ${pk} | ${fks} | ${unqs} | ${chks} | ${idxs} | ${status} |`);
   }
 
