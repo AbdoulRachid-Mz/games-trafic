@@ -463,12 +463,24 @@ export function compareTableStructures(docTable: TableStructuralDef, scriptTable
   for (const docFK of docTable.foreignKeys) {
     const docSig = fkSignature(docFK);
 
-    // Recherche d'une FK correspondante non encore appariée
-    // Priorité 1: sourceCols identiquement ordonnées ET même table cible
+    // Recherche d'une FK correspondante non encore appariée (Appariement 1-à-1 strict)
+    // Priorité 1: sourceCols + même table cible + mêmes targetCols (résolution fine des FK ambiguës)
+    const docTargetSig = docFK.targetCols.join(',');
     let matchIdx = scriptTable.foreignKeys.findIndex(
-      (sfk, idx) => !usedScriptFkIndices.has(idx) && fkSignature(sfk) === docSig && sfk.targetTable === docFK.targetTable
+      (sfk, idx) => !usedScriptFkIndices.has(idx) && 
+                    fkSignature(sfk) === docSig && 
+                    sfk.targetTable === docFK.targetTable &&
+                    sfk.targetCols.join(',') === docTargetSig
     );
-    // Priorité 2: sourceCols identiquement ordonnées (pour détecter altération table cible)
+    // Priorité 2: sourceCols + même table cible (pour détecter altération des colonnes cibles ou ON DELETE)
+    if (matchIdx === -1) {
+      matchIdx = scriptTable.foreignKeys.findIndex(
+        (sfk, idx) => !usedScriptFkIndices.has(idx) && 
+                      fkSignature(sfk) === docSig && 
+                      sfk.targetTable === docFK.targetTable
+      );
+    }
+    // Priorité 3: sourceCols identiquement ordonnées (pour détecter altération de la table cible)
     if (matchIdx === -1) {
       matchIdx = scriptTable.foreignKeys.findIndex(
         (sfk, idx) => !usedScriptFkIndices.has(idx) && fkSignature(sfk) === docSig
@@ -653,15 +665,16 @@ export function performFullStructuralComparison(customDocPath?: string, customSc
 }
 
 // ============================================================================
-// TESTS NÉGATIFS (21 mutations — chacune DOIT être détectée)
+// TESTS NÉGATIFS (22 mutations — chacune DOIT être détectée)
 // ============================================================================
 
 export function runComparatorNegativeTests(): boolean {
   console.log("================================================================================");
-  console.log("   TESTS NÉGATIFS DU COMPARATEUR STRUCTUREL DDL (21 mutations)");
+  console.log("   TESTS NÉGATIFS DU COMPARATEUR STRUCTUREL DDL (22 mutations)");
   console.log("================================================================================\n");
 
   // DDL de référence : table avec PK composite, FK composites, multiples FK sur même source,
+  // FK ambiguës partageant mêmes colonnes sources et même table cible,
   // ON UPDATE, DEFAULT, index unique partiel, index INCLUDE, index DESC, index expression
   const baseDocSQL = `
     CREATE TABLE test_table (
@@ -674,6 +687,7 @@ export function runComparatorNegativeTests(): boolean {
       PRIMARY KEY (id, edition_id),
       UNIQUE(edition_id, id),
       FOREIGN KEY (team_id) REFERENCES second_teams(id) ON DELETE CASCADE ON UPDATE NO ACTION,
+      FOREIGN KEY (team_id) REFERENCES teams(backup_id) ON DELETE RESTRICT ON UPDATE NO ACTION,
       FOREIGN KEY (team_id, edition_id) REFERENCES other_teams(team_id, edition_id) ON DELETE RESTRICT ON UPDATE CASCADE
     );
     CREATE UNIQUE INDEX test_partial_idx ON test_table(edition_id) WHERE status = 'OPEN';
@@ -871,8 +885,18 @@ export function runComparatorNegativeTests(): boolean {
     "INDEX"
   );
 
+  // ── 22. FK ambiguës partageant mêmes colonnes sources et même table cible ─
+  runMutationTest(
+    "22. Altération ON DELETE sur FK ambiguë (même source [team_id] et même cible 'teams')",
+    baseDocSQL.replace(
+      "FOREIGN KEY (team_id) REFERENCES teams(backup_id) ON DELETE RESTRICT ON UPDATE NO ACTION,",
+      "FOREIGN KEY (team_id) REFERENCES teams(backup_id) ON DELETE CASCADE ON UPDATE NO ACTION,"
+    ),
+    "FOREIGN_KEY"
+  );
+
   if (allPassed) {
-    console.log("✔ TOUS LES 21 TESTS NÉGATIFS DU COMPARATEUR ONT RÉUSSI AVEC SUCCÈS !\n");
+    console.log("✔ TOUS LES 22 TESTS NÉGATIFS DU COMPARATEUR ONT RÉUSSI AVEC SUCCÈS !\n");
   } else {
     console.error("❌ CERTAINS TESTS NÉGATIFS ONT ÉCHOUÉ — le comparateur laisse passer des divergences !\n");
     process.exit(1);
@@ -885,7 +909,9 @@ export function runComparatorNegativeTests(): boolean {
 // POINT D'ENTRÉE CLI
 // ============================================================================
 
-if (import.meta.main || process.argv[1]?.endsWith('compare-ddl.ts')) {
+const isMainModule = Boolean((import.meta as any).main || (typeof process !== 'undefined' && process.argv?.[1]?.endsWith('compare-ddl.ts')));
+
+if (isMainModule) {
   if (process.argv.includes('--test-negative')) {
     runComparatorNegativeTests();
     process.exit(0);
