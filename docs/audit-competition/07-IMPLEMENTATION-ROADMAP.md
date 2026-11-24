@@ -1,24 +1,30 @@
 # Document 07 — Feuille de Route d'Implémentation "Clean Slate" et Procédure de Migration Sécurisée (Révisée)
 
-Ce document détaille le plan de déploiement du Scénario C (Clean Slate Universel), incluant la procédure pas-à-pas de migration vérifiée, les contrôles pré et post migration et le plan de rollback garantissant l'intégrité absolue du ledger financier.
+Ce document détaille le plan de déploiement du Scénario C (Clean Slate Universel avec Conservation des Conteneurs — Container Preservation), incluant la procédure pas-à-pas de migration vérifiée, les contrôles pré et post migration et le plan de rollback garantissant l'intégrité absolue du ledger financier.
 
 ---
 
 ## 1. Procédure de Migration et Découplage Comptable
 
-Pour supprimer les anciennes compétitions sans jamais rompre l'auditabilité des transactions de portefeuilles (`wallets` et `walletTransactions`), la migration exclut tout recours à un `TRUNCATE CASCADE` aveugle et applique un ordre strict de déconnexion et de suppression.
+Pour moderniser le système de compétition sans jamais rompre l'auditabilité des transactions de portefeuilles (`user_wallets`, `wallet_transactions`, `financial_accounts` et `ledger_entries`), la migration applique une stratégie de **Conservation des Conteneurs (Container Preservation)**.
+
+### Pourquoi préserver les conteneurs `tournaments` et `tournament_editions` ?
+L'audit de la base de production PostgreSQL 17.12 a identifié des dépendances transversales majeures :
+1. **Comptes d'escrow financier (`financial_accounts`) :** 13 comptes réels possèdent un `owner_edition_id` lié à des éditions. Supprimer ces éditions orphelinerait ces comptes et romprait la réconciliation financière.
+2. **Historique des communications (`messages`, `interactions`, `notifications`) :** Les discussions et notifications de tournois sont rattachées à `tournament_id` et `edition_id`.
+
+Par conséquent, **les lignes de `tournaments` et `tournament_editions` sont rigoureusement conservées**. Seules les structures sportives obsolètes (`matches`, `bracket_nodes`, `phase_groups`, `tournament_phases`, `edition_registrations`, `tournament_members`, `edition_results`) sont supprimées après découplage et archivage de `registration_payments`.
 
 ```mermaid
 flowchart TD
     A[Étape 1: Contrôles de Cohérence Pré-Migration] --> B[Étape 2: Découplage & Archivage Comptable de registration_payments]
-    B --> C[Étape 3: Neutralisation des FK dans messages, interactions, notifs]
-    C --> D[Étape 4: Suppression Ordonnée des Tables Sportives Obsolètes]
-    D --> E[Étape 5: Déploiement du Schéma Cible Drizzle]
-    E --> F[Étape 6: Contrôles de Cohérence Post-Migration]
-    F --> G[Étape 7: Déploiement des Moteurs & Server Actions]
+    B --> C[Étape 3: Suppression Sélective des Tables Sportives Obsolètes]
+    C --> D[Étape 4: Déploiement des 21 Tables Canoniques Drizzle]
+    D --> E[Étape 5: Contrôles de Cohérence Post-Migration]
+    E --> F[Étape 6: Déploiement des Moteurs & Server Actions]
 ```
 
-### Script SQL de Migration Vérifié sur le Schéma Réel
+### Script SQL de Migration Vérifié sous PostgreSQL 17.12
 
 ```sql
 -- ============================================================================
@@ -26,6 +32,8 @@ flowchart TD
 -- ============================================================================
 SELECT count(*) AS pending_transactions FROM wallet_transactions WHERE status = 'PENDING';
 SELECT count(*) AS total_payments, sum(amount) AS total_amount FROM registration_payments;
+SELECT count(*) AS total_wallet_transactions FROM wallet_transactions;
+SELECT count(*) AS edition_accounts FROM financial_accounts WHERE owner_edition_id IS NOT NULL;
 
 -- ============================================================================
 -- 2. DÉCOUPLAGE ET ARCHIVAGE DE LA TRAÇABILITÉ FINANCIÈRE
@@ -55,21 +63,15 @@ JOIN tournaments t ON t.id = te.tournament_id
 JOIN tournament_members tm ON tm.id = er.member_id
 WHERE er.id = rp.registration_id;
 
--- Supprimer la FK cascade vers les anciennes inscriptions
+-- Supprimer la FK cascade vers les anciennes inscriptions et renommer en legacy
 ALTER TABLE registration_payments DROP CONSTRAINT IF EXISTS registration_payments_registration_id_fkey;
 ALTER TABLE registration_payments ALTER COLUMN registration_id DROP NOT NULL;
 ALTER TABLE registration_payments RENAME COLUMN registration_id TO legacy_registration_id;
-ALTER TABLE registration_payments ADD COLUMN entrant_id UUID;
+ALTER TABLE registration_payments ADD COLUMN entrant_id TEXT REFERENCES competition_entrants(id) ON DELETE SET NULL;
 
 -- ============================================================================
--- 3. NEUTRALISATION DES CLÉS ÉTRANGÈRES DANS MESSAGES, INTERACTIONS, NOTIFS
--- ============================================================================
-UPDATE messages SET edition_id = NULL, tournament_id = NULL WHERE edition_id IS NOT NULL OR tournament_id IS NOT NULL;
-UPDATE interactions SET tournament_id = NULL WHERE tournament_id IS NOT NULL;
-UPDATE notifications SET tournament_id = NULL WHERE tournament_id IS NOT NULL;
-
--- ============================================================================
--- 4. SUPPRESSION ORDONNÉE DU BAS VERS LE HAUT DES TABLES SPORTIVES OBSOLÈTES
+-- 3. SUPPRESSION SÉLECTIVE DES TABLES SPORTIVES OBSOLÈTES
+-- (Les conteneurs tournaments et tournament_editions sont INTÉGRALEMENT CONSERVÉS)
 -- ============================================================================
 DROP TABLE IF EXISTS matches;
 DROP TABLE IF EXISTS bracket_nodes;
@@ -79,17 +81,18 @@ DROP TABLE IF EXISTS tournament_phases;
 DROP TABLE IF EXISTS edition_results;
 DROP TABLE IF EXISTS edition_registrations;
 DROP TABLE IF EXISTS tournament_members;
-DELETE FROM tournament_editions;
-DELETE FROM tournaments;
 
 -- ============================================================================
--- 5. CONTRÔLES POST-MIGRATION (VALIDATION DE PRÉSERVATION FINANCIÈRE)
+-- 4. CONTRÔLES POST-MIGRATION (VALIDATION DE PRÉSERVATION FINANCIÈRE ABSOLUE)
 -- ============================================================================
 SELECT count(*) AS verified_payments, sum(amount) AS verified_total_amount FROM registration_payments;
 SELECT count(*) AS total_wallet_transactions FROM wallet_transactions;
 SELECT count(*) AS total_wallets FROM user_wallets;
 SELECT count(*) AS total_users FROM users;
 SELECT count(*) AS total_teams FROM teams;
+SELECT count(*) AS preserved_tournaments FROM tournaments;
+SELECT count(*) AS preserved_editions FROM tournament_editions;
+SELECT count(*) AS preserved_edition_accounts FROM financial_accounts WHERE owner_edition_id IS NOT NULL;
 ```
 
 ---
@@ -100,11 +103,12 @@ SELECT count(*) AS total_teams FROM teams;
 gantt
     title Déploiement Clean Slate du Moteur de Compétition
     dateFormat  YYYY-MM-DD
-    section Sprint 1 : Purge & Schéma Cible
-    Exécution SQL Purge & Drizzle Migration   :s1_1, 2026-12-01, 3d
-    Contraintes SQL Composites & Types        :s1_2, after s1_1, 4d
+    section Sprint 1 : Socle & 21 Tables Canoniques
+    Drizzle Schema (21 tables canoniques)     :s1_1, 2026-12-01, 3d
+    Index Partiels & Contraintes Composites   :s1_2, after s1_1, 2d
+    Migration Drizzle & Script Découplage     :s1_3, after s1_2, 2d
     section Sprint 2 : Rule Engine & Métriques
-    Évaluateur Universel & Métriques Typées   :s2_1, after s1_2, 4d
+    Évaluateur Universel & Métriques Typées   :s2_1, after s1_3, 4d
     Algorithme de Départage Head-to-Head      :s2_2, after s2_1, 3d
     section Sprint 3 : Brackets DAG & Collectif
     Brackets DAG & Grand Finals Reset         :s3_1, after s2_2, 4d
@@ -114,6 +118,12 @@ gantt
     Recette Complète sur les Formats          :s4_2, after s4_1, 3d
 ```
 
+### Banc d'Essai Automatisé Reproductible
+Pour valider l'intégrité de la migration et l'ensemble des contraintes relationnelles cibles à tout moment :
+```bash
+bun run test:competition-engine
+```
+
 ---
 
 ## 3. Stratégie de Rollback
@@ -121,3 +131,4 @@ gantt
 En cas d'incident pendant la migration du Sprint 1 :
 1. **Restauration Immédiate du Snapshot :** Restauration du snapshot Neon ou dump PostgreSQL réalisé juste avant le script.
 2. **Intégrité Comptable Garantie :** Aucune opération ne modifiant les montants ou les soldes dans `wallets` ou `wallet_transactions`, les fonds de tous les utilisateurs restent intangibles.
+3. **Conservation des Conteneurs :** Les identifiants `tournaments.id` et `tournament_editions.id` n'ayant pas été altérés, aucune rupture de FK n'est possible sur les flux d'escrow ou les messages.

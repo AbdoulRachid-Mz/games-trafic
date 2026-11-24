@@ -28,9 +28,9 @@ Ce document constitue le procès-verbal d'arbitrage architectural définitif pou
    * `SUBSTITUTED_OUT` : Joueur sorti sur remplacement.
    * `INELIGIBLE` : Joueur suspendu ou disqualifié.
 3. **Activation des Remplaçants :** Un remplaçant (`SUBSTITUTE`) ne peut être promu actif pour une manche ou un sous-match que sur demande du capitaine avant le début de la partie et sur **validation obligatoire de l'arbitre**.
-4. **Règle Anti-Cumul Absolue :** Un joueur ne peut pas être joueur actif dans deux équipes de la même édition (garanti par l'index partiel `roster_edition_user_unique` sur `entrant_roster_members`).
+4. **Règle Anti-Cumul Absolue :** Un joueur ne peut pas être joueur actif dans deux équipes de la même édition (garanti par l'index partiel `CREATE UNIQUE INDEX roster_edition_user_unique ON entrant_roster_members(edition_id, user_id) WHERE user_id IS NOT NULL AND role IN ('CAPTAIN', 'STARTER', 'SUBSTITUTE')`).
 5. **Changement de Capitaine :**
-   * L'équipe ne peut compter qu'un seul capitaine à la fois (garanti par `UNIQUE(entrant_id) WHERE role = 'CAPTAIN'`).
+   * L'équipe ne peut compter qu'un seul capitaine à la fois (garanti par l'index partiel PostgreSQL natif : `CREATE UNIQUE INDEX entrant_roster_captain_unique ON entrant_roster_members(entrant_id) WHERE role = 'CAPTAIN'`).
    * Tout changement de brassard s'effectue dans une transaction atomique permutant les rôles et enregistrant l'action dans `match_arbitration_logs`.
 
 ---
@@ -38,8 +38,8 @@ Ce document constitue le procès-verbal d'arbitrage architectural définitif pou
 ## 2. Entrants : Identités, Profils et Invités
 
 ### A. Spécification des Types d'Entrants
-* **`SOLO` :** Lié obligatoirement à un `user_id`. Contrainte `CHECK (type = 'SOLO' AND user_id IS NOT NULL AND team_id IS NULL)`. Unicité par édition : `UNIQUE(edition_id, user_id) WHERE type = 'SOLO'`.
-* **`TEAM` :** Lié obligatoirement à un `team_id`. Contrainte `CHECK (type = 'TEAM' AND team_id IS NOT NULL AND user_id IS NULL)`. Unicité par édition : `UNIQUE(edition_id, team_id) WHERE type = 'TEAM'`.
+* **`SOLO` :** Lié obligatoirement à un `user_id`. Contrainte `CHECK (type = 'SOLO' AND user_id IS NOT NULL AND team_id IS NULL)`. Unicité par édition garantie par l'index partiel natif : `CREATE UNIQUE INDEX entrants_edition_solo_user_unique ON competition_entrants(edition_id, user_id) WHERE type = 'SOLO'`.
+* **`TEAM` :** Lié obligatoirement à un `team_id`. Contrainte `CHECK (type = 'TEAM' AND team_id IS NOT NULL AND user_id IS NULL)`. Unicité par édition garantie par l'index partiel natif : `CREATE UNIQUE INDEX entrants_edition_team_unique ON competition_entrants(edition_id, team_id) WHERE type = 'TEAM'`.
 * **`GUEST` :** Entrant invité sans compte obligatoire sur la plateforme. Possède obligatoirement `guest_identifier` (téléphone WhatsApp, email ou référence externe). Contrainte `CHECK (type = 'GUEST' AND team_id IS NULL AND guest_identifier IS NOT NULL)`.
 
 ### B. Rapprochement des Comptes Invités (`Claim Process`)
@@ -301,15 +301,8 @@ ALTER TABLE registration_payments RENAME COLUMN registration_id TO legacy_regist
 ALTER TABLE registration_payments ADD COLUMN entrant_id UUID;
 
 -- ============================================================================
--- 3. NEUTRALISATION DES CLÉS ÉTRANGÈRES DANS MESSAGES, INTERACTIONS, NOTIFS
--- ============================================================================
--- Éviter les violations de clés étrangères lors de la suppression des anciens tournois
-UPDATE messages SET edition_id = NULL, tournament_id = NULL WHERE edition_id IS NOT NULL OR tournament_id IS NOT NULL;
-UPDATE interactions SET tournament_id = NULL WHERE tournament_id IS NOT NULL;
-UPDATE notifications SET tournament_id = NULL WHERE tournament_id IS NOT NULL;
-
--- ============================================================================
--- 4. SUPPRESSION ORDONNÉE DU BAS VERS LE HAUT DES TABLES SPORTIVES OBSOLÈTES
+-- 3. SUPPRESSION SÉLECTIVE DES TABLES SPORTIVES OBSOLÈTES
+-- (Les conteneurs tournaments et tournament_editions sont INTÉGRALEMENT CONSERVÉS)
 -- ============================================================================
 DROP TABLE IF EXISTS matches;
 DROP TABLE IF EXISTS bracket_nodes;
@@ -320,12 +313,8 @@ DROP TABLE IF EXISTS edition_results;
 DROP TABLE IF EXISTS edition_registrations;
 DROP TABLE IF EXISTS tournament_members;
 
--- Vider les anciennes éditions et anciens tournois dont les données sont closes
-DELETE FROM tournament_editions;
-DELETE FROM tournaments;
-
 -- ============================================================================
--- 5. CONTRÔLES POST-MIGRATION (VALIDATION DE PRÉSERVATION FINANCIÈRE)
+-- 4. CONTRÔLES POST-MIGRATION (VALIDATION DE PRÉSERVATION FINANCIÈRE ABSOLUE)
 -- ============================================================================
 -- Vérifier que TOUS les paiements existent toujours avec le même montant total
 SELECT count(*) AS verified_payments, sum(amount) AS verified_total_amount FROM registration_payments;
@@ -335,6 +324,9 @@ SELECT count(*) AS total_wallet_transactions FROM wallet_transactions;
 SELECT count(*) AS total_wallets FROM user_wallets;
 SELECT count(*) AS total_users FROM users;
 SELECT count(*) AS total_teams FROM teams;
+SELECT count(*) AS preserved_tournaments FROM tournaments;
+SELECT count(*) AS preserved_editions FROM tournament_editions;
+SELECT count(*) AS preserved_edition_accounts FROM financial_accounts WHERE owner_edition_id IS NOT NULL;
 ```
 
 ---

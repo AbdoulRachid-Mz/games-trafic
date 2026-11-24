@@ -71,6 +71,49 @@ erDiagram
 
 ---
 
+## 2.1 Inventaire Canonique Exhaustif des 21 Tables
+
+L'architecture du moteur de compétition repose sur **exactement 21 tables canoniques**, structurées en 6 domaines métier sans aucune ambiguïté de nomenclature :
+
+| Domaine | # | Nom SQL Canonique | Entité Drizzle (`schema.ts`) | Responsabilité Métier | Clés & Contraintes Majeures |
+|---|---|---|---|---|---|
+| **Socle Compétitif** | 1 | `tournaments` | `tournaments` | Conteneur global du tournoi (jeu, slug, titre, visibilité). | PK `id`, `UNIQUE(slug)` |
+| | 2 | `tournament_editions` | `tournament_editions` | Édition spécifique (dates, cashprize, escrow, paramètres de forfait). | PK `id`, FK `tournament_id`, `UNIQUE(id, tournament_id)`, `UNIQUE(tournament_id, edition_number)` |
+| | 3 | `tournament_staff` | `tournamentStaff` | Encadrement administratif et arbitrage dissocié des joueurs. | PK `id`, FK composite `(edition_id, tournament_id)`, `UNIQUE(tournament_id, edition_id, user_id, role)` |
+| **Participants & Rosters** | 4 | `competition_entrants` | `competitionEntrants` | Entité compétitrice officielle (`SOLO`, `TEAM`, `GUEST`). | PK `id`, FK `edition_id`, `UNIQUE(id, edition_id)`, Index partiels `entrants_edition_solo_user_unique`, `entrants_edition_team_unique` |
+| | 5 | `entrant_roster_members` | `entrantRosterMembers` | Composition figée de l'équipe (capitaine, titulaires, remplaçants). | PK `id`, FK composite `(entrant_id, edition_id)`, Index partiel `entrant_roster_captain_unique` (1 capitaine), Index partiel `roster_edition_user_unique` (anti-cumul) |
+| **Finance & Inscriptions** | 6 | `registration_payments` | `registrationPayments` | Quittance comptable d'inscription découplée avec snapshot immuable. | PK `id`, FK `transaction_id` UNIQUE, snapshot colonnes `archived_*`, `legacy_registration_id` |
+| **Moteur de Règles & Métriques** | 7 | `competition_rulesets` | `competitionRulesets` | Catalogue de règlements par jeu et discipline. | PK `id` |
+| | 8 | `ruleset_versions` | `rulesetVersions` | Versions immuables publiées d'un ruleset (format match, scoring). | PK `id`, FK `ruleset_id`, `UNIQUE(ruleset_id, version)`, `UNIQUE(id, ruleset_id)` |
+| | 9 | `metric_definitions` | `metricDefinitions` | Dictionnaire global des métriques sportives (KILLS, GOALS, etc.). | PK `code` |
+| | 10 | `ruleset_metric_configs` | `rulesetMetricConfigs` | Métriques autorisées et pondérations par version de ruleset. | PK composite `(ruleset_version_id, metric_code)` |
+| **Structure Sportive** | 11 | `competition_stages` | `competitionStages` | Phases d'une compétition (Poules, Arbres, Suisse, FFA). | PK `id`, FK `edition_id`, FK `ruleset_version_id`, `UNIQUE(id, edition_id)`, `UNIQUE(edition_id, stage_order)` |
+| | 12 | `competition_groups` | `competitionGroups` | Groupes / Poules de classement au sein d'une phase. | PK `id`, FK `stage_id`, `UNIQUE(id, stage_id)`, `UNIQUE(stage_id, group_order)` |
+| | 13 | `competition_rounds` | `competitionRounds` | Tours calendaires (Journée 1, 1/4 finale, etc.). | PK `id`, FK `stage_id`, FK `group_id`, `UNIQUE(id, stage_id)`, `UNIQUE(stage_id, round_number)` |
+| **Rencontres & Camps** | 14 | `competition_encounters` | `competitionEncounters` | Nœud de confrontation globale (`DUEL`, `FFA`, `COLLECTIVE_FIXTURE`). | PK `id`, FK `stage_id`, FK `ruleset_version_id`, `UNIQUE(id, edition_id)`, `UNIQUE(id, encounter_type)` |
+| | 15 | `encounter_sides` | `encounterSides` | Camps d'une rencontre collective (Camp 1 vs Camp 2). | PK `id`, FK composite `(encounter_id, encounter_type)` CHECK `COLLECTIVE_FIXTURE`, `UNIQUE(id, encounter_id)` |
+| | 16 | `encounter_side_entrants` | `encounterSideEntrants` | Entrants composant chaque camp d'une confrontation collective. | PK `id`, FK composite `(side_id, encounter_id)`, FK `entrant_id`, `UNIQUE(side_id, entrant_id)`, `UNIQUE(encounter_id, entrant_id)` |
+| **Matchs & Slots** | 17 | `encounter_matches` | `encounterMatches` | Match unitaire ou sous-match d'une rencontre. | PK `id`, FK composite `(encounter_id, edition_id)`, `UNIQUE(encounter_id, match_order)`, `UNIQUE(id, encounter_id)` |
+| | 18 | `match_slots` | `matchSlots` | Emplacements participants dans le match avec sources de qualification. | PK `id`, FK composite `(match_id, encounter_id)`, FK composite `(side_id, assigned_entrant_id)` RESTRICT, CHECK conditionnel type/side |
+| **Manches, Métriques & Arbitrage** | 19 | `match_games` | `matchGames` | Manches / Rounds unitaires d'un match (BO3, BO5). | PK `id`, FK `match_id`, `UNIQUE(match_id, game_number)`, `UNIQUE(id, match_id)` |
+| | 20 | `game_metrics` | `gameMetrics` | Mesures de performance par manche et par slot (scoring universel). | PK `id`, FK composite `(game_id, match_id)`, FK composite `(slot_id, match_id)`, FK composite `(ruleset_version_id, metric_code)` RESTRICT |
+| | 21 | `match_arbitration_logs` | `matchArbitrationLogs` | Journal d'audit immuable des décisions d'arbitrage et forfaits. | PK `id`, FK `encounter_id`, FK `match_id`, FK `slot_id`, FK `author_user_id` |
+
+---
+
+## 2.2 Stratégie de Conservation des Conteneurs (Container Preservation)
+
+L'audit technique confirme que les tables conteneurs `tournaments` et `tournament_editions` sont liées aux flux transversaux de l'application :
+1. **Comptes d'escrow financier (`financial_accounts`) :** 13 comptes financiers réels possèdent un `owner_edition_id` rattaché aux éditions existantes.
+2. **Messagerie et Notifications (`messages`, `interactions`, `notifications`) :** Les discussions et notifications de tournois référencent `tournament_id` et `edition_id`.
+
+**Décision stricte :** 
+- **Aucune suppression des lignes de `tournaments` et `tournament_editions` n'est effectuée.**
+- Seules les **structures sportives obsolètes internes** (`matches`, `bracket_nodes`, `phase_groups`, `tournament_phases`, `edition_registrations`, `tournament_members`, `edition_results`) sont supprimées lors du déploiement Clean Slate, après découplage et archivage comptable de `registration_payments`.
+- Les nouveaux tournois et éditions utilisent nativement l'arbre des 21 tables canoniques.
+
+---
+
 ## 3. Spécification Détaillée des Tables et Contraintes SQL d'Intégrité
 
 ### A. Niveau Compétition, Staff et Inscriptions
@@ -123,11 +166,12 @@ CREATE TABLE tournament_editions (
 CREATE TABLE tournament_staff (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-    edition_id UUID REFERENCES tournament_editions(id) ON DELETE CASCADE,
+    edition_id UUID,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL, -- ORGANIZER, CO_ORGANIZER, HEAD_REFEREE, REFEREE, CASTER, OBSERVER
+    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ORGANIZER', 'HEAD_REFEREE', 'REFEREE', 'CASTER', 'OBSERVER')),
     permissions TEXT[] DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    FOREIGN KEY (edition_id, tournament_id) REFERENCES tournament_editions(id, tournament_id) ON DELETE CASCADE,
     UNIQUE(tournament_id, edition_id, user_id, role)
 );
 
@@ -175,24 +219,25 @@ CREATE TABLE entrant_roster_members (
     user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
     in_game_name TEXT NOT NULL,
     in_game_id TEXT,
-    role TEXT NOT NULL DEFAULT 'STARTER', -- CAPTAIN, STARTER, SUBSTITUTE, COACH
+    role TEXT NOT NULL DEFAULT 'STARTER' CHECK (role IN ('CAPTAIN', 'STARTER', 'SUBSTITUTE', 'COACH')),
     status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, BENCH, SUBSTITUTED_OUT, INELIGIBLE
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
     -- Règle d'intégrité 1 : l'entrant et le roster member partagent OBLIGATOIREMENT la même édition
     FOREIGN KEY (entrant_id, edition_id) 
-        REFERENCES competition_entrants(id, edition_id) ON DELETE CASCADE,
-        
-    -- 1 seul capitaine par entrant
-    UNIQUE(entrant_id) WHERE (role = 'CAPTAIN')
+        REFERENCES competition_entrants(id, edition_id) ON DELETE CASCADE
 );
+
+-- 1 seul capitaine par entrant (Index unique partiel PostgreSQL natif)
+CREATE UNIQUE INDEX entrant_roster_captain_unique 
+    ON entrant_roster_members(entrant_id) WHERE role = 'CAPTAIN';
 
 -- Règle d'or anti-cumul : un même joueur ne peut être actif dans deux équipes de la même édition !
 CREATE UNIQUE INDEX roster_edition_user_unique 
     ON entrant_roster_members(edition_id, user_id) 
     WHERE user_id IS NOT NULL AND role IN ('CAPTAIN', 'STARTER', 'SUBSTITUTE');
 
--- 6. Paiements d'inscriptions et traçabilité financière
+-- 6. Paiements d'inscriptions et traçabilité financière (Découplé)
 CREATE TABLE registration_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entrant_id UUID REFERENCES competition_entrants(id) ON DELETE SET NULL,
@@ -202,10 +247,12 @@ CREATE TABLE registration_payments (
     payment_method TEXT DEFAULT 'WALLET',
     status TEXT DEFAULT 'COMPLETED', -- PENDING, COMPLETED, REFUNDED, FAILED
     
-    -- Archivage comptable des anciennes inscriptions
+    -- Archivage comptable exhaustif des inscriptions (Snapshot immuable)
     legacy_registration_id TEXT,
     archived_edition_id TEXT,
     archived_edition_name TEXT,
+    archived_tournament_id TEXT,
+    archived_tournament_name TEXT,
     archived_user_id TEXT,
     archived_team_id TEXT,
     archived_participant_name TEXT,
@@ -453,9 +500,9 @@ CREATE TABLE match_slots (
     FOREIGN KEY (match_id, encounter_type) 
         REFERENCES encounter_matches(id, encounter_type) ON DELETE CASCADE,
         
-    -- Cohérence de l'entrant affecté (même édition)
+    -- Cohérence de l'entrant affecté (même édition) - RESTRICT garantit l'intégrité de l'arbre
     FOREIGN KEY (assigned_entrant_id, edition_id) 
-        REFERENCES competition_entrants(id, edition_id) ON DELETE SET NULL,
+        REFERENCES competition_entrants(id, edition_id) ON DELETE RESTRICT,
 
     -- Clé composite pour game_metrics
     UNIQUE(id, match_id),
@@ -499,10 +546,11 @@ CREATE TABLE match_games (
 -- 20. Mesures et métriques de performance par manche
 CREATE TABLE game_metrics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ruleset_version_id UUID NOT NULL,
     match_id UUID NOT NULL,
     game_id UUID NOT NULL,
     slot_id UUID NOT NULL,
-    metric_code TEXT NOT NULL REFERENCES metric_definitions(code) ON DELETE RESTRICT,
+    metric_code TEXT NOT NULL,
     raw_value NUMERIC(15, 4) NOT NULL DEFAULT 0,
     calculated_points NUMERIC(12, 4) NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -510,6 +558,10 @@ CREATE TABLE game_metrics (
     -- Règle d'intégrité absolue : game_id et slot_id appartiennent OBLIGATOIREMENT au même match !
     FOREIGN KEY (game_id, match_id) REFERENCES match_games(id, match_id) ON DELETE CASCADE,
     FOREIGN KEY (slot_id, match_id) REFERENCES match_slots(id, match_id) ON DELETE CASCADE,
+    
+    -- Contrôle d'autorisation par le ruleset : seules les métriques déclarées dans la version active sont autorisées
+    FOREIGN KEY (ruleset_version_id, metric_code) 
+        REFERENCES ruleset_metric_configs(ruleset_version_id, metric_code) ON DELETE RESTRICT,
     
     UNIQUE(game_id, slot_id, metric_code)
 );
